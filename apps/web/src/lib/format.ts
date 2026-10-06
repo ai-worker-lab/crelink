@@ -34,12 +34,12 @@ export function recentRange(days: number): { from: string; to: string } {
 
 /** SNS 플랫폼 이름과 아이콘 자산(`public/icons/sns/`, 출처는 apps/web/docs/sns-icons.md). */
 export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, { name: string; icon: string }> = {
-  instagram: { name: '인스타그램', icon: '/icons/sns/instagram.svg' },
-  youtube: { name: '유튜브', icon: '/icons/sns/youtube.svg' },
+  instagram: { name: '인스타그램', icon: '/icons/sns/instagram.png' },
+  youtube: { name: '유튜브', icon: '/icons/sns/youtube.png' },
   tiktok: { name: '틱톡', icon: '/icons/sns/tiktok.svg' },
-  naver_blog: { name: '네이버 블로그', icon: '/icons/sns/naver_blog.svg' },
+  naver_blog: { name: '네이버 블로그', icon: '/icons/sns/naver_blog.png' },
   x: { name: 'X', icon: '/icons/sns/x.svg' },
   threads: { name: '스레드', icon: '/icons/sns/threads.svg' },
-  facebook: { name: '페이스북', icon: '/icons/sns/facebook.svg' },
+  facebook: { name: '페이스북', icon: '/icons/sns/facebook.png' },
   other: { name: '기타', icon: '/icons/sns/other.svg' },
 };

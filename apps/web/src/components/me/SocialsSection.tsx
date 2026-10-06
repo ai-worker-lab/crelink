@@ -63,7 +63,9 @@ export function SocialsSection({ socials, reload }: { socials: SocialLinkView[];
         <ul className="edit-list">
           {rows.map((row, index) => (
             <li key={row.key} className="social-row">
-              <SocialIcon platform={row.platform} className="social-row-icon" />
+              <span className="social-row-slot">
+                <SocialIcon platform={row.platform} />
+              </span>
               <div className="field">
                 <label htmlFor={`${baseId}-platform-${row.key}`}>플랫폼 {index + 1}</label>
                 <select

@@ -4,7 +4,7 @@
 
 ## 2026-10-06
 
-- SNS 채널 아이콘: 글자 표시(IG·YT 등)를 공식 출처 기반 SVG 자산(`public/icons/sns/`, Simple Icons 16.34.0, CC0-1.0)으로 바꿈. `SocialIcon`이 CSS mask로 글자색을 따르는 단색으로 그림. 랜딩 SNS 줄과 `/me` SNS 편집 행에 표시. `SOCIAL_PLATFORM_LABELS`의 `mark`를 `icon` 경로로 교체. 출처·상표 규칙 `docs/sns-icons.md`. 근거: `docs/work/web/0023-sns-channel-icons.md`, PRD R12.
+- SNS 채널 아이콘: 글자 표시(IG·YT 등)를 각 서비스의 공식 컬러 아이콘 파일(`public/icons/sns/`, Meta·YouTube·TikTok·NAVER·X 공식 브랜드 자료)로 바꿈. `SocialIcon`이 `<img>`로 원본 색 그대로 표시하고 디자인 토큰·글자색·테마·필터·mask를 적용하지 않음(`other`만 예외). 크기·타일 배경(X 검정, 스레드 흰색)은 브랜드 가이드라인 고정값(`.social-icon--{platform}`). 랜딩 SNS 줄과 `/me` SNS 편집 행에 표시. `SOCIAL_PLATFORM_LABELS`의 `mark`를 `icon` 경로로 교체. 출처·규칙·남은 위험 `docs/sns-icons.md`. 근거: `docs/work/web/0023-sns-channel-icons.md`, PRD R12.
 - 개발 서버 출력 디렉터리를 빌드와 나눔: `next.config.ts`의 `distDir: process.env.NEXT_DIST_DIR || '.next'`, `start`가 `NEXT_DIST_DIR=.next-dev`로 실행. `next-env.d.ts`를 Git에서 빼고 `typecheck`를 `next typegen && tsc --noEmit`으로, `tsconfig.json` include에 `.next-dev/types`. 개발 서버가 떠 있어도 `pnpm verify`의 `next build`가 개발 서버를 깨뜨리지 않음. 근거: `docs/work/orchestrator/0019-verify-build-clobbers-dev-web.md`.
 - 랜딩 관리 화면 `/me/landings/[publicId]`(편집·보기 모드)를 추가하고 외부 링크 관리를 `/me`에서 옮김. 근거: `docs/work/web/0022-landing-link-editor.md`, PRD R18(R4·R5·R13·R14).
   - 공개 랜딩 본문을 공용 `src/components/landing/Landing.tsx`(`Landing`, `LinkCardContent`)로 빼 `/p/[publicId]`와 관리 화면이 함께 씀. 편집 상태를 공개 형태로 바꾸는 `src/lib/landing-preview.ts`(`toLandingPreview`: 공개 API와 같이 숨긴·차단 링크 제외, 링크 주소는 클릭 기록 주소 대신 저장된 URL이라 미리보기가 방문·클릭 통계를 남기지 않음).

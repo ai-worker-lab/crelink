@@ -578,10 +578,13 @@ textarea.input {
 .social-row > .field.grow {
   flex: 3 1 220px;
 }
-.social-row-icon {
-  width: 24px;
-  height: 24px;
-  margin-bottom: var(--ds-space-12);
+/* 편집 행의 플랫폼 아이콘 자리. 아이콘 크기·배경은 브랜드 가이드라인 고정값(.social-icon--*)이 정한다. */
+.social-row-slot {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 56px;
+  height: 56px;
 }
 .item-card {
   padding: var(--ds-space-16);
@@ -888,24 +891,62 @@ textarea.input {
 .social-link {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 2px solid var(--ds-color-border-strong);
-  background: var(--ds-color-surface-default);
+  width: 56px;
+  height: 56px;
   color: var(--ds-color-text-primary);
-  font-weight: var(--ds-font-weight-extrabold);
-  font-size: var(--ds-font-size-14);
 }
 .social-link:hover {
-  border-color: var(--ds-color-action-primary);
   text-decoration: none;
 }
-/* SNS 아이콘 자산을 mask로 그려 글자색을 따른다(src/components/SocialIcon.tsx). 크기는 기본 22px. */
+/*
+ * SNS 브랜드 아이콘(src/components/SocialIcon.tsx). 각 서비스의 브랜드 가이드라인 고정값이며 디자인 토큰·테마를 적용하지 않는다
+ * (색·타일 배경·크기 모두 apps/web/docs/sns-icons.md 기준). filter·opacity·mask·clip-path·테두리를 아이콘에 걸지 않는다.
+ */
 .social-icon {
   display: block;
   flex: none;
-  width: 22px;
-  height: 22px;
+  object-fit: contain;
+}
+.social-icon--instagram {
+  width: 36px; /* 글리프 29px 이상 */
+  height: 36px;
+}
+.social-icon--facebook {
+  width: 40px;
+  height: 40px;
+}
+.social-icon--youtube {
+  width: 56px; /* 공식 PNG에 여백(clear space)이 들어 있어 몸통은 약 37px */
+  height: 48px;
+}
+.social-icon--tiktok {
+  width: 56px; /* 공식 원형 아이콘, 검정 원 포함 */
+  height: 56px;
+}
+.social-icon--naver_blog {
+  width: 48px; /* 공식 아이콘이 검정 바탕 포함 */
+  height: 48px;
+}
+/* X: 공식 흰 로고는 #000000 배경 위에서만 쓴다(X 브랜드 가이드라인 p.3·p.5). */
+.social-icon--x {
+  box-sizing: border-box;
+  width: 48px;
+  height: 48px;
+  padding: 11px;
+  background: #000000;
+}
+/* 스레드: 공식 검정 로고는 흰 배경 위에서 쓴다. */
+.social-icon--threads {
+  box-sizing: border-box;
+  width: 48px;
+  height: 48px;
+  padding: 11px;
+  background: #ffffff;
+}
+/* 기타(크리링 자체 링크 아이콘)만 디자인 시스템 글자색을 따르는 mask. */
+.social-icon--other {
+  width: 28px;
+  height: 28px;
   background-color: currentColor;
   mask: var(--social-icon) center / contain no-repeat;
 }
