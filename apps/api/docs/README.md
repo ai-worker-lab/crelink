@@ -129,7 +129,7 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 - `N`: 신뢰할 프록시가 N단이면 각 프록시가 받은 연결 주소를 `X-Forwarded-For` 끝에 덧붙이므로, 오른쪽에서 N번째 값이 가장 바깥 신뢰 프록시가 본 클라이언트 주소입니다. 그 값을 쓰고 앞쪽 값(클라이언트가 넣은 위조 값)은 무시합니다. 운영은 Caddy 1단이라 `1`(마지막 값). 여러 줄로 온 헤더는 쉼표로 이어 한 목록으로 봅니다.
 - 값이 N개보다 적거나, 고른 값이 IP가 아니면(포트가 붙은 값 포함) 소켓 주소로 돌아갑니다.
 - 정규화: IPv4-mapped IPv6(`::ffff:1.2.3.4`)는 IPv4로, IPv6는 소문자로 저장합니다.
-- 이 설정은 방문·클릭을 기록하는 요청이 모두 그 프록시를 거칠 때만 안전합니다. 운영은 API 포트를 호스트에 공개하지 않고 Compose 내부 네트워크에서 스택 Caddy와 웹만 접근하며, 방문·클릭을 기록하는 단축·클릭 경로는 Caddy를 거쳐서만 들어옵니다([운영 배포 설계](../../../docs/specs/crelink-prod-deploy.md#공개-경로와-caddy-정책)).
+- 이 설정은 방문·클릭을 기록하는 요청이 모두 그 프록시를 거칠 때만 안전합니다. 운영은 API 포트를 호스트에 공개하지 않고 공용 Docker 네트워크 `crelink-edge`에서 edge Caddy와 같은 색 웹만 API를 부르며(색 별칭 `api-<색>`), 방문·클릭을 기록하는 단축·클릭 경로는 edge Caddy를 거쳐서만 들어옵니다([운영 배포 설계](../../../docs/specs/crelink-prod-deploy.md#공개-경로와-caddy-정책)).
 
 ### 방문·클릭 기록 항목
 
@@ -140,7 +140,7 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 - 단축 주소(R8, `src/creator/slug.service.ts`): 입력은 앞뒤 공백을 빼고 소문자로 바꾼 뒤 `SLUG_PATTERN`·3~30자·예약어를 봅니다. 다른 단축 URL의 현재 주소나 90일 안의 옛 주소면 409 `slug_taken`. 자기 옛 주소는 되돌릴 수 있습니다. 첫 변경(`slug_changed_at`이 없음)은 바로, 그 뒤에는 마지막 변경에서 30일 뒤부터(429 `slug_change_too_soon`). 자동 주소로 되돌려도 30일 제한은 마지막 변경 시각 기준이라 우회할 수 없습니다. 같은 주소로 바꾸는 요청은 아무것도 바꾸지 않고 200입니다. 예약 기간이 끝난 남의 옛 주소는 행을 지우고 새로 만듭니다.
 - 링크 한도(R13): 보이는(숨기지 않고 차단되지 않은) 링크 ≤ 5 + `extra_link_slots`(409 `link_limit_reached`), 숨긴 링크 포함 ≤ 50(409 `link_total_limit_reached`). 추가와 숨김 해제에서 확인하며, 같은 사용자의 링크 변경은 사용자 행 잠금으로 줄 세웁니다. 운영자 추가 슬롯은 0~45.
 - 차단 도메인(R14): 링크 호스트가 차단 도메인이거나 그 하위 도메인이면 추가·URL 수정이 422 `link_domain_blocked`. 운영자가 도메인을 추가하면 같은 트랜잭션에서 기존 링크의 `blocked_at`을 채웁니다. 목록에서 빼도 이미 차단된 링크는 운영자가 링크별로 풉니다.
-- 이미지(`src/files/`): multipart 필드 `file`, `CRELINK_LIMITS.imageMaxBytes`(4MB, MVP 임시값. 운영 스택 Caddy의 웹 호스트 본문 한도는 6MB) 이하. 형식은 클라이언트 Content-Type이 아니라 파일 앞부분(매직 바이트)으로 JPEG·PNG·WebP·GIF만 받습니다. 저장은 `FileStorage` 경계 뒤의 로컬 디스크 또는 S3 호환 저장소([이미지 저장소](#이미지-저장소))이고, `GET /api/files/{id}`는 누구나 받을 수 있으며 1년 캐시합니다(id는 UUID, 내용 불변).
+- 이미지(`src/files/`): multipart 필드 `file`, `CRELINK_LIMITS.imageMaxBytes`(4MB, MVP 임시값. 운영 edge Caddy의 웹 호스트 본문 한도는 6MB) 이하. 형식은 클라이언트 Content-Type이 아니라 파일 앞부분(매직 바이트)으로 JPEG·PNG·WebP·GIF만 받습니다. 저장은 `FileStorage` 경계 뒤의 로컬 디스크 또는 S3 호환 저장소([이미지 저장소](#이미지-저장소))이고, `GET /api/files/{id}`는 누구나 받을 수 있으며 1년 캐시합니다(id는 UUID, 내용 불변).
 
 ## 이미지 저장소
 

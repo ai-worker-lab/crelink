@@ -6,7 +6,7 @@
 
 ## 목표 배치
 
-- **웹·API·단축 도메인:** 배포 대상 서버 1대의 Docker Compose 스택(`infra/prod/compose.yaml`: Caddy + NestJS API + Next.js 웹)에서 함께 실행합니다(`https://links.shaul.kr`·`https://go.shaul.kr`, 임시). 1차 대상은 집 서버 `home-server`(x86_64)이고, 대상 목록은 `infra/prod/targets.json`입니다. 공개는 Cloudflare Tunnel → 스택 Caddy, 관리·배포 접속은 Tailscale이며 서버에 공인 인바운드 포트를 열지 않습니다. 이미지는 GHCR(amd64·arm64 가능)이라 OCI(ARM)·AWS로 옮기거나 대상을 더할 수 있습니다([이식 규칙](../specs/crelink-prod-deploy.md#이식-규칙)).
+- **웹·API·단축 도메인:** 배포 대상 서버 1대의 Docker Compose에서 함께 실행합니다(`https://links.shaul.kr`·`https://go.shaul.kr`, 임시). 공개 정책 Caddy는 배포와 무관하게 계속 떠 있는 edge 스택(`infra/prod/edge/compose.yaml`, project `crelink-edge`)이고, NestJS API·Next.js 웹은 같은 `infra/prod/compose.yaml`을 색(blue·green)별 스택으로 띄워 배포·롤백 때 비활성 색에 올린 뒤 Caddy reload로 전환합니다(Blue/Green 무중단, [ADR 0011](../adr/0011-zero-downtime-deploy.md)). 1차 대상은 집 서버 `home-server`(x86_64)이고, 대상 목록은 `infra/prod/targets.json`입니다. 공개는 Cloudflare Tunnel → edge Caddy → 활성 색, 관리·배포 접속은 Tailscale이며 서버에 공인 인바운드 포트를 열지 않습니다. 이미지는 GHCR(amd64·arm64 가능)이라 OCI(ARM)·AWS로 옮기거나 대상을 더할 수 있습니다([이식 규칙](../specs/crelink-prod-deploy.md#이식-규칙)).
 - **캐시:** 프로덕션 캐시 제품과 실행 위치는 미정입니다. 로컬 Compose의 Valkey 설정은 프로덕션 배포 결정을 의미하지 않습니다. 제품별 비교는 [Redis와 Valkey 레퍼런스](../references/redis-vs-valkey.md)를 참고하세요.
 - **관계형 데이터베이스:** Supabase 관리형 PostgreSQL 사용. API에서 TLS로 세션 풀러에 연결하며 데이터베이스 포트를 공개 인터넷에 열지 않습니다.
 - **모바일:** Expo + React Native 앱은 Apple App Store와 Google Play를 대상으로 한다.

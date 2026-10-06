@@ -39,8 +39,8 @@
 
 ### 문서·마무리
 
-- [ ] `docs/specs/crelink-prod-deploy.md`를 현재 동작으로 고친다: 구성·서버 배치(project·`state/active-color`·edge 폴더), "릴리스·배포·롤백"의 무중단 아님 문장과 흐름, 이식 규칙 7·8, 위험·후속, 변경 범위 표, 변경 기록.
-- [ ] `infra/docs/prod-runbook.md` 머리말의 "배포 중 약 30~40초 502" 현재 제약 문구를 실제 결과로 바꾼다(cutover 결과가 다르면 0035 절차와 함께 갱신).
+- [x] `docs/specs/crelink-prod-deploy.md`를 현재 동작으로 고친다: 구성·서버 배치(project·`state/active-color`·edge 폴더), "릴리스·배포·롤백"의 무중단 아님 문장과 흐름, 이식 규칙 7·8, 위험·후속, 변경 범위 표, 변경 기록.
+- [x] `infra/docs/prod-runbook.md` 머리말의 "배포 중 약 30~40초 502" 현재 제약 문구를 실제 결과로 바꾼다(cutover 결과가 다르면 0035 절차와 함께 갱신).
 - [ ] ADR 0011 상태를 사용자 확인에 따라 `승인`으로 바꾸고 `docs/README.md` 색인 설명을 맞춘다. 0033에서 `deploymentId`를 넣었으면 `.github/workflows/` 웹 이미지 빌드 인자(커밋 SHA)를 연결한다.
 - [ ] 루트 `CHANGELOGS.md`, 에픽 0031 수용 기준 체크와 상태.
 
@@ -69,4 +69,5 @@
 - 2026-10-07: 착수(사용자 지시 "0035 진행"에 cutover 포함). 결정 기록: 구 색은 drain 뒤 stop(기본안, 사용자 확인), `DATABASE_POOL_MAX=6`(Supabase Pool Size 15 [추정], 대시보드 확인 대기), cutover 시각 2026-10-06T21:16Z(한국 06:16, 트래픽 적은 시각), 공백 알림 대상 없음(운영자 1인). 이미지는 병합 배포가 미리 받아 둠(cutover 중 다운로드 없음).
 - 2026-10-07: cutover 실행 [실측]. 순서: PR #14 병합(`5e3e847`) → 자동 배포 run 37532494608 무변경 실패(설계대로) → `bootstrap.sh` 재실행(네트워크 `crelink-edge`, `/opt/crelink/edge`) → `cutover.sh --dry-run` 점검 13개 ok → `cutover.sh 5e3e847…`(옛 릴리스 `433dc88`, 이미지 그대로). 단계 ④ blue 기동 5초, ⑤ 18080 넘기기 2초, 전체 9.7초. 서버 `measure-gap.sh -r 10`(0.1초 간격, go `/zzzz`·links `/privacy`·links BFF health): **최장 공백 0.5초**(대상마다 `000` 5건). 직후 `verify` 6개 ok, `status` color blue.
 - 2026-10-07: 첫 무중단 배포 [실측]. 실패했던 Deploy run 37532494608의 배포 job을 다시 실행 → blue → green 전환(21:17:12Z) 성공, 배포 기록 태그 이동. 같은 시간 서버에서 158초 동안 대상마다 초당 10회(총 4749건) 측정: **실패 0건, 최장 공백 없음**, 성공 응답 최장 0.063초. 끝난 뒤 blue api·web `Exited (0)`(30초 강제 종료 아님), green·edge healthy.
-- 남은 것: 배포 2회·롤백 2회 부하 검증(지금 롤백 기본 대상은 옛 형식 `433dc88`이라 거부되므로 새 릴리스가 쌓인 뒤), 5초 이상 요청 완료 확인, 헬스 실패 배포 1회, `geoip.sh --restart`, Supabase 연결 수, 문서(설계·런북 머리말·ADR 0011 상태), `.github/dependabot.yml` edge 폴더·`deploy.yml` 주석(0035 인계 ④).
+- 2026-10-07: 문서·설정 정리(브랜치 `work/0036-zd-docs`, 운영 서버 접근 없음). 운영 설계를 Blue/Green 현재 동작과 실측(cutover 0.5초, 배포 2회 4,749건·7,872건 실패 0건)으로 고침(구성도·공개 경로·서버 배치·전환 흐름·DB migration·이식 규칙 3·7·8·변경 범위 0031~0036·위험·후속). `.github/dependabot.yml` docker-compose에 `/infra/prod/edge`, `deploy.yml`·`rollback.yml` 주석(동작 변경 없음), 런북 머리말 공백 문구, ADR 0010 상태(대체된 결정 부분)·ADR 0011 상태 설명·결과 한 줄(상태 `제안` 유지, 사용자 승인 대기), 배포 대상 아키텍처·외부 의존·환경과 비밀값·검증 루프·문서 색인·웹 README·`.env.example`·API 문서의 단일 스택 서술, 루트·infra·web·api 변경 기록.
+- 남은 것: 롤백 2회 부하 검증, 5초 이상 요청 완료 확인, 헬스 실패 배포 1회, `geoip.sh --restart`, Supabase 연결 수, ADR 0011 `승인`(사용자 확인), 에픽 0031 수용 기준 체크.

@@ -60,7 +60,7 @@
 | --- | --- |
 | `plan` | 배포 커밋, 변경 영역(`api`·`web`·`release`, 태그 `deploy/prod-api`·`deploy/prod-web`·`deploy/prod` 기준), `infra/prod/targets.json`의 사용 대상·플랫폼, 접속 설정(`vars.TS_OIDC_*`·`DEPLOY_SSH_KEY`) 여부. 접속 설정이 없으면 이미지까지만 만들고 배포를 건너뛰며 경고를 남깁니다. |
 | `이미지 api`·`이미지 web` | 바뀐 영역만 `ghcr.io/ai-worker-lab/crelink-<api\|web>:<SHA>`로 푸시(대상 플랫폼 합집합) |
-| `배포 <대상>` | 대상마다 차례로 Tailscale(OIDC, `tag:ci`) → `ssh deploy@<host> deploy …`로 `infra/prod` 묶음을 보내 서버 `deploy.sh` 실행. 헬스 실패면 서버가 직전 릴리스로 되돌리고 job이 실패합니다. 이어서 `운영 주소 검사` 단계가 `ssh deploy@<host> verify`(서버의 `verify.sh`가 Cloudflare를 거쳐 웹 `/`·`/privacy`·BFF health 200, `https://go.shaul.kr/<없는 주소>` 302 → notice, `https://go.shaul.kr/api/health` 404 확인)를 실행하고, 실패하면 `자동 롤백` 단계가 직전 릴리스로 되돌린 뒤 job을 실패로 끝냅니다. |
+| `배포 <대상>` | 대상마다 차례로 Tailscale(OIDC, `tag:ci`) → `ssh deploy@<host> deploy …`로 `infra/prod` 묶음을 보내 서버 `deploy.sh` 실행(비활성 색에 올려 헬스를 통과하면 edge Caddy reload로 전환하는 Blue/Green 무중단 배포). 새 색이 헬스에 실패하면 서버가 그 색만 내려 활성 색·트래픽은 그대로이고 job이 실패합니다. 이어서 `운영 주소 검사` 단계가 `ssh deploy@<host> verify`(서버의 `verify.sh`가 Cloudflare를 거쳐 웹 `/`·`/privacy`·BFF health 200, `https://go.shaul.kr/<없는 주소>` 302 → notice, `https://go.shaul.kr/api/health` 404 확인)를 실행하고, 실패하면 `자동 롤백` 단계가 직전 릴리스로 되돌린 뒤(같은 무중단 전환) job을 실패로 끝냅니다. |
 | `배포 기록 태그` | 성공하면 `deploy/prod`와 바뀐 영역의 `deploy/prod-api`·`deploy/prod-web`를 옮깁니다. |
 
 수동 롤백은 [`.github/workflows/rollback.yml`](../../.github/workflows/rollback.yml)(입력 `target`·`release`)입니다. 의존성 갱신 PR은 [`.github/dependabot.yml`](../../.github/dependabot.yml)이 주 1회 엽니다. 워크플로 문법은 `actionlint`로 검사합니다(로컬 설치 시 `actionlint .github/workflows/*.yml`).

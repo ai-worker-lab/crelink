@@ -1,7 +1,7 @@
 # ADR 0010: 운영(prod) 배포 구성과 CD
 
 - 날짜: 2026-10-06
-- 상태: 제안 (사용자가 배포 대상·접속·비밀값·공개 경로를 선택했고, 이 문서 자체의 `승인`은 사용자 확인 후. 검토한 대안 "Kamal 2"의 "무중단 배포가 필요해질 때 후보" 부분은 [ADR 0011](0011-zero-downtime-deploy.md)(제안)이 대체: 무중단은 고정 edge Caddy + Blue/Green)
+- 상태: 제안 (사용자가 배포 대상·접속·비밀값·공개 경로를 선택했고, 이 문서 자체의 `승인`은 사용자 확인 후. 검토한 대안 "Kamal 2"의 "무중단 배포가 필요해질 때 후보" 부분과, 결정 1의 단일 project `crelink-prod`·결정 2의 스택 안 Caddy → `api:3000`·`web:3000`·결정 6의 "헬스 실패 시 직전 릴리스로 스스로 복구"는 [ADR 0011](0011-zero-downtime-deploy.md)(제안)이 대체: 고정 edge Caddy(`crelink-edge`) + Blue/Green 색 스택, 새 색이 실패하면 활성 색 불변. 현재 구성은 [운영 배포 설계](../specs/crelink-prod-deploy.md))
 - 범위: 운영 서버 배치, 공개 경로, CI→서버 접속, 운영 비밀값, GitHub Actions CD (`infra/prod/`, `.github/workflows/deploy.yml`·`rollback.yml`, `.sops.yaml`, `apps/*/Dockerfile`)
 
 ## 배경

@@ -1,7 +1,8 @@
 # main의 CI가 성공하면 운영(prod)에 배포합니다: 이미지(API·웹, GHCR :<SHA>) → 배포 대상마다 Tailscale+SSH로 릴리스 배포 → 운영 주소 검사.
 # 배포 대상은 infra/prod/targets.json(enabled), 서버 쪽은 deploy 사용자의 forced command(infra/prod/ssh-entry.sh)만 실행됩니다.
-# 서버 deploy.sh가 헬스 실패 시 스스로 직전 릴리스로 복구합니다. 운영 주소 검사(서버의 verify.sh가 Cloudflare를 거쳐 공개 주소 호출)가
-# 실패하면 같은 job이 그 대상을 직전 릴리스로 롤백하고 실패로 끝납니다. 수동 롤백은 rollback.yml.
+# 서버 deploy.sh는 새 릴리스를 비활성 색에 올려 헬스를 통과할 때만 트래픽을 넘깁니다(Blue/Green 무중단, ADR 0011). 새 색이 헬스에 실패하면
+# 그 색만 내리고 활성 색·트래픽은 그대로 둔 채 배포 실패(종료 1)입니다. 운영 주소 검사(서버의 verify.sh가 Cloudflare를 거쳐 공개 주소 호출)가
+# 실패하면 같은 job이 그 대상을 직전 릴리스로 롤백(같은 무중단 전환)하고 실패로 끝납니다. 수동 롤백은 rollback.yml.
 # 운영 주소 검사를 러너에서 하지 않는 이유: Cloudflare가 GitHub 러너(데이터센터 IP)의 요청을 403으로 막습니다(2026-10-07 확인).
 # CI에는 앱 비밀값이 없습니다(서버가 infra/prod/secrets/<대상>.sops.env를 복호화). 이 워크플로가 쓰는 값:
 #   vars.TS_OIDC_CLIENT_ID·vars.TS_OIDC_AUDIENCE  Tailscale workload identity federation(main 브랜치 job만 허용, tag:ci)
@@ -207,7 +208,7 @@ jobs:
         env:
           HOST: ${{ matrix.target.host }}
         run: ssh "deploy@$HOST" verify
-      # 배포는 성공했는데 운영 주소 검사가 실패했을 때만 직전 릴리스로 되돌립니다(배포 자체 실패는 서버가 이미 복구함).
+      # 배포는 성공했는데 운영 주소 검사가 실패했을 때만 직전 릴리스로 되돌립니다(배포 자체가 실패하면 서버가 트래픽을 넘기지 않아 되돌릴 것이 없음).
       - name: 자동 롤백
         if: failure() && steps.verify.outcome == 'failure'
         env:

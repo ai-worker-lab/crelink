@@ -1,9 +1,9 @@
 # ADR 0011: 운영 배포 무중단 방식(고정 edge Caddy + Blue/Green 앱 스택)
 
 - 날짜: 2026-10-07
-- 상태: 제안 (계획 단계. 구현·운영 검증 전이며 `승인`은 사용자 확인 후)
+- 상태: 제안 (구현과 운영 적용(home-server, 0036)을 마쳤고 `승인`은 사용자 확인 후)
 - 범위: 운영 배포·롤백·GeoIP 재시작의 전환 방식(`infra/prod/`의 compose·Caddyfile·`lib.sh`·`deploy.sh`·`rollback.sh`·`geoip.sh`·`bootstrap.sh`·시험), API·웹의 종료 동작(`apps/api/src/main.ts`·`database.ts`, `apps/web` standalone 서버)
-- 관계: [ADR 0010](0010-prod-deployment-topology.md)의 배치·공개 경로·CI 접속·비밀값·릴리스 단위는 그대로 두고, 검토한 대안 "Kamal 2"의 "무중단 배포가 필요해질 때 … 후보로 둡니다"를 이 결정이 대체합니다.
+- 관계: [ADR 0010](0010-prod-deployment-topology.md)의 서버 1대 배치·공개 경로 정책(Tunnel, 호스트별 경로)·CI 접속·비밀값·릴리스 단위는 그대로 두고, 검토한 대안 "Kamal 2"의 "무중단 배포가 필요해질 때 … 후보로 둡니다"와 ADR 0010 결정 1의 단일 project·결정 2의 스택 안 Caddy·결정 6의 헬스 실패 복구 방식을 이 결정이 대체합니다.
 
 ## 배경
 
@@ -46,6 +46,7 @@
 - **DB 연결**: 겹치는 동안 연결이 최대 `2 × DATABASE_POOL_MAX`입니다. Supabase Pool Size를 넘으면 새 색의 readiness가 실패해 배포가 실패로 끝납니다(트래픽 영향은 없음). Pool Size나 compute를 바꿀 때 이 식을 다시 확인합니다.
 - **상태 1개 추가**: 서버에 활성 색(`state/active-color`)이 생깁니다. 활성 색·`current`·`releases.log`가 어긋나지 않게 갱신 순서를 스크립트가 지키고, 운영자는 런북의 색 확인·수동 전환 절차를 씁니다. Compose project가 `crelink-prod`에서 `crelink-edge`·`crelink-blue`·`crelink-green`으로 바뀌어 컨테이너 이름·로그 명령이 바뀝니다(GeoIP 볼륨은 기존 이름을 외부 볼륨으로 이어 씀).
 - **두 버전 동시 실행 제약**: 전환 직전까지 구 색이 새 스키마 위에서 서비스하므로 DB 변경은 **expand/contract**(호환 변경 먼저, 제거는 다음 배포)가 필수입니다. 롤백 때문에 이미 있던 규칙([설계 "DB migration 운영 규칙"](../specs/crelink-prod-deploy.md#db-migration-운영-규칙))이 배포마다 실제로 적용되는 조건이 됩니다. 웹은 전환 뒤 옛 HTML의 브라우저가 옛 chunk를 요청할 수 있어(지금도 있는 문제) `deploymentId`를 선택 항목으로 둡니다.
-- **cutover 1회 공백**: `crelink-prod`(스택 안 Caddy)에서 `crelink-edge` + 색 스택으로 처음 옮길 때 18080을 쥔 Caddy를 바꾸는 수 초 공백이 한 번 생깁니다[추정]. 트래픽이 적은 시각에 알리고 하며, 되돌리기 절차(옛 `crelink-prod` 재기동)를 먼저 준비합니다.
+- **cutover 1회 공백**: `crelink-prod`(스택 안 Caddy)에서 `crelink-edge` + 색 스택으로 처음 옮길 때 18080을 쥔 Caddy를 바꾸는 수 초 공백이 한 번 생깁니다[추정]. 트래픽이 적은 시각에 알리고 하며, 되돌리기 절차(옛 `crelink-prod` 재기동)를 먼저 준비합니다. 운영 실측은 0.5초였습니다.
 - **남는 공백**: Caddy 이미지 업그레이드와 edge 설정 중 reload로 반영할 수 없는 변경(포트·마운트)은 edge 재생성(1~2초)이 필요하므로 드물게 따로 수행합니다. 서버·회선 장애(단일 장애점)는 이 결정의 범위 밖입니다.
 - **이식성 유지**: compose와 Caddy만 쓰므로 OCI·AWS VM에서도 `bootstrap.sh`(네트워크·edge 폴더 준비)만 같으면 같은 절차입니다.
+- **운영 적용·실측(0036)**: home-server는 2026-10-06에 cutover했고(공백 0.5초), 그 뒤 부하를 흘리며 한 배포 2회(blue → green, green → blue)에서 요청 실패가 0건이었습니다. 결정 5의 롤백 2회·헬스 실패 배포 운영 검증은 남아 있습니다. 결과 요약은 [운영 배포 설계 "릴리스·배포·롤백"](../specs/crelink-prod-deploy.md#릴리스배포롤백)에 있습니다.

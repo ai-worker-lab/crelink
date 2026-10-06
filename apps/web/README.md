@@ -32,7 +32,7 @@ SNS 채널 아이콘 자산의 출처·상표 사용 규칙은 [SNS 채널 아�
 
 ## 운영 컨테이너 이미지
 
-운영 웹은 배포 대상 서버의 Compose 스택(`infra/prod/compose.yaml`의 `web` 서비스)에서 `ghcr.io/ai-worker-lab/crelink-web:<SHA>` 이미지로 실행하고, 스택 안 Caddy가 `https://links.shaul.kr`의 요청을 전부 넘깁니다. 배포 구성은 [운영 배포 설계](../../docs/specs/crelink-prod-deploy.md), 이미지 빌드·배포는 `.github/workflows/deploy.yml`입니다.
+운영 웹은 배포 대상 서버에서 `infra/prod/compose.yaml`의 `web` 서비스로 색(blue·green)별 스택(project `crelink-blue`·`crelink-green`)에 `ghcr.io/ai-worker-lab/crelink-web:<SHA>` 이미지로 실행하고, 배포와 무관하게 떠 있는 edge Caddy(project `crelink-edge`)가 `https://links.shaul.kr`의 요청을 전부 활성 색 웹(`web-<색>:3000`)으로 넘깁니다. 배포·롤백은 비활성 색에 새 웹·API를 올린 뒤 edge를 reload로 전환하고 옛 색을 SIGTERM으로 멈춥니다(아래 종료 동작). 배포 구성은 [운영 배포 설계](../../docs/specs/crelink-prod-deploy.md), 이미지 빌드·배포는 `.github/workflows/deploy.yml`입니다.
 
 ```bash
 # 저장소 루트에서(빌드 컨텍스트 = 루트, 허용 목록은 루트 .dockerignore)
@@ -48,10 +48,10 @@ docker build -f apps/web/Dockerfile -t crelink-web:local .
 
 | 키 | 운영 값 | 비고 |
 | --- | --- | --- |
-| `API_INTERNAL_URL` | `http://api:3000`(`infra/prod/compose.yaml`) | Compose 내부 네트워크로 API에 바로 감. 공개 Caddy를 거치지 않음 |
+| `API_INTERNAL_URL` | `http://api-${CRELINK_COLOR}:3000`(`infra/prod/compose.yaml`) | 같은 색 API로 공용 네트워크 `crelink-edge`를 거쳐 바로 감(웹·API는 항상 같은 릴리스 쌍). 공개 Caddy를 거치지 않음 |
 | `API_INTERNAL_TOKEN` | 비움 | 내부 네트워크라 필요 없음. 값이 있으면 `X-Crelink-Internal`을 붙이는 기능은 코드에 남아 있음(로그·오류·응답에 쓰지 않고, 빌드 산출물에 들어가지 않음) |
 
-- 업로드(`POST /api/backend/api/me/files`)와 이미지 조회(`/api/backend/api/files/{id}`)는 BFF를 지납니다. 이미지 한도 `CRELINK_LIMITS.imageMaxBytes`는 4MB(MVP 임시값)이고 화면 문구는 이 상수에서 계산합니다. 스택 Caddy는 웹 호스트 요청 본문을 6MB로 제한합니다.
+- 업로드(`POST /api/backend/api/me/files`)와 이미지 조회(`/api/backend/api/files/{id}`)는 BFF를 지납니다. 이미지 한도 `CRELINK_LIMITS.imageMaxBytes`는 4MB(MVP 임시값)이고 화면 문구는 이 상수에서 계산합니다. 운영 edge Caddy는 웹 호스트 요청 본문을 6MB로 제한합니다.
 
 ### 종료 동작(SIGTERM)
 

@@ -4,6 +4,7 @@
 
 ## 2026-10-07
 
+- 운영 배치 설명을 Blue/Green 구조로 고침(코드 변경 없음): README "운영 컨테이너 이미지"(색별 스택·edge Caddy, `API_INTERNAL_URL=http://api-${CRELINK_COLOR}:3000`, edge Caddy 본문 6MB), `.env.example`의 운영 주소 주석. 근거 `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`.
 - 운영 이미지의 종료 동작 확인(코드 변경 없음): standalone `server.js`(Next 15.5.27)는 SIGTERM에 새 연결을 거부하고 진행 중 요청(BFF·SSR)을 마친 뒤 종료 코드 0으로 끝남을 운영과 같은 조건(`--init --read-only`, 5초 지연 모형 API)에서 실측(`docker stop -t 30`·`-t 10` 4건 모두 200). 상한은 Docker grace가 맡고, 신호 시점에 처리 중이던 keep-alive 연결은 응답 뒤에도 남아 새 요청을 받으므로 앞단 프록시가 정지 전에 보내기를 멈춰야 함. README `종료 동작(SIGTERM)` 절. `deploymentId`(선택)는 사용자 결정 뒤 후속. 근거: `docs/work/web/0033-web-standalone-sigterm.md`.
 
 ## 2026-10-06
