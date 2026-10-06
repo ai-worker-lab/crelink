@@ -29,6 +29,7 @@
 - [ADR 0007 저장소 work item 실행기](adr/0007-repository-work-item-runner.md) — 저장소 work item을 제어 평면으로, 브랜치를 착수 점유로, 에이전트 명령을 설정으로 두는 결정
 - [ADR 0008 worktree별 로컬 인스턴스](adr/0008-worktree-local-instances.md) — worktree마다 포트 슬롯·Compose project·볼륨을 나누는 결정
 - [ADR 0009 work item을 역할별 폴더에 둠](adr/0009-work-item-role-folders.md) — 에픽은 `docs/work/epics/`, 티켓은 `docs/work/<역할>/`에 두고 계층은 계속 필드로 표현하는 결정
+- [ADR 0010 운영(prod) 배포 구성과 CD](adr/0010-prod-deployment-topology.md) — Vercel 웹·OCI API·Supabase DB, 도메인, main 병합 자동 배포와 롤백(제안)
 - [외부 서비스·도구 의존](architecture/external-dependencies.md) — 현재 사용 중이거나 계획된 외부 SaaS·도구와 기준 위치
 - [자주 묻는 질문](faq.md) — 저장소 구조, 개발 도구, 로컬 실행, 배포 목표, 언어 정책
 - [배포 대상 아키텍처](architecture/deployment-target.md) — Vercel, Supabase, Oracle ARM 목표 구성 및 미구현 범위
@@ -38,6 +39,8 @@
 - [RELEASES](../RELEASES.md) — 사용자에게 공개한 릴리스 노트
 
 제품 문서: [크리링 PRD](product/crelink.md)(확정, MVP 범위)와 [크리링 MVP 기술 설계](specs/crelink-mvp.md)(승인). 참고 자료: [크리링 서비스 기획 및 MVP Handoff](product/crelink-mvp-handoff.md)(PDF 사본 `product/crelink-mvp-handoff.pdf`) — AI가 제안한 검토 재료이며 확정된 결정이 아닙니다. 작성 절차는 [제품 탐색과 PRD](product/README.md), 제품 소개는 [루트 README](../README.md)에 둡니다.
+
+운영 배포: [크리링 운영 배포·CD 기술 설계](specs/crelink-prod-deploy.md) — 구성, Caddy 공개 정책, 환경변수, CD 흐름, 위험(승인, 에픽 0024).
 
 ## 문서 위치
 
