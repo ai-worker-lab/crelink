@@ -2,6 +2,7 @@ import { CRELINK_API_PATHS, CRELINK_WEB_PATHS, type PublicLandingResponse } from
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { cache } from 'react';
+import { DefaultAvatar } from '../../../../components/DefaultAvatar';
 import { Favicon } from '../../../../components/Favicon';
 import { RemoteImage } from '../../../../components/RemoteImage';
 import { serverApi, ServerApiError, type ServerApiResult } from '../../../../lib/api/server';
@@ -86,7 +87,9 @@ function Landing({ landing }: { landing: PublicLandingResponse }) {
             width={96}
             height={96}
           />
-        ) : null}
+        ) : (
+          <DefaultAvatar className="profile-avatar" />
+        )}
         {landing.displayName ? (
           <h1 className="profile-name">{landing.displayName}</h1>
         ) : (

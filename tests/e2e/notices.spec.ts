@@ -8,6 +8,8 @@ test('빈 랜딩은 크리링 표시와 함께 열리고, 없는 단축 주소�
   await page.goto(creator.shortUrl);
   expect(page.url()).toBe(creator.landingUrl);
   await expect(page.getByText('아직 준비 중인 페이지예요.')).toBeVisible();
+  // 프로필 사진이 없으면 기본 프로필(PRD R17)
+  await expect(page.locator('.profile-head .default-avatar')).toBeVisible();
   await expect(page.getByRole('contentinfo').getByRole('link', { name: '크리링', exact: true })).toBeVisible();
   await expect(page.locator('.link-card')).toHaveCount(0);
   await expectMobileFits(page, '빈 /p/{publicId}');

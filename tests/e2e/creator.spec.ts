@@ -31,10 +31,12 @@ test('크리에이터: 단축 URL 확인·복사, 프로필·SNS·포트폴리�
 
   // 프로필: 사진(작은 PNG)·이름·소개
   const profile = page.getByRole('region', { name: '프로필' });
+  await expect(profile.locator('.default-avatar')).toBeVisible();
   await profile
     .getByLabel('프로필 사진')
     .setInputFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: TINY_PNG });
   await expect(profile.getByRole('img', { name: '프로필 사진 미리보기' })).toBeVisible();
+  await expect(profile.locator('.default-avatar')).toHaveCount(0);
   await profile.getByLabel('이름(닉네임)').fill('E2E 크리에이터');
   await profile.getByLabel('소개').fill('E2E 소개 문구입니다.');
   await profile.getByRole('button', { name: '프로필 저장' }).click();
@@ -131,6 +133,7 @@ test('크리에이터: 단축 URL 확인·복사, 프로필·SNS·포트폴리�
   await expect(page.getByRole('heading', { name: 'E2E 크리에이터', level: 1 })).toBeVisible();
   await expect(page.getByText('E2E 소개 문구입니다.')).toBeVisible();
   await expect(page.getByRole('img', { name: 'E2E 크리에이터 프로필 사진' })).toBeVisible();
+  await expect(page.locator('.profile-head .default-avatar')).toHaveCount(0);
   await expect(page.getByRole('list', { name: 'SNS 채널' }).getByRole('link', { name: '유튜브' })).toHaveAttribute(
     'href',
     socialUrl,

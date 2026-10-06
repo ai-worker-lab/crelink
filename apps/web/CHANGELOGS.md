@@ -4,6 +4,7 @@
 
 ## 2026-10-06
 
+- 프로필 사진이 없으면 기본 프로필(`src/components/DefaultAvatar.tsx`, 디자인 토큰 색의 인라인 SVG, 장식용 `aria-hidden`)을 랜딩페이지 머리와 `/me` 프로필 사진 자리에 표시. `ImageField`에 `placeholder` 속성 추가. 근거: `docs/work/web/0021-default-profile-avatar.md`, PRD R17.
 - 크리링 MVP 웹 구현. 근거: `docs/work/web/0017-crelink-mvp-web.md`, 설계 `docs/specs/crelink-mvp.md`.
   - BFF 허용 목록을 계약(`CRELINK_API_PATHS`)의 공개·`me`·`admin`·`files`·로그아웃 경로로 넓힘. `cl_session` 쿠키만 API로 넘기고 API `Set-Cookie`·`Content-Type`·`Cache-Control`과 본문(이미지 바이너리)을 그대로 돌려줌, 204 처리, `POST api/me/files`의 multipart 본문·Content-Type 전달, POST·PUT·PATCH·DELETE의 `Origin` 불일치(없음 포함) 403 `forbidden`.
   - `serverApi`에 `session` 옵션(현재 요청의 `cl_session` 전달)과 401이면 `/`로 보내는 `loadSignedIn` 추가. API 오류 코드·`NoticeReason`별 한국어 안내(`src/lib/api/errors.ts`).

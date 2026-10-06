@@ -11,6 +11,7 @@ import { useId, useState, type FormEvent } from 'react';
 import { browserApi } from '../../lib/api/browser';
 import { useAction } from '../../lib/use-action';
 import { ActionStatus } from '../ActionStatus';
+import { DefaultAvatar } from '../DefaultAvatar';
 import { ImageField } from './ImageField';
 
 export function ProfileSection({
@@ -47,9 +48,17 @@ export function ProfileSection({
   return (
     <section className="card" aria-labelledby="profile-title">
       <h2 id="profile-title">프로필</h2>
-      <p className="section-help">모두 선택 항목이에요. 비워 두면 방문자 화면에 보이지 않아요.</p>
+      <p className="section-help">
+        모두 선택 항목이에요. 비워 두면 방문자 화면에 보이지 않고, 프로필 사진이 없으면 기본 프로필이 보여요.
+      </p>
       <form className="form-stack" onSubmit={submit}>
-        <ImageField label="프로필 사진" value={avatar} onChange={setAvatar} disabled={pending} />
+        <ImageField
+          label="프로필 사진"
+          value={avatar}
+          onChange={setAvatar}
+          disabled={pending}
+          placeholder={<DefaultAvatar className="image-preview" />}
+        />
         <div className="field">
           <label htmlFor={nameId}>이름(닉네임)</label>
           <input

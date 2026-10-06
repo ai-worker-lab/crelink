@@ -7,7 +7,7 @@ import {
   type ImageRef,
   type UploadFileResponse,
 } from '@crelink/shared';
-import { useId, useState } from 'react';
+import { type ReactNode, useId, useState } from 'react';
 import { browserApi } from '../../lib/api/browser';
 import { errorMessage } from '../../lib/api/errors';
 import { useAction } from '../../lib/use-action';
@@ -19,11 +19,14 @@ export function ImageField({
   value,
   onChange,
   disabled,
+  placeholder,
 }: {
   label: string;
   value: ImageRef | null;
   onChange: (image: ImageRef | null) => void;
   disabled?: boolean;
+  /** 이미지가 없을 때 미리보기 자리에 보여 줄 내용. 없으면 '없음'. */
+  placeholder?: ReactNode;
 }) {
   const inputId = useId();
   const helpId = useId();
@@ -54,9 +57,11 @@ export function ImageField({
         {value ? (
           <RemoteImage className="image-preview" src={value.url} alt={`${label} 미리보기`} width={72} height={72} />
         ) : (
-          <span className="image-preview image-empty" aria-hidden="true">
-            없음
-          </span>
+          (placeholder ?? (
+            <span className="image-preview image-empty" aria-hidden="true">
+              없음
+            </span>
+          ))
         )}
         <div className="image-field-actions">
           <input
