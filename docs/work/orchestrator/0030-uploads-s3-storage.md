@@ -42,3 +42,4 @@
   - 결과(크리링 운영 Docker 네트워크 `crelink-prod_default`의 컨테이너 → 공개 엔드포인트 `https://s3.shaul.kr`, AWS CLI): 4MB 객체 put 2.2~2.6초, get 3회 SHA-256 일치, Content-Type 유지. 다른 버킷 목록·버킷 생성은 `AccessDenied`, 익명 GET 403. 운영자 PC에서 presigned GET 200·SHA 일치.
   - **문제**: 키가 `.jpg`·`.webp`처럼 Cloudflare가 정적 파일로 보는 확장자면 서명된 `HEAD`가 간헐적으로 403(3회 중 1~2회), 확장자 없는 키는 항상 정상. Cloudflare Cache Rule(`s3.shaul.kr` Bypass cache) 미적용 상태라 생긴 일로 봅니다(home-seaweedfs README "Cloudflare 캐시 우회 규칙"). 구현 전 규칙을 적용하고, 키는 지금처럼 확장자 없는 UUID로 둡니다.
   - 시험 객체·도구 이미지는 지웠습니다.
+- 2026-10-06: 사용자가 Cloudflare Cache Rule(`s3.shaul.kr` Bypass cache)을 적용한 뒤 재시험. 키 확장자 없음·`.jpg`·`.webp`·`.png`·`.bin`·`.zip` 각각 4MB 객체의 서명된 `HEAD`·`GET` 5회씩 모두 200·SHA 일치, `cf-cache-status: DYNAMIC`. 150MB 멀티파트 업로드 성공, 150MB `.bin` 다운로드 3회 SHA 일치. 위 간헐 403은 해소됐습니다. 시험 객체는 지웠습니다.
