@@ -6,6 +6,7 @@
 
 ## 2026-10-07
 
+- 운영 배포 0단계(에픽 0031 티켓 0034): 운영 compose 종료 유예·`start_interval`, 배포 공백 측정 도구, `.sops.yaml` 평문 키 `DATABASE_POOL_MAX`, 운영 설계의 환경변수 표·배포 흐름. 세부는 [인프라](infra/CHANGELOGS.md) 로그. 근거 `docs/work/infra/0034-prod-compose-graceful-stop.md`.
 - 운영 배포 무중단화 계획(문서만, 동작 변경 없음): 원인·로컬 실측·방안 비교 조사 `docs/references/zero-downtime-deploy.md`, ADR 0011(제안: 고정 edge Caddy + Blue/Green, 선행 0단계 graceful shutdown·`start_interval`·DB pool 상한, ADR 0010의 Kamal 후보 문구 대체), 에픽 0031과 티켓 0032(api)·0033(web)·0034·0035(infra)·0036(orchestrator), 운영 설계의 "무중단 아님" 현황(약 30~40초 502)·이식 규칙 8·위험·후속 연결, 문서 색인. 런북 변경은 [인프라](infra/CHANGELOGS.md) 로그. 근거 `docs/work/epics/0031-zero-downtime-deploy.md`.
 - 업로드 이미지 저장소를 S3 호환 저장소로 바꿀 수 있게 함: API `FILE_STORAGE`(`disk` 기본·`s3`)·`S3_*`와 `S3FileStorage`(조건부 PUT), 저장소 계약 시험(일회용 SeaweedFS 4.47 컨테이너), `.sops.yaml` 평문 키(`FILE_STORAGE`·`S3_ENDPOINT`·`S3_REGION`·`S3_BUCKET`), 운영 설계(이식 규칙 4·SeaweedFS 의존 위험)·런북 9(키 발급·암호문·전환·되돌리기·볼륨 이전·정리)·외부 의존·환경 문서. 웹·앱 계약 변경 없음. 근거 `docs/work/orchestrator/0030-uploads-s3-storage.md`.
 

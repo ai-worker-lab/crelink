@@ -276,6 +276,14 @@ result "① 'deploy c1 c1 c1' 종료·마지막 줄" '0 c1 api:c1 web:c1' "$CODE
 result '⑨ 토큰 있음 → 로그인·pull' '있음 있음' "$(has "$registry 로그인") $(has '이미지 받기')"
 expect_live '①' 'c1 api:c1 web:c1' '302 api c1 r1 / web c1'
 result '① 성공 기록 releases/c1/.images.env' "API_IMAGE=api:c1 WEB_IMAGE=web:c1" "$(names <"$CRELINK_ROOT/releases/$c1/.images.env" | tr '\n' ' ' | sed 's/ $//')"
+# compose의 api·web healthcheck는 start_period·start_interval만 덧쓰고 test·interval·timeout·retries는 이미지 HEALTHCHECK를 물려받습니다.
+for spec in api:30s web:20s; do
+	svc="${spec%%:*}"
+	result "① $svc 헬스체크(이미지 test·interval·timeout·retries + compose start_period·start_interval)·정지 유예" \
+		"[\"CMD-SHELL\",\"wget -q -O /dev/null http://127.0.0.1:3000/healthz || exit 1\"] 1s 2s 2 ${spec#*:} 1s stop 30" \
+		"$(docker inspect --format '{{json .Config.Healthcheck.Test}} {{.Config.Healthcheck.Interval}} {{.Config.Healthcheck.Timeout}} {{.Config.Healthcheck.Retries}} {{.Config.Healthcheck.StartPeriod}} {{.Config.Healthcheck.StartInterval}} stop {{.Config.StopTimeout}}' \
+			"$(docker ps -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" --filter "label=com.docker.compose.service=$svc")" 2>&1)"
+done
 
 echo "== ②·⑨ 두 번째 배포: web만 교체(api=-)"
 before="$(snapshot)"

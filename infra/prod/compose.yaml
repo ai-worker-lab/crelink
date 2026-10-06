@@ -46,8 +46,17 @@ services:
     restart: unless-stopped
     env_file:
       - path: ${CRELINK_APP_ENV:-/run/crelink/app.env}
-    # PID 1이 node라 신호 전달·좀비 정리를 위해 init을 둡니다. HEALTHCHECK는 이미지(apps/api/Dockerfile) 것을 씁니다.
+    # PID 1이 node라 신호 전달·좀비 정리를 위해 init을 둡니다(tini가 SIGTERM을 node에 넘김).
     init: true
+    # 정지: SIGTERM 뒤 진행 중 요청을 마치고 스스로 끝날 때까지 최대 30초 기다린 다음 SIGKILL(기본 10초).
+    # Cloudflare 원본 응답 한도 100초(524)보다 충분히 짧습니다. 런북 "값 한눈에 보기".
+    stop_grace_period: 30s
+    # 헬스: test·interval·timeout·retries는 이미지 HEALTHCHECK(apps/api/Dockerfile) 것을 그대로 물려받고(docker inspect로 확인, 런북 6)
+    # 기동 중(start_period 안)에만 1초마다 검사해 준비되자마자 healthy가 됩니다(Engine 25 이상). Compose는 start_interval에
+    # start_period를 요구하므로 이미지와 같은 값을 다시 적습니다. Dockerfile의 --start-period를 바꾸면 여기도 바꿉니다.
+    healthcheck:
+      start_period: 30s
+      start_interval: 1s
     environment:
       # 업로드는 S3 호환 저장소만 씁니다(app.env의 S3_*, 런북 9). 이 compose에는 uploads 볼륨이 없어 disk면 이미지가 컨테이너 안에만
       # 저장되고 다음 배포에 사라지므로 app.env 값과 관계없이 s3로 고정합니다(environment가 env_file보다 우선). disk로 되돌리기는
@@ -66,7 +75,12 @@ services:
     environment:
       # 웹 서버 측 호출은 내부 네트워크로 API에 바로 갑니다(공개 Caddy를 거치지 않음, 내부 토큰 불필요).
       API_INTERNAL_URL: http://api:3000
+    # 정지·헬스는 api와 같은 규칙입니다(start_period는 apps/web/Dockerfile HEALTHCHECK와 같은 값).
     init: true
+    stop_grace_period: 30s
+    healthcheck:
+      start_period: 20s
+      start_interval: 1s
     read_only: true
     tmpfs: [/tmp]
     security_opt: [no-new-privileges:true]

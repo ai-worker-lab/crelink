@@ -74,7 +74,7 @@ flowchart LR
 | 위치 | 키 | 비고 |
 | --- | --- | --- |
 | `infra/prod/secrets/<대상>.sops.env`(암호화) | `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPERATOR_EMAILS`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | API가 읽음(compose `env_file` = `/run/crelink/app.env`). S3 키 원본은 서버 `/opt/seaweedfs/config/s3.json`의 identity `crelink` |
-| 같은 파일(평문, `.sops.yaml`의 `unencrypted_regex`) | `PORT=3000`, `WEB_URL`, `SHORT_LINK_BASE_URL`, `DATABASE_SSL=verify-full`, `DATABASE_SSL_CA_PATH=/etc/crelink/certs/supabase-ca.crt`, `FILE_STORAGE=s3`, `S3_ENDPOINT=https://s3.shaul.kr`, `S3_REGION=us-east-1`, `S3_BUCKET=crelink-uploads`, `UPLOAD_DIR=/data/uploads`(볼륨이 있던 릴리스로 롤백할 때용), `GEOIP_MMDB_PATH=/data/geoip/dbip-city-lite.mmdb`, `TRUSTED_PROXY_HOPS=1` | diff로 검토할 수 있게 평문. 정규식을 바꾸면 그 파일을 한 번 다시 암호화합니다([런북 9-2](../../infra/docs/prod-runbook.md#9-2-암호문에-키-넣기)) |
+| 같은 파일(평문, `.sops.yaml`의 `unencrypted_regex`) | `PORT=3000`, `WEB_URL`, `SHORT_LINK_BASE_URL`, `DATABASE_SSL=verify-full`, `DATABASE_SSL_CA_PATH=/etc/crelink/certs/supabase-ca.crt`, `DATABASE_POOL_MAX=6`(API pg Pool 상한, 산정은 [런북 12](../../infra/docs/prod-runbook.md#12-supabase-주의사항)), `FILE_STORAGE=s3`, `S3_ENDPOINT=https://s3.shaul.kr`, `S3_REGION=us-east-1`, `S3_BUCKET=crelink-uploads`, `UPLOAD_DIR=/data/uploads`(볼륨이 있던 릴리스로 롤백할 때용), `GEOIP_MMDB_PATH=/data/geoip/dbip-city-lite.mmdb`, `TRUSTED_PROXY_HOPS=1` | diff로 검토할 수 있게 평문. 정규식을 바꾸면 그 파일을 한 번 다시 암호화합니다([런북 9-2](../../infra/docs/prod-runbook.md#9-2-암호문에-키-넣기)) |
 | `infra/prod/certs/supabase-ca.crt` | Supabase 루트 CA(공개 인증서) | api 컨테이너 `/etc/crelink/certs`에 읽기 전용 마운트 |
 | `compose.yaml` `api.environment` | `FILE_STORAGE=s3` | `env_file`보다 우선. uploads 볼륨이 없는 compose에서 `disk`로 기동해 이미지가 컨테이너 안에만 저장되는 일을 막음 |
 | `compose.yaml` `web.environment` | `API_INTERNAL_URL=http://api:3000` | `API_INTERNAL_TOKEN`은 두지 않음 |
@@ -96,10 +96,11 @@ flowchart LR
 2. `deploy.sh`: 이미지 결정 → **아무것도 바꾸기 전에** 복호화·`docker compose config --quiet` 확인 → 레지스트리 로그인·없는 이미지만 pull·로그아웃 → `releases.log` 기록 → app.env 복호화·`images.env`·`current` 교체 → `docker compose up -d --remove-orphans --wait --wait-timeout 120`(caddy·api·web 헬스) → app.env 삭제.
 3. 성공하면 릴리스 폴더에 `.images.env`를 남기고 최근 5개와 운영 중인 것 외의 릴리스 폴더를 지웁니다. 마지막 줄은 `<릴리스> <API 이미지> <웹 이미지>`, 종료 0.
 4. 헬스 실패면 최근 로그 30줄을 출력하고 직전 릴리스·이미지로 다시 올립니다(`restore` 기록). 복구 성공이면 종료 1, 복구도 실패면 종료 2. 되돌릴 이전 상태가 없으면(첫 배포) 실패 상태로 남고 종료 1.
+   - 헬스 판정은 이미지 `HEALTHCHECK`(api `/api/health/ready`, web `/privacy`, 10초 간격)를 쓰고, compose가 api·web에 `start_interval: 1s`(Compose가 함께 요구하는 `start_period`는 이미지와 같은 값)를 덧써 기동 중에는 1초마다 검사합니다. 옛 컨테이너는 SIGTERM 뒤 최대 `stop_grace_period: 30s` 동안 진행 중 요청을 마치고 끝납니다(넘으면 SIGKILL).
 5. `rollback.sh [릴리스 SHA]`(`ssh-entry.sh rollback`이 `current/rollback.sh`를 실행): 인자가 없으면 `releases.log`에서 지금 릴리스를 배포한 마지막 `deploy` 줄의 이전 릴리스를 고릅니다(`rollback` 줄은 보지 않으므로 연달아 실행하면 배포 이력을 한 단계씩 거슬러 감). 대상 폴더와 `.images.env`가 남아 있어야 하고(최근 5개), 이미지가 서버에 없을 때만 pull합니다. 실패 처리·종료 코드는 `deploy.sh`와 같습니다.
 6. `ssh-entry.sh status`: 운영 릴리스, `images.env`, `releases.log` 마지막 5줄.
 
-**무중단 아님**: 배포·롤백은 caddy(Caddyfile bind 원본이 릴리스 폴더라 배포마다 재생성)·api·web 컨테이너를 멈춘 뒤 다시 만들므로(서비스당 컨테이너 1개), 그동안 약 30~40초 502가 납니다(2026-10-07 운영 관측). `geoip.sh --restart`도 api를 재시작하는 동안 단축 주소가 몇 초 멈춥니다. 원인과 무중단 전환 계획은 [ADR 0011](../adr/0011-zero-downtime-deploy.md)(제안)과 [에픽 0031](../work/epics/0031-zero-downtime-deploy.md)이고, 구현 전까지는 수동 배포·롤백을 트래픽이 적은 시각에 합니다(런북).
+**무중단 아님**: 배포·롤백은 caddy(Caddyfile bind 원본이 릴리스 폴더라 배포마다 재생성)·api·web 컨테이너를 멈춘 뒤 다시 만들므로(서비스당 컨테이너 1개), 그동안 502가 납니다. 0단계 전 운영 관측은 약 30~40초(2026-10-07)입니다. 0단계(API·웹 graceful shutdown, 위 4의 `start_interval`·`stop_grace_period`, 에픽 0031)는 헬스 판정 대기를 줄여 공백을 줄이지만 caddy가 api·web 헬스 통과까지 내려가 있어 없애지는 못합니다(더미 이미지 로컬 측정 약 11.8초 → 6.7초, `docs/work/infra/0034-prod-compose-graceful-stop.md`). 운영 공백은 [런북 6-1](../../infra/docs/prod-runbook.md#6-1-배포-공백-측정)로 잽니다. `geoip.sh --restart`도 api를 재시작하는 동안 단축 주소가 몇 초 멈춥니다. 원인과 무중단 전환 계획은 [ADR 0011](../adr/0011-zero-downtime-deploy.md)(제안)과 [에픽 0031](../work/epics/0031-zero-downtime-deploy.md)이고, 구현 전까지는 수동 배포·롤백을 트래픽이 적은 시각에 합니다(런북).
 
 ## 워크플로
 
@@ -180,3 +181,4 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 - 2026-10-06: 처음 설계(웹 Vercel + API OCI 서버 공용 edge Caddy, 웹→API 내부 토큰 헤더, GitHub secrets `OCI_*`·`VERCEL_*`, 서버 `.env`)를 home-server 단일 서버 + Tailscale OIDC SSH + SOPS/age + 스택 안 Caddy + Cloudflare Tunnel로 바꿈(사용자 결정). 대안과 이유는 ADR 0010.
 - 2026-10-07: 업로드 저장소를 서버 볼륨에서 S3 호환 저장소(SeaweedFS `https://s3.shaul.kr`, 버킷 `crelink-uploads`)로 바꿀 수 있게 함(`FILE_STORAGE`·`S3_*`, 이식 규칙 4, SeaweedFS 의존 위험, 런북 9). 근거: `docs/work/orchestrator/0030-uploads-s3-storage.md`.
 - 2026-10-07: 배포 중 502 현황을 실제 관측(약 30~40초)과 원인으로 고치고, 무중단 배포 계획(ADR 0011 제안, 에픽 0031)을 이식 규칙 8·위험·후속에 연결. 현재 동작은 바뀌지 않음. 근거: `docs/work/epics/0031-zero-downtime-deploy.md`.
+- 2026-10-07: 0단계(에픽 0031 티켓 0034): compose api·web `stop_grace_period: 30s`·healthcheck `start_interval: 1s`(+ 이미지와 같은 `start_period`), 암호문 평문 키 `DATABASE_POOL_MAX=6`, 배포 공백 측정 도구(`infra/prod/measure-gap.sh`, 런북 6-1). 근거: `docs/work/infra/0034-prod-compose-graceful-stop.md`.

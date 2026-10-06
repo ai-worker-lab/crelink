@@ -9,7 +9,7 @@
 # 바꾼 뒤에는 한 번 다시 암호화합니다(런북 "9-2. 암호문에 키 넣기").
 creation_rules:
   - path_regex: ^infra/prod/secrets/home-server\.sops\.env$
-    unencrypted_regex: ^(PORT|WEB_URL|SHORT_LINK_BASE_URL|DATABASE_SSL|DATABASE_SSL_CA_PATH|FILE_STORAGE|UPLOAD_DIR|S3_ENDPOINT|S3_REGION|S3_BUCKET|GEOIP_MMDB_PATH|TRUSTED_PROXY_HOPS)$
+    unencrypted_regex: ^(PORT|WEB_URL|SHORT_LINK_BASE_URL|DATABASE_SSL|DATABASE_SSL_CA_PATH|DATABASE_POOL_MAX|FILE_STORAGE|UPLOAD_DIR|S3_ENDPOINT|S3_REGION|S3_BUCKET|GEOIP_MMDB_PATH|TRUSTED_PROXY_HOPS)$
     age: >-
       age1jkv08aj00hqzappkuf8z60cxv0ucsxtzvnnt2saj3u7gguxl9eaq70h69e,
       age1g952gu6mk2h447pksl29c8xwpdpkk6qh4jmzr2x50fe9hynk7cjqd6xla0

@@ -3,7 +3,7 @@
 운영 서버 준비·최초 배포·운영 절차를 한 곳에 모은 문서입니다. 설계(구성·공개 경로·비밀값 표·배포 흐름·보안 한계·이식 규칙)의 원본은 [운영 배포·CD 기술 설계](../../docs/specs/crelink-prod-deploy.md), 결정은 [ADR 0010](../../docs/adr/0010-prod-deployment-topology.md), 실행 가능한 원본은 [`infra/prod/`](../prod/README.md)와 `.github/workflows/deploy.yml`·`rollback.yml`입니다. 이 문서와 원본이 다르면 원본이 맞고 이 문서를 같은 변경에서 고칩니다.
 
 - 대상별 적용 상태(언제 무엇을 실행했는지)는 운영 work item 진행 기록에 남기고 이 문서에는 적지 않습니다.
-- **현재 제약: 배포·롤백 중 약 30~40초 502**(무중단 아님, [설계](../../docs/specs/crelink-prod-deploy.md#릴리스배포롤백)). main 병합(자동 배포)·수동 배포·롤백·`geoip.sh --restart`는 트래픽이 적은 시간에 합니다. 무중단 전환 계획은 [ADR 0011](../../docs/adr/0011-zero-downtime-deploy.md)(제안)입니다.
+- **현재 제약: 배포·롤백 중 502 공백**(무중단 아님, [설계](../../docs/specs/crelink-prod-deploy.md#릴리스배포롤백)). 0단계(종료 유예·`start_interval`·graceful shutdown) 전 운영 관측은 약 30~40초이고, 0단계 뒤 공백은 [6-1](#6-1-배포-공백-측정)로 재서 운영 work item에 남깁니다. main 병합(자동 배포)·수동 배포·롤백·`geoip.sh --restart`는 트래픽이 적은 시간에 합니다. 무중단 전환 계획은 [ADR 0011](../../docs/adr/0011-zero-downtime-deploy.md)(제안)입니다.
 - 외부 서비스 사실은 공식 문서에서 2026-10-06에 확인했고 출처는 [마지막 절](#출처)에 있습니다. 확인하지 못한 것은 `[확인 못 함]`으로 표시합니다.
 - `<...>`는 실행하는 사람이 채우는 값입니다. 비밀값을 이 문서·저장소·채팅·작업 로그에 붙여 넣지 않습니다.
 - 명령의 `home-server`는 운영자의 SSH 별칭이자 Tailscale MagicDNS 이름입니다. 다른 대상이면 그 이름으로 바꿉니다.
@@ -20,6 +20,8 @@
 | 비밀값 원본 | `infra/prod/secrets/<대상>.sops.env`(SOPS + age, 수신자는 `.sops.yaml`) |
 | 운영자 age 키 | macOS 키체인 서비스 `crelink-sops-age`, 계정 `operator` + 운영자 비밀번호 관리자 백업 |
 | 업로드 저장소 | `s3`(compose `api.environment`의 `FILE_STORAGE=s3` 고정): SeaweedFS `https://s3.shaul.kr` 버킷 `crelink-uploads`, 접근 키는 암호문 `S3_*`. 볼륨 `crelink-prod_uploads`는 쓰지 않음. [9](#9-업로드-저장소) |
+| 정지·헬스(api·web) | compose `stop_grace_period: 30s`(SIGTERM 뒤 진행 중 요청을 마칠 시간, 넘으면 SIGKILL. 기본 10초, Cloudflare 원본 응답 한도 100초(524)보다 짧게), `healthcheck.start_interval: 1s`(기동 중 1초마다 검사해 준비되자마자 healthy)와 Compose가 함께 요구하는 `start_period`(api 30초·web 20초, 이미지와 같은 값). test·interval(10초)·timeout·retries는 이미지 `HEALTHCHECK`(확인: [6](#6-운영-확인)). Docker Engine 25 이상 |
+| DB pool 상한 | 암호문 평문 `DATABASE_POOL_MAX=6`(API pg Pool `max`, 비면 15). 산정·확인은 [12](#12-supabase-주의사항) |
 | GitHub | variables `TS_OIDC_CLIENT_ID`·`TS_OIDC_AUDIENCE`, secret `DEPLOY_SSH_KEY`. 그 밖의 배포 secret 없음 |
 
 ## 1. 서버 준비 (bootstrap)
@@ -196,12 +198,31 @@ column -t -s $'\t' /opt/crelink/state/releases.log | tail
 sudo docker ps --filter label=com.docker.compose.project=crelink-prod --format '{{.Names}}\t{{.Status}}'
 sudo docker logs --tail 100 crelink-prod-api-1        # web·caddy도 같은 방식
 sudo docker inspect --format '{{json .State.Health}}' crelink-prod-api-1
+# 헬스체크 설정: Test·Interval·Timeout·Retries는 이미지 HEALTHCHECK, StartPeriod·StartInterval은 compose 값이어야 함
+sudo docker inspect --format '{{json .Config.Healthcheck}} StopTimeout={{.Config.StopTimeout}}' crelink-prod-api-1
 # Cloudflare를 빼고 스택만 확인(302면 스택 정상)
 curl -sS -o /dev/null -w '%{http_code}\n' -H 'Host: go.shaul.kr' http://127.0.0.1:18080/zzzz
 ```
 
 - `releases.log` 열: UTC 시각, 동작(`deploy`·`rollback`·`restore`), 이전 릴리스, 새 릴리스, API 이미지, 웹 이미지. `restore`는 실패한 배포·롤백 뒤 자동 복구입니다.
 - `docker compose` 명령을 직접 쓰려면 릴리스 폴더에서 `--env-file /opt/crelink/state/images.env`와 `CRELINK_APP_ENV=/dev/null`이 필요합니다(복호화 파일이 평소에는 없음). 컨테이너를 다시 만드는 작업은 하지 말고 배포·롤백 스크립트를 씁니다.
+
+### 6-1. 배포 공백 측정
+
+배포·롤백 1회의 공백(502·연결 실패 구간)을 서버에서 잽니다. 도구는 릴리스에 들어 있는 `measure-gap.sh`(bash·curl만 씀)이고, Cloudflare·Tunnel을 빼고 스택 입구 `127.0.0.1:18080`에 Host 헤더별로 일정 간격 요청을 보냅니다. 운영자 계정으로 실행하며 sudo·docker 권한은 필요 없습니다.
+
+```bash
+# 터미널 1: 180초 동안 대상마다 초당 5회(0.2초 간격). 기본 대상 go.shaul.kr/zzzz(api, 302)·links.shaul.kr/privacy(web, 200)
+ssh home-server /opt/crelink/current/measure-gap.sh -d 180
+# 터미널 2: 측정이 시작되면 배포 1회(main 병합 자동 배포, 또는 Actions Deploy를 force로 실행해 서버 단계가 180초 안에 들어가게)
+# 끝을 직접 정하려면 -d를 빼고 ssh -t로 띄운 뒤 Ctrl-C(-t 없이 끊으면 원격이 요약 없이 종료됨)
+ssh -t home-server /opt/crelink/current/measure-gap.sh
+```
+
+- 출력(끝날 때): 대상마다 `요청 N, 실패 M(502×a 000×b), 실패 구간 k개, 최장 공백 X초(+T초부터), 성공 응답 최장 Y초`, 마지막 줄 `전체: 실패 …, 최장 공백 …초`. 종료 코드 0이면 실패 없음, 1이면 실패 있음.
+- 성공은 응답 코드 1xx~4xx, 실패는 5xx와 응답 없음(`000`: 연결 거부·요청 제한 시간 30초 초과). `000`은 caddy가 내려가 18080 리스너가 없던 구간(cloudflared가 502로 바꿔 보냄), `502`는 caddy는 떠 있고 api·web이 없던 구간입니다. 공백 = 첫 실패 요청을 보낸 시각부터 다음 성공 요청을 보낸 시각까지라 간격(0.2초)만큼 오차가 있습니다. `성공 응답 최장`은 caddy 재시도(0035 이후)처럼 실패 대신 늦게 성공한 요청을 봅니다.
+- 옵션(`-r` 초당 횟수, `-m` 요청 제한 시간, `-u` 기준 URL, 대상 `<Host>[/경로]` 여러 개, `-- <명령>` 감싸기)은 `infra/prod/measure-gap.sh` 머리말이 원본입니다. 배포로 `current`가 바뀌어도 이미 읽은 스크립트는 그대로 돌고, 옛 릴리스 폴더는 최근 5개 안에 남습니다.
+- 결과(날짜·릴리스 SHA·대상별 최장 공백·실패 코드)는 운영 work item 진행 기록에 남깁니다.
 
 ## 7. 롤백
 
@@ -371,6 +392,10 @@ DB 백업은 [12](#12-supabase-주의사항)입니다.
 
 - `DATABASE_URL`은 Supavisor **세션 모드**(`aws-<N>-<리전>.pooler.supabase.com:5432`, 사용자 `postgres.<프로젝트 ref>`) 연결 문자열을 대시보드 **Connect** > Session pooler에서 그대로 복사합니다. **6543(트랜잭션 모드)은 쓰지 않습니다**(migration 세션 advisory lock·prepared statement 미지원, [API 문서](../../apps/api/docs/README.md#환경변수)). 세션 풀러는 IPv4로 접속됩니다(직접 연결은 IPv6 전용).
 - TLS 파라미터는 URL에 넣지 않고 `DATABASE_SSL=verify-full`·`DATABASE_SSL_CA_PATH`로 정합니다. CA는 Database Settings > SSL Configuration의 **Download Certificate** 파일을 `infra/prod/certs/supabase-ca.crt`로 커밋합니다(공개 인증서). Supabase가 CA를 바꾸면 이 파일을 바꿔 배포합니다. **Enforce SSL on incoming connections**를 켭니다.
+- **API DB pool 상한 `DATABASE_POOL_MAX`**(암호문 평문 키, API pg Pool `max`, 비면 15). 세션 모드에서는 대시보드 Database Settings > Connection pooling의 **Pool Size**가 Supavisor가 Postgres에 여는 연결 상한이고 API 연결 하나가 그 하나를 계속 차지합니다. 무중단 전환(0035)에서는 구·신 API가 잠시 함께 돌아 연결이 최대 `2 × DATABASE_POOL_MAX`이므로 식 `2 × DATABASE_POOL_MAX ≤ Pool Size − 2`(관리 접속·migration 도구 여유, [ADR 0011](../../docs/adr/0011-zero-downtime-deploy.md))로 정합니다.
+  - 운영값 6(2026-10-07): 운영 DB `max_connections` 60(Nano·Micro compute의 기본값), Pool Size는 그 compute 기본 15로 보고 `2 × 6 = 12 ≤ 15 − 2`. Pool Size 15는 `[확인 못 함]`이라 대시보드에서 확인해 운영 work item에 남기고, 다르면 같은 식으로 다시 정합니다(예: 20이면 9). Pool Size는 `max_connections`의 40~80%까지 올릴 수 있지만 Supabase 서비스(Auth·Storage·PostgREST 등)도 같은 `max_connections`를 씁니다.
+  - 바꾸기: 저장소 루트에서 [9-2](#9-2-암호문에-키-넣기)의 `SOPS_AGE_KEY_CMD`·`f`를 정한 뒤 `sops set "$f" '["DATABASE_POOL_MAX"]' '"6"'`(평문 키라 diff에 보임) → 병합·배포. 키를 정규식에 넣은 뒤 처음 한 번은 9-2처럼 먼저 다시 암호화합니다(`grep -q '^sops_unencrypted_regex=.*DATABASE_POOL_MAX' "$f"`로 확인). 값이 너무 낮으면 피크 때 쿼리가 pool에서 기다려 API 지연이 늘므로, 그때는 Pool Size(필요하면 compute)를 올리고 값을 함께 올립니다.
+  - 확인: SQL Editor에서 `show max_connections;`와 `select usename, application_name, state, count(*) from pg_stat_activity group by 1, 2, 3 order by 4 desc;`(Supabase 문서의 실시간 확인 방법). Supavisor 세션 모드 연결이 어느 행(`usename`·`application_name`)으로 보이는지와 클라이언트가 끊은 뒤 Supavisor가 Postgres 연결을 얼마나 유지하는지는 `[확인 못 함]`이라, 배포 전·배포 중·배포 뒤에 같은 쿼리로 비교해 API 몫이 6(겹치는 동안 12)을 넘지 않는지 봅니다. 대시보드 Observability > Database Connections·Shared Pooler (Supavisor) Client Connections 보고서도 같은 수를 보입니다(실시간 아님).
 - Free 플랜은 7일 동안 활동이 적으면 일시정지되고 자동 백업이 없습니다. 출시 전 Pro로 전환합니다(일일 백업 7일 보관, PITR은 별도 애드온). 그 전까지는 아래 `pg_dump`를 정기적으로 합니다.
 
 ```bash
@@ -421,5 +446,8 @@ docker run --rm -e PGURL='<세션 풀러 연결 문자열>?sslmode=require' -v "
 | S3 조건부 쓰기(`If-None-Match: *` → 412), aws-cli `put-object --if-none-match`(2026-10-07) | <https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html>, <https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html> |
 | Cloudflare R2 PutObject의 `If-None-Match` 지원(2026-10-07) | <https://developers.cloudflare.com/r2/api/s3/api/> |
 | SeaweedFS 스택 운영(접근 키·버킷·백업)(2026-10-07) | <https://github.com/shaul1991/home-seaweedfs#readme> |
+| Compose `stop_grace_period`(기본 10초)·`healthcheck.start_interval`(`start_period` 안에서만 쓰임, Compose v2.20.2·Engine 25 이상)(2026-10-07) | <https://github.com/compose-spec/compose-spec/blob/main/05-services.md>, <https://docs.docker.com/reference/dockerfile/#healthcheck> |
+| Cloudflare 원본 응답 한도 100초(524)(2026-10-07) | <https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-524/> |
+| Supabase Pool Size·클라이언트/백엔드 연결·`pg_stat_activity` 확인, compute별 `max_connections`(Nano 60)·Pool Size 비율 권장(2026-10-07) | <https://supabase.com/docs/guides/database/connecting-to-postgres/pooling-and-limits>, <https://supabase.com/docs/guides/platform/compute-and-disk>, <https://supabase.com/docs/guides/database/connection-management> |
 
-`[확인 못 함]`: Tailscale WIF Custom claims의 와일드카드, `pg_dump`의 Supabase 버전·풀러 제약.
+`[확인 못 함]`: Tailscale WIF Custom claims의 와일드카드, `pg_dump`의 Supabase 버전·풀러 제약, 운영 Supabase Pool Size(15로 봄)와 `pg_stat_activity`에 보이는 Supavisor 연결의 구분.

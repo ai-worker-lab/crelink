@@ -8,7 +8,7 @@ CD 워크플로(`.github/workflows/deploy.yml`)는 이 폴더에서 `tests/`·`R
 
 | 파일 | 내용 |
 | --- | --- |
-| `compose.yaml` | Compose project `crelink-prod`: `caddy`(호스트 `127.0.0.1:${CRELINK_HTTP_PORT:-18080}`만), `api`(`${API_IMAGE}`, `FILE_STORAGE=s3` 고정(업로드는 S3, 볼륨 없음), 볼륨 geoip(ro)·`./certs`(ro), `env_file` = 복호화한 `/run/crelink/app.env`), `web`(`${WEB_IMAGE}`, `API_INTERNAL_URL=http://api:3000`), 도구 프로필 `geoip-writer`. 헬스체크는 각 이미지의 `HEALTHCHECK` |
+| `compose.yaml` | Compose project `crelink-prod`: `caddy`(호스트 `127.0.0.1:${CRELINK_HTTP_PORT:-18080}`만), `api`(`${API_IMAGE}`, `FILE_STORAGE=s3` 고정(업로드는 S3, 볼륨 없음), 볼륨 geoip(ro)·`./certs`(ro), `env_file` = 복호화한 `/run/crelink/app.env`), `web`(`${WEB_IMAGE}`, `API_INTERNAL_URL=http://api:3000`), 도구 프로필 `geoip-writer`. 헬스체크는 각 이미지의 `HEALTHCHECK`를 물려받고 api·web만 `start_period`(이미지와 같은 값)·`start_interval: 1s`를 덧씀. api·web `stop_grace_period: 30s` |
 | `Caddyfile` | 공개 정책: `go.shaul.kr`은 `GET /{slug}`·`GET /c/{id}`만 api, 나머지 404. `links.shaul.kr`은 전부 web(본문 6MB). `CF-Connecting-IP`(사설 대역에서 온 것만)를 방문자 IP로 `X-Forwarded-For`에 넣음 |
 | `targets.json` | 배포 대상 목록(`name`·`host`(Tailscale MagicDNS)·`platform`·`enabled`). 워크플로가 대상 matrix와 이미지 플랫폼을 여기서 정함 |
 | `secrets/<대상>.sops.env` | 대상별 앱 설정·비밀값(SOPS + age 암호문, 비밀이 아닌 키는 평문). 규칙은 루트 `.sops.yaml` |
@@ -16,6 +16,7 @@ CD 워크플로(`.github/workflows/deploy.yml`)는 이 폴더에서 `tests/`·`R
 | `images.env.example` | 서버 `state/images.env` 형식(`API_IMAGE`·`WEB_IMAGE`). compose 문법 확인용 |
 | `ssh-entry.sh` | `deploy` 사용자의 SSH forced command(`deploy`·`rollback`·`status`·`verify`). `bootstrap.sh`가 `/usr/local/lib/crelink/`에 설치하며 워크플로로는 바뀌지 않음 |
 | `verify.sh` | 운영 주소 검사(서버에서 Cloudflare를 거쳐 공개 주소 6개). 주소는 릴리스 암호문의 평문 `WEB_URL`·`SHORT_LINK_BASE_URL`. 워크플로가 `ssh deploy@<host> verify`로 부름 |
+| `measure-gap.sh` | 배포 공백 측정(bash·curl): 스택 입구에 Host별 요청을 일정 간격으로 보내 실패(5xx·응답 없음) 수와 최장 연속 실패 구간을 출력. 서버에서는 `/opt/crelink/current/measure-gap.sh`, 로컬에서는 `-- <명령>`으로 배포 명령을 감쌈. 사용법은 머리말, 절차는 런북 "6-1. 배포 공백 측정" |
 | `deploy.sh` | `releases/<SHA>/deploy.sh <릴리스 SHA> <API SHA\|-> <웹 SHA\|->`: 복호화·문법 확인 → 이미지 pull → `releases.log` → `current`·`images.env` 교체 → `up --wait` → 실패 시 직전 릴리스로 복구 → 성공 시 최근 5개 외 릴리스 정리 |
 | `rollback.sh` | `rollback.sh [릴리스 SHA]`: 기본은 `releases.log`에서 지금 릴리스를 배포한 마지막 `deploy` 줄의 이전 릴리스. 그 릴리스의 설정·비밀값·이미지 전체로 되돌림 |
 | `geoip.sh` | `geoip.sh [--restart]`: DB-IP City Lite(`scripts/geoip.mjs`와 같은 월 후보 규칙)를 `geoip` 볼륨에 넣음 |
@@ -34,6 +35,8 @@ bash -n infra/prod/*.sh infra/prod/tests/*.sh && shellcheck -x infra/prod/*.sh i
 
 `--env-file` 없이 `config`를 실행하면 `API_IMAGE`·`WEB_IMAGE`가 비어 일부러 실패합니다. `CRELINK_APP_ENV`를 주지 않으면 서버의 `/run/crelink/app.env`를 찾습니다.
 
+`config`는 `healthcheck.start_interval`에 `start_period`가 함께 있어야 한다는 Compose 검사를 하지 않습니다(`up`에서야 실패). 헬스체크를 바꾸면 실제 기동까지 하는 `tests/deploy-rollback.sh`를 돌립니다.
+
 ## 로컬 시험
 
 필요 도구: `caddy-routing.sh`는 Docker·curl, `deploy-rollback.sh`는 Docker·sops·age(+curl·openssl). 원격 서버·DNS·실제 키·레지스트리 자격 증명은 쓰지 않으며, 끝나면(실패해도) 만든 컨테이너·네트워크·볼륨·더미 이미지·임시 폴더를 지웁니다. 실행 중인 `make up` 인스턴스와 `infra/local` Compose는 건드리지 않습니다.
@@ -41,7 +44,7 @@ bash -n infra/prod/*.sh infra/prod/tests/*.sh && shellcheck -x infra/prod/*.sh i
 | 명령(저장소 루트) | 확인하는 것 |
 | --- | --- |
 | `infra/prod/tests/caddy-routing.sh` | 실제 `caddy` 이미지에 저장소 `Caddyfile`을 붙이고 api·web 자리를 스텁으로 바꿔 curl로 공개 정책(단축·클릭·404·웹 전달·본문 한도)과 방문자 IP(사설 대역 `CF-Connecting-IP` 신뢰, 그 밖은 무시)를 확인 |
-| `infra/prod/tests/deploy-rollback.sh` | htpasswd 인증 로컬 레지스트리의 더미 이미지와 임시 age 키로 암호화한 시험용 비밀값으로 `ssh-entry.sh`를 직접 실행(sshd 불필요)해 `deploy.sh`·`rollback.sh`를 시뮬레이션: 허용 안 된 명령 거부, 첫 배포 SHA 필수, web만 교체, 헬스 실패 시 `restore`, 없는 이미지·복호화 불가 시 무변경, 연속 rollback이 한 단계씩, `rollback <SHA>`, 토큰이 있을 때만 로그인 후 로그아웃, 오래된 릴리스 정리, 평문 비밀값 미잔류, `releases.log` 형식 |
+| `infra/prod/tests/deploy-rollback.sh` | htpasswd 인증 로컬 레지스트리의 더미 이미지와 임시 age 키로 암호화한 시험용 비밀값으로 `ssh-entry.sh`를 직접 실행(sshd 불필요)해 `deploy.sh`·`rollback.sh`를 시뮬레이션: 허용 안 된 명령 거부, 첫 배포 SHA 필수, api·web 헬스체크가 이미지 `HEALTHCHECK`를 물려받고 compose `start_period`·`start_interval`·`stop_grace_period`가 적용됨, web만 교체, 헬스 실패 시 `restore`, 없는 이미지·복호화 불가 시 무변경, 연속 rollback이 한 단계씩, `rollback <SHA>`, 토큰이 있을 때만 로그인 후 로그아웃, 오래된 릴리스 정리, 평문 비밀값 미잔류, `releases.log` 형식 |
 
 두 스크립트 모두 확인마다 `ok   - …` 또는 `FAIL - …`(기대·실제) 줄을 출력하고 끝에 `통과 N, 실패 M`을 보이며, 불일치가 있으면 종료 코드 1입니다. 세부 시나리오는 각 스크립트 머리말이 원본입니다.
 
