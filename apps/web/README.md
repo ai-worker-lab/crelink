@@ -52,3 +52,12 @@ docker build -f apps/web/Dockerfile -t crelink-web:local .
 | `API_INTERNAL_TOKEN` | 비움 | 내부 네트워크라 필요 없음. 값이 있으면 `X-Crelink-Internal`을 붙이는 기능은 코드에 남아 있음(로그·오류·응답에 쓰지 않고, 빌드 산출물에 들어가지 않음) |
 
 - 업로드(`POST /api/backend/api/me/files`)와 이미지 조회(`/api/backend/api/files/{id}`)는 BFF를 지납니다. 이미지 한도 `CRELINK_LIMITS.imageMaxBytes`는 4MB(MVP 임시값)이고 화면 문구는 이 상수에서 계산합니다. 스택 Caddy는 웹 호스트 요청 본문을 6MB로 제한합니다.
+
+### 종료 동작(SIGTERM)
+
+standalone `server.js`는 Next의 `startServer`(`next/dist/server/lib/start-server.js`)를 그대로 쓰고, 이 저장소는 신호 처리를 따로 넣지 않습니다(`NEXT_MANUAL_SIG_HANDLE` 미설정). Next 15.5.27(Node 22.23) 이미지에서 확인한 동작:
+
+- SIGTERM·SIGINT를 받으면 `server.close()`로 listen 소켓과 쉬는 keep-alive 연결을 닫고(새 연결은 곧바로 `ECONNREFUSED`), 진행 중 요청(SSR·BFF·route handler)이 끝나면 `nextServer.close()` 뒤 종료 코드 0으로 끝납니다. Compose `init: true`의 `docker-init`이 PID 1로서 신호를 node에 넘깁니다.
+- Next 자체에는 종료 상한이 없습니다. 진행 중 요청이 Docker grace(`docker stop -t`, Compose `stop_grace_period`) 안에 끝나지 않으면 Docker가 SIGKILL로 끝내고(종료 코드 137) 그 요청은 끊깁니다. grace를 정하지 않으면 엔진 기본값을 쓰는데, 로컬 Docker Desktop 29.8.1은 약 3초였습니다(`docker stop`·`docker compose stop` 모두. Docker 문서상 Linux 엔진 기본은 10초). 그래서 grace는 Compose에 명시합니다([0034](../../docs/work/infra/0034-prod-compose-graceful-stop.md)).
+- 신호를 받을 때 요청을 처리 중이던 keep-alive 연결은 응답 뒤에도 닫지 않습니다(`Connection: keep-alive`). 같은 연결로 새 요청이 계속 오면 그것도 처리해 grace까지 살아 있을 수 있고, 새 요청이 없으면 keep-alive 제한 시간(Node 기본 5초) 뒤에 끝납니다. 앞단 프록시(Caddy)는 컨테이너를 멈추기 전에 이 컨테이너로 보내기를 멈춰야 합니다([ADR 0011](../../docs/adr/0011-zero-downtime-deploy.md)의 전환 순서).
+- 실측(2026-10-07, 로컬 arm64, 운영과 같은 `--init --read-only --tmpfs /tmp`, 5초 뒤 응답하는 모형 API): 진행 중 BFF(`/api/backend/api/health`) 3건과 SSR(`/p/[publicId]`) 1건이 모두 200, `docker stop -t 30`·`-t 10`은 마지막 응답 직후 종료 코드 0. 조건별 결과는 [0033 진행 기록](../../docs/work/web/0033-web-standalone-sigterm.md#진행-기록)에 있습니다.

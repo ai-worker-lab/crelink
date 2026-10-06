@@ -2,6 +2,10 @@
 
 내부 참고용으로 웹 클라이언트의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-10-07
+
+- 운영 이미지의 종료 동작 확인(코드 변경 없음): standalone `server.js`(Next 15.5.27)는 SIGTERM에 새 연결을 거부하고 진행 중 요청(BFF·SSR)을 마친 뒤 종료 코드 0으로 끝남을 운영과 같은 조건(`--init --read-only`, 5초 지연 모형 API)에서 실측(`docker stop -t 30`·`-t 10` 4건 모두 200). 상한은 Docker grace가 맡고, 신호 시점에 처리 중이던 keep-alive 연결은 응답 뒤에도 남아 새 요청을 받으므로 앞단 프록시가 정지 전에 보내기를 멈춰야 함. README `종료 동작(SIGTERM)` 절. `deploymentId`(선택)는 사용자 결정 뒤 후속. 근거: `docs/work/web/0033-web-standalone-sigterm.md`.
+
 ## 2026-10-06
 
 - 운영 배포 준비: 운영 컨테이너 이미지 `Dockerfile`(`node:22-slim` 멀티 스테이지, `next.config.ts` `output: 'standalone'`, `node` 사용자, `HEALTHCHECK` `/privacy`, `NEXT_TELEMETRY_DISABLED=1`). 웹이 API로 보내는 서버 측 요청(서버 컴포넌트 `serverApi`, BFF, `/auth/google`·`/auth/google/callback`)의 헤더를 `apiRequestHeaders()`(`src/lib/api/server.ts`) 한 곳에서 만들고, 서버 전용 `API_INTERNAL_TOKEN`이 있을 때만 `X-Crelink-Internal`을 붙임(운영은 내부 네트워크 `API_INTERNAL_URL=http://api:3000`이라 쓰지 않음). `package.json` `engines.node` `22.x`, `.env.example` 주석, README `운영 컨테이너 이미지` 절. 이미지 크기 문구(`5MB`)를 `CRELINK_LIMITS.imageMaxBytes`(4MB, MVP 임시값)에서 계산하는 `IMAGE_MAX_LABEL`로 바꿈. 처음 설계의 `vercel.json`·Vercel 배포 문서는 같은 날 대체되어 지움. 근거: `docs/work/web/0026-web-internal-token-vercel.md`, `docs/specs/crelink-prod-deploy.md`.
