@@ -99,7 +99,7 @@ flowchart LR
 5. `rollback.sh [릴리스 SHA]`(`ssh-entry.sh rollback`이 `current/rollback.sh`를 실행): 인자가 없으면 `releases.log`에서 지금 릴리스를 배포한 마지막 `deploy` 줄의 이전 릴리스를 고릅니다(`rollback` 줄은 보지 않으므로 연달아 실행하면 배포 이력을 한 단계씩 거슬러 감). 대상 폴더와 `.images.env`가 남아 있어야 하고(최근 5개), 이미지가 서버에 없을 때만 pull합니다. 실패 처리·종료 코드는 `deploy.sh`와 같습니다.
 6. `ssh-entry.sh status`: 운영 릴리스, `images.env`, `releases.log` 마지막 5줄.
 
-컨테이너를 다시 만드는 동안 수 초 동안 502가 날 수 있습니다(서비스당 컨테이너 1개, 무중단 아님).
+**무중단 아님**: 배포·롤백은 caddy(Caddyfile bind 원본이 릴리스 폴더라 배포마다 재생성)·api·web 컨테이너를 멈춘 뒤 다시 만들므로(서비스당 컨테이너 1개), 그동안 약 30~40초 502가 납니다(2026-10-07 운영 관측). `geoip.sh --restart`도 api를 재시작하는 동안 단축 주소가 몇 초 멈춥니다. 원인과 무중단 전환 계획은 [ADR 0011](../adr/0011-zero-downtime-deploy.md)(제안)과 [에픽 0031](../work/epics/0031-zero-downtime-deploy.md)이고, 구현 전까지는 수동 배포·롤백을 트래픽이 적은 시각에 합니다(런북).
 
 ## 워크플로
 
@@ -139,7 +139,7 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 5. 관리 접속은 Tailscale 하나로 통일합니다.
 6. 비밀 원본은 sops 암호문이고 CI에 두지 않습니다.
 7. 헬스·롤백 계약(이미지 HEALTHCHECK, `up --wait`, 실패 시 직전 릴리스, `releases.log`)을 대상과 무관하게 유지합니다.
-8. 서버 준비는 `bootstrap.sh`로 재현합니다. 서버가 2대 이상이 되거나 관리형으로 옮기면 OpenTofu를 검토합니다. 무중단 배포가 필요해지면 Kamal을 후보로 봅니다.
+8. 서버 준비는 `bootstrap.sh`로 재현합니다. 서버가 2대 이상이 되거나 관리형으로 옮기면 OpenTofu를 검토합니다. 무중단 배포 방식은 [ADR 0011](../adr/0011-zero-downtime-deploy.md)(제안: 고정 edge Caddy + Blue/Green)입니다.
 
 ## 변경 범위
 
@@ -155,6 +155,7 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 ## 위험·후속 `[임시값]`
 
 - Supabase 무료 플랜: 자동 일시정지·백업 제한. 출시 전 유료 전환 또는 백업 절차 필요.
+- **배포 중 502(무중단 아님)**: 위 "릴리스·배포·롤백"대로 배포·롤백마다 약 30~40초 502가 나고 main 병합마다 자동 배포됩니다. 후속: [에픽 0031](../work/epics/0031-zero-downtime-deploy.md)(0단계 graceful shutdown·healthcheck `start_interval`·DB pool 상한 → 고정 edge Caddy + Blue/Green, [ADR 0011](../adr/0011-zero-downtime-deploy.md)). 무중단 전환에서는 구·신 API가 잠시 함께 돌아 DB 연결이 2배가 되므로 Supabase Pool Size 확인이 선행 조건이고, DB 변경은 expand/contract가 필수 조건이 됩니다.
 - 업로드 저장소 SeaweedFS는 home-server 한 대(단일 master·volume·filer, 복제 없음)와 가정 회선·Cloudflare Tunnel에 의존합니다. 서버·회선·SeaweedFS 장애면 이미지 업로드·조회가 500이 되고(단축 이동은 영향 없음, readiness에 넣지 않음), 디스크가 망가지면 데이터를 잃습니다. 백업은 SeaweedFS 데이터 디렉터리 백업(home-seaweedfs README "운영")이 맡고 아직 정기 실행·서버 밖 보관이 정해지지 않았습니다. API를 다른 대상으로 옮겨도 이미지 가용성은 home-server에 남으므로, 그때 Cloudflare R2 등 관리형 저장소로 옮길지 정합니다(사용자 결정).
 - OCI 대상 추가는 필요할 때 `targets.json`에 `enabled: false`로 준비한 뒤 런북대로. 웹 이미지 arm64 빌드(QEMU) 시간은 그때 확인하고, 느리면 네이티브 arm64 러너로 나눕니다.
 - 대상별로 다른 호스트·포트가 필요해지면 compose 변수 전달 경로를 추가합니다(지금은 기본값).
@@ -178,3 +179,4 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 
 - 2026-10-06: 처음 설계(웹 Vercel + API OCI 서버 공용 edge Caddy, 웹→API 내부 토큰 헤더, GitHub secrets `OCI_*`·`VERCEL_*`, 서버 `.env`)를 home-server 단일 서버 + Tailscale OIDC SSH + SOPS/age + 스택 안 Caddy + Cloudflare Tunnel로 바꿈(사용자 결정). 대안과 이유는 ADR 0010.
 - 2026-10-07: 업로드 저장소를 서버 볼륨에서 S3 호환 저장소(SeaweedFS `https://s3.shaul.kr`, 버킷 `crelink-uploads`)로 바꿀 수 있게 함(`FILE_STORAGE`·`S3_*`, 이식 규칙 4, SeaweedFS 의존 위험, 런북 9). 근거: `docs/work/orchestrator/0030-uploads-s3-storage.md`.
+- 2026-10-07: 배포 중 502 현황을 실제 관측(약 30~40초)과 원인으로 고치고, 무중단 배포 계획(ADR 0011 제안, 에픽 0031)을 이식 규칙 8·위험·후속에 연결. 현재 동작은 바뀌지 않음. 근거: `docs/work/epics/0031-zero-downtime-deploy.md`.

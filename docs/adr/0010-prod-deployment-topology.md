@@ -1,7 +1,7 @@
 # ADR 0010: 운영(prod) 배포 구성과 CD
 
 - 날짜: 2026-10-06
-- 상태: 제안 (사용자가 배포 대상·접속·비밀값·공개 경로를 선택했고, 이 문서 자체의 `승인`은 사용자 확인 후)
+- 상태: 제안 (사용자가 배포 대상·접속·비밀값·공개 경로를 선택했고, 이 문서 자체의 `승인`은 사용자 확인 후. 검토한 대안 "Kamal 2"의 "무중단 배포가 필요해질 때 후보" 부분은 [ADR 0011](0011-zero-downtime-deploy.md)(제안)이 대체: 무중단은 고정 edge Caddy + Blue/Green)
 - 범위: 운영 서버 배치, 공개 경로, CI→서버 접속, 운영 비밀값, GitHub Actions CD (`infra/prod/`, `.github/workflows/deploy.yml`·`rollback.yml`, `.sops.yaml`, `apps/*/Dockerfile`)
 
 ## 배경

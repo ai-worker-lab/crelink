@@ -3,6 +3,7 @@
 운영 서버 준비·최초 배포·운영 절차를 한 곳에 모은 문서입니다. 설계(구성·공개 경로·비밀값 표·배포 흐름·보안 한계·이식 규칙)의 원본은 [운영 배포·CD 기술 설계](../../docs/specs/crelink-prod-deploy.md), 결정은 [ADR 0010](../../docs/adr/0010-prod-deployment-topology.md), 실행 가능한 원본은 [`infra/prod/`](../prod/README.md)와 `.github/workflows/deploy.yml`·`rollback.yml`입니다. 이 문서와 원본이 다르면 원본이 맞고 이 문서를 같은 변경에서 고칩니다.
 
 - 대상별 적용 상태(언제 무엇을 실행했는지)는 운영 work item 진행 기록에 남기고 이 문서에는 적지 않습니다.
+- **현재 제약: 배포·롤백 중 약 30~40초 502**(무중단 아님, [설계](../../docs/specs/crelink-prod-deploy.md#릴리스배포롤백)). main 병합(자동 배포)·수동 배포·롤백·`geoip.sh --restart`는 트래픽이 적은 시간에 합니다. 무중단 전환 계획은 [ADR 0011](../../docs/adr/0011-zero-downtime-deploy.md)(제안)입니다.
 - 외부 서비스 사실은 공식 문서에서 2026-10-06에 확인했고 출처는 [마지막 절](#출처)에 있습니다. 확인하지 못한 것은 `[확인 못 함]`으로 표시합니다.
 - `<...>`는 실행하는 사람이 채우는 값입니다. 비밀값을 이 문서·저장소·채팅·작업 로그에 붙여 넣지 않습니다.
 - 명령의 `home-server`는 운영자의 SSH 별칭이자 Tailscale MagicDNS 이름입니다. 다른 대상이면 그 이름으로 바꿉니다.

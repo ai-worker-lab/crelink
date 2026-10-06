@@ -30,11 +30,13 @@
 - [ADR 0008 worktree별 로컬 인스턴스](adr/0008-worktree-local-instances.md) — worktree마다 포트 슬롯·Compose project·볼륨을 나누는 결정
 - [ADR 0009 work item을 역할별 폴더에 둠](adr/0009-work-item-role-folders.md) — 에픽은 `docs/work/epics/`, 티켓은 `docs/work/<역할>/`에 두고 계층은 계속 필드로 표현하는 결정
 - [ADR 0010 운영(prod) 배포 구성과 CD](adr/0010-prod-deployment-topology.md) — 배포 대상 서버 1대의 웹·API Compose 스택, Cloudflare Tunnel 공개, Tailscale OIDC 배포 접속, SOPS/age 비밀값, main 병합 자동 배포와 롤백(제안)
+- [ADR 0011 운영 배포 무중단 방식](adr/0011-zero-downtime-deploy.md) — 고정 edge Caddy + Blue/Green 앱 스택, Caddy reload 전환, 선행 0단계(graceful shutdown·`start_interval`·DB pool 상한)(제안, ADR 0010의 Kamal 후보 문구 대체)
 - [외부 서비스·도구 의존](architecture/external-dependencies.md) — 현재 사용 중이거나 계획된 외부 SaaS·도구와 기준 위치
 - [자주 묻는 질문](faq.md) — 저장소 구조, 개발 도구, 로컬 실행, 배포 목표, 언어 정책
 - [배포 대상 아키텍처](architecture/deployment-target.md) — 운영 배치(배포 대상 서버·Supabase·Cloudflare Tunnel)와 운영상 경계
 - [NestJS API 구조와 구현 기준](architecture/nestjs-api.md) · [Next.js 웹 구조와 구현 기준](architecture/nextjs-web.md) · [Expo 모바일 구조와 구현 기준](architecture/expo-mobile.md) — 프레임워크별 구조와 현재 골격
 - [Redis와 Valkey 비교](references/redis-vs-valkey.md) — 프로젝트 역사, 라이선스, 호환성, 기능 비교 자료
+- [운영 배포 무중단화 방식 비교](references/zero-downtime-deploy.md) — 배포 중 502 원인, 로컬 실측, Caddy 재시도·docker-rollout·Blue/Green·Kamal·Swarm 비교
 - [CHANGELOGS](../CHANGELOGS.md) — 공개 여부와 무관한 내부 전체 변경 기록. 영역별 로그는 `infra/` 및 `apps/` 아래에 있음
 - [RELEASES](../RELEASES.md) — 사용자에게 공개한 릴리스 노트
 

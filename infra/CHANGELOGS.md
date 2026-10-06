@@ -4,6 +4,7 @@
 
 ## 2026-10-07
 
+- 런북 머리말에 현재 제약 한 줄: 배포·롤백 중 약 30~40초 502(무중단 아님)라 main 병합·수동 배포·롤백·`geoip.sh --restart`는 트래픽이 적은 시간에 함, 계획은 ADR 0011(제안). 실행 설정 변경 없음. 근거 `docs/work/epics/0031-zero-downtime-deploy.md`.
 - 업로드 S3 전환 준비: `prod/compose.yaml`의 api `uploads` 볼륨에 `FILE_STORAGE` 설명 주석(값은 app.env), 루트 `.sops.yaml` `unencrypted_regex`에 `FILE_STORAGE`·`S3_ENDPOINT`·`S3_REGION`·`S3_BUCKET` 추가(파일 메타데이터에 기록되므로 바꾼 뒤 한 번 다시 암호화). 런북 9를 "업로드 저장소"로 바꿔 SeaweedFS 버킷·identity 발급, 암호문 키 넣기(`sops set --value-stdin`), 전환·볼륨 이전(`amazon/aws-cli` `s3 sync`, 로컬 SeaweedFS로 리허설)·확인(조건부 PUT 412 포함), 되돌리기, 볼륨 정리, `disk` 볼륨 백업을 둠. 대상 추가(10-8)·장애 대응(11-8) 갱신. 근거 `docs/work/orchestrator/0030-uploads-s3-storage.md`.
 - 업로드 볼륨 제거: `prod/compose.yaml`에서 api `uploads` 볼륨(마운트·`volumes.uploads`)을 빼고 `api.environment`에 `FILE_STORAGE: s3`를 고정(`env_file`보다 우선, 볼륨 없이 `disk`로 떠 이미지가 컨테이너 안에만 저장되는 일 방지). 운영 볼륨은 파일 0개(통합 담당 확인)라 이전할 것이 없음. 이 변경은 암호문에 `S3_*`가 들어간 같은 릴리스에서만 배포. 서버의 남은 볼륨 삭제·되돌리기는 런북 9-4·9-5. 근거 `docs/work/orchestrator/0030-uploads-s3-storage.md`.
 - 운영 주소 검사를 서버로 옮김: `prod/verify.sh`(대상 서버가 Cloudflare를 거쳐 공개 주소 6개 확인, 첫 주소는 최대 60초 대기)와 `prod/ssh-entry.sh`의 `verify` 명령. GitHub 러너에서 부르면 Cloudflare가 데이터센터 IP를 403으로 막아 앱이 정상이어도 실패하고 자동 롤백이 돌았기 때문(2026-10-07 Deploy run 37497401435). `ssh-entry.sh`가 바뀌어 서버에서 `bootstrap.sh`를 다시 실행함. 워크플로 쪽은 `.github/workflows/deploy.yml`의 배포 job 안 `운영 주소 검사`·`자동 롤백` 단계, `rollback.yml`의 검사 단계. 근거 `docs/work/orchestrator/0029-first-prod-provision-verify.md`.
