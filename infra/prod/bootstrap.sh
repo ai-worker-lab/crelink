@@ -6,7 +6,9 @@
 #   - deploy 사용자(비밀번호 로그인 없음, sudo 없음, docker 그룹 = root와 같은 권한)
 #     DEPLOY_SSH_PUBKEY를 주면 authorized_keys에 restrict,command="/usr/local/lib/crelink/ssh-entry.sh"로 등록(배포 명령만 가능)
 #   - /usr/local/lib/crelink/ssh-entry.sh(root 소유, 이 폴더의 ssh-entry.sh 사본)
-#   - /opt/crelink/{releases,state}(deploy 소유), /run/crelink(tmpfs, systemd-tmpfiles로 부팅마다 deploy 0700)
+#   - /opt/crelink/{releases,state,edge,edge/conf}(deploy 소유), /run/crelink(tmpfs, systemd-tmpfiles로 부팅마다 deploy 0700)
+#   - Docker 네트워크 crelink-edge(edge Caddy와 두 색 앱 스택이 붙음)와 GeoIP 볼륨 crelink-prod_geoip(없을 때만 만듦, 두 색이 같이 씀).
+#     edge·앱 스택을 띄우는 일은 하지 않습니다(처음 한 번은 cutover.sh, 런북 "14. blue/green cutover").
 #   - /etc/crelink(root:deploy 750): target(대상 이름), age.key(없으면 생성, root:deploy 640). 공개키를 출력합니다 → .sops.yaml 수신자에 추가.
 #   - CLOUDFLARED_TOKEN을 주면 cloudflared를 설치하고 원격 관리형 Tunnel 서비스로 등록(이미 있으면 건너뜀)
 # Tailscale은 이 스크립트가 설치하지 않습니다(대상 추가 절차: infra/docs/prod-runbook.md "배포 대상 추가").
@@ -103,9 +105,13 @@ if [[ -n "${DEPLOY_SSH_PUBKEY:-}" ]]; then
 	fi
 fi
 
-install -d -m 755 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$CRELINK_ROOT" "$CRELINK_ROOT/releases" "$CRELINK_ROOT/state"
+install -d -m 755 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$CRELINK_ROOT" "$CRELINK_ROOT/releases" "$CRELINK_ROOT/state" \
+	"$CRELINK_ROOT/edge" "$CRELINK_ROOT/edge/conf"
 printf 'd /run/crelink 0700 %s %s -\n' "$DEPLOY_USER" "$DEPLOY_USER" >/etc/tmpfiles.d/crelink.conf
 systemd-tmpfiles --create /etc/tmpfiles.d/crelink.conf
+docker network inspect crelink-edge >/dev/null 2>&1 || docker network create crelink-edge >/dev/null
+docker volume inspect crelink-prod_geoip >/dev/null 2>&1 || docker volume create crelink-prod_geoip >/dev/null
+log "Docker 네트워크 crelink-edge·볼륨 crelink-prod_geoip 준비"
 
 install -d -m 750 -o root -g "$DEPLOY_USER" "$CRELINK_ETC"
 printf '%s\n' "$TARGET_NAME" >"$CRELINK_ETC/target"

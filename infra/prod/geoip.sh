@@ -2,7 +2,8 @@
 # DB-IP IP to City Lite(MMDB, CC BY 4.0)를 받아 크리링 geoip 볼륨(/data/geoip/dbip-city-lite.mmdb)에 넣습니다.
 # 사용법(서버, deploy 사용자): /opt/crelink/current/geoip.sh [--restart]
 #   규칙은 scripts/geoip.mjs와 같습니다: 이번 달 파일이 아직 없을 수 있어 이번 달부터 두 달 전까지 차례로 시도(404면 이전 달).
-#   API는 기동할 때 파일을 읽으므로 --restart를 주면 api를 재시작하고 헬스를 기다립니다(몇 초 단축 주소 중단). 주지 않으면 다음 배포부터 적용.
+#   API는 기동할 때 파일을 읽으므로 --restart를 주면 지금 릴리스·이미지를 반대 색에 다시 올려 전환합니다(배포와 같은 무중단 절차,
+#   lib.sh switch_color. releases.log에는 쓰지 않음). 주지 않으면 다음 배포부터 적용.
 # 출처 표기: 웹 /privacy의 https://db-ip.com 링크(docs/specs/crelink-mvp.md).
 set -euo pipefail
 # shellcheck source=SCRIPTDIR/lib.sh
@@ -14,8 +15,12 @@ case "${1:-}" in
 --restart) restart=1 ;;
 *) die "사용법: $0 [--restart]" ;;
 esac
-dir="$CRELINK_ROOT/current"
-[[ -f "$dir/compose.yaml" && -f "$IMAGES_FILE" ]] || die "운영 중인 릴리스가 없습니다($CURRENT_LINK). 먼저 배포하세요."
+release="$(current_release)"
+dir="$RELEASES_DIR/$release"
+[[ -n "$release" && -f "$dir/compose.yaml" && -f "$IMAGES_FILE" ]] || die "운영 중인 릴리스가 없습니다($CURRENT_LINK). 먼저 배포하세요."
+# 볼륨 쓰기·재기동 모두 blue/green 구성을 전제로 합니다(활성 색 project로 geoip-writer 실행).
+require_edge
+color="$(active_color)"
 
 # 이번 달부터 두 달 전까지 YYYY-MM(UTC). GNU·BSD date 차이를 피하려고 직접 계산합니다.
 year="$(date -u +%Y)"
@@ -53,7 +58,7 @@ log "받음: $found"
 
 # 볼륨에는 .partial로 쓴 뒤 rename해 API가 반쯤 쓴 파일을 읽지 않게 합니다. 파일은 root 소유 644(API의 node 사용자가 읽기 가능).
 # geoip-writer는 앱 설정을 쓰지 않으므로 app.env 대신 빈 파일로 compose를 읽습니다.
-gunzip -c "$archive" | APP_ENV=/dev/null compose "$dir" "$IMAGES_FILE" run --rm -T --no-deps geoip-writer sh -c '
+gunzip -c "$archive" | APP_ENV=/dev/null compose "$color" "$dir" "$IMAGES_FILE" run --rm -T --no-deps geoip-writer sh -c '
 	set -e
 	cat >/data/geoip/dbip-city-lite.mmdb.partial
 	chmod 644 /data/geoip/dbip-city-lite.mmdb.partial
@@ -64,11 +69,10 @@ log "geoip 볼륨에 저장했습니다."
 
 if [[ -n "$restart" ]]; then
 	trap 'rm -rf "$work"; clear_app_env' EXIT
-	decrypt_app_env "$dir"
-	compose "$dir" "$IMAGES_FILE" restart api
-	compose "$dir" "$IMAGES_FILE" up -d --no-recreate --wait --wait-timeout "$CRELINK_WAIT_SECONDS" ||
-		die "재시작 뒤 헬스 검사를 통과하지 못했습니다." 2
-	log "API 재시작 완료"
+	status=0
+	switch_color "" "$dir" "$(file_get API_IMAGE "$IMAGES_FILE")" "$(file_get WEB_IMAGE "$IMAGES_FILE")" || status=$?
+	((status == 0)) || die "반대 색으로 다시 올리지 못했습니다(종료 1이면 트래픽은 그대로 $color)." "$status"
+	log "재기동 완료: $release 를 $(active_color) 로 전환했습니다."
 else
 	log "API는 다음 배포나 geoip.sh --restart 이후 새 파일을 읽습니다."
 fi

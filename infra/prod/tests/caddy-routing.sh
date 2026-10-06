@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# 운영 스택 Caddy(infra/prod/Caddyfile) 공개 정책 로컬 시험. Docker만 필요(DNS·Cloudflare 불필요). 저장소 루트에서:
+# 운영 edge Caddy(infra/prod/Caddyfile) 공개 정책 로컬 시험. Docker만 필요(DNS·Cloudflare 불필요). 저장소 루트에서:
 #   infra/prod/tests/caddy-routing.sh
-# - 실제 caddy:2.11.7-alpine(compose.yaml과 같은 이미지·읽기 전용·권한 축소)에 저장소 Caddyfile을 그대로 붙입니다. 다른 점은 아래뿐입니다.
+# - 실제 caddy:2.11.7-alpine(edge/compose.yaml과 같은 이미지·읽기 전용·권한 축소)에 서버와 같은 설정 폴더(/etc/caddy 폴더 bind:
+#   저장소 Caddyfile + lib.sh upstreams_for가 쓰는 upstreams.caddy)를 붙입니다. 다른 점은 아래뿐입니다.
 #   호스트 CRELINK_SHORT_HOST=go.localhost·CRELINK_WEB_HOST=links.localhost, 호스트 포트(127.0.0.1의 빈 포트),
-#   api·web 자리에 요청 메서드·경로·X-Forwarded-For를 응답 헤더(x-echo-*)로 되돌려주는 스텁(같은 네트워크, 별칭 api·web).
+#   api·web 자리에 요청 메서드·경로·X-Forwarded-For를 응답 헤더(x-echo-*)로 되돌려주는 스텁(같은 네트워크, 색 별칭 api-blue·web-blue·
+#   api-green·web-green만. 색 없는 api·web 이름은 없어서 Caddyfile이 그 이름을 쓰면 실패합니다).
 # - 방문자 IP: 호스트에서 보낸 요청은 Docker 게이트웨이(사설 대역)에서 오므로 cloudflared처럼 신뢰됩니다. 사설 대역이 아닌 곳에서 오는 요청은
 #   203.0.113.0/24(TEST-NET-3) 네트워크의 클라이언트 컨테이너로 흉내 냅니다.
+# - 관리 API: 컨테이너 안 localhost:2019에서만 열리고(같은 네트워크·호스트에서 닿지 않음) upstreams.caddy를 green으로 바꾼 뒤
+#   `caddy reload`(lib.sh와 같은 명령)로 전환되는지 확인합니다.
 # - 끝나면(실패해도) 컨테이너·네트워크·임시 폴더를 지웁니다. 이미지(caddy, node:22-alpine)는 남깁니다.
 # 종료 코드: 0 모든 기대 일치, 1 불일치 있음.
 set -euo pipefail
@@ -72,6 +76,7 @@ require("http").createServer((q, s) => {
   q.on("error", () => {});
   q.on("end", () => {
     s.setHeader("x-echo-role", role);
+    s.setHeader("x-echo-color", process.env.COLOR);
     s.setHeader("x-echo-method", q.method);
     s.setHeader("x-echo-url", q.url);
     s.setHeader("x-echo-xff", q.headers["x-forwarded-for"] ?? "-");
@@ -80,16 +85,26 @@ require("http").createServer((q, s) => {
     s.end(JSON.stringify(q.headers));
   });
 }).listen(3000);'
-for role in api web; do
-	docker run -d --label "crelink-test=$run_id" --name "$run_id-$role" --network "$net" --network-alias "$role" \
-		-e "ROLE=$role" "$node_image" node -e "$stub_js" >/dev/null
+for color in blue green; do
+	for role in api web; do
+		docker run -d --label "crelink-test=$run_id" --name "$run_id-$role-$color" --network "$net" --network-alias "$role-$color" \
+			-e "ROLE=$role" -e "COLOR=$color" "$node_image" node -e "$stub_js" >/dev/null
+	done
 done
 
+# 서버의 /opt/crelink/edge/conf와 같은 폴더: 저장소 Caddyfile + 활성 색 upstreams.caddy(lib.sh의 upstreams_for로 만듦).
+for color in blue green; do
+	CRELINK_ROOT="$work/opt" bash -c 'source "$1/lib.sh" && upstreams_for "$2"' _ "$prod" "$color" >"$work/upstreams.$color"
+done
+mkdir -p "$work/conf"
+cp "$prod/Caddyfile" "$work/conf/Caddyfile"
+cp "$work/upstreams.blue" "$work/conf/upstreams.caddy"
+
 port="$(free_port)"
-# compose.yaml의 caddy 서비스와 같은 실행 조건(읽기 전용, tmpfs, cap_drop all + NET_BIND_SERVICE, no-new-privileges).
+# edge/compose.yaml의 caddy 서비스와 같은 실행 조건(읽기 전용, tmpfs, cap_drop all + NET_BIND_SERVICE, no-new-privileges, 폴더 bind).
 docker run -d --label "crelink-test=$run_id" --name "$caddy" --network "$net" -p "127.0.0.1:$port:80" \
 	-e "CRELINK_SHORT_HOST=$short" -e "CRELINK_WEB_HOST=$web" \
-	-v "$prod/Caddyfile:/etc/caddy/Caddyfile:ro" \
+	-v "$work/conf:/etc/caddy:ro" \
 	--read-only --tmpfs /data --tmpfs /config --cap-drop all --cap-add NET_BIND_SERVICE \
 	--security-opt no-new-privileges:true "$caddy_image" >/dev/null
 docker network connect "$pubnet" "$caddy"
@@ -113,10 +128,17 @@ for _ in $(seq 30); do
 	sleep 1
 done
 
-echo "== 설정·헬스"
-result 'caddy validate(저장소 Caddyfile)' 0 "$(docker exec "$caddy" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 && echo 0 || echo 1)"
+echo "== 설정·헬스·관리 API"
+result 'caddy validate(저장소 Caddyfile + upstreams.caddy)' 0 "$(docker exec "$caddy" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 && echo 0 || echo 1)"
 result '헬스 :2020/healthz(컨테이너 안)' ok "$(docker exec "$caddy" wget -q -O - http://127.0.0.1:2020/healthz 2>/dev/null || echo 실패)"
 result '호스트 포트는 127.0.0.1:<포트>→80 하나' "80/tcp -> 127.0.0.1:$port" "$(docker port "$caddy" | tr '\n' ' ' | sed 's/ *$//')"
+result 'Caddyfile에 색 없는 업스트림(api:·web:) 없음, 업스트림은 스니펫만' '' \
+	"$(grep -nE '(reverse_proxy|to)[[:space:]]+(api|web)(:|[[:space:]]|$)' "$prod/Caddyfile" || true)"
+result '관리 API는 컨테이너 안 localhost:2019에서만' 'in:200 net:닫힘' \
+	"in:$(docker exec "$caddy" wget -q -S -O /dev/null http://127.0.0.1:2019/config/ 2>&1 | sed -n 's/.*HTTP\/1.1 \([0-9]*\).*/\1/p' | head -n 1) net:$(docker run --rm --label "crelink-test=$run_id" --network "$net" "$node_image" node -e '
+require("http").get({ host: process.argv[1], port: 2019, path: "/config/", timeout: 3000 }, () => console.log("열림")).on("error", () => console.log("닫힘"))' "$caddy" 2>&1)"
+result '전환 전 업스트림 blue(api·web)' 'blue blue' \
+	"$("${CURL[@]}" -o /dev/null -w '%header{x-echo-color}' "$go/abc") $("${CURL[@]}" -o /dev/null -w '%header{x-echo-color}' "$links/")"
 
 echo "== 단축 호스트($short): GET 단축·클릭만 api"
 check 'GET /abc (3자)' '200 api GET /abc' "$go/abc"
@@ -188,6 +210,16 @@ read -r code got self <<<"$(client "$pubnet" "$short" /abc 8.8.8.8)"
 result 'go: 사설 대역이 아닌 곳(203.0.113.0/24) + CF-Connecting-IP → CF 무시, XFF = 접속 주소' "200 $self" "$code $got"
 read -r code got self <<<"$(client "$pubnet" "$web" / 8.8.8.8)"
 result 'links: 사설 대역이 아닌 곳 + CF-Connecting-IP → CF 무시, XFF = 접속 주소' "200 $self" "$code $got"
+
+echo "== 색 전환(upstreams.caddy 교체 + caddy reload, Caddy 재생성 없음)"
+caddy_started="$(docker inspect -f '{{.State.StartedAt}}' "$caddy")"
+cp "$work/upstreams.green" "$work/conf/upstreams.caddy.tmp" && mv "$work/conf/upstreams.caddy.tmp" "$work/conf/upstreams.caddy"
+result 'caddy reload(컨테이너 안 admin)' 0 "$(docker exec "$caddy" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 && echo 0 || echo 1)"
+result '전환 뒤 업스트림 green(api·web)' 'green green' \
+	"$("${CURL[@]}" -o /dev/null -w '%header{x-echo-color}' "$go/abc") $("${CURL[@]}" -o /dev/null -w '%header{x-echo-color}' "$links/")"
+check '전환 뒤 공개 정책 유지: GET /api/health' 404 "$go/api/health"
+check '전환 뒤 공개 정책 유지: GET /c/abcde12345' '200 api GET /c/abcde12345' "$go/c/abcde12345"
+result 'reload는 컨테이너를 다시 만들거나 재시작하지 않음' "$caddy_started" "$(docker inspect -f '{{.State.StartedAt}}' "$caddy")"
 
 echo
 echo "통과 $passes, 실패 $failures"
