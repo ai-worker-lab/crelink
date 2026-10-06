@@ -7,7 +7,7 @@
 ## 2026-10-06
 
 - `ai-worker-lab/skeleton-repository` 템플릿에서 `crelink`로 초기화: 패키지 범위 `@crelink/*`, 저장소 `ai-worker-lab/crelink`, 로컬 포트 API 3020·웹 5193·Expo 8101·PostgreSQL 5452·Valkey 6399.
-- 서비스 기획 및 MVP Handoff 문서를 `docs/product/crelink-mvp-handoff.md`(PDF 사본 포함)에 두고 문서 색인과 README 서비스 소개에 연결.
+- 서비스 기획 및 MVP Handoff 제안 문서를 참고 자료(확정 결정 없음)로 `docs/product/crelink-mvp-handoff.md`(PDF 사본 포함)에 두고 문서 색인과 README에 연결.
 
 ## 2026-10-02
 

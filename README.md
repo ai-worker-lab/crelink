@@ -1,6 +1,6 @@
 # crelink
 
-크리링(CreLink, Creator + Link)은 광고주(소상공인·중소 브랜드)와 마이크로 크리에이터를 직접 연결하는 인플루언서 마케팅 플랫폼입니다. 현재 상태는 MVP 착수 전이며, 핵심 루프(캠페인 등록 → 크리에이터 지원 → 수동 선정 → 결과 URL 제출·검수)와 범위는 [서비스 기획 및 MVP Handoff](docs/product/crelink-mvp-handoff.md)에 있습니다.
+크리링(CreLink, Creator + Link)은 브랜드와 크리에이터를 연결하는 인플루언서 마케팅 서비스로 기획 중입니다. 확정된 제품 결정은 아직 없습니다. 검토용 제안은 [서비스 기획 및 MVP Handoff 참고 자료](docs/product/crelink-mvp-handoff.md)에 있으며, 범위·타깃·기능은 사용자가 결정한 뒤 PRD에 기록합니다.
 
 현재 웹·앱 화면과 health endpoint는 실행 확인용 시작점이며 제품 기능이 아닙니다.
 
