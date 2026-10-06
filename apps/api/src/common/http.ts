@@ -15,9 +15,21 @@ const FALLBACK_CODES: Partial<Record<number, { code: string; message: string }>>
   403: { code: 'forbidden', message: '권한이 없습니다.' },
   404: { code: 'not_found', message: '요청한 경로를 찾을 수 없습니다.' },
   413: { code: 'validation_failed', message: '요청 본문이 너무 큽니다.' },
+  415: { code: 'validation_failed', message: '지원하지 않는 요청 본문 형식입니다.' },
 };
 
-/** 모든 오류 응답을 `ApiError`로 맞춥니다. 프레임워크가 만든 오류(잘못된 JSON, 없는 경로 등)도 포함합니다. */
+/**
+ * express 미들웨어(body-parser 등)가 컨트롤러 전에 내는 클라이언트 오류의 상태 코드. 이 오류는 Nest `HttpException`이 아니라
+ * http-errors 객체(`status`, `expose`)라서 따로 읽습니다. 4xx이고 `expose`(클라이언트에 알려도 되는 오류)일 때만 씁니다.
+ * 예: 본문 한도 초과 413(`entity.too.large`), 지원하지 않는 문자셋 415(`charset.unsupported`).
+ */
+function clientErrorStatus(exception: unknown): number | null {
+  if (typeof exception !== 'object' || exception === null) return null;
+  const { status, expose } = exception as { status?: unknown; expose?: unknown };
+  return typeof status === 'number' && status >= 400 && status < 500 && expose === true ? status : null;
+}
+
+/** 모든 오류 응답을 `ApiError`로 맞춥니다. 프레임워크가 만든 오류(잘못된 JSON, 본문 한도 초과, 없는 경로 등)도 포함합니다. */
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger('ApiExceptionFilter');
@@ -31,8 +43,12 @@ export class ApiExceptionFilter implements ExceptionFilter {
         response.status(status).json({ code: body.code, message: body.message });
         return;
       }
-      const fallback = FALLBACK_CODES[status] ?? { code: 'http_error', message: '요청을 처리할 수 없습니다.' };
-      response.status(status).json(fallback);
+      response.status(status).json(fallbackBody(status));
+      return;
+    }
+    const clientStatus = clientErrorStatus(exception);
+    if (clientStatus !== null) {
+      response.status(clientStatus).json(fallbackBody(clientStatus));
       return;
     }
     const request = host.switchToHttp().getRequest<Request>();
@@ -44,6 +60,10 @@ export class ApiExceptionFilter implements ExceptionFilter {
       .status(HttpStatus.INTERNAL_SERVER_ERROR)
       .json({ code: 'internal_error', message: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' });
   }
+}
+
+function fallbackBody(status: number): { code: string; message: string } {
+  return FALLBACK_CODES[status] ?? { code: 'http_error', message: '요청을 처리할 수 없습니다.' };
 }
 
 /** `Cookie` 헤더에서 이름이 같은 첫 값을 읽습니다. */

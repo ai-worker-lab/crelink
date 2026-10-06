@@ -112,6 +112,7 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 - 세션: 쿠키 `cl_session`(원문 무작위 토큰, 30일), DB `sessions.token_hash`는 SHA-256 hex. API는 웹 BFF·웹 서버가 전달한 `Cookie` 헤더에서 읽습니다.
 - `/api/me/*`는 로그인 필수(401 `unauthenticated`), 남의 리소스는 404. `/api/admin/*`는 로그인(401) 후 `role='operator'`(아니면 403 `forbidden`). 정지하면 그 사용자의 세션을 모두 지우고, 세션 조회도 정지 사용자를 제외하며, 다시 로그인하면 403 `account_suspended`.
 - 오류 응답은 모두 `{ code, message }`입니다(`src/common/http.ts`의 `ApiExceptionFilter`). 없는 `/api` 경로는 404 `not_found`, 예상하지 못한 오류는 500 `internal_error`와 로그.
+- 본문 파서(express body-parser, JSON 한도 기본 100KB)가 컨트롤러 전에 내는 클라이언트 오류는 `HttpException`이 아니라 http-errors(`status`, `expose`)라서 필터가 따로 읽습니다. 4xx이고 `expose`인 것만 그 상태로 응답하고 로그를 남기지 않습니다: 잘못된 JSON 400 `validation_failed`, 본문 한도 초과 413 `validation_failed`("요청 본문이 너무 큽니다."), 지원하지 않는 문자셋 415 `validation_failed`. 시험: `test/error-response.e2e-spec.ts`.
 
 ## 단축 도메인
 

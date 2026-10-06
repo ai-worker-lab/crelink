@@ -4,6 +4,7 @@
 
 ## 2026-10-07
 
+- 결함 수정: JSON 본문 한도(100KB) 초과·지원하지 않는 문자셋 요청이 500 `internal_error`(오류 로그)였던 것을 413·415 `validation_failed`로 응답(`ApiExceptionFilter`가 4xx `expose` http-errors의 상태를 씀). 다른 예상하지 못한 오류는 그대로 500. 회귀 시험 `test/error-response.e2e-spec.ts`. 근거 `docs/work/api/0037-api-body-parser-error-status.md`.
 - 문서(코드 변경 없음): `docs/README.md`의 운영 접근 경로를 Blue/Green 구조로 고침(공용 네트워크 `crelink-edge`에서 edge Caddy와 같은 색 웹만 `api-<색>`을 부름, edge Caddy 본문 한도). 근거 `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`.
 - graceful shutdown(`src/shutdown.ts`, `main.ts`): SIGTERM·SIGINT를 받으면 새 연결을 받지 않고(idle keep-alive 연결은 바로 끊고 진행 중·종료 중 응답은 `Connection: close`), 진행 중 요청을 끝낸 뒤 `app.close()`로 `onModuleDestroy`(pg pool `end`, 보존 작업 timer 정리)를 부르고 종료 코드 0으로 끝냄. 이전에는 신호에 바로 죽어 진행 중 요청이 끊김(컨테이너 143). Nest 11의 `enableShutdownHooks()`는 HTTP 서버보다 pool을 먼저 닫아 진행 중 업로드가 500이 되므로 쓰지 않음. `Database.onModuleDestroy`는 pool 종료를 로그로 남기고 두 번 불려도 안전. 근거 `docs/work/api/0032-api-graceful-shutdown-pool-max.md`.
 - 환경변수 추가: `DATABASE_POOL_MAX`(pg Pool `max`, 기본 15라 비우면 기존 동작과 같음). 1 이상의 정수가 아니면 기동 거부(오류에 키 이름만). 운영값 산정 기준(`2 × DATABASE_POOL_MAX ≤ Supabase Pool Size − 2`)은 `apps/api/docs/README.md#db-연결-수`.
