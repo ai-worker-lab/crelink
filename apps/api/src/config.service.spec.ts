@@ -1,5 +1,6 @@
 import {
   assertProductionConfig,
+  parseDatabasePoolMax,
   parseFileStorageConfig,
   parseTrustedProxyHops,
   productionConfigProblems,
@@ -89,6 +90,23 @@ describe('TRUSTED_PROXY_HOPS', () => {
     expect(parseTrustedProxyHops('1')).toBe(1);
     for (const value of ['-1', '1.5', 'one', '1e2']) {
       expect(() => parseTrustedProxyHops(value)).toThrow('TRUSTED_PROXY_HOPS');
+    }
+  });
+});
+
+describe('DATABASE_POOL_MAX', () => {
+  it('비면 15, 1 이상의 정수를 그대로 쓴다', () => {
+    expect(parseDatabasePoolMax(undefined)).toBe(15);
+    expect(parseDatabasePoolMax(' ')).toBe(15);
+    expect(parseDatabasePoolMax('6')).toBe(6);
+    expect(parseDatabasePoolMax(' 1 ')).toBe(1);
+  });
+
+  it('정수가 아니거나 1 미만이면 값 없이 키 이름만 넣은 오류로 기동을 거부한다', () => {
+    for (const value of ['0', '-1', '1.5', 'six', '1e2', '6 connections', '99999999999999999999']) {
+      expect(() => parseDatabasePoolMax(value)).toThrow(
+        new Error('DATABASE_POOL_MAX는 1 이상의 정수여야 합니다(기본 15).'),
+      );
     }
   });
 });

@@ -4,6 +4,9 @@
 
 ## 2026-10-07
 
+- graceful shutdown(`src/shutdown.ts`, `main.ts`): SIGTERM·SIGINT를 받으면 새 연결을 받지 않고(idle keep-alive 연결은 바로 끊고 진행 중·종료 중 응답은 `Connection: close`), 진행 중 요청을 끝낸 뒤 `app.close()`로 `onModuleDestroy`(pg pool `end`, 보존 작업 timer 정리)를 부르고 종료 코드 0으로 끝냄. 이전에는 신호에 바로 죽어 진행 중 요청이 끊김(컨테이너 143). Nest 11의 `enableShutdownHooks()`는 HTTP 서버보다 pool을 먼저 닫아 진행 중 업로드가 500이 되므로 쓰지 않음. `Database.onModuleDestroy`는 pool 종료를 로그로 남기고 두 번 불려도 안전. 근거 `docs/work/api/0032-api-graceful-shutdown-pool-max.md`.
+- 환경변수 추가: `DATABASE_POOL_MAX`(pg Pool `max`, 기본 15라 비우면 기존 동작과 같음). 1 이상의 정수가 아니면 기동 거부(오류에 키 이름만). 운영값 산정 기준(`2 × DATABASE_POOL_MAX ≤ Supabase Pool Size − 2`)은 `apps/api/docs/README.md#db-연결-수`.
+- 시험: `DATABASE_POOL_MAX` 해석 단위 시험, `test/shutdown.e2e-spec.ts`(Pool `max` 반영·잘못된 값 기동 거부 / 느린 업로드 중 SIGTERM → 201, 새 연결 거부, idle keep-alive 연결이 종료를 막지 않음, 응답 뒤 1초 안에 pool·timer 정리와 종료 코드 0).
 - 업로드 저장소 선택: 환경변수 `FILE_STORAGE`(`disk` 기본, `s3`), `S3_ENDPOINT`·`S3_REGION`(기본 `us-east-1`)·`S3_BUCKET`·`S3_ACCESS_KEY_ID`·`S3_SECRET_ACCESS_KEY`. 잘못된 값·`s3`인데 빠진 키면 기동 거부. 운영 필수 검사는 `disk`면 `UPLOAD_DIR`, `s3`면 `S3_*` 4개와 https `S3_ENDPOINT`. `FilesModule`이 설정으로 구현을 고름.
 - `S3FileStorage`(`src/files/s3-file-storage.ts`, 의존성 `@aws-sdk/client-s3`, 순수 JS): path-style, 설정 자격 증명만 사용, put은 `If-None-Match: *`(같은 key면 412로 실패), get은 `NoSuchKey`·404면 null, 연결 3초·시도당 15초·최대 3번(SDK standard 재시도), 기동 시 HeadBucket을 5초 안에 한 번 확인해 로그만 남김(readiness 제외). `LocalDiskFileStorage`의 ENOENT 판별을 realm과 무관하게 바꿈.
 - 시험: 설정 파싱 단위 시험, `test/file-storage.e2e-spec.ts`(disk·s3 공통 계약: 같은 바이트, 없는 key null, 재put 실패, 동시 put 하나만 성공 / 자격 증명·버킷 확인 / `FILE_STORAGE=s3` API 업로드·조회·객체 삭제 시 404). s3는 `test/test-s3.ts`가 Docker로 `chrislusf/seaweedfs:4.47`을 띄움. `createTestApp({ env })`. 근거 `docs/work/orchestrator/0030-uploads-s3-storage.md`.

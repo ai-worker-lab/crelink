@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { DatabaseError, Pool, PoolClient, PoolConfig, QueryResultRow } from 'pg';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { parseDatabasePoolMax } from './config.service';
 
 /** 트랜잭션 client와 pool 모두 받는 질의 대상. */
 export type Queryable = Pick<PoolClient, 'query'>;
@@ -120,7 +121,8 @@ export class Database implements OnModuleInit, OnModuleDestroy {
     loadLocalEnvironment();
     this.pool = new Pool({
       ...databaseConnectionConfig(process.env),
-      max: 15,
+      // 무중단 전환 중 구·신 API가 함께 돌면 연결이 2배가 됩니다. 운영값 산정: apps/api/docs/README.md#db-연결-수
+      max: parseDatabasePoolMax(process.env.DATABASE_POOL_MAX),
       application_name: 'crelink-api',
       // DB가 응답하지 않을 때 요청(readiness 포함)이 무한히 기다리지 않게 합니다.
       connectionTimeoutMillis: 5000,
@@ -130,8 +132,12 @@ export class Database implements OnModuleInit, OnModuleDestroy {
     await this.pool.query('SELECT 1');
     await runMigrations(this.pool, resolve(__dirname, '../migrations'));
   }
+  /** 종료 때(src/shutdown.ts가 HTTP 요청을 모두 마친 뒤) 빌려 간 연결이 돌아오길 기다려 pool을 닫습니다. */
   async onModuleDestroy() {
-    await this.pool?.end();
+    // app.close()가 두 번 불려도(테스트 정리 등) pool.end를 다시 부르지 않습니다(pg는 두 번째 end를 오류로 냄).
+    if (!this.pool || this.pool.ending) return;
+    await this.pool.end();
+    this.logger.log('PostgreSQL pool을 닫았습니다.');
   }
   query<T extends QueryResultRow = QueryResultRow>(sql: string, values: unknown[] = []) {
     return this.pool.query<T>(sql, values);

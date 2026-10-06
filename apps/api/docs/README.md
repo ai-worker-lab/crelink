@@ -20,6 +20,7 @@
 | `DATABASE_URL` | 예 | PostgreSQL 연결 문자열. 운영(Supabase)은 세션 풀러(5432) 주소. [DB TLS](#db-tls) 참고. |
 | `DATABASE_SSL` | 아니오 | `disable`·`require`·`verify-full`. 비면 URL을 그대로 씁니다(로컬, TLS 없음). 값이 있으면 URL의 `sslmode` 등 TLS 파라미터를 지우고 이 값만 따릅니다. 다른 값이면 기동 거부. [DB TLS](#db-tls). |
 | `DATABASE_SSL_CA_PATH` | 아니오 | `verify-full`일 때 서버 인증서를 확인할 CA(PEM) 파일 경로(Supabase 루트 인증서). 다른 모드와 함께 쓰거나 파일을 읽지 못하면 기동 거부. |
+| `DATABASE_POOL_MAX` | 아니오 | pg Pool 최대 연결 수(기본 15). 1 이상의 정수가 아니면 기동 거부(오류에는 키 이름만). 운영값은 [DB 연결 수](#db-연결-수) 기준으로 정합니다. |
 | `PORT` | 예 | API 포트. 컨테이너 운영은 `3000`. |
 | `WEB_URL` | 예(운영은 https) | 본 도메인. 랜딩 302 대상 `{WEB_URL}/p/{publicId}`, 안내 `{WEB_URL}/notice?reason=`, 이미지 주소 `{WEB_URL}/api/backend/api/files/{id}`, 구글 리디렉션 URI `{WEB_URL}/auth/google/callback`. https면 세션·state 쿠키에 `Secure`. |
 | `SHORT_LINK_BASE_URL` | 예(운영은 https) | 단축 도메인. 단축 URL `{SHORT}/{slug}`, 클릭 주소 `{SHORT}/c/{linkPublicId}`. 로컬은 API 주소. https면 `cl_vid`에 `Secure`. |
@@ -58,6 +59,33 @@
 - Supabase 운영 권장: `DATABASE_SSL=verify-full`, `DATABASE_SSL_CA_PATH`=대시보드 Database Settings의 SSL Configuration에서 받은 루트 인증서(`prod-ca-2021.crt`)를 컨테이너에 읽기 전용으로 마운트한 경로. `require`는 중간자 공격을 막지 못합니다. 근거: [Supabase SSL Enforcement](https://supabase.com/docs/guides/platform/ssl-enforcement), [Supabase Connect to your database — SSL](https://supabase.com/docs/guides/database/connecting-to-postgres#connecting-with-ssl).
 
 > **경고: Supabase 트랜잭션 풀러(포트 6543)를 쓰지 마세요.** API는 기동할 때 migration을 세션 advisory lock(`pg_advisory_lock`)으로 한 연결에서 잡고 풉니다(`runMigrations`). Supavisor 트랜잭션 모드는 트랜잭션마다 연결을 풀에 돌려줘 세션 단위 advisory lock·`SET`·prepared statement가 유지되지 않습니다. `DATABASE_URL`은 직접 연결 또는 Supavisor **세션 모드**(`aws-[INDEX]-[REGION].pooler.supabase.com:5432`, 사용자 `postgres.[PROJECT-REF]`)를 씁니다. Supabase 직접 연결은 IPv6 전용이라 IPv4만 쓰는 서버에서는 안 되므로 운영은 세션 모드 풀러가 기본입니다. 근거: [Supabase Connect to your database — Transaction mode limitations·Endpoints](https://supabase.com/docs/guides/database/connecting-to-postgres#transaction-mode-limitations) (2026-10-06 확인).
+
+### DB 연결 수
+
+`src/database.ts`의 pg Pool은 `max: DATABASE_POOL_MAX`(`parseDatabasePoolMax`, 기본 15)로 연결을 엽니다. idle 연결은 10초 뒤 닫히고(pg 기본 `idleTimeoutMillis`), 모든 연결이 사용 중이면 쿼리는 빈 연결을 기다리다 `connectionTimeoutMillis`(5초)를 넘으면 실패합니다.
+
+운영 `DATABASE_URL`은 Supavisor 세션 모드라 Supabase 대시보드의 **Pool Size**가 그 프로젝트에 붙을 수 있는 클라이언트 연결 상한입니다(세션 모드는 클라이언트 연결 하나가 DB 연결 하나를 차지). 무중단 전환([ADR 0011](../../../docs/adr/0011-zero-downtime-deploy.md)) 중에는 구·신 API가 잠시 함께 돌아 연결이 최대 2배가 되므로 운영값은 다음을 지킵니다.
+
+```text
+2 × DATABASE_POOL_MAX ≤ Pool Size − 여유(관리 접속·migration 도구용, 최소 2)
+```
+
+- 예: Pool Size 15면 `2 × 6 = 12 ≤ 13`이라 6, Pool Size 20이면 `2 × 9 = 18 ≤ 18`이라 9.
+- 맞출 수 없으면(필요한 동시 쿼리가 더 많으면) `DATABASE_POOL_MAX`를 억지로 낮추지 말고 Pool Size를 올립니다. Pool Size 상한은 compute 크기의 `max_connections`에 묶이므로 필요하면 compute를 올립니다.
+- 상한을 넘으면 새 인스턴스의 연결(readiness·migration)이 `max clients reached`로 실패합니다. 운영값 설정과 Pool Size 기록은 인프라(`infra/prod/` 암호문)에서 합니다.
+- 근거: [Supavisor FAQ](https://supabase.com/docs/guides/troubleshooting/supavisor-faq-YyP5tI), [Supabase connection management](https://supabase.com/docs/guides/database/connection-management), [세션 모드 클라이언트 상한 discussion #22305](https://github.com/orgs/supabase/discussions/22305), [node-postgres Pool](https://node-postgres.com/apis/pool), [조사: 두 버전이 동시에 도는 동안의 조건](../../../docs/references/zero-downtime-deploy.md#두-버전이-동시에-도는-동안의-조건).
+
+## 종료
+
+`src/shutdown.ts`의 `enableGracefulShutdown`(`main.ts`가 `listen` 전에 부름)이 SIGTERM·SIGINT를 받으면 다음 순서로 끝냅니다. 컨테이너는 `init: true`(tini)가 신호를 node에 넘깁니다.
+
+1. HTTP 서버를 닫아 새 연결을 받지 않습니다. idle keep-alive 연결은 바로 끊고, 진행 중 요청과 종료 중 기존 연결로 들어온 요청은 `Connection: close`로 응답한 뒤 연결을 끊습니다(이미 헤더를 보낸 응답은 끝나면 idle 연결로 끊음). 그래서 Caddy 같은 keep-alive 클라이언트가 종료를 `keepAliveTimeout`(5초)만큼 늦추거나 계속 붙잡지 못합니다.
+2. 진행 중 요청이 모두 끝나면 `app.close()`로 `onModuleDestroy`를 부릅니다: `Database`가 빌려 간 연결이 돌아오길 기다려 pool을 닫고(`PostgreSQL pool을 닫았습니다.` 로그), `RetentionService`가 24시간 timer를 정리합니다.
+3. 종료 코드 0으로 끝냅니다. 종료 중 오류면 1입니다. 종료 중 다시 온 신호는 무시합니다.
+
+- `app.enableShutdownHooks()`를 쓰지 않는 이유: Nest 11.2는 신호를 받으면 `onModuleDestroy`를 HTTP 서버를 닫기 **전에** 부르고(`NestApplicationContext.close`: destroy hook → beforeShutdown hook → HTTP 서버 close), 끝에 같은 신호로 자신을 다시 죽입니다. 이 순서면 진행 중 업로드가 닫힌 pool을 써서 500이 되고(실측), 컨테이너 종료 코드가 143입니다.
+- 요청이 compose `stop_grace_period`(기본 10초)보다 오래 걸리면 Docker가 SIGKILL로 끝냅니다(종료 코드 137). 운영 grace는 `infra/prod/compose.yaml`에서 정합니다.
+- 시험: `test/shutdown.e2e-spec.ts`(느린 업로드 중 SIGTERM → 201·`Connection: close`, 새 연결 거부, idle keep-alive 연결이 종료를 막지 않음, 그 뒤 pool·timer 정리와 종료 코드 0). 컨테이너 실측(느린 업로드 중 `docker stop -t 30`)은 [0032 진행 기록](../../../docs/work/api/0032-api-graceful-shutdown-pool-max.md#진행-기록).
 
 ## 컨테이너 이미지
 

@@ -101,6 +101,23 @@ export function assertProductionConfig(env: NodeJS.ProcessEnv): void {
   }
 }
 
+/** `DATABASE_POOL_MAX`가 비었을 때의 pg Pool 최대 연결 수. */
+export const DEFAULT_DATABASE_POOL_MAX = 15;
+
+/**
+ * `DATABASE_POOL_MAX`: 비면 15, 1 이상의 정수가 아니면 오류(기동 거부). 오류에는 키 이름만 넣습니다.
+ * 운영값 산정 기준: apps/api/docs/README.md#db-연결-수
+ */
+export function parseDatabasePoolMax(value: string | undefined): number {
+  const text = value?.trim();
+  if (!text) return DEFAULT_DATABASE_POOL_MAX;
+  const max = Number(text);
+  if (!/^\d+$/.test(text) || !Number.isSafeInteger(max) || max < 1) {
+    throw new Error(`DATABASE_POOL_MAX는 1 이상의 정수여야 합니다(기본 ${DEFAULT_DATABASE_POOL_MAX}).`);
+  }
+  return max;
+}
+
 /** `TRUSTED_PROXY_HOPS`: 비면 0, 0 이상의 정수가 아니면 오류. */
 export function parseTrustedProxyHops(value: string | undefined): number {
   const text = value?.trim() || '0';
