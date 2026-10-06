@@ -4,7 +4,7 @@
 - 역할: infra
 - 상위: 0031
 - 선행: 0033, 0034
-- 상태: 검증
+- 상태: 완료
 - 종류: 운영
 - 우선순위: P1 (AI 제안)
 - 작성일: 2026-10-07
@@ -87,3 +87,4 @@
   - 부하 중 배포 2회·롤백 2회·`geoip.sh --restart` 1회(`zero-downtime.sh`, keep-alive 클라이언트로 edge에 직접, 초당 22.6건, drain 8초): 2xx·3xx가 아닌 응답·연결 오류 **0건**(1566건·1584건), p99 **6ms**(평시 4ms·6ms, 기준 평시 + 1초), 6초 긴 요청 **34/34·35/35 완료**, web→api **같은 색 377·382건, 다른 색 0**, 끝난 뒤 옛 색 stopped·edge 재생성 0. keepalive 추가 전 네 번도 오류 0건(2591·2257·2235·2245건)이었습니다.
   - cutover 리허설(`measure-gap.sh` 대상마다 0.1초 간격, 옛 caddy 정지 유예 5초): **cutover 공백 0.4초**(대상마다 4건 `000`), 되돌린 뒤 두 번째 cutover 0.4초, **되돌리기 공백 1.4초**(대상마다 14건 `000`), cutover 뒤 첫 배포(green) 실패 0. 앞선 실행들은 cutover 0.3~0.5초, 되돌리기 1.3초. `--dry-run`·없는 이미지 점검 실패·blue 헬스 실패는 운영 상태 그대로, 다시 실행은 "이미 완료".
 - 2026-10-07: 0036 인계. ① 병합과 cutover를 같은 운영 창에: 병합 배포는 서버에서 이미지만 받고 "edge가 준비되지 않았습니다"로 무변경 실패(`자동 롤백`은 돌지 않음) → bootstrap 재실행(`ssh-entry.sh` status 색 줄) → `cutover.sh --dry-run`·`cutover.sh`(런북 14) → 실패한 Deploy job 다시 실행(첫 무중단 배포·태그). ② 되돌리기는 옛 릴리스 폴더가 남아 있는 동안만(최근 5개 규칙, cutover 뒤 네 번째 배포쯤 정리). ③ `docs/specs/crelink-prod-deploy.md`(구성·서버 배치·"릴리스·배포·롤백"·이식 규칙 7)와 ADR 0011 상태. ④ `.github/`(이 티켓 범위 밖): `dependabot.yml`의 docker-compose `directory: /infra/prod`는 하위 폴더를 보지 않아 이제 `infra/prod/edge/compose.yaml`의 Caddy 이미지를 추적하지 못하므로 `/infra/prod/edge`를 추가, `deploy.yml` 머리말·`자동 롤백` 주석의 "헬스 실패 시 직전 릴리스로 복구"를 "아무것도 바꾸지 않고 실패"로. 인터페이스는 같아 워크플로 동작 변경은 필요 없음. ⑤ 운영 검증에서 옛 색 정지가 30초 걸리지 않는지(`docker ps -a`의 `Exited (0)`)와 실제 이미지의 전환 시간을 봅니다.
+- 2026-10-07: 운영 적용(통합 담당, 사용자 지시 "0035 진행"). PR #14 CI 7개 통과 → main 빨리 감기 병합(`5e3e847`) → 자동 배포가 설계대로 "edge가 준비되지 않았습니다"로 무변경 실패 → bootstrap 재실행 → `cutover.sh` 실행. 운영 dry-run에서 하나 고침: root의 작업 폴더(`/root`)에서 `runuser`로 deploy가 되면 `docker compose`가 `stat .: permission denied`로 실패 → `cutover.sh`가 다시 실행하기 전에 `$CRELINK_ROOT`로 이동하도록 수정(운영은 `/opt/crelink`에서 실행해 통과). 운영 결과는 0036 진행 기록.

@@ -30,7 +30,9 @@ source "$here/lib.sh"
 if [[ "$(id -u)" -eq 0 ]]; then
 	owner="$(stat -c %U "$CRELINK_ROOT")" || die "$CRELINK_ROOT 가 없습니다(bootstrap.sh)."
 	[[ "$owner" != root ]] || die "$CRELINK_ROOT 가 root 소유입니다. bootstrap.sh를 먼저 실행하세요."
-	# docker CLI가 root의 ~/.docker를 읽지 않게 HOME도 그 사용자 것으로 둡니다.
+	# docker CLI가 root의 ~/.docker를 읽지 않게 HOME도 그 사용자 것으로 둡니다. 작업 폴더가 /root처럼 그 사용자가 못 읽는 곳이면
+	# docker compose가 "stat .: permission denied"로 실패하므로(2026-10-07 운영 dry-run) $CRELINK_ROOT에서 실행합니다.
+	cd "$CRELINK_ROOT"
 	HOME="$(getent passwd "$owner" | cut -d: -f6)" exec runuser -u "$owner" -- "$here/$(basename "${BASH_SOURCE[0]}")" "$@"
 fi
 
