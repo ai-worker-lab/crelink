@@ -1,0 +1,11 @@
+{
+  "$comment": "운영 배포 대상 목록(.github/workflows/deploy.yml·rollback.yml이 읽음). host는 Tailscale MagicDNS 이름, platform은 이미지 플랫폼, secrets는 infra/prod/secrets/<name>.sops.env. 대상 추가 절차: infra/docs/prod-runbook.md \"배포 대상 추가\".",
+  "targets": [
+    {
+      "name": "home-server",
+      "host": "home-server",
+      "platform": "linux/amd64",
+      "enabled": true
+    }
+  ]
+}

@@ -1,4 +1,6 @@
-# 운영(prod) 수동 롤백. API는 서버의 rollback.sh(이전 또는 지정 태그), 웹은 Vercel의 직전 운영 배포로 되돌립니다.
+# 운영(prod) 수동 롤백. 배포 대상 서버의 rollback.sh로 이전 릴리스(설정·비밀값·API·웹 이미지 전체)로 되돌립니다.
+# 릴리스 SHA를 비우면 지금 릴리스 직전 운영 릴리스, 지정하면 그 릴리스(서버에 남은 최근 릴리스만 가능).
+# 접속은 deploy.yml과 같습니다(Tailscale workload identity + deploy 사용자 forced command). main에서만 실행할 수 있습니다.
 # 기준: docs/specs/crelink-prod-deploy.md, infra/docs/prod-runbook.md
 name: Rollback
 
@@ -6,16 +8,11 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: 되돌릴 대상
-        type: choice
-        options: [api, web, both]
-        default: api
-      api_tag:
-        description: API 이미지 태그(커밋 SHA). 비우면 서버 releases.log의 직전 배포
+        description: 배포 대상 이름(infra/prod/targets.json의 name)
         type: string
-        required: false
-      web_url:
-        description: 웹 Vercel 배포 URL(https://….vercel.app). 비우면 직전 운영 배포
+        default: home-server
+      release:
+        description: 되돌릴 릴리스(커밋 SHA). 비우면 직전 운영 릴리스
         type: string
         required: false
 
@@ -26,53 +23,56 @@ concurrency:
   group: deploy-prod
   cancel-in-progress: false
 
+env:
+  WEB_URL: https://links.shaul.kr
+  SHORT_URL: https://go.shaul.kr
+
 jobs:
-  api:
-    name: API 롤백
-    if: inputs.target == 'api' || inputs.target == 'both'
+  rollback:
+    name: 롤백 ${{ inputs.target }}
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
-      packages: read # 서버가 GHCR 이미지를 받을 때 이 job의 GITHUB_TOKEN을 일회용으로 넘김
+      packages: read # 이미지가 서버에 없을 때 받도록 이 job의 GITHUB_TOKEN을 일회용으로 넘김
+      id-token: write
     steps:
-      - name: SSH 준비
+      - uses: actions/checkout@v7
+      - name: 입력 확인
+        id: input
         env:
-          OCI_SSH_KEY: ${{ secrets.OCI_SSH_KEY }}
-          OCI_KNOWN_HOSTS: ${{ secrets.OCI_KNOWN_HOSTS }}
+          TARGET: ${{ inputs.target }}
+          RELEASE: ${{ inputs.release }}
         run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$OCI_SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
-          printf '%s\n' "$OCI_KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
-      - name: rollback.sh
+          if [[ -n "$RELEASE" && ! "$RELEASE" =~ ^[0-9a-f]{7,40}$ ]]; then echo "::error::release는 커밋 SHA여야 합니다."; exit 1; fi
+          host=$(jq -r --arg t "$TARGET" '.targets[] | select(.name == $t) | .host' infra/prod/targets.json)
+          [[ -n "$host" ]] || { echo "::error::infra/prod/targets.json에 대상 $TARGET 이 없습니다."; exit 1; }
+          echo "host=$host" >> "$GITHUB_OUTPUT"
+      - uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ vars.TS_OIDC_CLIENT_ID }}
+          audience: ${{ vars.TS_OIDC_AUDIENCE }}
+          tags: tag:ci
+          ping: ${{ steps.input.outputs.host }}
+      - name: rollback
         env:
-          OCI_HOST: ${{ secrets.OCI_HOST }}
-          OCI_USER: ${{ secrets.OCI_USER }}
+          HOST: ${{ steps.input.outputs.host }}
+          RELEASE: ${{ inputs.release }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           GHCR_PULL_USER: ${{ github.actor }}
           GHCR_PULL_TOKEN: ${{ github.token }}
-          API_TAG: ${{ inputs.api_tag }}
         run: |
-          if [[ -n "$API_TAG" && ! "$API_TAG" =~ ^[0-9a-f]{7,40}$ ]]; then echo "::error::api_tag는 커밋 SHA여야 합니다."; exit 1; fi
-          printf '%s\n' "$GHCR_PULL_TOKEN" | ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$OCI_USER@$OCI_HOST" \
-            "cd /opt/crelink && GHCR_PULL_USER='$GHCR_PULL_USER' GHCR_PULL_TOKEN_STDIN=1 ./rollback.sh $API_TAG"
-
-  web:
-    name: 웹 롤백
-    if: inputs.target == 'web' || inputs.target == 'both'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-    steps:
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-      - name: vercel rollback
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          WEB_TARGET: ${{ inputs.web_url }}
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s %s\n' "$GHCR_PULL_USER" "$GHCR_PULL_TOKEN" |
+            ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o BatchMode=yes "deploy@$HOST" "rollback $RELEASE"
+      - name: 운영 주소 검사
         run: |
-          if [[ -n "$WEB_TARGET" && ! "$WEB_TARGET" =~ ^https://[a-z0-9.-]+\.vercel\.app$ ]]; then echo "::error::web_url 형식이 아닙니다."; exit 1; fi
-          if [[ -n "$WEB_TARGET" ]]; then npx --yes vercel@62 rollback "$WEB_TARGET" --token "$VERCEL_TOKEN" --yes
-          else npx --yes vercel@62 rollback --token "$VERCEL_TOKEN" --yes; fi
+          set -u
+          fail=0
+          check() { local name=$1 expect=$2 got=$3; if [[ "$got" == "$expect" ]]; then echo "ok   $name ($got)"; else echo "FAIL $name: 기대 $expect, 실제 $got"; fail=1; fi; }
+          check "웹 /" 200 "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_URL/")"
+          check "웹 BFF health" 200 "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_URL/api/backend/api/health")"
+          check "단축 없는 주소 302" 302 "$(curl -s -o /dev/null -w '%{http_code}' "$SHORT_URL/zzz-e2e-none")"
+          exit $fail

@@ -1,4 +1,4 @@
-# 저장소 루트가 빌드 컨텍스트인 이미지(apps/api/Dockerfile)용. 비밀값·로컬 상태가 이미지와 빌드 캐시에 들어가지 않도록
+# 저장소 루트가 빌드 컨텍스트인 이미지(apps/api/Dockerfile, apps/web/Dockerfile)용. 비밀값·로컬 상태가 이미지와 빌드 캐시에 들어가지 않도록
 # 전부 제외한 뒤 빌드에 필요한 파일만 다시 넣습니다(허용 목록). 다른 이미지가 생기면 그 이미지에 필요한 경로만 추가합니다.
 *
 !package.json
@@ -6,7 +6,9 @@
 !pnpm-workspace.yaml
 !.npmrc
 !apps/api
+!apps/web
 !packages/shared
+!packages/design-tokens
 
 # 허용한 디렉터리 안에서도 다시 제외합니다(.env*·로컬 의존성·빌드 결과·테스트).
 **/.env
@@ -19,3 +21,4 @@
 **/.DS_Store
 apps/api/test
 apps/api/**/*.spec.ts
+apps/web/next-env.d.ts

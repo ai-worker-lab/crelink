@@ -1,5 +1,9 @@
-# main의 CI가 성공하면 운영(prod)에 배포합니다: API(OCI, GHCR 이미지 + SSH) → 웹(Vercel CLI) → 운영 주소 검사.
-# 배포 직후 검사가 실패하면 그 영역을 자동 롤백합니다. 수동 롤백은 rollback.yml.
+# main의 CI가 성공하면 운영(prod)에 배포합니다: 이미지(API·웹, GHCR :<SHA>) → 배포 대상마다 Tailscale+SSH로 릴리스 배포 → 운영 주소 검사.
+# 배포 대상은 infra/prod/targets.json(enabled), 서버 쪽은 deploy 사용자의 forced command(infra/prod/ssh-entry.sh)만 실행됩니다.
+# 서버 deploy.sh가 헬스 실패 시 스스로 직전 릴리스로 복구하고, 운영 주소 검사가 실패하면 이 워크플로가 직전 릴리스로 롤백합니다. 수동 롤백은 rollback.yml.
+# CI에는 앱 비밀값이 없습니다(서버가 infra/prod/secrets/<대상>.sops.env를 복호화). 이 워크플로가 쓰는 값:
+#   vars.TS_OIDC_CLIENT_ID·vars.TS_OIDC_AUDIENCE  Tailscale workload identity federation(main 브랜치 job만 허용, tag:ci)
+#   secrets.DEPLOY_SSH_KEY                         서버 deploy 사용자 SSH 개인키(forced command로 배포 명령만 가능)
 # 기준: docs/specs/crelink-prod-deploy.md, 런북 infra/docs/prod-runbook.md, 결정 docs/adr/0010-prod-deployment-topology.md
 name: Deploy
 
@@ -11,20 +15,20 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: 변경 영역과 관계없이 API·웹을 모두 배포
+        description: 변경 영역과 관계없이 API·웹 이미지를 새로 만들어 배포
         type: boolean
         default: false
 
 permissions:
   contents: read
 
-# 배포는 한 번에 하나씩, 진행 중인 배포를 취소하지 않습니다.
+# 배포는 한 번에 하나씩, 진행 중인 배포를 취소하지 않습니다(rollback.yml과 같은 그룹).
 concurrency:
   group: deploy-prod
   cancel-in-progress: false
 
 env:
-  API_IMAGE_REPO: ghcr.io/ai-worker-lab/crelink-api
+  IMAGE_PREFIX: ghcr.io/ai-worker-lab/crelink
   WEB_URL: https://links.shaul.kr
   SHORT_URL: https://go.shaul.kr
 
@@ -41,8 +45,10 @@ jobs:
       sha: ${{ steps.target.outputs.sha }}
       api: ${{ steps.changes.outputs.api }}
       web: ${{ steps.changes.outputs.web }}
-      api_ready: ${{ steps.secrets.outputs.api_ready }}
-      web_ready: ${{ steps.secrets.outputs.web_ready }}
+      release: ${{ steps.changes.outputs.release }}
+      targets: ${{ steps.targets.outputs.targets }}
+      platforms: ${{ steps.targets.outputs.platforms }}
+      ready: ${{ steps.ready.outputs.ready }}
     steps:
       - name: 배포 대상 커밋
         id: target
@@ -53,8 +59,8 @@ jobs:
         with:
           ref: ${{ steps.target.outputs.sha }}
           fetch-depth: 0
-      # 영역별로 마지막 성공 배포 커밋(태그 deploy/prod-api, deploy/prod-web)과 비교해 바뀐 영역만 배포합니다.
-      # 태그가 없으면(최초) 그 영역을 배포합니다. 시크릿이 없어 건너뛴 실행은 태그를 옮기지 않으므로 변경이 누락되지 않습니다.
+      # 마지막 성공 배포 커밋(태그 deploy/prod-api·deploy/prod-web·deploy/prod)과 비교해 바뀐 것만 만듭니다.
+      # 태그가 없으면(최초) 그 영역을 만듭니다. 배포를 건너뛴 실행은 태그를 옮기지 않으므로 변경이 누락되지 않습니다.
       - name: 변경 영역
         id: changes
         env:
@@ -62,168 +68,139 @@ jobs:
           SHA: ${{ steps.target.outputs.sha }}
         run: |
           decide() {
-            local area=$1 pattern=$2 base
-            base=$(git rev-parse -q --verify "refs/tags/deploy/prod-$area^{commit}" || true)
-            if [[ "$FORCE" == "true" || -z "$base" ]]; then echo "$area: 배포(force 또는 첫 배포)"; echo "$area=true" >> "$GITHUB_OUTPUT"; return; fi
+            local key=$1 tag=$2 pattern=$3 base
+            base=$(git rev-parse -q --verify "refs/tags/$tag^{commit}" || true)
+            if [[ "$FORCE" == "true" || -z "$base" ]]; then echo "$key: 예(force 또는 첫 배포)"; echo "$key=true" >> "$GITHUB_OUTPUT"; return; fi
             if git diff --name-only "$base" "$SHA" | grep -Eq "$pattern"; then
-              echo "$area: 배포(${base:0:7} 이후 변경)"; echo "$area=true" >> "$GITHUB_OUTPUT"
+              echo "$key: 예(${base:0:7} 이후 변경)"; echo "$key=true" >> "$GITHUB_OUTPUT"
             else
-              echo "$area: 변경 없음(${base:0:7})"; echo "$area=false" >> "$GITHUB_OUTPUT"
+              echo "$key: 아니오(${base:0:7})"; echo "$key=false" >> "$GITHUB_OUTPUT"
             fi
           }
-          decide api '^(apps/api/|packages/shared/|infra/prod/|pnpm-lock\.yaml$|\.dockerignore$)'
-          decide web '^(apps/web/|packages/shared/|packages/design-tokens/|pnpm-lock\.yaml$)'
-      # 운영 시크릿이 아직 없으면(최초 준비 전) 배포 job을 건너뜁니다. 값은 출력하지 않습니다.
-      - name: 시크릿 준비 여부
-        id: secrets
-        env:
-          OCI_HOST: ${{ secrets.OCI_HOST }}
-          OCI_SSH_KEY: ${{ secrets.OCI_SSH_KEY }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          decide api deploy/prod-api '^(apps/api/|packages/shared/|pnpm-lock\.yaml$|\.dockerignore$)'
+          decide web deploy/prod-web '^(apps/web/|packages/shared/|packages/design-tokens/|pnpm-lock\.yaml$|\.dockerignore$)'
+          # 릴리스(설정·비밀값 포함)는 이미지가 바뀌었거나 infra/prod가 바뀌면 배포합니다.
+          decide release deploy/prod '^(apps/api/|apps/web/|packages/shared/|packages/design-tokens/|pnpm-lock\.yaml$|\.dockerignore$|infra/prod/)'
+      - name: 배포 대상
+        id: targets
         run: |
-          [[ -n "$OCI_HOST" && -n "$OCI_SSH_KEY" ]] && echo "api_ready=true" >> "$GITHUB_OUTPUT" || echo "::warning::OCI 시크릿이 없어 API 배포를 건너뜁니다(infra/docs/prod-runbook.md)."
-          [[ -n "$VERCEL_TOKEN" && -n "$VERCEL_PROJECT_ID" ]] && echo "web_ready=true" >> "$GITHUB_OUTPUT" || echo "::warning::Vercel 시크릿이 없어 웹 배포를 건너뜁니다(infra/docs/prod-runbook.md)."
+          targets=$(jq -c '[.targets[] | select(.enabled) | {name, host, platform}]' infra/prod/targets.json)
+          platforms=$(jq -r '[.targets[] | select(.enabled) | .platform] | unique | join(",")' infra/prod/targets.json)
+          [[ "$targets" != "[]" ]] || { echo "::error::infra/prod/targets.json에 enabled 대상이 없습니다."; exit 1; }
+          echo "대상: $targets / 플랫폼: $platforms"
+          { echo "targets=$targets"; echo "platforms=$platforms"; } >> "$GITHUB_OUTPUT"
+      # 접속 설정이 아직 없으면(최초 준비 전) 이미지까지만 만들고 배포는 건너뜁니다. 값은 출력하지 않습니다.
+      - name: 접속 설정 여부
+        id: ready
+        env:
+          TS_OIDC_CLIENT_ID: ${{ vars.TS_OIDC_CLIENT_ID }}
+          TS_OIDC_AUDIENCE: ${{ vars.TS_OIDC_AUDIENCE }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          if [[ -n "$TS_OIDC_CLIENT_ID" && -n "$TS_OIDC_AUDIENCE" && -n "$DEPLOY_SSH_KEY" ]]; then echo "ready=true" >> "$GITHUB_OUTPUT"
+          else echo "::warning::Tailscale(vars.TS_OIDC_*)·DEPLOY_SSH_KEY 설정이 없어 배포를 건너뜁니다(infra/docs/prod-runbook.md \"CI 접속 설정\")."; fi
 
-  api-image:
-    name: API 이미지
+  image:
+    name: 이미지 ${{ matrix.area }}
     needs: plan
-    if: needs.plan.outputs.api == 'true' && needs.plan.outputs.api_ready == 'true'
+    strategy:
+      matrix:
+        area: [api, web]
+    # 바뀐 영역만 만듭니다(matrix 값으로 plan 출력을 고름).
+    if: needs.plan.outputs.api == 'true' || needs.plan.outputs.web == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     permissions:
       contents: read
       packages: write
     steps:
+      - name: 이 영역을 만들지
+        id: want
+        env:
+          WANT: ${{ matrix.area == 'api' && needs.plan.outputs.api || needs.plan.outputs.web }}
+        run: echo "build=$WANT" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
+        if: steps.want.outputs.build == 'true'
         with:
           ref: ${{ needs.plan.outputs.sha }}
-      # 런타임 단계에 RUN이 있으면 arm64 에뮬레이션이 필요합니다. 빌드 단계는 러너 플랫폼에서 돕니다(apps/api/Dockerfile).
+      # 대상에 arm64가 있을 때만 QEMU가 필요합니다(API는 빌드 단계를 러너 플랫폼에서 교차 빌드, 웹은 대상 플랫폼에서 빌드).
       - uses: docker/setup-qemu-action@v4
+        if: steps.want.outputs.build == 'true' && contains(needs.plan.outputs.platforms, 'arm64')
       - uses: docker/setup-buildx-action@v4
+        if: steps.want.outputs.build == 'true'
       - uses: docker/login-action@v4
+        if: steps.want.outputs.build == 'true'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
       - uses: docker/build-push-action@v7
+        if: steps.want.outputs.build == 'true'
         with:
           context: .
-          file: apps/api/Dockerfile
-          platforms: linux/arm64
+          file: apps/${{ matrix.area }}/Dockerfile
+          platforms: ${{ needs.plan.outputs.platforms }}
           push: true
-          tags: ${{ env.API_IMAGE_REPO }}:${{ needs.plan.outputs.sha }}
-          cache-from: type=gha,scope=api
-          cache-to: type=gha,mode=max,scope=api
+          tags: ${{ env.IMAGE_PREFIX }}-${{ matrix.area }}:${{ needs.plan.outputs.sha }}
+          cache-from: type=gha,scope=${{ matrix.area }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.area }}
 
-  deploy-api:
-    name: API 배포
-    needs: [plan, api-image]
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: write # 성공한 배포 커밋을 태그 deploy/prod-api로 기록
-      packages: read # 서버가 GHCR 이미지를 받을 때 이 job의 GITHUB_TOKEN을 일회용으로 넘김(서버에 장기 토큰 없음)
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ needs.plan.outputs.sha }}
-      - name: SSH 준비
-        env:
-          OCI_SSH_KEY: ${{ secrets.OCI_SSH_KEY }}
-          OCI_KNOWN_HOSTS: ${{ secrets.OCI_KNOWN_HOSTS }}
-        run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$OCI_SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
-          printf '%s\n' "$OCI_KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
-      # 서버 스크립트를 이 커밋의 것으로 맞춘 뒤 실행합니다(compose·Caddyfile 변경도 함께 반영).
-      - name: 서버 설정 동기화
-        env:
-          OCI_HOST: ${{ secrets.OCI_HOST }}
-          OCI_USER: ${{ secrets.OCI_USER }}
-        # edge/(서버 공용 Caddy, /opt/edge)는 런북 절차로만 바꾸므로 동기화하지 않습니다. 크리링 사이트 파일은 deploy.sh가 /opt/edge/sites로 반영합니다.
-        run: |
-          rsync -az -e "ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes" \
-            --exclude '.env' --exclude 'releases.log' --exclude '*.example' --exclude 'README.md' --exclude 'edge/' --exclude 'tests/' \
-            infra/prod/ "$OCI_USER@$OCI_HOST:/opt/crelink/"
-      - name: deploy.sh
-        env:
-          OCI_HOST: ${{ secrets.OCI_HOST }}
-          OCI_USER: ${{ secrets.OCI_USER }}
-          GHCR_PULL_USER: ${{ github.actor }}
-          GHCR_PULL_TOKEN: ${{ github.token }}
-          SHA: ${{ needs.plan.outputs.sha }}
-        # deploy.sh는 헬스체크 실패 시 서버에서 이전 이미지로 스스로 되돌리고 1로 끝납니다. 토큰은 stdin으로만 넘깁니다.
-        run: |
-          printf '%s\n' "$GHCR_PULL_TOKEN" | ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$OCI_USER@$OCI_HOST" \
-            "cd /opt/crelink && GHCR_PULL_USER='$GHCR_PULL_USER' GHCR_PULL_TOKEN_STDIN=1 ./deploy.sh '$SHA'"
-      - name: 배포 기록 태그
-        env:
-          SHA: ${{ needs.plan.outputs.sha }}
-        run: |
-          git tag -f deploy/prod-api "$SHA"
-          git push -f origin refs/tags/deploy/prod-api
-
-  deploy-web:
-    name: 웹 배포
-    needs: [plan, deploy-api]
-    # API 배포가 실패하면 웹을 배포하지 않습니다. API 배포를 건너뛴 경우에는 진행합니다.
+  deploy:
+    name: 배포 ${{ matrix.target.name }}
+    needs: [plan, image]
     if: >-
       always() && needs.plan.result == 'success'
-      && needs.plan.outputs.web == 'true' && needs.plan.outputs.web_ready == 'true'
-      && (needs.deploy-api.result == 'success' || needs.deploy-api.result == 'skipped')
+      && needs.plan.outputs.release == 'true' && needs.plan.outputs.ready == 'true'
+      && (needs.image.result == 'success' || needs.image.result == 'skipped')
+    strategy:
+      max-parallel: 1
+      fail-fast: true
+      matrix:
+        target: ${{ fromJSON(needs.plan.outputs.targets) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      contents: write # 성공한 배포 커밋을 태그 deploy/prod-web로 기록
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      contents: read
+      packages: read # 서버가 GHCR 이미지를 받을 때 이 job의 GITHUB_TOKEN을 일회용으로 넘김(서버에 장기 토큰 없음)
+      id-token: write # Tailscale workload identity federation
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.plan.outputs.sha }}
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - name: Tailscale
+        uses: tailscale/github-action@v4
         with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: vercel build·deploy
-        id: deploy
+          oauth-client-id: ${{ vars.TS_OIDC_CLIENT_ID }}
+          audience: ${{ vars.TS_OIDC_AUDIENCE }}
+          tags: tag:ci
+          ping: ${{ matrix.target.host }}
+      - name: SSH 준비
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        # 호스트 신원은 Tailscale(WireGuard 키)이 보증하므로 처음 보는 호스트 키를 받아들입니다(실행마다 새 known_hosts).
         run: |
-          pnpm dlx vercel@62 pull --yes --environment=production --token "$VERCEL_TOKEN"
-          pnpm dlx vercel@62 build --prod --token "$VERCEL_TOKEN"
-          pnpm dlx vercel@62 deploy --prebuilt --prod --token "$VERCEL_TOKEN"
-      - name: 운영 웹 검사
-        run: |
-          for _ in $(seq 30); do
-            if curl -fsS -o /dev/null "$WEB_URL/" && curl -fsS -o /dev/null "$WEB_URL/privacy"; then echo "웹 정상"; exit 0; fi
-            sleep 5
-          done
-          echo "::error::운영 웹 검사 실패"; exit 1
-      # 새 배포가 운영으로 승격된 뒤 검사가 실패했을 때만 직전 운영 배포로 되돌립니다(Vercel Instant Rollback).
-      - name: 실패 시 웹 롤백
-        if: failure() && steps.deploy.outcome == 'success'
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf 'Host *\n  IdentityFile ~/.ssh/id_deploy\n  IdentitiesOnly yes\n  StrictHostKeyChecking accept-new\n  BatchMode yes\n' > ~/.ssh/config
+      # stdin: 첫 줄 GHCR 사용자·토큰, 이어서 이 커밋의 infra/prod 묶음(시험·문서 제외). 서버 ssh-entry.sh가 releases/<SHA>로 풉니다.
+      - name: deploy
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: pnpm dlx vercel@62 rollback --token "$VERCEL_TOKEN" --yes
-      - name: 배포 기록 태그
-        env:
+          HOST: ${{ matrix.target.host }}
           SHA: ${{ needs.plan.outputs.sha }}
+          API: ${{ needs.plan.outputs.api == 'true' && needs.plan.outputs.sha || '-' }}
+          WEB: ${{ needs.plan.outputs.web == 'true' && needs.plan.outputs.sha || '-' }}
+          GHCR_PULL_USER: ${{ github.actor }}
+          GHCR_PULL_TOKEN: ${{ github.token }}
         run: |
-          git tag -f deploy/prod-web "$SHA"
-          git push -f origin refs/tags/deploy/prod-web
+          # shellcheck disable=SC2029 # 명령 인자는 러너에서 펼쳐 보냅니다(서버 forced command가 형식을 다시 검사).
+          { printf '%s %s\n' "$GHCR_PULL_USER" "$GHCR_PULL_TOKEN"
+            tar -czf - -C infra/prod --exclude ./tests --exclude ./README.md --exclude '*.example' --exclude ./.env .
+          } | ssh "deploy@$HOST" "deploy $SHA $API $WEB"
 
   verify-prod:
     name: 운영 주소 검사
-    needs: [plan, deploy-api, deploy-web]
-    if: >-
-      always() && needs.plan.result == 'success'
-      && (needs.deploy-api.result == 'success' || needs.deploy-web.result == 'success')
-      && needs.deploy-api.result != 'failure' && needs.deploy-web.result != 'failure'
+    needs: [plan, deploy]
+    if: always() && needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -233,8 +210,69 @@ jobs:
           fail=0
           check() { local name=$1 expect=$2 got=$3; if [[ "$got" == "$expect" ]]; then echo "ok   $name ($got)"; else echo "FAIL $name: 기대 $expect, 실제 $got"; fail=1; fi; }
           check "웹 /" 200 "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_URL/")"
+          check "웹 /privacy" 200 "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_URL/privacy")"
           check "웹 BFF health" 200 "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_URL/api/backend/api/health")"
           check "단축 없는 주소 302" 302 "$(curl -s -o /dev/null -w '%{http_code}' "$SHORT_URL/zzz-e2e-none")"
           check "단축 → notice" "$WEB_URL/notice?reason=link_not_found" "$(curl -s -o /dev/null -w '%{redirect_url}' "$SHORT_URL/zzz-e2e-none")"
           check "API 직접 접근 차단" 404 "$(curl -s -o /dev/null -w '%{http_code}' "$SHORT_URL/api/health")"
           exit $fail
+
+  # 운영 주소 검사가 실패하면 대상마다 직전 릴리스로 되돌립니다(서버 rollback.sh). 이 job이 돌면 워크플로는 실패로 끝납니다.
+  rollback-on-failure:
+    name: 자동 롤백 ${{ matrix.target.name }}
+    needs: [plan, deploy, verify-prod]
+    if: always() && needs.deploy.result == 'success' && needs.verify-prod.result == 'failure'
+    strategy:
+      max-parallel: 1
+      matrix:
+        target: ${{ fromJSON(needs.plan.outputs.targets) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+    steps:
+      - uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ vars.TS_OIDC_CLIENT_ID }}
+          audience: ${{ vars.TS_OIDC_AUDIENCE }}
+          tags: tag:ci
+          ping: ${{ matrix.target.host }}
+      - name: rollback
+        env:
+          HOST: ${{ matrix.target.host }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          GHCR_PULL_USER: ${{ github.actor }}
+          GHCR_PULL_TOKEN: ${{ github.token }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s %s\n' "$GHCR_PULL_USER" "$GHCR_PULL_TOKEN" |
+            ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o BatchMode=yes "deploy@$HOST" rollback
+          echo "::error::운영 주소 검사가 실패해 $HOST 를 직전 릴리스로 되돌렸습니다."
+          exit 1
+
+  # 모든 대상 배포와 운영 주소 검사가 성공했을 때만 배포 기록 태그를 옮깁니다(다음 실행의 변경 비교 기준).
+  record:
+    name: 배포 기록 태그
+    needs: [plan, verify-prod]
+    if: always() && needs.verify-prod.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - name: 태그
+        env:
+          SHA: ${{ needs.plan.outputs.sha }}
+          API: ${{ needs.plan.outputs.api }}
+          WEB: ${{ needs.plan.outputs.web }}
+        run: |
+          tags=(deploy/prod)
+          [[ "$API" == true ]] && tags+=(deploy/prod-api)
+          [[ "$WEB" == true ]] && tags+=(deploy/prod-web)
+          for t in "${tags[@]}"; do git tag -f "$t" "$SHA"; git push -f origin "refs/tags/$t"; done

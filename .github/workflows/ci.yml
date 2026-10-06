@@ -107,23 +107,25 @@ jobs:
           echo '::group::API 로그'; cat .local/ci/api.log || true; echo '::endgroup::'
           echo '::group::웹 로그'; cat .local/ci/web.log || true; echo '::endgroup::'
 
-  # 운영 API 이미지(linux/arm64)가 빌드되는지 확인합니다. 푸시하지 않습니다. 배포는 deploy.yml.
-  api-image:
-    name: API 이미지 빌드
+  # 운영 이미지(API·웹)가 빌드되는지 확인합니다. 푸시하지 않습니다. 배포·멀티 플랫폼 빌드는 deploy.yml(infra/prod/targets.json의 플랫폼).
+  image:
+    name: 이미지 빌드 ${{ matrix.area }}
+    strategy:
+      matrix:
+        area: [api, web]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-      - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
       - uses: docker/build-push-action@v7
         with:
           context: .
-          file: apps/api/Dockerfile
-          platforms: linux/arm64
+          file: apps/${{ matrix.area }}/Dockerfile
+          platforms: linux/amd64
           push: false
-          cache-from: type=gha,scope=api
-          cache-to: type=gha,mode=max,scope=api
+          cache-from: type=gha,scope=${{ matrix.area }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.area }}
 
   # work item 브랜치(work/NNNN-*) PR은 변경 파일이 티켓 역할의 소유 경로 안에 있는지 검사합니다.
   work-scope:

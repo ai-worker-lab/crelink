@@ -1,6 +1,0 @@
-# ai-character-chat API(다른 프로젝트). 서버에 있던 그 프로젝트 Caddy 설정을 edge로 그대로 옮긴 것입니다.
-# 업스트림 컨테이너는 그 프로젝트 네트워크 ai-character-chat-backend_backend에 있습니다(edge/compose.yaml의 aichat 네트워크).
-aichat-api.shaul.kr {
-	reverse_proxy ai-character-chat-backend-api-1:3000
-	encode zstd gzip
-}

@@ -1,0 +1,65 @@
+# 크리링 운영 스택의 공개 정책(compose.yaml의 caddy 서비스). 기준: docs/specs/crelink-prod-deploy.md "공개 경로".
+# 경로: 방문자 → Cloudflare(TLS 종료) → cloudflared(서버 호스트) → 127.0.0.1:${CRELINK_HTTP_PORT} → 이 Caddy(http) → api·web.
+# 모든 배포 대상(home-server, 나중의 OCI·AWS)이 이 파일을 그대로 씁니다. 대상별 값은 환경변수뿐입니다.
+#
+# - 방문자 IP: 이 Caddy에 직접 붙는 것은 같은 호스트의 cloudflared뿐입니다(compose가 포트를 127.0.0.1에만 엶). 그래서 사설 대역에서 온
+#   요청의 CF-Connecting-IP를 믿고, 업스트림에는 X-Forwarded-For로 방문자 주소 하나({client_ip})만 보냅니다(API TRUSTED_PROXY_HOPS=1).
+#   클라이언트가 보낸 X-Forwarded-For는 버려집니다. 이 포트를 공인 주소에 열면 CF-Connecting-IP를 위조할 수 있으므로 열지 않습니다.
+# - 관리 API(admin)는 끕니다. 설정을 바꾸면 deploy.sh가 새 릴리스 폴더로 컨테이너를 다시 만듭니다.
+# - 접근 로그(log)는 켜지 않습니다.
+{
+	admin off
+	auto_https off
+	servers {
+		trusted_proxies static private_ranges
+		client_ip_headers CF-Connecting-IP
+	}
+}
+
+# 단축·클릭 호스트. API는 이 두 경로만 공개합니다. /api/*를 포함한 나머지는 404(웹은 내부 네트워크로 API를 부름).
+http://{$CRELINK_SHORT_HOST:go.shaul.kr} {
+	# 단축 주소. 규칙 원본은 packages/shared/src/crelink.ts의 SLUG_PATTERN(영소문자·숫자·하이픈, 양끝 하이픈 불가)과
+	# CRELINK_LIMITS.slugMinLength·slugMaxLength(3~30). API가 slug를 소문자로 바꿔 찾으므로 대문자도 통과시킵니다.
+	@shortlink {
+		method GET
+		path_regexp ^/[A-Za-z0-9][A-Za-z0-9-]{1,28}[A-Za-z0-9]$
+	}
+
+	# 링크 클릭. 링크 public_id는 [a-z0-9] 10자(apps/api/src/creator/links.service.ts LINK_PUBLIC_ID_LENGTH, common/http.ts ID_ALPHABET).
+	@click {
+		method GET
+		path_regexp ^/c/[a-z0-9]{10}$
+	}
+
+	handle @click {
+		reverse_proxy api:3000 {
+			header_up X-Forwarded-For {client_ip}
+		}
+	}
+
+	handle @shortlink {
+		reverse_proxy api:3000 {
+			header_up X-Forwarded-For {client_ip}
+		}
+	}
+
+	handle {
+		respond 404
+	}
+}
+
+# 본 도메인(웹). 브라우저의 API 호출은 웹 BFF(/api/backend)가 내부 네트워크로 API에 넘깁니다.
+http://{$CRELINK_WEB_HOST:links.shaul.kr} {
+	# 이미지 업로드 한도(CRELINK_LIMITS.imageMaxBytes 4MB)에 multipart 여유를 더한 값. 넘으면 413.
+	request_body {
+		max_size 6MB
+	}
+	reverse_proxy web:3000 {
+		header_up X-Forwarded-For {client_ip}
+	}
+}
+
+# 컨테이너 헬스체크 전용(호스트에 열지 않음).
+http://:2020 {
+	respond /healthz "ok" 200
+}
