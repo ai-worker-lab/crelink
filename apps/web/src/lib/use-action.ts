@@ -32,5 +32,5 @@ export function useAction() {
     }
   }
 
-  return { pending, error, notice, run, setError };
+  return { pending, error, notice, run, setError, setNotice };
 }

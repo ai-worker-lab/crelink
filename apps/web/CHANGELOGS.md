@@ -4,6 +4,12 @@
 
 ## 2026-10-06
 
+- 랜딩 관리 화면 `/me/landings/[publicId]`(편집·보기 모드)를 추가하고 외부 링크 관리를 `/me`에서 옮김. 근거: `docs/work/web/0022-landing-link-editor.md`, PRD R18(R4·R5·R13·R14).
+  - 공개 랜딩 본문을 공용 `src/components/landing/Landing.tsx`(`Landing`, `LinkCardContent`)로 빼 `/p/[publicId]`와 관리 화면이 함께 씀. 편집 상태를 공개 형태로 바꾸는 `src/lib/landing-preview.ts`(`toLandingPreview`: 공개 API와 같이 숨긴·차단 링크 제외, 링크 주소는 클릭 기록 주소 대신 저장된 URL이라 미리보기가 방문·클릭 통계를 남기지 않음).
+  - 관리 화면: 남의 랜딩 ID는 찾을 수 없음 안내, 401은 `/`. 편집/보기 전환(`?mode=view`, `aria-current`), `/me`로 돌아가기, 공개 페이지 열기(새 창).
+  - 편집 모드(`src/components/manage/`): 랜딩과 같은 배치에서 링크 구역만 편집. 카드별 끌기 손잡이·숨기기 스위치(`role="switch"`, 실패 시 되돌리고 안내)·숨김 흐리게·차단 배지와 사유, 한도(보이는 링크·전체) 표시와 도달 시 추가 대신 안내. 카드·'링크 추가'는 네이티브 `<dialog>` 하단 시트(`LinkSheet`: 제목·URL·설명·썸네일, 저장·삭제(확인)·닫기, Esc·배경 누르기로 닫기, 열 때 첫 입력 포커스, 닫으면 연 요소로 포커스 복귀, 모바일은 화면 아래·넓은 화면은 560px).
+  - 순서 변경: `@dnd-kit/core` 6.3.1·`@dnd-kit/sortable` 10.0.0·`@dnd-kit/utilities` 3.2.2(모두 MIT) 의존성 추가. 마우스·터치(손잡이 `touch-action: none`)·키보드(스페이스/엔터로 들고 화살표로 옮김) 모두 지원, 한국어 스크린리더 안내, 놓으면 `PUT /api/me/links/order`, 실패 시 원래 순서로 되돌림.
+  - `/me`: 외부 링크 폼 `LinksSection`을 지우고 '링크 관리' 요약 카드(`LinksSummary`: 보이는 링크 수/한도, 숨긴·차단 수, 관리 화면 버튼)로 바꿈. `/me` 머리글과 홈(로그인 후)에 '링크 관리' 링크 추가. 쓰지 않게 된 `.inline-notice` 스타일 삭제, `useAction`이 `setNotice`도 돌려줌.
 - 프로필 사진이 없으면 기본 프로필(`src/components/DefaultAvatar.tsx`, 디자인 토큰 색의 인라인 SVG, 장식용 `aria-hidden`)을 랜딩페이지 머리와 `/me` 프로필 사진 자리에 표시. `ImageField`에 `placeholder` 속성 추가. 근거: `docs/work/web/0021-default-profile-avatar.md`, PRD R17.
 - 크리링 MVP 웹 구현. 근거: `docs/work/web/0017-crelink-mvp-web.md`, 설계 `docs/specs/crelink-mvp.md`.
   - BFF 허용 목록을 계약(`CRELINK_API_PATHS`)의 공개·`me`·`admin`·`files`·로그아웃 경로로 넓힘. `cl_session` 쿠키만 API로 넘기고 API `Set-Cookie`·`Content-Type`·`Cache-Control`과 본문(이미지 바이너리)을 그대로 돌려줌, 204 처리, `POST api/me/files`의 multipart 본문·Content-Type 전달, POST·PUT·PATCH·DELETE의 `Origin` 불일치(없음 포함) 403 `forbidden`.

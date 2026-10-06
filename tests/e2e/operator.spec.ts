@@ -77,7 +77,7 @@ test('운영자: 크리에이터 통계·분포, 슬롯 부여 후 6번째 링�
   // 추가 슬롯 1개 → 크리에이터가 보이는 링크 6번째 추가
   const creatorSession = await data.session(creator);
   const me = creatorSession.page;
-  await me.goto('/me');
+  await me.goto(`/me/landings/${creator.publicId}`);
   const links = me.getByRole('region', { name: '외부 링크' });
   await expect(links.getByText('보이는 링크 5/5')).toBeVisible();
   await expect(links.getByRole('button', { name: '링크 추가' })).toHaveCount(0);
@@ -90,10 +90,12 @@ test('운영자: 크리에이터 통계·분포, 슬롯 부여 후 6번째 링�
   await me.reload();
   await expect(links.getByText('보이는 링크 5/6')).toBeVisible();
   await links.getByRole('button', { name: '링크 추가' }).click();
-  await links.getByLabel('표시 이름 (필수)').fill('여섯 번째');
-  await links.getByLabel('주소 (필수)').fill(data.externalUrl('sixth'));
-  await links.getByRole('button', { name: '저장', exact: true }).click();
-  await expect(links.getByText('링크를 추가했어요.')).toBeVisible();
+  const addSheet = me.getByRole('dialog', { name: '새 링크' });
+  await addSheet.getByLabel('표시 이름 (필수)').fill('여섯 번째');
+  await addSheet.getByLabel('주소 (필수)').fill(data.externalUrl('sixth'));
+  await addSheet.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(addSheet).toHaveCount(0);
+  await expect(links.getByText("'여섯 번째' 링크를 추가했어요.")).toBeVisible();
   await expect(links.getByText('보이는 링크 6/6')).toBeVisible();
 
   // 도메인 차단 → 기존 링크 차단
@@ -111,19 +113,22 @@ test('운영자: 크리에이터 통계·분포, 슬롯 부여 후 6번째 링�
   const click = await visitorB.context.request.get(shop.clickUrl, { maxRedirects: 0 });
   expect(click.headers().location).toMatch(/\/notice\?reason=link_unavailable$/);
 
-  // 편집 화면에 차단 표시, 같은 도메인(하위 도메인 포함) 저장 거부
+  // 관리 화면에 차단 표시, 같은 도메인(하위 도메인 포함) 저장 거부
   await me.reload();
-  const shopItem = links.locator('li', { hasText: shop.title });
+  const shopItem = links.getByRole('listitem').filter({ has: me.getByRole('button', { name: `${shop.title} 수정` }) });
   await expect(shopItem.getByText('차단됨', { exact: true })).toBeVisible();
   await expect(shopItem.getByText('크리링이 이 링크를 차단해 방문자에게 보이지 않아요. 사유: E2E 차단')).toBeVisible();
   await expect(links.getByText('보이는 링크 5/6')).toBeVisible();
   await links.getByRole('button', { name: '링크 추가' }).click();
-  await links.getByLabel('표시 이름 (필수)').fill('차단 도메인 링크');
-  await links.getByLabel('주소 (필수)').fill(`https://www.${domain}/other`);
+  const blockedSheet = me.getByRole('dialog', { name: '새 링크' });
+  await blockedSheet.getByLabel('표시 이름 (필수)').fill('차단 도메인 링크');
+  await blockedSheet.getByLabel('주소 (필수)').fill(`https://www.${domain}/other`);
   data.allowConsoleError(/status of 422 .*\/api\/backend\/api\/me\/links$/);
-  await links.getByRole('button', { name: '저장', exact: true }).click();
-  await expect(links.getByText('크리링 차단 목록에 있는 도메인이라 저장할 수 없어요.')).toBeVisible();
-  await expect(links.locator('.item-title', { hasText: '차단 도메인 링크' })).toHaveCount(0);
+  await blockedSheet.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(blockedSheet.getByText('크리링 차단 목록에 있는 도메인이라 저장할 수 없어요.')).toBeVisible();
+  await blockedSheet.getByRole('button', { name: '닫기' }).click();
+  await expect(blockedSheet).toHaveCount(0);
+  await expect(links.getByRole('button', { name: '차단 도메인 링크 수정' })).toHaveCount(0);
 
   // 크리에이터 권한으로 /admin 접근
   await me.goto('/admin');

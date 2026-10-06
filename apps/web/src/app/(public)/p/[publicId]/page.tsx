@@ -2,11 +2,8 @@ import { CRELINK_API_PATHS, CRELINK_WEB_PATHS, type PublicLandingResponse } from
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { cache } from 'react';
-import { DefaultAvatar } from '../../../../components/DefaultAvatar';
-import { Favicon } from '../../../../components/Favicon';
-import { RemoteImage } from '../../../../components/RemoteImage';
+import { Landing } from '../../../../components/landing/Landing';
 import { serverApi, ServerApiError, type ServerApiResult } from '../../../../lib/api/server';
-import { SOCIAL_PLATFORM_LABELS } from '../../../../lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,110 +61,5 @@ function LandingError({ error }: { error: ServerApiError }) {
         크리링 홈으로
       </Link>
     </div>
-  );
-}
-
-function Landing({ landing }: { landing: PublicLandingResponse }) {
-  const links = landing.blocks.flatMap((block) => block.links);
-  const empty =
-    !landing.displayName &&
-    !landing.bio &&
-    !landing.avatarUrl &&
-    landing.socials.length === 0 &&
-    landing.portfolio.length === 0 &&
-    links.length === 0;
-  return (
-    <article className="profile">
-      <header className="profile-head">
-        {landing.avatarUrl ? (
-          <RemoteImage
-            className="profile-avatar"
-            src={landing.avatarUrl}
-            alt={landing.displayName ? `${landing.displayName} 프로필 사진` : '프로필 사진'}
-            width={96}
-            height={96}
-          />
-        ) : (
-          <DefaultAvatar className="profile-avatar" />
-        )}
-        {landing.displayName ? (
-          <h1 className="profile-name">{landing.displayName}</h1>
-        ) : (
-          <h1 className="visually-hidden">크리링 페이지</h1>
-        )}
-        {landing.bio ? <p className="profile-bio">{landing.bio}</p> : null}
-        {empty ? <p className="profile-bio">아직 준비 중인 페이지예요.</p> : null}
-      </header>
-
-      {landing.socials.length > 0 ? (
-        <ul className="social-list" aria-label="SNS 채널">
-          {landing.socials.map((social, index) => (
-            <li key={`${social.platform}-${index}`}>
-              <a className="social-link" href={social.url} rel="noopener">
-                <span className="social-mark" aria-hidden="true">
-                  {SOCIAL_PLATFORM_LABELS[social.platform].mark}
-                </span>
-                <span className="visually-hidden">{SOCIAL_PLATFORM_LABELS[social.platform].name}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {landing.blocks.map((block, blockIndex) =>
-        block.links.length > 0 ? (
-          <section key={blockIndex} aria-label="링크">
-            <ul className="link-list">
-              {block.links.map((link) => (
-                <li key={link.id}>
-                  <a className="link-card" href={link.clickUrl} rel="noopener">
-                    {link.thumbnailUrl ? (
-                      <RemoteImage className="link-thumb" src={link.thumbnailUrl} alt="" width={56} height={56} />
-                    ) : null}
-                    <span className="link-text">
-                      <span className="link-title">
-                        <Favicon src={link.faviconUrl} />
-                        <span>{link.title}</span>
-                      </span>
-                      {link.description ? <span className="link-description">{link.description}</span> : null}
-                    </span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null,
-      )}
-
-      {landing.portfolio.length > 0 ? (
-        <section className="portfolio" aria-labelledby="portfolio-title">
-          <h2 id="portfolio-title">포트폴리오</h2>
-          <ul className="portfolio-grid">
-            {landing.portfolio.map((item) => {
-              const content = (
-                <>
-                  {item.imageUrl ? (
-                    <RemoteImage className="portfolio-image" src={item.imageUrl} alt="" width={320} height={200} />
-                  ) : null}
-                  <span className="portfolio-title">{item.title}</span>
-                  {item.description ? <span className="portfolio-description">{item.description}</span> : null}
-                </>
-              );
-              return (
-                <li key={item.id} className="portfolio-item">
-                  {item.url ? (
-                    <a className="portfolio-card" href={item.url} rel="noopener">
-                      {content}
-                    </a>
-                  ) : (
-                    <div className="portfolio-card">{content}</div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : null}
-    </article>
   );
 }

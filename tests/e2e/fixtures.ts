@@ -1,6 +1,13 @@
 // E2E 공용 fixture. 구글 로그인 대신 개발 DB에 가입 결과 행과 세션 행을 직접 넣고, 브라우저 컨텍스트에 cl_session 쿠키를 심습니다.
 // 만든 사용자·차단 도메인은 테스트가 끝나면 지웁니다. 원리와 실행 방법: tests/e2e/README.md
-import { expect, test as base, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import {
+  expect,
+  test as base,
+  type Browser,
+  type BrowserContext,
+  type BrowserContextOptions,
+  type Page,
+} from '@playwright/test';
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -224,13 +231,13 @@ export class E2EData {
   }
 
   /**
-   * 새 브라우저 컨텍스트. user를 주면 그 사용자의 cl_session 쿠키를 심습니다.
+   * 새 브라우저 컨텍스트. user를 주면 그 사용자의 cl_session 쿠키를 심습니다. `options`로 컨텍스트 설정(예: 터치 모바일)을 덧붙입니다.
    * 외부 요청(사이트 아이콘 등)은 네트워크로 나가지 않게 가짜 응답을 줍니다: favicon은 404, 나머지는 200 빈 문서.
    * Playwright route는 리디렉트된 요청을 가로채지 않으므로 `/c/{id}` 302의 도착지는 DNS 실패로 끝납니다(테스트는 302와 요청만 확인).
    */
-  async session(user?: SeededUser): Promise<Session> {
+  async session(user?: SeededUser, options: BrowserContextOptions = {}): Promise<Session> {
     // 데스크톱 1280px 기본. 390px 확인은 expectMobileFits가 폭을 바꿔 다시 엽니다.
-    const context = await this.browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const context = await this.browser.newContext({ viewport: { width: 1280, height: 800 }, ...options });
     this.contexts.push(context);
     await context.route(
       (url) => !isLocal(url.href),

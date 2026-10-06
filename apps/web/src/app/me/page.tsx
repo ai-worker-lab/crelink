@@ -18,6 +18,9 @@ export default async function MePage() {
   return (
     <div className="app-page">
       <SiteHeader>
+        {landing.ok ? (
+          <Link href={`/me/landings/${encodeURIComponent(landing.data.landing.publicId)}`}>링크 관리</Link>
+        ) : null}
         {me.ok && me.data.role === 'operator' ? <Link href="/admin">운영자 화면</Link> : null}
         <LogoutButton />
       </SiteHeader>
