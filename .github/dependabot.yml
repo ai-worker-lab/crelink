@@ -13,7 +13,13 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  # 운영 이미지 베이스(apps/api·apps/web Dockerfile)
   - package-ecosystem: docker
-    directory: /apps/api
+    directories: [/apps/api, /apps/web]
+    schedule:
+      interval: weekly
+  # 운영 스택 compose의 caddy·alpine 이미지(infra/prod/compose.yaml)
+  - package-ecosystem: docker-compose
+    directory: /infra/prod
     schedule:
       interval: weekly

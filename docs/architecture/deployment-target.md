@@ -1,13 +1,12 @@
 # 배포 대상 아키텍처
 
-**상태: 구성 준비됨, 원격 자원 미생성.** 결정은 [ADR 0010](../adr/0010-prod-deployment-topology.md)(제안), 세부 설계는 [운영 배포·CD 기술 설계](../specs/crelink-prod-deploy.md)입니다. 저장소에는 API 이미지·`infra/prod/`·CD 워크플로가 있고, OCI·Supabase·Vercel 계정과 시크릿이 준비되면 [prod 런북](../../infra/docs/prod-runbook.md)대로 최초 배포합니다. 코드·서비스 설정과 달라지면 구현을 기준으로 이 문서를 같은 변경에서 갱신합니다.
+**상태: 1차 대상(`home-server`) 구성, 운영 적용은 work item 진행 기록 기준.** 결정은 [ADR 0010](../adr/0010-prod-deployment-topology.md)(제안), 세부 설계는 [운영 배포·CD 기술 설계](../specs/crelink-prod-deploy.md), 절차는 [prod 런북](../../infra/docs/prod-runbook.md)입니다. 코드·서비스 설정과 달라지면 구현을 기준으로 이 문서를 같은 변경에서 갱신합니다.
 
 환경별 구성 상태는 [infra/dev](../../infra/dev/README.md), [infra/prod](../../infra/prod/README.md)에, 설정·비밀값 소유권은 [환경과 비밀값 관리](../development/environment-secrets.md)에 기록합니다. 실행 가능한 로컬 설정은 [infra/local/compose.yaml](../../infra/local/compose.yaml)이며 원격 배포 명령이 아닙니다.
 
 ## 목표 배치
 
-- **웹 클라이언트:** Next.js 앱을 Vercel에서 제공(`https://links.shaul.kr`, 임시). 배포는 GitHub Actions의 Vercel CLI. 도메인 API는 NestJS에 둔다.
-- **API·단축 도메인:** Oracle Cloud Infrastructure의 ARM 서버(목표 사양 2 OCPU, 12 GB RAM)에서 Docker Compose(API 컨테이너 + Caddy TLS)로 실행(`https://go.shaul.kr`, 임시). 이미지는 GHCR.
+- **웹·API·단축 도메인:** 배포 대상 서버 1대의 Docker Compose 스택(`infra/prod/compose.yaml`: Caddy + NestJS API + Next.js 웹)에서 함께 실행합니다(`https://links.shaul.kr`·`https://go.shaul.kr`, 임시). 1차 대상은 집 서버 `home-server`(x86_64)이고, 대상 목록은 `infra/prod/targets.json`입니다. 공개는 Cloudflare Tunnel → 스택 Caddy, 관리·배포 접속은 Tailscale이며 서버에 공인 인바운드 포트를 열지 않습니다. 이미지는 GHCR(amd64·arm64 가능)이라 OCI(ARM)·AWS로 옮기거나 대상을 더할 수 있습니다([이식 규칙](../specs/crelink-prod-deploy.md#이식-규칙)).
 - **캐시:** 프로덕션 캐시 제품과 실행 위치는 미정입니다. 로컬 Compose의 Valkey 설정은 프로덕션 배포 결정을 의미하지 않습니다. 제품별 비교는 [Redis와 Valkey 레퍼런스](../references/redis-vs-valkey.md)를 참고하세요.
 - **관계형 데이터베이스:** Supabase 관리형 PostgreSQL 사용. API에서 TLS로 세션 풀러에 연결하며 데이터베이스 포트를 공개 인터넷에 열지 않습니다.
 - **모바일:** Expo + React Native 앱은 Apple App Store와 Google Play를 대상으로 한다.
@@ -16,9 +15,9 @@
 ## 운영상 경계
 
 - Supabase는 PostgreSQL 관리 서비스입니다. 저장소의 local Compose PostgreSQL은 로컬 개발 전용이며, Supabase 프로젝트나 schema를 자동으로 생성하지 않습니다.
-- 저장소에 API 컨테이너 이미지(`apps/api/Dockerfile`), 서버 구성(`infra/prod/`), Vercel 빌드 설정(`apps/web`), CD 워크플로(`.github/workflows/deploy.yml`·`rollback.yml`)가 있습니다. Oracle 서버·Supabase 프로젝트·Vercel 프로젝트·DNS는 사용자가 만들어야 합니다([prod 런북](../../infra/docs/prod-runbook.md)).
-- `infra/local/.env.example`의 자격 증명은 개발 전용입니다. 원격 비밀값은 환경·서비스별로 분리해 주입하고 Git에 커밋하지 않습니다. 실제 주입 수단은 배포 구성 시 정합니다.
-- Oracle 서버의 2 OCPU/12 GB 제한을 고려해 API 자원 사용량을 확인합니다. 캐시를 함께 운영하기로 하면 제품·메모리 제한·eviction 정책·백업·복구·가용성을 함께 결정해야 합니다.
+- 저장소에 컨테이너 이미지(`apps/api/Dockerfile`·`apps/web/Dockerfile`), 운영 스택과 스크립트(`infra/prod/`), 대상별 비밀값 암호문(`infra/prod/secrets/`), CD 워크플로(`.github/workflows/deploy.yml`·`rollback.yml`)가 있습니다. 서버·Supabase 프로젝트·Cloudflare Tunnel·Tailscale 설정은 사용자 계정에서 준비합니다([prod 런북](../../infra/docs/prod-runbook.md)).
+- `infra/local/.env.example`의 자격 증명은 개발 전용입니다. 운영 비밀값은 대상별 SOPS 암호문으로 관리하고 서버만 복호화합니다([환경과 비밀값 관리](../development/environment-secrets.md#원격-비밀값-주입)).
+- 서버 1대에 웹·API가 함께 있으므로 서버 자원과 장애가 두 서비스에 같이 영향을 줍니다. 캐시를 함께 운영하기로 하면 제품·메모리 제한·eviction 정책·백업·복구·가용성을 함께 결정해야 합니다.
 - API는 Supabase PostgreSQL에 대해 TLS를 요구합니다. 연결 수 제한·pooling 설정은 배포 구성 때 검증합니다.
 
 ## 프레임워크별 구현 구조
@@ -33,4 +32,4 @@
 
 ## 공유 계약과 배포 경계
 
-`packages/shared`는 API route와 직렬화 가능한 DTO/type만 제공한다. 데이터베이스 접근, 비밀값, UI state, 도메인 service는 공유 패키지에 넣지 않는다. NestJS API가 단일 도메인 경계이며 Next.js와 Expo는 같은 계약을 소비한다. 웹과 API, iOS/Android 앱은 각각 독립 배포한다.
+`packages/shared`는 API route와 직렬화 가능한 DTO/type만 제공한다. 데이터베이스 접근, 비밀값, UI state, 도메인 service는 공유 패키지에 넣지 않는다. NestJS API가 단일 도메인 경계이며 Next.js와 Expo는 같은 계약을 소비한다. 웹과 API는 이미지가 따로이고 바뀐 쪽만 새 이미지로 바뀌지만 같은 릴리스로 함께 배포·롤백한다. iOS/Android 앱은 독립 배포한다.

@@ -1,89 +1,175 @@
 # 크리링 운영(prod) 배포와 CD 기술 설계
 
-- 상태: 승인 (2026-10-06, 사용자가 호스팅·DB·도메인·배포 트리거를 선택. 세부 `[임시값]`은 운영하며 조정)
+- 상태: 승인 (2026-10-06, 사용자가 배포 대상·CI 접속·비밀값·공개 경로를 선택. 세부 `[임시값]`은 운영하며 조정)
 - 작성일: 2026-10-06
 - 에픽: `docs/work/epics/0024-prod-deploy.md`
 - 입력: [ADR 0010](../adr/0010-prod-deployment-topology.md)(제안), [배포 대상 아키텍처](../architecture/deployment-target.md), [환경과 비밀값 관리](../development/environment-secrets.md), 기존 [CI](../development/verification.md#ci), [MVP 기술 설계](crelink-mvp.md)
 
-`[사용자 준비]`는 저장소가 아니라 사용자가 계정·콘솔에서 해야 하는 일입니다.
+이 문서가 운영 배포의 설계 원본입니다. 사람이 따라 하는 절차는 [prod 런북](../../infra/docs/prod-runbook.md), 실행 가능한 원본은 [`infra/prod/`](../../infra/prod/README.md)와 `.github/workflows/deploy.yml`·`rollback.yml`입니다. `[사용자 준비]`는 저장소가 아니라 사용자가 계정·콘솔에서 하는 일입니다.
 
 ## 구성
 
-```text
-방문자 ──https──▶ links.shaul.kr (Vercel, Next.js)
-                     │ BFF·서버 컴포넌트: https://go.shaul.kr/api/... + X-Crelink-Internal 토큰
-                     ▼
-인스타 링크 ─https─▶ go.shaul.kr ─▶ oci-server: 공용 edge Caddy(/opt/edge, 80·443)
-                                      ├─ go.shaul.kr ──▶ crelink-api:3000 (/opt/crelink, 네트워크 edge) ──TLS──▶ Supabase(세션 풀러)
-                                      └─ aichat-api.shaul.kr ──▶ ai-character-chat-backend-api-1:3000 (기존 다른 프로젝트)
+```mermaid
+flowchart LR
+  V["방문자 · 인스타그램 링크"] -->|https| CF["Cloudflare (TLS)"]
+  CF -->|Tunnel| CFD["cloudflared (서버 호스트, systemd)"]
+  CFD -->|"127.0.0.1:18080"| C
+  subgraph S["Compose project crelink-prod"]
+    C["caddy (Caddyfile, http)"] -->|"go.shaul.kr: GET /slug, GET /c/id"| A["api:3000"]
+    C -->|"links.shaul.kr 전체"| W["web:3000"]
+    W -->|"API_INTERNAL_URL=http://api:3000"| A
+  end
+  A -->|"TLS verify-full"| DB[("Supabase 세션 풀러 :5432")]
+  GHA["GitHub Actions (호스트 러너)"] -->|"Tailscale tag:ci → tcp/22"| E["deploy 사용자 forced command (ssh-entry.sh)"]
+  E -->|"deploy.sh · rollback.sh"| S
+  GHA -->|"이미지 push"| R["GHCR"]
+  E -->|"이미지 pull (job 토큰)"| R
 ```
 
 | 항목 | 값 |
 | --- | --- |
-| 웹 | `https://links.shaul.kr` = `WEB_URL`. Google 리디렉션 URI `https://links.shaul.kr/auth/google/callback` |
-| API·단축 | `https://go.shaul.kr` = `SHORT_LINK_BASE_URL`, 웹의 `API_INTERNAL_URL` `[임시값, 정식 도메인이 정해지면 교체]` |
-| DNS(`shaul.kr`, Cloudflare) | `go` A → `193.122.104.153` **프록시 켬(주황 구름)**, `links` CNAME → Vercel이 안내하는 값(**DNS only 권장**, Vercel이 앞단 리버스 프록시를 권장하지 않음) `[사용자 준비]`(사용자 결정 2026-10-06: Cloudflare 프록시 사용). Cloudflare SSL/TLS 모드는 **Full (strict)**. 방문자 IP는 edge Caddy가 Cloudflare 대역에서 온 요청만 `CF-Connecting-IP`를 믿어 `{client_ip}`로 정하고, API에는 `X-Forwarded-For: <client_ip>` 하나만 보냅니다(`TRUSTED_PROXY_HOPS=1` 그대로). |
-| 서버 | 기존 `oci-server`(`193.122.104.153`, Ubuntu 26.04 ARM, 2 OCPU·11GB, Docker 29·Compose 2.40). 이미 `ai-character-chat`이 같은 서버에서 동작 중이라 80·443은 서버 공용 edge Caddy가 맡습니다(사용자 결정 2026-10-06). |
-| 배포 접속 | 사용자 `deploy`(docker 그룹, sudo 없음), 배포 전용 ed25519 키. `/opt/crelink`·`/opt/edge` 소유 |
-| DB | Supabase 프로젝트 1개(prod 전용). `DATABASE_URL` = 세션 풀러 주소 + TLS |
+| 웹 | `https://links.shaul.kr` = `WEB_URL`. Google 리디렉션 URI `https://links.shaul.kr/auth/google/callback` `[임시값]` |
+| 단축 | `https://go.shaul.kr` = `SHORT_LINK_BASE_URL` `[임시값, 정식 도메인이 정해지면 교체]` |
+| 배포 대상 | `infra/prod/targets.json`의 `enabled` 항목. 지금 `home-server` 하나(Ubuntu 24.04 x86_64, Tailscale MagicDNS 이름 `home-server`, 플랫폼 `linux/amd64`) |
+| 공개 | Cloudflare 원격 관리형 Tunnel(home-server는 기존 Tunnel `my-home-server`)의 공개 호스트 `go.shaul.kr`·`links.shaul.kr` → `http://localhost:18080` `[사용자 준비]`. 서버 공인 인바운드 포트 없음 |
+| 관리·배포 접속 | Tailscale. CI는 임시 노드(`tag:ci`)로 서버 `deploy` 사용자 SSH(22)만 |
+| DB | Supabase 프로젝트 1개(prod 전용). `DATABASE_URL` = Supavisor 세션 모드(5432), TLS `verify-full` |
+| 이미지 | `ghcr.io/ai-worker-lab/crelink-api:<SHA>`(`apps/api/Dockerfile`), `ghcr.io/ai-worker-lab/crelink-web:<SHA>`(`apps/web/Dockerfile`, Next.js `output: 'standalone'`) |
 
-## Caddy 공개 정책 (`go.shaul.kr`)
+스택은 대상 서버의 다른 서비스(home-server의 호스트 Caddy 등)와 독립입니다. 호스트에 여는 포트는 caddy의 `127.0.0.1:${CRELINK_HTTP_PORT:-18080}` 하나입니다.
 
-- 서버 공용 edge Caddy(`infra/prod/edge/`, 서버 `/opt/edge`, Compose project `edge`)가 80·443을 맡고 `sites/*.caddy`를 import합니다. 크리링 사이트 파일은 `infra/prod/crelink.caddy`이고 `deploy.sh`가 `/opt/edge/sites/`로 반영한 뒤 reload합니다.
-- 공개: `GET /{slug}`(3~30자 `[a-z0-9-]`), `GET /c/{id}` → API.
-- `/api/*`: 요청 헤더 `X-Crelink-Internal`이 edge의 환경변수 `CRELINK_INTERNAL_TOKEN`과 같을 때만 API로 전달, 아니면 404. 웹(Vercel)이 서버 측 호출마다 이 헤더를 붙입니다. 브라우저는 `go.shaul.kr/api`를 직접 부르지 않습니다.
-- 그 밖의 경로는 404. 크리링 API 컨테이너는 호스트 포트를 열지 않고 외부 네트워크 `edge`(alias `crelink-api`)에서만 Caddy가 접근합니다.
-- 클라이언트 IP: Caddy가 `X-Forwarded-For`를 덧붙이고 API는 `TRUSTED_PROXY_HOPS=1`일 때만 그 값을 신뢰합니다(기본 0=소켓 주소, 로컬·테스트와 같음). 방문 기록의 IP·위치(R9)가 Caddy 주소가 되지 않게 합니다.
+## 공개 경로와 Caddy 정책
 
-## 환경변수
+원본은 [`infra/prod/Caddyfile`](../../infra/prod/Caddyfile)입니다.
 
-| 위치 | 키 | 설명 |
+- 전역: `admin off`, `auto_https off`(TLS는 Cloudflare), `trusted_proxies static private_ranges` + `client_ip_headers CF-Connecting-IP`. Caddy에 붙는 것은 같은 호스트의 cloudflared뿐이라 사설 대역에서 온 `CF-Connecting-IP`를 방문자 주소(`{client_ip}`)로 믿습니다. 접근 로그는 켜지 않습니다.
+- `http://{$CRELINK_SHORT_HOST:go.shaul.kr}`: `GET ^/[A-Za-z0-9][A-Za-z0-9-]{1,28}[A-Za-z0-9]$`(단축, `SLUG_PATTERN`·3~30자, API가 소문자로 찾음)와 `GET ^/c/[a-z0-9]{10}$`(클릭)만 `api:3000`으로, 나머지(`/api/*` 포함)는 404.
+- `http://{$CRELINK_WEB_HOST:links.shaul.kr}`: 전부 `web:3000`. `request_body max_size 6MB`(이미지 한도 `CRELINK_LIMITS.imageMaxBytes` 4MB + multipart 여유, 넘으면 413).
+- 업스트림에는 `X-Forwarded-For: {client_ip}` 하나만 보냅니다. 클라이언트가 보낸 `X-Forwarded-For`는 버려지고 API는 `TRUSTED_PROXY_HOPS=1`로 그 값을 방문·클릭 IP(R9)로 씁니다.
+- 웹의 서버 컴포넌트·BFF·구글 로그인 route handler는 compose 내부 네트워크 `http://api:3000`으로 API를 부릅니다. 웹 코드의 `API_INTERNAL_TOKEN`(`X-Crelink-Internal` 헤더) 기능은 남아 있지만 운영에서는 값을 두지 않습니다.
+- `:2020/healthz`는 caddy 컨테이너 헬스체크 전용이고 호스트에 열지 않습니다.
+
+## 서버 배치
+
+원본은 [`infra/prod/lib.sh`](../../infra/prod/lib.sh) 머리말과 `bootstrap.sh`입니다.
+
+| 경로 | 내용 |
+| --- | --- |
+| `/opt/crelink/releases/<SHA>/` | 커밋 SHA의 `infra/prod` 사본(시험·README·`*.example` 제외). 성공하면 `.images.env`(그 릴리스의 `API_IMAGE`·`WEB_IMAGE`)를 남김 |
+| `/opt/crelink/current` | 운영 중인 릴리스를 가리키는 심볼릭 링크 |
+| `/opt/crelink/state/images.env` | 운영 중인 `API_IMAGE`·`WEB_IMAGE`(compose `--env-file`) |
+| `/opt/crelink/state/releases.log` | 탭 구분: UTC 시각 / 동작(`deploy`·`rollback`·`restore`) / 이전 릴리스 / 새 릴리스 / API 이미지 / 웹 이미지 |
+| `/etc/crelink/target` | 대상 이름(`targets.json`의 `name`). `secrets/<이름>.sops.env`를 고름 |
+| `/etc/crelink/age.key` | 서버 age 개인키(root:deploy 640) |
+| `/run/crelink/` | tmpfs(systemd-tmpfiles, deploy 0700). 복호화한 `app.env`를 compose 실행 동안만 둠 |
+| `/usr/local/lib/crelink/ssh-entry.sh` | `deploy` SSH forced command(root 소유, `bootstrap.sh`만 설치) |
+
+- Compose project 이름은 `crelink-prod`로 고정이라 릴리스 폴더가 바뀌어도 볼륨 `crelink-prod_uploads`·`crelink-prod_geoip`가 유지됩니다.
+- 서비스: `caddy`(`caddy:2.11.7-alpine`, 읽기 전용 루트), `api`(이미지 HEALTHCHECK `/api/health/ready`, 볼륨 uploads·geoip(ro)·`./certs`(ro)), `web`(이미지 HEALTHCHECK `/privacy`, 읽기 전용 루트), 도구 프로필 `geoip-writer`(`alpine:3.22`, `geoip.sh`만 사용). `caddy`는 `api`·`web`이 healthy일 때 뜹니다.
+
+## 비밀값과 환경변수
+
+| 위치 | 키 | 비고 |
 | --- | --- | --- |
-| 서버 `/opt/crelink/.env`(Git 제외, 권한 600) | `API_IMAGE`(GHCR 이미지·태그, 배포가 갱신), `DATABASE_URL`, `DATABASE_SSL`·`DATABASE_SSL_CA_PATH`(Supabase TLS), `PORT=3000`, `WEB_URL`, `SHORT_LINK_BASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPERATOR_EMAILS`, `UPLOAD_DIR=/data/uploads`, `GEOIP_MMDB_PATH=/data/geoip/dbip-city-lite.mmdb`, `TRUSTED_PROXY_HOPS=1` | API가 읽음 |
-| 서버 `/opt/edge/.env` | `CRELINK_DOMAIN=go.shaul.kr`, `CRELINK_INTERNAL_TOKEN` | edge Caddy가 읽음 |
-| Vercel(production) | `API_INTERNAL_URL=https://go.shaul.kr`, `API_INTERNAL_TOKEN`(=`CRELINK_INTERNAL_TOKEN`) | 서버 전용 변수, `NEXT_PUBLIC_*` 아님 |
-| GitHub Actions secrets | `OCI_HOST`, `OCI_USER`, `OCI_SSH_KEY`(배포 전용 키), `OCI_KNOWN_HOSTS` — **등록 완료(2026-10-06)**. `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` — 미등록 | GHCR 푸시·서버 pull 모두 job의 `GITHUB_TOKEN`(푸시 `packages: write`, 서버 pull은 `packages: read` 토큰을 stdin으로 넘겨 일회성 로그인). 서버에 장기 레지스트리 토큰을 두지 않습니다. |
+| `infra/prod/secrets/<대상>.sops.env`(암호화) | `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPERATOR_EMAILS` | API가 읽음(compose `env_file` = `/run/crelink/app.env`) |
+| 같은 파일(평문, `.sops.yaml`의 `unencrypted_regex`) | `PORT=3000`, `WEB_URL`, `SHORT_LINK_BASE_URL`, `DATABASE_SSL=verify-full`, `DATABASE_SSL_CA_PATH=/etc/crelink/certs/supabase-ca.crt`, `UPLOAD_DIR=/data/uploads`, `GEOIP_MMDB_PATH=/data/geoip/dbip-city-lite.mmdb`, `TRUSTED_PROXY_HOPS=1` | diff로 검토할 수 있게 평문 |
+| `infra/prod/certs/supabase-ca.crt` | Supabase 루트 CA(공개 인증서) | api 컨테이너 `/etc/crelink/certs`에 읽기 전용 마운트 |
+| `compose.yaml` `web.environment` | `API_INTERNAL_URL=http://api:3000` | `API_INTERNAL_TOKEN`은 두지 않음 |
+| `compose.yaml` 변수 기본값 | `CRELINK_HTTP_PORT`(18080), `CRELINK_SHORT_HOST`(`go.shaul.kr`), `CRELINK_WEB_HOST`(`links.shaul.kr`) | 지금은 기본값만 씀. 대상별로 달라지면 전달 경로를 추가(후속) |
+| 서버 `state/images.env` | `API_IMAGE`, `WEB_IMAGE` | `deploy.sh`·`rollback.sh`만 씀. 형식 `infra/prod/images.env.example` |
+| `.sops.yaml` | 수신자 `operator`(운영자 키: macOS 키체인 `crelink-sops-age` + 운영자 비밀번호 관리자 백업), `home-server`(서버 `/etc/crelink/age.key`) | 대상 추가 시 그 서버 공개키를 수신자에 넣고 `sops updatekeys` |
+| GitHub Actions variables | `TS_OIDC_CLIENT_ID`, `TS_OIDC_AUDIENCE` | Tailscale workload identity federation. 비밀 아님 |
+| GitHub Actions secret | `DEPLOY_SSH_KEY` | `deploy` 사용자 배포 키(forced command) |
+| job `GITHUB_TOKEN` | GHCR push(`packages: write`), 서버 pull(`packages: read`) | 서버 pull은 SSH stdin 첫 줄로 넘겨 일회 로그인 후 로그아웃. 서버·secrets에 레지스트리 장기 토큰 없음 |
+
+- CI에는 앱 비밀값이 없습니다. 평문 비밀값은 서버의 `/run/crelink/app.env`에 compose 실행 동안만 있고 끝나면 지웁니다(실행 중 컨테이너 환경에는 남음).
+- API는 `NODE_ENV=production`(이미지)에서 필수 키 누락·https 아님을 기동 단계에서 거부합니다([API 문서](../../apps/api/docs/README.md#환경변수)).
+
+## 릴리스·배포·롤백
+
+릴리스 = 커밋 SHA의 `infra/prod` 묶음(compose·Caddyfile·인증서·암호문·스크립트) + API 이미지 + 웹 이미지입니다. 설정·비밀값도 릴리스와 함께 배포·롤백됩니다.
+
+1. `ssh-entry.sh deploy <릴리스 SHA> <API SHA|-> <웹 SHA|->`: 인자 형식을 다시 검사하고, stdin 첫 줄(`<GHCR 사용자> <토큰>`) 뒤의 `infra/prod` tar.gz를 `releases/.incoming.*`에 풀어 `releases/<SHA>`로 옮긴 뒤 그 안의 `deploy.sh`를 실행합니다. `-`는 그 영역의 운영 중 이미지를 유지합니다(첫 배포는 둘 다 SHA).
+2. `deploy.sh`: 이미지 결정 → **아무것도 바꾸기 전에** 복호화·`docker compose config --quiet` 확인 → 레지스트리 로그인·없는 이미지만 pull·로그아웃 → `releases.log` 기록 → app.env 복호화·`images.env`·`current` 교체 → `docker compose up -d --remove-orphans --wait --wait-timeout 120`(caddy·api·web 헬스) → app.env 삭제.
+3. 성공하면 릴리스 폴더에 `.images.env`를 남기고 최근 5개와 운영 중인 것 외의 릴리스 폴더를 지웁니다. 마지막 줄은 `<릴리스> <API 이미지> <웹 이미지>`, 종료 0.
+4. 헬스 실패면 최근 로그 30줄을 출력하고 직전 릴리스·이미지로 다시 올립니다(`restore` 기록). 복구 성공이면 종료 1, 복구도 실패면 종료 2. 되돌릴 이전 상태가 없으면(첫 배포) 실패 상태로 남고 종료 1.
+5. `rollback.sh [릴리스 SHA]`(`ssh-entry.sh rollback`이 `current/rollback.sh`를 실행): 인자가 없으면 `releases.log`에서 지금 릴리스를 배포한 마지막 `deploy` 줄의 이전 릴리스를 고릅니다(`rollback` 줄은 보지 않으므로 연달아 실행하면 배포 이력을 한 단계씩 거슬러 감). 대상 폴더와 `.images.env`가 남아 있어야 하고(최근 5개), 이미지가 서버에 없을 때만 pull합니다. 실패 처리·종료 코드는 `deploy.sh`와 같습니다.
+6. `ssh-entry.sh status`: 운영 릴리스, `images.env`, `releases.log` 마지막 5줄.
+
+컨테이너를 다시 만드는 동안 수 초 동안 502가 날 수 있습니다(서비스당 컨테이너 1개, 무중단 아님).
+
+## 워크플로
+
+| 워크플로·job | 내용 |
+| --- | --- |
+| `ci.yml` `이미지 빌드 api`·`web` | PR·main push마다 두 이미지를 `linux/amd64`로 빌드만 합니다(푸시 없음, gha 캐시) |
+| `deploy.yml` 트리거 | `workflow_run`(`CI` 성공, main push) 또는 main에서 `workflow_dispatch`(`force`: 변경과 무관하게 두 이미지 새로 빌드). 동시 실행 그룹 `deploy-prod`(취소 안 함, `rollback.yml`과 공유) |
+| `plan` | 배포 커밋, 변경 영역(태그 기준: `api` ← `deploy/prod-api` 이후 `apps/api/`·`packages/shared/`·`pnpm-lock.yaml`·`.dockerignore`, `web` ← `deploy/prod-web` 이후 `apps/web/`·`packages/shared/`·`packages/design-tokens/`·같은 두 파일, `release` ← `deploy/prod` 이후 위 경로나 `infra/prod/`. 태그가 없으면 그 영역 예), `targets.json`의 `enabled` 대상 matrix와 플랫폼 합집합, 접속 설정 준비 여부(`vars.TS_OIDC_*`·`DEPLOY_SSH_KEY`가 없으면 배포를 건너뛰고 경고) |
+| `image` | matrix `api`·`web` 중 바뀐 영역만 GHCR `:<SHA>`로 push. 플랫폼에 arm64가 있을 때만 QEMU |
+| `deploy` | 대상 matrix(`max-parallel: 1`, `fail-fast`). `release`가 예이고 접속 설정이 있을 때. Tailscale(OIDC, `tag:ci`, 대상 `ping`) → `ssh deploy@<host> "deploy <SHA> <api SHA|-> <web SHA|->"`, stdin = GHCR 사용자·토큰 + `infra/prod` tar.gz(`tests`·`README.md`·`*.example`·`.env` 제외). 호스트 신원은 Tailscale이 보증하므로 `StrictHostKeyChecking accept-new` |
+| `verify-prod` | 운영 주소 6개: 웹 `/` 200, `/privacy` 200, BFF `/api/backend/api/health` 200, `go.shaul.kr/zzz-e2e-none` 302 → `https://links.shaul.kr/notice?reason=link_not_found`, `go.shaul.kr/api/health` 404 |
+| `rollback-on-failure` | `verify-prod`가 실패하면 대상마다 `rollback`(직전 릴리스) 후 워크플로 실패 |
+| `record` | 성공 시 태그 `deploy/prod`와 바뀐 영역의 `deploy/prod-api`·`deploy/prod-web`를 배포 커밋으로 옮김(다음 변경 비교 기준) |
+| `rollback.yml` | main에서 `workflow_dispatch`(입력 `target` 기본 `home-server`, `release` SHA 선택) → Tailscale → `ssh deploy@<host> "rollback [SHA]"` → 운영 주소 3개(웹 `/`, BFF health, 단축 302) |
+
+## DB migration 운영 규칙
+
+API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 풀러 6543 금지) 새 컨테이너가 헬스에 실패하면 이전 릴리스로 돌아갑니다. 롤백된 이전 코드가 새 스키마에서도 동작해야 하므로 컬럼·테이블 삭제는 쓰는 코드를 먼저 배포한 다음 배포에서 합니다(expand/contract).
+
+## 보안 경계와 한계
+
+- **GitHub Free 조직의 비공개 저장소**: 브랜치 보호·environment secrets·deployment branches가 없어 push 권한이 있으면 워크플로를 고쳐 모든 secret을 읽을 수 있습니다. 그래서 CI에는 앱 비밀값을 두지 않고, tailnet 진입은 Tailscale workload identity의 `sub` 조건(`repo:ai-worker-lab/crelink:ref:refs/heads/main`)으로 main 브랜치 job만 허용합니다. `DEPLOY_SSH_KEY`가 새도 tailnet 밖에서는 쓸 수 없고, tailnet 안에서도 forced command 세 가지만 됩니다.
+- **main 병합 = 서버 실행 권한**: main의 `infra/prod/compose.yaml`이 서버에서 복호화된 비밀값과 함께 실행됩니다. main에 병합할 수 있는 사람(에이전트 포함)은 비밀값을 읽는 컨테이너를 넣을 수 있습니다. 운영자가 `infra/prod/` 변경을 리뷰하는 것이 통제 수단입니다(별도 운영 저장소 대안은 ADR 0010).
+- **docker 그룹 = root**: `deploy`는 docker 그룹이라 서버 root와 같습니다. 배포 키는 forced command(`restrict`, 셸·포워딩 없음)로 줄이고, 운영자 관리 접속은 Tailscale로 별도입니다.
+- **Tailscale Personal 무료 플랜은 비상업 조건**입니다. 상업 운영 전 Standard 등으로 바꿉니다. ephemeral 노드 사용량 한도도 이 플랜 기준입니다.
+- **방문자 IP 신뢰**: Caddy는 사설 대역에서 온 `CF-Connecting-IP`를 믿습니다. 호스트 포트를 127.0.0.1에만 열어 외부 위조를 막고, 이 포트를 공인 주소에 열지 않습니다.
+- **단일 서버·가정 회선**: 서버·회선 장애가 곧 서비스 장애입니다. 업로드는 서버 볼륨에 있습니다.
+- 평문 비밀값은 실행 중 컨테이너 환경(`docker inspect`)에서는 보입니다. 서버 root·docker 그룹 접근을 줄이는 것으로 막습니다.
+
+## 이식 규칙
+
+다른 대상(OCI ARM, AWS 등)으로 옮기거나 추가할 때 같은 절차가 되도록 지킵니다. 절차는 [런북 "배포 대상 추가와 Tunnel 전환"](../../infra/docs/prod-runbook.md#10-배포-대상-추가와-tunnel-전환)입니다.
+
+1. 배포 단위는 불변 이미지 SHA + 저장소 `infra/prod` + 대상별 sops 파일뿐입니다. 서버에서 손으로 고친 파일·서버에만 있는 스크립트·`latest` 태그를 두지 않습니다. 대상별 차이는 `targets.json` 항목과 `secrets/<대상>.sops.env`에만 둡니다.
+2. 이미지는 멀티 아키텍처로 만들 수 있게 유지합니다. API는 `$BUILDPLATFORM` 교차 빌드를 유지하고 native 애드온 의존성을 피합니다. 런타임 베이스는 amd64·arm64를 모두 내는 이미지만 씁니다.
+3. 공개는 어디서나 Cloudflare Tunnel → 스택 Caddy입니다. 서버에 공인 인바운드를 열지 않고 Caddyfile을 대상별로 나누지 않습니다. 호스트 이전은 Tunnel 공개 호스트(또는 CNAME)를 새 대상 Tunnel로 바꾸는 것으로 합니다.
+4. 업로드는 S3 호환 저장소(SeaweedFS `s3.shaul.kr` 또는 Cloudflare R2)로 옮깁니다(후속). 그 전까지 이전에는 `uploads` 볼륨 복사가 필요합니다.
+5. 관리 접속은 Tailscale 하나로 통일합니다.
+6. 비밀 원본은 sops 암호문이고 CI에 두지 않습니다.
+7. 헬스·롤백 계약(이미지 HEALTHCHECK, `up --wait`, 실패 시 직전 릴리스, `releases.log`)을 대상과 무관하게 유지합니다.
+8. 서버 준비는 `bootstrap.sh`로 재현합니다. 서버가 2대 이상이 되거나 관리형으로 옮기면 OpenTofu를 검토합니다. 무중단 배포가 필요해지면 Kamal을 후보로 봅니다.
 
 ## 변경 범위
 
 | 티켓 | 역할 | 내용 |
 | --- | --- | --- |
-| 0025 | api | `apps/api/Dockerfile`(arm64 런타임, 빌드는 빌더 플랫폼에서 해 QEMU 없이), 컨테이너 헬스체크, `TRUSTED_PROXY_HOPS`, Supabase TLS 접속(`DATABASE_SSL`·CA), 운영 필수 설정 검증(`NODE_ENV=production`에서 필수 키 누락 시 기동 거부), 통합 테스트 |
-| 0026 | web | 서버 측 API 호출·BFF에 `X-Crelink-Internal` 헤더(`API_INTERNAL_TOKEN`), Vercel 배포 설정(`vercel.json`·모노레포 빌드), 환경변수 문서 |
-| 0027 | infra | `infra/prod/`: `compose.yaml`(API만, 네트워크 `edge`), `crelink.caddy`, `edge/`(공용 edge Caddy compose·Caddyfile·`sites/aichat.caddy`), `.env.example`, 서버 부트스트랩, 배포·롤백 스크립트(`deploy.sh`), 런북(OCI·Supabase·Vercel·DNS·Google 콘솔, edge 전환·롤백, 백업·복구), `infra/CHANGELOGS.md` |
-| 0028 | orchestrator | `.github/workflows/deploy.yml`(이미지 빌드 → API 배포 → 웹 배포 → 배포 후 검사, 자동 롤백), `rollback.yml`(수동), CI에 이미지 빌드 검증, `dependabot.yml`, 문서 |
-| 0029 | orchestrator | 사용자 계정·시크릿이 준비된 뒤 최초 prod 프로비저닝 실행과 실서비스 검증(사용자 준비물 필요) |
+| 0025 | api | `apps/api/Dockerfile`(빌더 플랫폼에서 빌드해 대상 플랫폼 런타임으로 옮김, amd64·arm64), 컨테이너 헬스체크, `TRUSTED_PROXY_HOPS`, Supabase TLS(`DATABASE_SSL`·CA), 운영 필수 설정 검증, 통합 테스트 |
+| 0026 | web | 웹 운영 컨테이너 이미지(`apps/web/Dockerfile`, `output: 'standalone'`, 헬스체크 `/privacy`), 서버 측 API 호출 헤더 공용화(`apiRequestHeaders()`, 내부 토큰 기능은 남지만 운영 미사용), 환경변수 문서 |
+| 0027 | infra | `infra/prod/`: `compose.yaml`(caddy·api·web), `Caddyfile`, `targets.json`, `secrets/`·`certs/`, `lib.sh`·`deploy.sh`·`rollback.sh`·`ssh-entry.sh`·`geoip.sh`·`bootstrap.sh`, 로컬 시험, 런북, `infra/CHANGELOGS.md` |
+| 0028 | orchestrator | `.github/workflows/deploy.yml`·`rollback.yml`, CI `이미지 빌드`, `.sops.yaml`, `.dockerignore`, `dependabot.yml`, 문서 |
+| 0029 | orchestrator | home-server 준비(bootstrap·age 키·Tailscale·Tunnel), 최초 배포와 실서비스 검증 |
 
-## CD 흐름 (`deploy.yml`)
+## 위험·후속 `[임시값]`
 
-1. 트리거: `workflow_run`(`CI` 성공, `main`) 또는 `workflow_dispatch`. 동시 실행 그룹 `deploy-prod`(취소 안 함).
-2. `plan`: 영역별 마지막 성공 배포 태그(`deploy/prod-api`·`deploy/prod-web`)와 비교해 `apps/api/**`·`packages/shared/**`·`infra/prod/**` 변경 시 API 배포, `apps/web/**`·`packages/shared/**`·`packages/design-tokens/**` 변경 시 웹 배포. 시크릿이 없으면 해당 영역을 건너뜁니다.
-3. `api-image`: buildx로 `linux/arm64` 이미지를 빌드해 `ghcr.io/ai-worker-lab/crelink-api:<SHA>`로 푸시.
-4. `deploy-api`: `infra/prod/`(edge 제외)를 `/opt/crelink`로 rsync하고 SSH로 `deploy.sh <SHA>` 실행: GHCR 로그인(일회용 토큰) → pull → 이전 태그 기록 → `docker compose up -d` → 컨테이너 헬스를 최대 60초 확인 → 실패하면 이전 태그로 되돌리고 워크플로를 실패 처리 → 성공하면 크리링 사이트 파일을 edge에 반영·reload → 로그아웃.
-5. `deploy-web`: `vercel pull`·`vercel build --prod`·`vercel deploy --prebuilt --prod`. 배포 URL이 아니라 운영 도메인으로 `/`·`/api/backend/api/health`를 확인하고 실패하면 이전 배포로 `vercel rollback`.
-6. `verify-prod`: 운영 주소 smoke(`GET https://links.shaul.kr/` 200, `GET https://go.shaul.kr/zzzz` 302 notice, `GET https://go.shaul.kr/api/health` 404 — 토큰 없이 닫혀 있음).
-7. 수동 롤백 `rollback.yml`: 입력 `target`(api|web|both), `api_tag`(기본 서버가 기록한 이전 태그), 웹은 `vercel rollback`.
-
-## DB migration 운영 규칙
-
-API 기동 시 migration이 돌고(advisory lock) 새 컨테이너가 헬스체크에 실패하면 이전 이미지로 돌아갑니다. 롤백된 이전 코드가 새 스키마에서도 동작해야 하므로 컬럼·테이블 삭제는 쓰는 코드를 먼저 배포한 다음 배포에서 합니다(expand/contract).
-
-## 위험·미정 `[임시값]`
-
-- Vercel Hobby는 상업적 사용 불가. 수익 서비스 전환 전 Pro 필요.
 - Supabase 무료 플랜: 자동 일시정지·백업 제한. 출시 전 유료 전환 또는 백업 절차 필요.
-- 업로드 이미지는 서버 볼륨. 서버 교체 대비 `FileStorage`를 Supabase Storage로 옮기는 후속 작업과 볼륨 백업 필요.
-- GeoIP 파일은 서버에서 월 1회 갱신(`deploy.sh geoip` 또는 크론). 없으면 위치만 비어 있음.
-- 단축 도메인(`go.shaul.kr`)은 임시. 정식 도메인이 정해지면 `SHORT_LINK_BASE_URL`·Caddy 도메인·Vercel `API_INTERNAL_URL`·DNS를 함께 바꿉니다. 이미 인스타그램에 걸린 링크는 옛 도메인이 유지되어야 합니다.
-- 속도 제한(rate limit)·WAF는 Cloudflare 앞단 기능(무료 플랜 범위)으로 시작하고, 부족하면 Caddy 쪽을 추가합니다(후속). Cloudflare 대역 목록(`infra/prod/edge/Caddyfile`의 `trusted_proxies`)은 바뀔 수 있어 분기마다 확인합니다. 서버 IP로 직접 들어오는 요청은 Cloudflare를 우회하지만 그 경우 방문자 IP는 접속 주소로 기록됩니다(위조 불가). 원본 서버를 Cloudflare 대역만 허용하도록 막는 것은 후속.
-- SSH 키 방식 배포는 서버 접근 권한을 CI에 위임합니다. 배포 전용 키와 사용자를 쓰고 키는 정기 교체합니다.
+- 업로드 S3 이전(`docs/work/orchestrator/0030-uploads-s3-storage.md`). 그 전까지 `uploads` 볼륨 백업은 런북 절차.
+- OCI 대상 추가는 필요할 때 `targets.json`에 `enabled: false`로 준비한 뒤 런북대로. 웹 이미지 arm64 빌드(QEMU) 시간은 그때 확인하고, 느리면 네이티브 arm64 러너로 나눕니다.
+- 대상별로 다른 호스트·포트가 필요해지면 compose 변수 전달 경로를 추가합니다(지금은 기본값).
+- GeoIP 파일은 서버에서 월 1회 갱신(`geoip.sh --restart`, 런북). 없으면 위치만 비어 있음.
+- 단축 도메인(`go.shaul.kr`)은 임시. 정식 도메인이 정해지면 `SHORT_LINK_BASE_URL`·Caddy 호스트·Tunnel 공개 호스트를 함께 바꿉니다. 이미 인스타그램에 걸린 링크는 옛 도메인이 유지되어야 합니다.
+- 속도 제한(rate limit)·WAF는 Cloudflare 무료 기능으로 시작하고 부족하면 Caddy 쪽을 추가합니다(후속).
+- 이미지 한도 4MB는 MVP 임시값입니다. 스택 Caddy의 `request_body` 6MB가 웹 호스트 본문 상한입니다.
 
 ## 검증 계획
 
-- 로컬: API 이미지를 빌드해(`linux/arm64`) 로컬 PostgreSQL에 붙여 기동·헬스체크, `TRUSTED_PROXY_HOPS`와 DB TLS 옵션 단위·통합 테스트, `infra/prod/compose.yaml`을 `docker compose config`로 검사, Caddy 라우팅(내부 토큰 유무·단축 경로)을 로컬 컨테이너로 실행해 curl 확인, `pnpm verify`·`pnpm e2e`.
-- 워크플로: `actionlint`(가능하면)로 문법 검사, 로컬에서 실행할 수 없는 단계는 사용자 준비 후 0029에서 실제 실행.
-- 실서비스(0029): 사용자가 준비한 뒤 최초 배포, 헬스·smoke·구글 로그인·단축 URL 클릭 기록(IP가 클라이언트 IP인지)을 확인.
+- 로컬: 두 이미지 빌드, `CRELINK_APP_ENV=/dev/null docker compose -f infra/prod/compose.yaml --env-file infra/prod/images.env.example config --quiet`, `bash -n`·`shellcheck`, `infra/prod/tests/*.sh`(Caddy 공개 정책, 배포·롤백·복구 시뮬레이션), `pnpm verify`·`pnpm e2e`.
+- 워크플로: `actionlint`, 로컬에서 실행할 수 없는 단계는 서버 준비 후 0029에서 실제 실행.
+- 실서비스(0029): 최초 배포, 운영 주소 smoke, 구글 로그인, 단축 URL 클릭 기록(IP가 방문자 IP), 자동 배포·자동 롤백·수동 롤백 각 1회.
 
 ## 검토 기록
 
-- 2026-10-06: 빠른 진행을 위해 역할별 설계 검토를 생략하고 사용자 선택(호스팅·DB·도메인·배포 트리거)을 승인 근거로 둠.
+- 2026-10-06: 빠른 진행을 위해 역할별 설계 검토를 생략하고 사용자 선택을 승인 근거로 둠.
+
+## 변경 기록
+
+- 2026-10-06: 처음 설계(웹 Vercel + API OCI 서버 공용 edge Caddy, 웹→API 내부 토큰 헤더, GitHub secrets `OCI_*`·`VERCEL_*`, 서버 `.env`)를 home-server 단일 서버 + Tailscale OIDC SSH + SOPS/age + 스택 안 Caddy + Cloudflare Tunnel로 바꿈(사용자 결정). 대안과 이유는 ADR 0010.

@@ -60,7 +60,7 @@ PM2 없이 `pnpm dev:api`, `pnpm dev:web`, `pnpm dev:app`을 터미널에서 직
 
 ### 프로덕션은 어디에 배포할 계획인가요?
 
-웹은 Vercel, PostgreSQL은 Supabase, API는 Oracle ARM 서버(목표 사양 2 OCPU·12 GB RAM)를 사용하는 방향입니다. 이는 아직 계획이며 배포·보안·백업 자동화가 구성된 상태는 아닙니다. 프로덕션 캐시 제품과 배치 위치는 미정이며, 로컬 Valkey 설정만으로 프로덕션 선택이 확정된 것은 아닙니다. 자세한 내용은 [배포 대상 아키텍처](architecture/deployment-target.md)를 참고하세요.
+웹·API는 배포 대상 서버 1대(지금 `home-server`)의 Docker Compose 스택에서 함께 실행하고, PostgreSQL은 Supabase를 씁니다. 공개는 Cloudflare Tunnel, 배포는 main 병합 뒤 GitHub Actions가 Tailscale로 서버에 접속해 합니다. 나중에 OCI·AWS로 옮기거나 대상을 더할 수 있게 이식 규칙을 지킵니다. 프로덕션 캐시 제품과 배치 위치는 미정이며, 로컬 Valkey 설정만으로 프로덕션 선택이 확정된 것은 아닙니다. 자세한 내용은 [배포 대상 아키텍처](architecture/deployment-target.md)를 참고하세요.
 
 ### 지금 다국어 번역을 지원하나요?
 

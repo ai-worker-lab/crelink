@@ -9,14 +9,14 @@ crelink이 의존하는 외부 SaaS와 개발 도구를 한곳에서 찾기 위�
 | 대상 | 종류 | 상태 | 용도 | 기준 위치 |
 | --- | --- | --- | --- | --- |
 | GitHub (`ai-worker-lab/crelink`) | SaaS | 사용 중 | 원격 Git 저장소, Pull Request. Issues는 끔. Release는 선택 | [ADR 0002](../adr/0002-work-items-in-repository.md), `.github/pull_request_template.md` |
-| GitHub Actions | SaaS | 사용 중 | PR·`main` push 검사(Node 22·24·26 matrix, PostgreSQL 서비스 컨테이너, API 이미지 빌드), `main` CI 성공 시 운영 배포·수동 롤백 | `.github/workflows/ci.yml`, `deploy.yml`, `rollback.yml` |
-| GitHub Container Registry(GHCR) | SaaS | 사용 중(첫 배포 때 생성) | 운영 API 이미지 `ghcr.io/ai-worker-lab/crelink-api:<SHA>` | `.github/workflows/deploy.yml`, [prod 런북](../../infra/docs/prod-runbook.md) |
-| Dependabot | SaaS | 사용 중 | npm·Actions·Docker 의존성 갱신 PR(주 1회) | `.github/dependabot.yml` |
+| GitHub Actions | SaaS | 사용 중 | PR·`main` push 검사(Node 22·24·26 matrix, PostgreSQL 서비스 컨테이너, API·웹 이미지 빌드), `main` CI 성공 시 운영 배포·수동 롤백 | `.github/workflows/ci.yml`, `deploy.yml`, `rollback.yml` |
+| GitHub Container Registry(GHCR) | SaaS | 사용 중(패키지는 Deploy 첫 실행 때 생성) | 운영 이미지 `ghcr.io/ai-worker-lab/crelink-api:<SHA>`·`crelink-web:<SHA>` | `.github/workflows/deploy.yml`, [prod 런북](../../infra/docs/prod-runbook.md) |
+| Dependabot | SaaS | 사용 중 | npm·Actions·Docker(`apps/api`·`apps/web` Dockerfile)·Docker Compose(`infra/prod`) 의존성 갱신 PR(주 1회) | `.github/dependabot.yml` |
 | npm registry | SaaS | 사용 중 | `pnpm install`의 패키지 다운로드 | `pnpm-lock.yaml`, 각 `package.json` |
 | Node.js · pnpm(corepack) | 도구 | 사용 중 | 런타임과 workspace 관리. 지원 버전은 CI matrix, 로컬 기본값은 `.nvmrc` | `.github/workflows/ci.yml`, `.nvmrc`, 루트 `package.json`의 `packageManager` |
-| Docker Engine/Compose · Docker Hub 이미지 | 도구·SaaS | 사용 중 | 로컬 PostgreSQL(`postgres:17-alpine`)·Valkey(`valkey/valkey:8-alpine`) | `infra/local/compose.yaml` |
+| Docker Engine/Compose · Docker Hub 이미지 | 도구·SaaS | 사용 중 | 로컬 PostgreSQL(`postgres:17-alpine`)·Valkey(`valkey/valkey:8-alpine`), 운영 이미지 베이스(`node:22-slim`)와 운영 스택(`caddy`, `alpine`) | `infra/local/compose.yaml`, `apps/*/Dockerfile`, `infra/prod/compose.yaml` |
 | PM2 | 도구 | 사용 중 | 로컬 API·웹·Expo 개발 서버 실행 | `ecosystem.config.cjs`, `Makefile` |
-| Next.js 텔레메트리 | SaaS | 사용 중(기본값) | `next build`가 익명 사용 통계를 Vercel에 전송. 빌드 출력에서 확인 | `apps/web` |
+| Next.js 텔레메트리 | SaaS | 사용 중(기본값, 운영 이미지 빌드는 끔) | 로컬·CI `next build`가 익명 사용 통계를 Next.js 운영사(Vercel)에 전송. 빌드 출력에서 확인. 웹 이미지는 `NEXT_TELEMETRY_DISABLED=1` | `apps/web`, `apps/web/Dockerfile` |
 
 ## 모바일 개발·검증
 
@@ -31,13 +31,14 @@ crelink이 의존하는 외부 SaaS와 개발 도구를 한곳에서 찾기 위�
 
 | 대상 | 종류 | 상태 | 용도 | 기준 위치 |
 | --- | --- | --- | --- | --- |
-| Vercel | SaaS | 구성 준비(계정·프로젝트 미생성) | Next.js 웹 호스팅(`links.shaul.kr`). Hobby는 비상업용 | [운영 배포 설계](../specs/crelink-prod-deploy.md), [prod 런북](../../infra/docs/prod-runbook.md) |
-| Oracle Cloud Infrastructure (ARM) | SaaS | 구성 준비(서버 미생성) | API·단축 도메인 서버(Docker Compose + Caddy) | `infra/prod/`, [prod 런북](../../infra/docs/prod-runbook.md) |
-| Supabase | SaaS | 구성 준비(프로젝트 미생성) | 관리형 PostgreSQL(세션 풀러, TLS) | [운영 배포 설계](../specs/crelink-prod-deploy.md), [prod 런북](../../infra/docs/prod-runbook.md) |
-| Caddy(공식 Docker 이미지)·Let's Encrypt | 도구·SaaS | 구성 준비 | `go.shaul.kr` TLS와 공개 경로 제한 | `infra/prod/Caddyfile` |
-| DNS(`shaul.kr`) | 도메인 | 구성 준비 | `links`(Vercel)·`go`(OCI) 레코드 | [prod 런북](../../infra/docs/prod-runbook.md) |
+| 운영 서버(`home-server`, 자체 서버) | 서버 | 사용 중(1차 배포 대상) | 웹·API Compose 스택 실행. 대상 목록은 `targets.json`, 나중에 OCI·AWS 추가 가능 | `infra/prod/targets.json`, [prod 런북](../../infra/docs/prod-runbook.md) |
+| Cloudflare(DNS·Tunnel) | SaaS | 사용 중 | `shaul.kr` DNS, TLS 종료, 원격 관리형 Tunnel로 `go`·`links` 공개(서버 인바운드 없음) | [운영 배포 설계](../specs/crelink-prod-deploy.md), [prod 런북](../../infra/docs/prod-runbook.md#3-cloudflare-tunnel-공개-호스트) |
+| Tailscale | SaaS | 사용 중(CI 접속은 관리 화면 설정 후) | 운영자 관리 접속, CI 배포 접속(workload identity federation, `tag:ci`). Personal 무료 플랜은 비상업 조건 | [prod 런북](../../infra/docs/prod-runbook.md#2-ci-접속-설정-tailscalegithub) |
+| Supabase | SaaS | 사용 중 | 관리형 PostgreSQL(세션 풀러, TLS `verify-full`) | [운영 배포 설계](../specs/crelink-prod-deploy.md), [prod 런북](../../infra/docs/prod-runbook.md#12-supabase-주의사항) |
+| SOPS · age | 도구 | 사용 중 | 운영 비밀값 암호문(`infra/prod/secrets/`)과 서버 복호화 | `.sops.yaml`, `infra/prod/bootstrap.sh` |
+| Caddy(공식 Docker 이미지) | 도구 | 사용 중 | 운영 스택의 공개 경로 정책(http, TLS는 Cloudflare) | `infra/prod/Caddyfile` |
 
-배포 계정·비밀값은 저장소에 없습니다. 로컬 Valkey는 표준 구성으로 유지하지만 API는 아직 사용하지 않으며, 운영 캐시 제품과 위치는 미정입니다([ADR 0005](../adr/0005-keep-valkey-local-infra.md)).
+운영 비밀값은 대상별 SOPS 암호문으로만 저장소에 있고 평문·계정 자격 증명은 없습니다. 로컬 Valkey는 표준 구성으로 유지하지만 API는 아직 사용하지 않으며, 운영 캐시 제품과 위치는 미정입니다([ADR 0005](../adr/0005-keep-valkey-local-infra.md)).
 
 ## 제품 기능
 

@@ -1,304 +1,304 @@
 # 크리링 운영(prod) 런북
 
-운영 서버 준비·최초 배포·운영 절차를 한 곳에 모은 문서입니다. 설계 기준은 [운영 배포·CD 기술 설계](../../docs/specs/crelink-prod-deploy.md)와 [ADR 0010](../../docs/adr/0010-prod-deployment-topology.md), 실행 가능한 원본은 [`infra/prod/`](../prod/README.md)와 `.github/workflows/deploy.yml`·`rollback.yml`입니다. 이 문서와 원본이 다르면 원본이 맞고 이 문서를 같은 변경에서 고칩니다.
+운영 서버 준비·최초 배포·운영 절차를 한 곳에 모은 문서입니다. 설계(구성·공개 경로·비밀값 표·배포 흐름·보안 한계·이식 규칙)의 원본은 [운영 배포·CD 기술 설계](../../docs/specs/crelink-prod-deploy.md), 결정은 [ADR 0010](../../docs/adr/0010-prod-deployment-topology.md), 실행 가능한 원본은 [`infra/prod/`](../prod/README.md)와 `.github/workflows/deploy.yml`·`rollback.yml`입니다. 이 문서와 원본이 다르면 원본이 맞고 이 문서를 같은 변경에서 고칩니다.
 
-- 현재 상태(2026-10-06): 저장소 쪽 코드 준비 완료. OCI 서버(`oci-server`, Ubuntu 26.04 ARM, Docker 29·Compose 2.40)는 있고 80·443을 다른 프로젝트(ai-character-chat)의 Caddy가 쓰고 있습니다. edge 전환·Supabase·Vercel·DNS·GitHub secrets·최초 배포는 아직 하지 않았습니다.
+- 대상별 적용 상태(언제 무엇을 실행했는지)는 운영 work item 진행 기록에 남기고 이 문서에는 적지 않습니다.
 - 외부 서비스 사실은 공식 문서에서 2026-10-06에 확인했고 출처는 [마지막 절](#출처)에 있습니다. 확인하지 못한 것은 `[확인 못 함]`으로 표시합니다.
 - `<...>`는 실행하는 사람이 채우는 값입니다. 비밀값을 이 문서·저장소·채팅·작업 로그에 붙여 넣지 않습니다.
-
-## 구성 요약
-
-```text
-방문자 ─https─▶ links.shaul.kr (Vercel, Next.js) ── 서버 측 호출 + X-Crelink-Internal ──┐
-인스타 링크 ─https─▶ go.shaul.kr ─┐                                                     │
-                                 ▼                                                     ▼
-OCI 서버: edge Caddy(/opt/edge, project edge, 80·443) ──▶ crelink-api:3000 (/opt/crelink, project crelink-prod) ──TLS──▶ Supabase 세션 풀러
-                    └──▶ aichat-api.shaul.kr → ai-character-chat-backend-api-1:3000 (다른 프로젝트)
-```
+- 명령의 `home-server`는 운영자의 SSH 별칭이자 Tailscale MagicDNS 이름입니다. 다른 대상이면 그 이름으로 바꿉니다.
 
 ## 값 한눈에 보기
 
-| 항목 | 값 | 어디서 쓰나 |
-| --- | --- | --- |
-| 웹 주소 | `https://links.shaul.kr` | API `.env` `WEB_URL`, Vercel 도메인, Google 리디렉션 URI `https://links.shaul.kr/auth/google/callback` |
-| API·단축 주소 | `https://go.shaul.kr` | API `.env` `SHORT_LINK_BASE_URL`, edge `.env` `CRELINK_DOMAIN`, Vercel `API_INTERNAL_URL` |
-| 서버 폴더 | `/opt/crelink`(deploy 소유 755, 비밀값은 `.env` 600), `/opt/edge`(root 소유 755) | `bootstrap.sh`가 만듦 |
-| 서버 사용자 | 관리: `ubuntu`(sudo), 배포: `deploy`(docker 그룹, sudo 없음) | GitHub secret `OCI_USER=deploy` |
-| 크리링 서버 비밀값 | `/opt/crelink/.env`(600) — 키 목록 [`infra/prod/.env.example`](../prod/.env.example) | API 컨테이너 |
-| edge 비밀값 | `/opt/edge/.env`(600) — 키 목록 [`infra/prod/edge/.env.example`](../prod/edge/.env.example) | edge Caddy(`CRELINK_DOMAIN`·`CRELINK_INTERNAL_TOKEN`) |
-| 내부 토큰 | `openssl rand -hex 32`로 만든 64자. edge `CRELINK_INTERNAL_TOKEN` = Vercel `API_INTERNAL_TOKEN` | Caddy `/api/*` 통과 조건 |
-| Supabase CA | `/opt/crelink/certs/supabase-ca.crt`(644) → 컨테이너 `/etc/crelink/certs/supabase-ca.crt` | `DATABASE_SSL=verify-full`, `DATABASE_SSL_CA_PATH` |
-| 이미지 | `ghcr.io/ai-worker-lab/crelink-api:<커밋 SHA>` | `deploy.sh`가 `.env` `API_IMAGE`를 바꿈 |
-| 배포 기록 | `/opt/crelink/releases.log`(탭 구분: 시각·동작·이전·새 이미지) | `rollback.sh` 인자 없을 때 |
-| GitHub secrets | `OCI_HOST`, `OCI_USER`, `OCI_SSH_KEY`, `OCI_KNOWN_HOSTS`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | 워크플로. GHCR pull은 job의 `GITHUB_TOKEN`(`packages: read`)을 stdin으로 넘기므로 서버·secrets에 GHCR 장기 토큰이 없습니다 |
-
-## 1. OCI 인스턴스·네트워크
-
-이미 있는 `oci-server`를 씁니다. 새로 만들 때만 1-1을 따릅니다.
-
-1-1. 새 인스턴스(필요할 때만): Compute > Instances > Create, 이미지 Canonical Ubuntu(ARM), Shape `VM.Standard.A1.Flex`. Always Free 한도는 문서상 테넌시 전체 2 OCPU·12 GB 메모리(월 1,500 OCPU 시간·9,000 GB 시간)이고, 7일 동안 CPU·네트워크·메모리 사용률이 모두 낮으면 유휴로 회수될 수 있습니다. 공인 IP는 인스턴스와 별개로 남는 **예약 공인 IP**(Networking > IP Management)를 붙입니다. 임시 IP를 예약 IP로 바꿀 수는 없으므로 임시 IP를 지우고 예약 IP를 붙입니다.
-
-1-2. 보안 목록(VCN > 서브넷 > Security List > Add Ingress Rules), 소스 `0.0.0.0/0`:
-
-| 프로토콜 | 포트 | 용도 |
-| --- | --- | --- |
-| TCP | 22 | SSH(키 인증만). 가능하면 소스를 관리자 IP로 좁힙니다. GitHub Actions 러너 IP는 고정이 아니라 22를 넓게 열어 둡니다 |
-| TCP | 80 | ACME HTTP 챌린지, http→https 리디렉션 |
-| TCP | 443 | HTTPS |
-| UDP | 443 | HTTP/3(선택. 닫혀 있으면 브라우저가 TCP로 내려감) |
-
-1-3. 서버 방화벽: OCI Ubuntu 이미지는 SSH만 허용하는 iptables 규칙(`/etc/iptables/rules.v4`)으로 시작하고, Oracle은 **UFW 사용을 금지**합니다(부팅 실패 가능). `bootstrap.sh`는 방화벽을 건드리지 않습니다. 현재 서버는 aichat Caddy가 80·443을 이미 서비스하므로 열려 있습니다. 새 서버라면 Oracle 안내대로 iptables에 넣고 저장합니다.
-
-```bash
-sudo iptables -L INPUT --line-numbers          # REJECT 줄 번호 확인. 그 앞에 넣습니다(예시는 6번째 자리)
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
-sudo iptables -I INPUT 6 -m state --state NEW -p udp --dport 443 -j ACCEPT
-sudo netfilter-persistent save
-```
-
-Docker가 publish한 포트는 ufw 같은 호스트 방화벽 규칙을 우회합니다. 크리링 API는 호스트 포트를 publish하지 않고, 외부에 열리는 컨테이너 포트는 edge Caddy의 80·443뿐입니다. OCI 기본 iptables의 FORWARD 규칙과 Docker 규칙이 어떻게 맞물리는지는 `[확인 못 함]`이며, 현재 서버에서 aichat Caddy가 동작하는 것이 실측 근거입니다.
-
-## 2. 서버 부트스트랩
-
-로컬 checkout에서 실행합니다. `bootstrap.sh`는 다시 실행해도 같은 결과입니다(Docker가 이미 있으면 설치를 건너뜀).
-
-```bash
-# 2-1. 배포 전용 SSH 키(로컬, 비밀번호 없음). 이 키는 GitHub secret에만 넣고 다른 용도로 쓰지 않습니다.
-ssh-keygen -t ed25519 -N '' -C crelink-deploy -f ~/.ssh/crelink_deploy
-
-# 2-2. 부트스트랩: deploy 사용자·docker 그룹·authorized_keys, /opt/crelink·/opt/edge·/opt/edge/sites/crelink.caddy, rsync·curl·gzip
-scp infra/prod/bootstrap.sh ubuntu@<서버 IP>:/tmp/
-ssh ubuntu@<서버 IP> "sudo DEPLOY_SSH_PUBKEY='$(cat ~/.ssh/crelink_deploy.pub)' bash /tmp/bootstrap.sh"
-
-# 2-3. known_hosts: 서버에서 본 호스트 키 지문과 로컬 ssh-keyscan 결과의 지문이 같은지 비교합니다(검증 없이 쓰면 MITM에 취약).
-ssh ubuntu@<서버 IP> 'for f in /etc/ssh/ssh_host_*_key.pub; do ssh-keygen -lf "$f"; done'
-ssh-keyscan -t ed25519,ecdsa,rsa <서버 IP> 2>/dev/null > /tmp/crelink_known_hosts
-ssh-keygen -lf /tmp/crelink_known_hosts         # 위 지문과 같아야 합니다
-
-# 2-4. 배포 키로 접속·docker 권한 확인
-ssh -i ~/.ssh/crelink_deploy -o UserKnownHostsFile=/tmp/crelink_known_hosts deploy@<서버 IP> 'docker version --format {{.Server.Version}} && ls -ld /opt/crelink /opt/edge/sites/crelink.caddy'
-```
-
-`deploy`는 docker 그룹이라 사실상 root와 같은 권한입니다(Docker 공식 문서). 배포 전용 키만 등록하고 키를 정기 교체합니다([7-4](#7-4-키비밀값-교체)).
-
-## 3. edge Caddy 전환 (aichat Caddy → 공용 edge)
-
-80·443을 쓰는 ai-character-chat의 Caddy를 서버 공용 edge Caddy로 바꿉니다. edge가 없으면 크리링 `deploy.sh`는 아무것도 바꾸지 않고 실패합니다. aichat 사이트 설정은 [`edge/sites/aichat.caddy`](../prod/edge/sites/aichat.caddy)에 그대로 옮겨 두었습니다.
-
-```bash
-# 3-1. 기존 Caddy 확인(관리자). 이름·Compose 폴더·서비스·설정 파일을 적어 둡니다.
-docker ps --filter publish=443 --format '{{.Names}}  {{.Label "com.docker.compose.project.working_dir"}}  {{.Label "com.docker.compose.service"}}'
-docker inspect <aichat caddy 컨테이너> --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{println}}{{end}}'
-cat <위에서 본 Caddyfile 경로>           # edge/sites/aichat.caddy와 같은 내용인지 확인
-docker network inspect ai-character-chat-backend_backend --format '{{.Name}}'   # edge가 참가할 네트워크
-
-# 3-2. edge 파일 배치(로컬 checkout → 서버). .env와 sites/crelink.caddy는 덮어쓰지 않습니다(--delete 없음).
-rsync -az --exclude .env.example infra/prod/edge/ ubuntu@<서버 IP>:/tmp/edge/
-ssh ubuntu@<서버 IP>
-sudo rsync -a /tmp/edge/ /opt/edge/ && sudo chown -R root:root /opt/edge && sudo chown deploy:deploy /opt/edge/sites/crelink.caddy
-sudo install -m 600 /dev/null /opt/edge/.env && sudo nano /opt/edge/.env   # edge/.env.example의 두 키. 토큰: openssl rand -hex 32
-
-# 3-3. 전환 전 검사(포트는 아직 기존 Caddy가 씀. run은 포트를 publish하지 않음)
-cd /opt/edge
-sudo docker compose config --quiet
-sudo docker compose pull
-sudo docker compose run --rm --no-deps -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
-
-# 3-4. 전환(수 초 중단 + 인증서 발급 시간). edge 볼륨은 새로 만들어 인증서를 다시 받습니다.
-docker stop <aichat caddy 컨테이너>
-sudo docker compose up -d
-sudo docker compose logs -f caddy          # "certificate obtained successfully" 확인 후 Ctrl-C
-
-# 3-5. 확인
-curl -sS -o /dev/null -w '%{http_code}\n' https://aichat-api.shaul.kr/
-echo | openssl s_client -connect aichat-api.shaul.kr:443 -servername aichat-api.shaul.kr 2>/dev/null | openssl x509 -noout -issuer -dates
-```
-
-- 인증서 재발급: Let's Encrypt는 같은 이름 집합에 7일 동안 최대 5장까지 발급합니다. 전환을 여러 번 되풀이하지 않습니다. 재발급을 피하려면 3-4에서 `sudo docker compose create` → `docker run --rm -v <기존 caddy data 볼륨>:/from:ro -v edge_data:/to alpine:3.22 cp -a /from/. /to/` → `docker stop <aichat caddy>` → `sudo docker compose start` 순서로 기존 인증서를 옮길 수 있습니다.
-- 기존 컨테이너는 `docker stop`이라 `restart: unless-stopped`여도 재부팅 뒤 다시 뜨지 않습니다. 하지만 ai-character-chat 쪽에서 `docker compose up`을 다시 실행하면 그 Caddy가 80·443을 잡으려다 실패합니다. 그 프로젝트의 Compose에서 Caddy 서비스를 빼는 일은 그 저장소에서 합니다.
-- 전환 롤백: `cd /opt/edge && sudo docker compose down`(볼륨은 남김, `-v` 금지) → `docker start <aichat caddy 컨테이너>`.
-- 사이트 추가·수정: `/opt/edge/sites/<이름>.caddy`를 고친 뒤 `cd /opt/edge && sudo docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile`. `/opt/edge/.env` 값을 바꾸면 reload가 아니라 `sudo docker compose up -d`(컨테이너 재생성, 모든 사이트 수 초 중단)가 필요합니다.
-
-## 4. 외부 서비스 준비
-
-### 4-1. DNS (`shaul.kr` 영역)
-
-| 이름 | 유형 | 값 | 프록시 |
-| --- | --- | --- | --- |
-| `go` | A | 서버 예약 공인 IP | 켬(주황 구름) |
-| `links` | CNAME | Vercel 프로젝트 Settings > Domains에 표시되는 **프로젝트별** 값(예전의 공용 `cname.vercel-dns.com`이 아님) | 끔 권장(아래) |
-
-- Cloudflare 프록시를 씁니다(사용자 결정 2026-10-06). SSL/TLS 모드는 **Full (strict)**로 둡니다(원본 Caddy·Vercel 모두 유효한 인증서가 있음). Flexible을 쓰면 원본으로 HTTP가 가서 Caddy의 HTTPS 리디렉트와 반복됩니다.
-- 방문자 IP: edge Caddy(`edge/Caddyfile`)는 Cloudflare 대역에서 온 요청만 `CF-Connecting-IP`를 믿습니다. 대역 목록(<https://www.cloudflare.com/ips-v4>, <https://www.cloudflare.com/ips-v6>)이 바뀌면 `trusted_proxies` 줄을 갱신하고 reload합니다.
-- 인증서: Caddy가 Let's Encrypt HTTP 검증으로 받습니다(같은 서버의 `aichat-api.shaul.kr`도 프록시 켠 상태로 발급·유지 중). 발급이 실패하면 Cloudflare의 **Always Use HTTPS**가 `/.well-known/acme-challenge/` 요청을 막는지 확인하고, 막으면 첫 발급 동안 그 레코드만 DNS only로 바꿨다가 되돌립니다.
-- Vercel은 앞단 리버스 프록시(Cloudflare 프록시 포함)를 권장하지 않습니다. 방문자 IP·Vercel 방화벽·캐시가 가려지기 때문입니다([Reverse Proxy Servers and Vercel](https://vercel.com/docs/security/reverse-proxy), [Should I use Cloudflare in front of Vercel?](https://vercel.com/kb/guide/cloudflare-with-vercel), 확인일 2026-10-06). 그래서 `links`는 **DNS only를 권장**하고, 프록시를 켜려면 Vercel KB의 설정(SSL Full (strict), 캐시 우회)을 따릅니다. `go`(OCI)는 프록시를 켭니다.
-- 배포 후 검사(`deploy.yml`의 운영 주소 검사)는 GitHub 러너에서 Cloudflare를 거쳐 요청합니다. Bot Fight Mode 등이 러너를 막으면 검사가 실패하니 해당 기능을 끄거나 예외를 둡니다.
-
-확인: `dig +short go.shaul.kr`(Cloudflare IP가 나오면 정상).
-
-### 4-2. Supabase
-
-1. prod 전용 프로젝트를 만듭니다(리전은 서버와 가까운 곳). DB 비밀번호는 비밀번호 관리자에 보관합니다.
-2. 프로젝트 상단 **Connect** → **Session pooler** 연결 문자열을 복사합니다. 형식 `postgresql://postgres.<프로젝트 ref>:<비밀번호>@aws-<N>-<리전>.pooler.supabase.com:5432/postgres`. 호스트는 리전 이름으로 조합할 수 없으니 화면 값을 그대로 씁니다. 세션 풀러는 IPv4로 접속되고(직접 연결 `db.<ref>.supabase.co`는 IPv6 전용, IPv4는 유료 애드온) session-level advisory lock을 지원합니다. **6543(트랜잭션 모드)은 쓰지 않습니다**(migration advisory lock·prepared statement 미지원).
-3. Database Settings > SSL Configuration: **Enforce SSL on incoming connections**를 켜고(적용 시 DB가 잠깐 재시작), **Download Certificate**로 CA 파일을 받아 서버에 둡니다.
-
-   ```bash
-   scp -i ~/.ssh/crelink_deploy <받은 파일>.crt deploy@<서버 IP>:/opt/crelink/certs/supabase-ca.crt
-   ssh -i ~/.ssh/crelink_deploy deploy@<서버 IP> chmod 644 /opt/crelink/certs/supabase-ca.crt
-   ```
-
-4. 플랜: Free는 7일 동안 활동이 적으면 일시정지되고(1년 안에 대시보드에서 재개) 자동 백업이 없습니다. 출시 전 **Pro로 전환**합니다(일일 백업 7일 보관, PITR은 별도 애드온). Pro 전환 전까지는 [7-3](#7-3-백업복구)의 `pg_dump` 백업을 정기적으로 합니다.
-
-### 4-3. Google OAuth
-
-Google Auth Platform > Clients(<https://console.developers.google.com/auth/clients>)에서 웹 애플리케이션 클라이언트의 **승인된 리디렉션 URI**에 `https://links.shaul.kr/auth/google/callback`을 추가합니다(정확히 같아야 하며 반영에 5분~몇 시간). 크리링은 이름·이메일·프로필 범위만 쓰므로 Testing 상태에서도 테스트 사용자 제한·7일 만료가 적용되지 않는 예외에 해당하지만, 운영 공개 전 Publishing status를 **In production**으로 바꿉니다. 클라이언트 ID·비밀번호는 `/opt/crelink/.env`의 `GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET`에 넣습니다.
-
-### 4-4. Vercel
-
-웹 빌드 설정과 환경변수 표의 원본은 [apps/web/README.md "Vercel 배포"](../../apps/web/README.md#vercel-배포)입니다. 여기서는 순서만 적습니다.
-
-1. Git 연동 없이 프로젝트를 만듭니다: 저장소 루트에서 `pnpm dlx vercel@62 link`(팀·프로젝트 선택) → 생성된 `.vercel/project.json`의 `orgId`·`projectId`가 GitHub secret `VERCEL_ORG_ID`·`VERCEL_PROJECT_ID`입니다. `.vercel/`은 커밋하지 않습니다. 대시보드에서 Git을 연결했다면 Settings > Git > **Disconnect**로 끊습니다(CI와 이중 배포 방지). 저장소가 GitHub 조직(`ai-worker-lab`) 소유이고 Vercel이 개인 Hobby 계정이어도 됩니다. Hobby가 막는 것은 **Git 연동 배포**(커밋 작성자가 Hobby 팀 소유자여야 함, 비공개 저장소 협업 불가)이고, CI가 토큰으로 `vercel deploy --prebuilt`하는 방식에는 저장소 소유자 조건이 없습니다([Troubleshoot project collaboration](https://vercel.com/docs/deployments/troubleshoot-project-collaboration), 확인일 2026-10-06). 그래서 Git을 연결하지 않습니다.
-2. Settings > Build and Deployment > **Root Directory** = `apps/web`.
-3. Settings > Environment Variables(**Production**만): `API_INTERNAL_URL=https://go.shaul.kr`, `API_INTERNAL_TOKEN=<edge CRELINK_INTERNAL_TOKEN과 같은 값>`(Sensitive 켬). 환경변수 변경은 다음 배포부터 적용됩니다.
-4. Settings > Domains에 `links.shaul.kr` 추가 → 표시되는 CNAME을 DNS에 넣습니다.
-5. 계정 Settings > Tokens에서 `VERCEL_TOKEN`을 만듭니다(만료일 지정).
-6. Hobby 플랜은 **비상업적 개인 용도만** 허용합니다. 결제·판매 광고 등 수익 활동 전에 Pro로 바꿉니다. Hobby의 `vercel rollback`은 직전 운영 배포로만 되돌릴 수 있습니다.
-
-### 4-5. GitHub Actions secrets
-
-저장소 Settings > Secrets and variables > Actions > **New repository secret**(또는 `gh secret set <이름> < 파일`).
-
-| secret | 값 만드는 법 |
+| 항목 | 값 |
 | --- | --- |
-| `OCI_HOST` | 서버 예약 공인 IP(또는 DNS 이름) |
-| `OCI_USER` | `deploy` |
-| `OCI_SSH_KEY` | `gh secret set OCI_SSH_KEY < ~/.ssh/crelink_deploy`(2-1의 개인키 전체) |
-| `OCI_KNOWN_HOSTS` | `gh secret set OCI_KNOWN_HOSTS < /tmp/crelink_known_hosts`(2-3에서 지문을 확인한 파일) |
-| `VERCEL_TOKEN` | 4-4의 5 |
-| `VERCEL_ORG_ID`·`VERCEL_PROJECT_ID` | 4-4의 1(`.vercel/project.json`) |
+| 대상 목록 | `infra/prod/targets.json`(`name`·`host`(MagicDNS)·`platform`·`enabled`) |
+| 서버 사용자 | 운영자 관리 계정(sudo, Tailscale로 접속), 배포 `deploy`(docker 그룹, sudo 없음, 배포 키는 forced command) |
+| 서버 경로 | `/opt/crelink/{releases,current,state}`, `/etc/crelink/{target,age.key}`, `/run/crelink`(tmpfs). 설명은 [설계 "서버 배치"](../../docs/specs/crelink-prod-deploy.md#서버-배치) |
+| 컨테이너 | Compose project `crelink-prod`: `crelink-prod-caddy-1`, `crelink-prod-api-1`, `crelink-prod-web-1` |
+| 스택 입구 | `127.0.0.1:18080`(caddy). cloudflared가 여기로 보냄 |
+| 비밀값 원본 | `infra/prod/secrets/<대상>.sops.env`(SOPS + age, 수신자는 `.sops.yaml`) |
+| 운영자 age 키 | macOS 키체인 서비스 `crelink-sops-age`, 계정 `operator` + 운영자 비밀번호 관리자 백업 |
+| GitHub | variables `TS_OIDC_CLIENT_ID`·`TS_OIDC_AUDIENCE`, secret `DEPLOY_SSH_KEY`. 그 밖의 배포 secret 없음 |
 
-GHCR: 워크플로가 `GITHUB_TOKEN`(`packages: write`)으로 이미지를 올리면 패키지가 이 저장소에 연결되고(기본 private) 같은 저장소 job의 `GITHUB_TOKEN`(`packages: read`)으로 받을 수 있습니다. 같은 이름의 패키지를 CLI로 먼저 올려 두면 연결되지 않아 워크플로가 push하지 못하니 손으로 push하지 않습니다.
+## 1. 서버 준비 (bootstrap)
+
+대상 서버는 Ubuntu(amd64·arm64)이고 Tailscale에 접속되어 있어야 합니다(운영자가 `ssh home-server`로 들어갈 수 있는 상태). `bootstrap.sh`는 다시 실행해도 같은 결과입니다. 하는 일은 스크립트 머리말이 원본입니다(패키지·sops 3.13.3(SHA-256 확인)·Docker, `deploy` 사용자, `ssh-entry.sh` 설치, `/opt/crelink`, tmpfiles, `/etc/crelink`(target·age 키 생성), 토큰을 주면 cloudflared). 방화벽은 건드리지 않습니다.
+
+```bash
+# 1-1. 배포 전용 SSH 키(로컬 임시 폴더, 비밀번호 없음). 개인키는 GitHub secret에만 넣고 지웁니다(2-4).
+mkdir -m 700 /tmp/crelink-key && ssh-keygen -t ed25519 -N '' -C crelink-deploy -f /tmp/crelink-key/crelink_deploy
+
+# 1-2. bootstrap.sh는 같은 폴더의 ssh-entry.sh를 설치하므로 둘을 함께 복사합니다.
+ssh home-server 'mkdir -p /tmp/crelink-bootstrap'
+scp infra/prod/bootstrap.sh infra/prod/ssh-entry.sh home-server:/tmp/crelink-bootstrap/
+ssh -t home-server "sudo TARGET_NAME=home-server DEPLOY_SSH_PUBKEY='$(cat /tmp/crelink-key/crelink_deploy.pub)' bash /tmp/crelink-bootstrap/bootstrap.sh"
+```
+
+- 마지막 줄에 이 서버의 age 공개키가 나옵니다. `.sops.yaml`에 그 대상 수신자로 들어가 있어야 합니다([4-4](#4-4-새-대상수신자-추가)).
+- cloudflared가 아직 없는 새 서버는 Tunnel 토큰을 함께 줍니다. 토큰이 셸 기록에 남지 않게 서버에서 읽어 넘깁니다: `ssh -t <host>` → `read -rs CLOUDFLARED_TOKEN` → `sudo TARGET_NAME=<이름> DEPLOY_SSH_PUBKEY='<공개키>' CLOUDFLARED_TOKEN="$CLOUDFLARED_TOKEN" bash /tmp/crelink-bootstrap/bootstrap.sh`. home-server는 기존 Tunnel `my-home-server`를 쓰므로 주지 않습니다.
+- `ssh-entry.sh`를 바꾸면 이 절차로 bootstrap을 다시 실행해야 서버에 반영됩니다(워크플로가 바꿀 수 없음).
+- `deploy`는 docker 그룹이라 서버 root와 같은 권한입니다. home-server에서는 `deploy`가 uid 1000이고 다른 서비스(seaweedfs) 데이터와 컨테이너 `node` 사용자도 uid 1000입니다. docker 그룹이라 위험이 늘지는 않지만 파일 소유자를 볼 때 헷갈리지 않게 유의합니다.
+
+확인:
+
+```bash
+ssh -i /tmp/crelink-key/crelink_deploy deploy@home-server status   # "release -"(배포 전) 또는 운영 릴리스
+ssh -i /tmp/crelink-key/crelink_deploy deploy@home-server id       # "허용되지 않은 명령입니다" — 셸이 열리지 않아야 정상
+ssh home-server 'tailscale debug prefs | grep RunSSH'              # "RunSSH": false 여야 함(아래)
+```
+
+Tailscale SSH(`tailscale up --ssh`)가 켜져 있으면 tailnet에서 오는 22번을 tailscaled가 가져가 OpenSSH의 forced command가 적용되지 않습니다. 배포 대상에서는 Tailscale SSH를 끄고 OpenSSH를 씁니다.
+
+## 2. CI 접속 설정 (Tailscale·GitHub)
+
+배포 job은 GitHub 호스트 러너에서 Tailscale 임시 노드(`tag:ci`)로 tailnet에 들어가 `deploy@<host>`로 SSH합니다. 이 절의 값이 없으면 Deploy 워크플로는 이미지까지만 만들고 배포를 건너뛰며 경고를 남깁니다.
+
+2-1. tailnet 정책(관리 화면 Access controls). `tag:ci`를 만들고 배포 대상 22번만 허용합니다.
+
+```jsonc
+{
+  "tagOwners": { "tag:ci": ["autogroup:admin"] },
+  "hosts": { "home-server": "<home-server의 Tailscale IP 100.x.y.z>" },
+  "grants": [
+    { "src": ["tag:ci"], "dst": ["home-server"], "ip": ["tcp:22"] }
+    // 기존 규칙은 그대로 두되, src "*" 처럼 태그 장치까지 포함하는 규칙이 있으면 "autogroup:member"로 좁힙니다.
+  ]
+}
+```
+
+`src: ["*"]`는 태그 장치도 포함하므로 그런 규칙이 남아 있으면 `tag:ci`가 tailnet 전체에 닿습니다. 저장 뒤 정책 편집기의 미리보기에서 `tag:ci`가 `home-server:22`만 갖는지 확인합니다.
+
+2-2. workload identity federation 자격 증명(관리 화면 Settings > Trust credentials > **Credential** > **OpenID Connect**):
+
+| 항목 | 값 |
+| --- | --- |
+| Issuer | GitHub(`https://token.actions.githubusercontent.com`) |
+| Subject | `repo:ai-worker-lab/crelink:ref:refs/heads/main` — main 브랜치에서 실행된 job만. Deploy(`workflow_run`·main 수동 실행)·Rollback(main만 허용)이 이 형식입니다 |
+| Scope | `auth_keys` 쓰기, 태그 `tag:ci` |
+
+**Generate credential** 뒤 표시되는 **Client ID**와 **Audience**를 복사합니다(비밀 아님). 토큰 교환이 실패하면 같은 화면의 자격 증명 항목에 마지막 오류가 표시됩니다.
+
+선택: Custom claims로 더 좁힐 수 있습니다(예: 워크플로 파일). 배포·롤백 두 워크플로가 한 Client ID를 쓰므로 두 파일을 함께 허용하는 규칙이 필요하고, 와일드카드 지원 여부는 `[확인 못 함]`입니다. 지금은 Subject 조건만 씁니다.
+
+2-3. GitHub variables(비밀 아님):
+
+```bash
+gh variable set TS_OIDC_CLIENT_ID --body '<Client ID>'
+gh variable set TS_OIDC_AUDIENCE --body '<Audience>'
+```
+
+2-4. GitHub secret과 로컬 개인키 삭제:
+
+```bash
+gh secret set DEPLOY_SSH_KEY < /tmp/crelink-key/crelink_deploy
+rm -rf /tmp/crelink-key     # 공개키는 서버 /home/deploy/.ssh/authorized_keys에 남아 있어 대상 추가 때 거기서 읽습니다
+```
+
+2-5. 쓰지 않는 secret 삭제: 처음 설계의 `OCI_HOST`·`OCI_USER`·`OCI_SSH_KEY`·`OCI_KNOWN_HOSTS`와 `VERCEL_TOKEN`·`VERCEL_ORG_ID`·`VERCEL_PROJECT_ID`(등록했다면). `gh secret list`에 `DEPLOY_SSH_KEY`만 남아야 합니다.
+
+```bash
+for s in OCI_HOST OCI_USER OCI_SSH_KEY OCI_KNOWN_HOSTS VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do gh secret delete "$s" 2>/dev/null || true; done
+gh secret list && gh variable list
+```
+
+## 3. Cloudflare Tunnel 공개 호스트
+
+대상 서버의 원격 관리형 Tunnel(home-server는 `my-home-server`)에 공개 호스트 두 개를 추가합니다. Cloudflare 대시보드 Zero Trust > Networks > Tunnels > 해당 Tunnel > **Published application routes**(이전 화면의 Public Hostname):
+
+| 호스트 | 서비스 |
+| --- | --- |
+| `go.shaul.kr` | `HTTP` · `localhost:18080` |
+| `links.shaul.kr` | `HTTP` · `localhost:18080` |
+
+- 경로를 추가하면 Cloudflare가 `<Tunnel UUID>.cfargotunnel.com`을 가리키는 proxied CNAME을 만듭니다. 같은 이름의 기존 레코드(처음 설계의 `go` A 레코드, `links` CNAME 등)가 있으면 먼저 지웁니다.
+- TLS는 Cloudflare 엣지가 맡고 스택 Caddy는 http만 받습니다. Caddy는 요청의 Host로 사이트를 고르므로 Host를 바꾸지 않습니다(다른 이름으로 시험할 때만 [10](#10-배포-대상-추가와-tunnel-전환)처럼 HTTP Host Header를 지정).
+- `localhost:18080`은 호스트에서 도는 cloudflared(systemd 서비스) 기준입니다. cloudflared를 컨테이너로 돌리는 서버라면 이 주소가 닿지 않으므로 호스트 서비스로 둡니다.
+- 배포 후 검사(`deploy.yml` `verify-prod`)는 GitHub 러너에서 Cloudflare를 거쳐 요청합니다. Bot Fight Mode 등이 러너를 막으면 검사가 실패하니 끄거나 예외를 둡니다.
+
+확인(배포 전에는 Cloudflare 502가 정상): `curl -sS -o /dev/null -w '%{http_code}\n' https://go.shaul.kr/zzzz`.
+
+## 4. 비밀값 (SOPS·age)
+
+### 4-1. 키 구성
+
+| 수신자(`.sops.yaml`) | 개인키 위치 | 쓰는 곳 |
+| --- | --- | --- |
+| `operator` | 운영자 macOS 키체인(`crelink-sops-age`/`operator`) + 운영자 비밀번호 관리자 | 운영자의 `sops edit`·`updatekeys` |
+| `home-server`(대상마다 하나) | 서버 `/etc/crelink/age.key`(root:deploy 640) | 배포 때 서버가 복호화 |
+
+- 서버 키는 백업하지 않습니다. 잃으면 bootstrap이 새 키를 만들고, 운영자 키로 새 공개키를 수신자에 넣어 다시 암호화합니다([4-4](#4-4-새-대상수신자-추가)).
+- 운영자 키는 평문 파일로 두지 않습니다. `SOPS_AGE_KEY_CMD`가 키체인에서 꺼내므로 에이전트가 파일로 읽을 수 없습니다.
+
+### 4-2. 운영자 키 만들기(처음 한 번)
+
+```bash
+umask 077 && age-keygen -o /tmp/operator.agekey     # 출력의 "Public key"가 .sops.yaml의 operator 수신자
+security add-generic-password -s crelink-sops-age -a operator -w   # 프롬프트에 /tmp/operator.agekey의 AGE-SECRET-KEY-... 줄을 붙여 넣음
+# 같은 줄을 비밀번호 관리자에 백업한 뒤
+rm -f /tmp/operator.agekey
+age-keygen -y <(security find-generic-password -s crelink-sops-age -a operator -w)   # 공개키 다시 보기
+```
+
+### 4-3. 값 편집
+
+저장소 루트에서(`.sops.yaml`을 찾음):
+
+```bash
+SOPS_AGE_KEY_CMD='security find-generic-password -s crelink-sops-age -a operator -w' sops edit infra/prod/secrets/home-server.sops.env
+```
+
+- 키 목록은 [설계 "비밀값과 환경변수"](../../docs/specs/crelink-prod-deploy.md#비밀값과-환경변수)가 원본입니다. 비밀이 아닌 키는 평문으로 남아 diff로 검토할 수 있습니다.
+- 커밋 → main 병합 → Deploy가 `infra/prod/` 변경으로 릴리스를 배포합니다. 값은 릴리스와 함께 적용되고 롤백하면 이전 값으로 돌아갑니다.
+- 복호화한 내용을 파일·로그·채팅에 남기지 않습니다(`sops decrypt`를 화면에 출력하지 않음).
+
+### 4-4. 새 대상·수신자 추가
+
+1. 새 서버의 bootstrap 출력에서 age 공개키를 얻습니다.
+2. `.sops.yaml`에 그 대상 파일의 규칙을 추가합니다: `path_regex: ^infra/prod/secrets/<대상>\.sops\.env$`, 같은 `unencrypted_regex`, 수신자 = `operator` 공개키 + 새 서버 공개키.
+3. 새 파일을 만듭니다: 위 4-3 명령의 파일 이름만 `<대상>.sops.env`로 바꿔 실행하고 home-server 파일과 같은 키를 채웁니다.
+4. 기존 파일의 수신자를 바꿨다면(운영자 키 교체, 백업 수신자 추가 등) 규칙을 고친 뒤 `SOPS_AGE_KEY_CMD=... sops updatekeys infra/prod/secrets/<파일>`로 다시 암호화합니다.
+5. AWS로 가면 KMS 키를 수신자로 추가할 수 있습니다(`.sops.yaml`의 `kms`).
+
+### 4-5. 회전
+
+| 대상 | 절차 |
+| --- | --- |
+| 앱 비밀값(DB 비밀번호, Google 클라이언트 비밀번호) | 제공자에서 새 값 발급(Google은 새 비밀번호를 추가해 둘 다 유효하게) → 4-3으로 편집 → 병합·배포 → 확인 → 옛 값 폐기 |
+| 운영자 age 키 | 새 키를 4-2로 만들고 `.sops.yaml`에 수신자로 추가 → 모든 암호문 `updatekeys` → 옛 수신자 삭제 → 다시 `updatekeys` → 병합. Git 이력의 옛 암호문은 옛 키로 계속 풀리므로, 키가 샜다면 안의 비밀값도 회전합니다 |
+| 서버 age 키 | 서버에서 `sudo age-keygen -o /etc/crelink/age.key.new` → 공개키를 수신자에 **추가**하고 `updatekeys`·병합·배포 → 서버에서 새 파일을 `age.key`로 바꾸고 `chown root:deploy`·`chmod 640` → 옛 수신자 삭제·`updatekeys`·병합·배포. 바꾼 뒤에는 그 전 릴리스로 롤백하면 복호화가 실패합니다 |
+| `DEPLOY_SSH_KEY` | 1-1로 새 키 → 1-2로 bootstrap을 `DEPLOY_SSH_PUBKEY=<새 공개키>`로 다시 실행(줄 추가) → 2-4로 secret 교체 → `ssh -i <새 키> deploy@<host> status` 확인 → 서버 `/home/deploy/.ssh/authorized_keys`에서 옛 줄 삭제 |
+| Tailscale WIF 자격 증명 | Trust credentials에서 새로 만들고 2-3으로 variables 교체 → 옛 자격 증명 삭제 |
+| GHCR | 장기 토큰 없음(job마다 `GITHUB_TOKEN`). 교체할 것 없음 |
 
 ## 5. 최초 배포
 
-순서대로 하고 각 단계의 확인이 통과해야 다음으로 갑니다.
+순서대로 하고 각 확인이 통과해야 다음으로 갑니다.
 
-1. [1](#1-oci-인스턴스네트워크)~[4](#4-외부-서비스-준비) 완료: 부트스트랩, edge 전환, DNS(`dig +short go.shaul.kr`이 서버 IP), Supabase(세션 풀러 문자열·CA 파일), Google 리디렉션 URI, Vercel 프로젝트·환경변수, GitHub secrets.
-2. 서버 `.env`(로컬 checkout에서):
+1. 준비 확인: [1](#1-서버-준비-bootstrap)(bootstrap, `RunSSH: false`), [2](#2-ci-접속-설정-tailscalegithub)(정책·자격 증명·variables·secret), [3](#3-cloudflare-tunnel-공개-호스트)(공개 호스트), [4](#4-비밀값-sopsage)(대상 파일이 서버 키로 풀림), [12](#12-supabase-주의사항)(세션 풀러 문자열·CA), Google 콘솔의 승인된 리디렉션 URI `https://links.shaul.kr/auth/google/callback`.
+2. 서버 복호화 확인(값은 출력하지 않음): `ssh home-server 'sudo -u deploy env SOPS_AGE_KEY_FILE=/etc/crelink/age.key sops decrypt --input-type dotenv --output-type dotenv /dev/stdin' < infra/prod/secrets/home-server.sops.env | wc -l`이 키 개수를 보이면 통과.
+3. GitHub Actions에서 **Deploy**를 main으로 `Run workflow`(`force` 켬). 배포 태그가 아직 없으므로 두 이미지를 만들고 배포합니다. 이후에는 main CI 성공 시 자동입니다.
+4. 첫 배포가 헬스 실패하면 되돌릴 이전 릴리스가 없어 실패 상태로 남습니다(종료 1). [6](#6-운영-확인)의 로그로 원인(대개 비밀값·DB 접속)을 고쳐 다시 실행합니다.
+5. GeoIP를 넣습니다([8](#8-geoip)).
+6. 확인: `verify-prod` job 결과(운영 주소 6개), 구글 로그인, 단축 주소 생성·방문, 링크 클릭 기록의 IP가 내 공인 IP인지(Caddy·cloudflared 주소가 아닌지).
 
-   ```bash
-   scp -i ~/.ssh/crelink_deploy infra/prod/.env.example deploy@<서버 IP>:/opt/crelink/.env
-   ssh -i ~/.ssh/crelink_deploy deploy@<서버 IP>
-   chmod 600 /opt/crelink/.env && nano /opt/crelink/.env   # DATABASE_URL, GOOGLE_*, OPERATOR_EMAILS 채움. API_IMAGE는 그대로 둠
-   ```
-
-3. GitHub Actions에서 **Deploy** 워크플로를 `workflow_dispatch`로 실행합니다(이후에는 main CI 성공 시 자동). 워크플로가 `infra/prod/`를 `/opt/crelink/`로 rsync하고 `deploy.sh <SHA>`를 실행합니다. 첫 배포가 헬스 실패하면 되돌릴 이전 이미지가 없어 API가 실패 상태로 남습니다 → 서버에서 `cd /opt/crelink && docker compose logs --tail 100 api`로 원인(대개 `.env`·DB 접속)을 고치고 다시 실행합니다.
-4. GeoIP(선택, 없으면 방문 기록의 국가·도시만 비어 있음):
-
-   ```bash
-   cd /opt/crelink && ./geoip.sh --restart
-   crontab -e   # 매월 3일 04:17 UTC 갱신: 17 4 3 * * cd /opt/crelink && ./geoip.sh --restart >> /opt/crelink/geoip.log 2>&1
-   ```
-
-5. 확인(로컬에서):
-
-   ```bash
-   curl -sS -o /dev/null -w '%{http_code}\n' https://links.shaul.kr/                       # 200
-   curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://go.shaul.kr/zzzz        # 302 → https://links.shaul.kr/notice?reason=link_not_found
-   curl -sS -o /dev/null -w '%{http_code}\n' https://go.shaul.kr/api/health                 # 404(토큰 없이 닫힘)
-   ```
-
-   그다음 구글 로그인, 단축 주소 생성·방문, 링크 클릭 기록의 IP가 내 공인 IP인지(Caddy 주소가 아닌지) 확인합니다.
-
-## 6. 일상 배포·롤백
-
-- 배포: main에 병합 → CI 성공 → Deploy 워크플로가 API(`deploy.sh`) → 웹(Vercel) 순서로 배포합니다. `deploy.sh`는 헬스(이미지 HEALTHCHECK `/api/health/ready`)가 60초 안에 healthy가 아니면 이전 이미지로 스스로 되돌리고 실패(종료 1)합니다. 이미지 교체 중 수 초 동안 단축 주소가 502일 수 있습니다(컨테이너 1개).
-- 롤백(권장): GitHub Actions **Rollback** 워크플로(`target` api|web|both, `api_tag` 비우면 직전).
-- 서버에서 직접(Actions를 쓸 수 없을 때, 이미지가 서버에 남아 있으면 토큰 없이 동작):
-
-  ```bash
-  cd /opt/crelink
-  ./rollback.sh                 # releases.log에서 현재 이미지를 배포한 deploy 줄의 이전 이미지로
-  ./rollback.sh <커밋 SHA>       # 지정 태그로
-  column -t -s $'\t' releases.log | tail
-  ```
-
-- 종료 코드(`deploy.sh`·`rollback.sh`): 0 성공(마지막 줄 = 배포된 이미지), 1 실패(이전 이미지로 복구했거나 아무것도 바꾸지 않음), 2 실패 후 복구도 실패(즉시 [8](#8-장애-대응-체크리스트)).
-- DB migration은 API 기동 시 실행되므로 롤백된 이전 코드가 새 스키마에서 동작해야 합니다. 컬럼·테이블 삭제는 쓰는 코드를 먼저 배포한 다음 배포에서 합니다(expand/contract).
-- 오래된 이미지 정리(디스크): 롤백 후보(최근 몇 개)는 남기고 지웁니다. `docker images ghcr.io/ai-worker-lab/crelink-api` → `docker rmi ghcr.io/ai-worker-lab/crelink-api:<오래된 SHA>`.
-
-## 7. 운영 작업
-
-### 7-1. 서버 상태 보기
+## 6. 운영 확인
 
 ```bash
-cd /opt/crelink && docker compose ps && docker compose logs --tail 100 api
-docker inspect --format '{{json .State.Health}}' "$(docker compose ps -q api)"
-cd /opt/edge && sudo docker compose ps && sudo docker compose logs --tail 100 caddy
+# 배포 키가 있으면(워크플로와 같은 경로)
+ssh -i <배포 키> deploy@home-server status
+
+# 운영자 관리 접속으로
+ssh home-server
+readlink /opt/crelink/current && cat /opt/crelink/state/images.env
+column -t -s $'\t' /opt/crelink/state/releases.log | tail
+sudo docker ps --filter label=com.docker.compose.project=crelink-prod --format '{{.Names}}\t{{.Status}}'
+sudo docker logs --tail 100 crelink-prod-api-1        # web·caddy도 같은 방식
+sudo docker inspect --format '{{json .State.Health}}' crelink-prod-api-1
+# Cloudflare를 빼고 스택만 확인(302면 스택 정상)
+curl -sS -o /dev/null -w '%{http_code}\n' -H 'Host: go.shaul.kr' http://127.0.0.1:18080/zzzz
 ```
 
-### 7-2. 내부 토큰
+- `releases.log` 열: UTC 시각, 동작(`deploy`·`rollback`·`restore`), 이전 릴리스, 새 릴리스, API 이미지, 웹 이미지. `restore`는 실패한 배포·롤백 뒤 자동 복구입니다.
+- `docker compose` 명령을 직접 쓰려면 릴리스 폴더에서 `--env-file /opt/crelink/state/images.env`와 `CRELINK_APP_ENV=/dev/null`이 필요합니다(복호화 파일이 평소에는 없음). 컨테이너를 다시 만드는 작업은 하지 말고 배포·롤백 스크립트를 씁니다.
 
-edge Caddy는 `/api/*` 요청의 `X-Crelink-Internal`이 `CRELINK_INTERNAL_TOKEN`과 같을 때만 API로 넘기고(토큰이 비어 있으면 모두 거부), 넘길 때 이 헤더를 지웁니다. 비교는 Caddy CEL 문자열 `==`이며 **상수 시간 비교가 아닙니다**. Caddy에는 임의 헤더를 상수 시간으로 비교하는 matcher가 없습니다(`basic_auth`는 Authorization 헤더·bcrypt 전용). 64자 무작위 토큰을 인터넷 너머에서 응답 시간 차이로 한 글자씩 알아내는 것은 현실적이지 않다고 보고 받아들이며, 의심되면 [7-4](#7-4-키비밀값-교체)대로 바로 교체합니다. Caddy 접근 로그를 켤 때는 이 헤더를 로그 필터로 지웁니다.
+## 7. 롤백
 
-### 7-3. 백업·복구
+- **자동(서버)**: `deploy.sh`·`rollback.sh`가 헬스 실패 시 직전 릴리스·이미지로 스스로 복구하고 실패(종료 1)합니다.
+- **자동(워크플로)**: 배포 뒤 운영 주소 검사가 실패하면 `rollback-on-failure` job이 대상마다 직전 릴리스로 되돌리고 워크플로를 실패로 끝냅니다.
+- **수동(권장)**: GitHub Actions **Rollback**을 main에서 실행합니다. `target`(기본 `home-server`), `release`(비우면 지금 릴리스를 배포한 마지막 `deploy` 줄의 이전 릴리스, 지정하면 그 SHA). 설정·비밀값·이미지가 함께 돌아갑니다.
+- **서버에서 직접**(Actions를 쓸 수 없을 때, 이미지가 서버에 남아 있으면 토큰 없이 동작):
 
-| 대상 | 방법 |
-| --- | --- |
-| DB | Pro: Supabase 일일 백업(7일)·대시보드 복원. Free 기간과 추가 보관용: 아래 `pg_dump` |
-| 업로드 이미지 | 서버 볼륨 `crelink-prod_uploads`. 아래 tar를 서버 밖으로 복사 |
-| `/opt/crelink/.env`·`/opt/edge/.env` | 서버 밖 비밀번호 관리자에 같은 값 보관 |
-| edge 인증서(`edge_data`) | 백업하지 않음(잃으면 다시 발급, 7일 5장 제한 유의) |
+  ```bash
+  ssh home-server
+  sudo -u deploy /opt/crelink/current/rollback.sh            # 지금 릴리스를 배포한 deploy 줄의 이전 릴리스로(연달아 실행하면 배포 이력을 한 단계씩)
+  sudo -u deploy /opt/crelink/current/rollback.sh <릴리스 SHA>
+  ls -t /opt/crelink/releases                                # 되돌릴 수 있는 릴리스(최근 5개 + 운영 중)
+  ```
+
+- 종료 코드: 0 성공(마지막 줄 = `<릴리스> <API 이미지> <웹 이미지>`), 1 실패(직전 상태로 복구했거나 아무것도 바꾸지 않음), 2 복구도 실패(즉시 [11](#11-장애-대응)).
+- 서버에 남지 않은 오래된 릴리스로 가려면 main에서 해당 변경을 되돌리는 커밋을 병합해 새로 배포합니다.
+- DB migration은 롤백되지 않습니다. 이전 코드가 새 스키마에서 동작하도록 expand/contract를 지킵니다([설계](../../docs/specs/crelink-prod-deploy.md#db-migration-운영-규칙)).
+
+## 8. GeoIP
 
 ```bash
-# DB(로컬에서, Supabase Postgres 메이저와 같은 pg_dump. 서버 메이저 버전은 대시보드에서 확인)
+ssh home-server
+sudo -u deploy /opt/crelink/current/geoip.sh --restart     # DB-IP City Lite를 geoip 볼륨에 넣고 api 재시작(몇 초 단축 주소 중단)
+sudo crontab -u deploy -e   # 매월 3일 04:17 UTC: 17 4 3 * * /opt/crelink/current/geoip.sh --restart >> /opt/crelink/state/geoip.log 2>&1
+```
+
+`--restart`를 빼면 다음 배포부터 새 파일을 읽습니다. 파일이 없으면 방문 기록의 국가·도시만 비어 있습니다. `geoip` 볼륨은 릴리스가 바뀌어도 유지됩니다.
+
+## 9. 업로드 볼륨 백업·복구
+
+업로드 이미지는 서버 볼륨 `crelink-prod_uploads`(api `/data/uploads`, 소유 uid 1000)에 있습니다. S3 호환 저장소로 옮기기 전까지 정기적으로 서버 밖에 복사합니다.
+
+```bash
+ssh home-server
+sudo install -d -m 700 /var/backups/crelink
+sudo docker run --rm -v crelink-prod_uploads:/data:ro -v /var/backups/crelink:/backup alpine:3.22 \
+  tar czf "/backup/uploads-$(date -u +%Y%m%d).tgz" -C /data .
+# 로컬로 가져오기: scp home-server:/var/backups/crelink/uploads-<날짜>.tgz ./   (root 소유라 필요하면 sudo로 권한 조정)
+# 복구(같은 이름 볼륨에):
+sudo docker run --rm -v crelink-prod_uploads:/data -v /var/backups/crelink:/backup:ro alpine:3.22 \
+  sh -c 'tar xzf /backup/uploads-YYYYMMDD.tgz -C /data && chown -R 1000:1000 /data'
+```
+
+DB 백업은 [12](#12-supabase-주의사항)입니다.
+
+## 10. 배포 대상 추가와 Tunnel 전환
+
+같은 저장소·같은 절차로 대상을 더하고, 공개 호스트를 새 대상 Tunnel로 옮겨 전환합니다. 원칙은 [설계 "이식 규칙"](../../docs/specs/crelink-prod-deploy.md#이식-규칙)입니다.
+
+1. 서버: Ubuntu(amd64 또는 arm64, 예: OCI `VM.Standard.A1.Flex`, AWS Graviton)를 만들고 Tailscale에 접속시킵니다(Tailscale SSH는 끔). 공인 인바운드는 열지 않습니다(OCI 보안 목록·AWS 보안 그룹에 80·443을 넣지 않음, Tailscale 접속 후 공인 22도 닫음).
+2. Tunnel: Cloudflare에서 이 서버용 원격 관리형 Tunnel을 만들고 토큰을 복사합니다.
+3. bootstrap: [1](#1-서버-준비-bootstrap)처럼 실행하되 `TARGET_NAME=<새 이름>`, `DEPLOY_SSH_PUBKEY`는 기존 서버 `/home/deploy/.ssh/authorized_keys`의 키(지금 `DEPLOY_SSH_KEY`의 공개키), `CLOUDFLARED_TOKEN`을 줍니다.
+4. 비밀값: [4-4](#4-4-새-대상수신자-추가)로 `.sops.yaml` 규칙과 `infra/prod/secrets/<새 이름>.sops.env`를 만듭니다.
+5. tailnet 정책: `hosts`에 새 서버를 넣고 `tag:ci` grant의 `dst`에 추가합니다(tcp:22만).
+6. `infra/prod/targets.json`에 `{ "name": "<새 이름>", "host": "<MagicDNS 이름>", "platform": "linux/arm64"(또는 amd64), "enabled": false }`를 넣어 병합합니다. 준비가 끝나면 `enabled: true`로 바꿔 병합하면 Deploy가 플랫폼 합집합으로 이미지를 만들고 대상마다 차례로 배포합니다(arm64는 QEMU라 웹 빌드가 느려질 수 있음).
+7. 검증: 새 Tunnel에 임시 공개 호스트(예: `go-oci.shaul.kr` → `HTTP localhost:18080`, Additional application settings > HTTP Settings > **HTTP Host Header** = `go.shaul.kr`)를 두고 단축 302를 확인합니다. 웹도 같은 방식(`links.shaul.kr`).
+8. 업로드 복사(S3 이전 전까지): 전환 직전에 [9](#9-업로드-볼륨-백업복구)로 옛 서버 볼륨을 백업해 새 서버 볼륨에 복구합니다. 복사 뒤 전환까지 옛 서버에 올라온 업로드는 새 서버에 없으므로 전환 창을 짧게 둡니다. 두 대상을 동시에 공개하지 않습니다(업로드가 갈라짐).
+9. 전환: 옛 Tunnel에서 `go.shaul.kr`·`links.shaul.kr` 경로를 지우고 새 Tunnel에 같은 경로(`HTTP localhost:18080`)를 추가합니다(CNAME이 새 Tunnel UUID로 바뀜). 되돌리기는 반대로 합니다. 임시 호스트는 지웁니다.
+10. 옛 대상은 하루 정도 그대로 둔 뒤 `targets.json`에서 `enabled: false`로 바꾸거나 빼고, tailnet 정책의 grant에서 뺍니다.
+
+## 11. 장애 대응
+
+1. 무엇이 안 되나: `curl -sS -o /dev/null -w '%{http_code}\n' https://go.shaul.kr/zzzz`(302 정상), `https://links.shaul.kr/`. 서버에서 [6](#6-운영-확인)의 `127.0.0.1:18080` 확인으로 Cloudflare·Tunnel 문제인지 스택 문제인지 나눕니다.
+2. Tunnel: Cloudflare 대시보드의 Tunnel 상태(Healthy), 서버 `systemctl status cloudflared`·`journalctl -u cloudflared -n 100`.
+3. 최근 배포·롤백: Actions 실행 기록과 `releases.log`. 배포 직후라면 [7](#7-롤백)대로 롤백부터 합니다.
+4. 컨테이너: [6](#6-운영-확인)의 상태·헬스·로그. api가 unhealthy면 DB 접속·환경변수 오류, web이 unhealthy면 `/privacy` 응답을 봅니다.
+5. 종료 2(복구도 실패): `ls -t /opt/crelink/releases`에서 `.images.env`가 있는 릴리스를 골라 `sudo -u deploy /opt/crelink/current/rollback.sh <SHA>`(`current`가 없으면 `/opt/crelink/releases/<SHA>/rollback.sh`).
+6. "복호화 실패": `/etc/crelink/age.key` 공개키(`sudo age-keygen -y /etc/crelink/age.key`)가 그 릴리스 암호문의 수신자인지 확인하고, 아니면 [4-4](#4-4-새-대상수신자-추가)의 `updatekeys` 후 다시 배포합니다.
+7. DB: Supabase 대시보드(일시정지·장애·연결 수), 세션 풀러 문자열(5432), `infra/prod/certs/supabase-ca.crt`.
+8. CI가 서버에 못 붙음: Tailscale 단계 오류면 Trust credentials의 오류 표시·Subject·태그, SSH 단계면 tailnet 정책(`tag:ci` → 22)·`RunSSH`·`DEPLOY_SSH_KEY`·`authorized_keys`를 봅니다.
+9. 서버 자원: `df -h`, `sudo docker system df`, `free -h`, `uptime`. 이미지를 지울 때는 남은 릴리스의 `.images.env`(`cat /opt/crelink/releases/*/.images.env`)에 없는 `ghcr.io/ai-worker-lab/crelink-*` 태그만 `sudo docker rmi`로 지웁니다.
+10. 복구 뒤 원인·조치를 운영 work item에 기록합니다.
+
+## 12. Supabase 주의사항
+
+- `DATABASE_URL`은 Supavisor **세션 모드**(`aws-<N>-<리전>.pooler.supabase.com:5432`, 사용자 `postgres.<프로젝트 ref>`) 연결 문자열을 대시보드 **Connect** > Session pooler에서 그대로 복사합니다. **6543(트랜잭션 모드)은 쓰지 않습니다**(migration 세션 advisory lock·prepared statement 미지원, [API 문서](../../apps/api/docs/README.md#환경변수)). 세션 풀러는 IPv4로 접속됩니다(직접 연결은 IPv6 전용).
+- TLS 파라미터는 URL에 넣지 않고 `DATABASE_SSL=verify-full`·`DATABASE_SSL_CA_PATH`로 정합니다. CA는 Database Settings > SSL Configuration의 **Download Certificate** 파일을 `infra/prod/certs/supabase-ca.crt`로 커밋합니다(공개 인증서). Supabase가 CA를 바꾸면 이 파일을 바꿔 배포합니다. **Enforce SSL on incoming connections**를 켭니다.
+- Free 플랜은 7일 동안 활동이 적으면 일시정지되고 자동 백업이 없습니다. 출시 전 Pro로 전환합니다(일일 백업 7일 보관, PITR은 별도 애드온). 그 전까지는 아래 `pg_dump`를 정기적으로 합니다.
+
+```bash
+# 로컬에서. Supabase Postgres 메이저와 같은 pg_dump(대시보드에서 버전 확인).
 docker run --rm -e PGURL='<세션 풀러 연결 문자열>?sslmode=require' -v "$PWD:/out" postgres:17-alpine \
   sh -c 'pg_dump "$PGURL" -Fc -f /out/crelink-$(date -u +%Y%m%d).dump'
-# 복원(새 프로젝트 등 대상 DB에): pg_restore --no-owner --no-privileges -d '<대상 연결 문자열>' crelink-YYYYMMDD.dump
-
-# 업로드(서버에서 deploy로)
-mkdir -p /opt/crelink/backups
-docker run --rm -v crelink-prod_uploads:/data:ro -v /opt/crelink/backups:/backup alpine:3.22 \
-  tar czf "/backup/uploads-$(date -u +%Y%m%d).tgz" -C /data .
-# 로컬로: rsync -az -e 'ssh -i ~/.ssh/crelink_deploy' deploy@<서버 IP>:/opt/crelink/backups/ ./crelink-backups/
-# 복원: docker run --rm -v crelink-prod_uploads:/data -v /opt/crelink/backups:/backup:ro alpine:3.22 \
-#   sh -c 'tar xzf /backup/uploads-YYYYMMDD.tgz -C /data && chown -R 1000:1000 /data'
+# 복원(대상 DB에): pg_restore --no-owner --no-privileges -d '<대상 연결 문자열>' crelink-YYYYMMDD.dump
 ```
 
 `pg_dump`의 Supabase 메이저 버전 일치와 세션 풀러 경유 덤프의 제약은 `[확인 못 함]`입니다. 처음 백업할 때 복원까지 한 번 시험합니다.
 
-### 7-4. 키·비밀값 교체
+## 13. 처음 설계에서 남은 것 정리(한 번)
 
-| 대상 | 절차 |
-| --- | --- |
-| 배포 SSH 키 | 새 키 `ssh-keygen -t ed25519 -N '' -C crelink-deploy -f ~/.ssh/crelink_deploy_new` → 공개키를 `/home/deploy/.ssh/authorized_keys`에 추가 → `gh secret set OCI_SSH_KEY < ~/.ssh/crelink_deploy_new` → Deploy 워크플로 실행으로 확인 → 옛 공개키 줄 삭제 |
-| 내부 토큰 | 새 값 `openssl rand -hex 32` → Vercel `API_INTERNAL_TOKEN`(Production) 수정 → `/opt/edge/.env` 수정 후 `cd /opt/edge && sudo docker compose up -d` → 즉시 웹 재배포(Deploy 워크플로 수동 실행). Caddy가 한 값만 받으므로 edge 반영부터 웹 재배포 완료까지 웹→API 호출이 실패합니다. 사용이 적은 시간에 합니다 |
-| Google 클라이언트 비밀번호 | 콘솔에서 새 비밀번호 추가 → `/opt/crelink/.env` 수정 → `cd /opt/crelink && docker compose up -d api`(환경변수 반영은 재생성) → 로그인 확인 → 옛 비밀번호 삭제 |
-| DB 비밀번호 | Supabase에서 재설정 → `.env` `DATABASE_URL` 수정 → `docker compose up -d api` → 헬스 확인 |
-| `VERCEL_TOKEN` | 새 토큰 만들기 → secret 교체 → 옛 토큰 삭제 |
-| GHCR | 장기 토큰 없음(job마다 `GITHUB_TOKEN`). 교체할 것 없음 |
-
-`.env`를 바꾼 뒤 `docker compose up -d api`가 헬스 실패하면 `.env`를 되돌리고 다시 `up -d`합니다(`deploy.sh`의 자동 복구는 이미지 교체에만 적용).
-
-### 7-5. 도메인 변경(정식 도메인)
-
-`SHORT_LINK_BASE_URL`(서버 `.env`), `CRELINK_DOMAIN`(edge `.env`, `up -d`), Vercel `API_INTERNAL_URL`, DNS를 함께 바꿉니다. 이미 인스타그램에 걸린 옛 단축 주소가 계속 동작해야 하므로 옛 도메인 사이트를 edge에 남기는 방법은 그때 정합니다.
-
-## 8. 장애 대응 체크리스트
-
-1. 무엇이 안 되나: `curl -sS -o /dev/null -w '%{http_code}\n' https://go.shaul.kr/zzzz`(302가 정상), `https://links.shaul.kr/`, `https://aichat-api.shaul.kr/`(edge 전체 문제인지 구분).
-2. 최근 배포·롤백: Actions 실행 기록, 서버 `tail /opt/crelink/releases.log`. 직후라면 [6](#6-일상-배포롤백)대로 롤백부터.
-3. 컨테이너: [7-1](#7-1-서버-상태-보기)의 상태·헬스·로그. API가 unhealthy면 로그에서 DB 접속·환경변수 오류를 봅니다.
-4. DB: Supabase 대시보드(일시정지·장애·연결 수), `.env`의 세션 풀러 문자열·CA 파일.
-5. TLS: edge 로그의 인증서 발급 오류, `dig +short go.shaul.kr`, 보안 목록·iptables 80·443.
-6. 서버 자원: `df -h`, `docker system df`, `free -h`, `uptime`. 디스크가 차면 오래된 이미지부터 지웁니다([6](#6-일상-배포롤백)).
-7. 웹만 안 되면: Vercel 배포 상태, `API_INTERNAL_URL`·`API_INTERNAL_TOKEN`, Vercel Rollback.
-8. 복구 뒤 원인·조치를 운영 work item에 기록합니다.
+- GitHub secrets: [2-5](#2-ci-접속-설정-tailscalegithub).
+- Cloudflare DNS: 처음 설계의 `go` A 레코드·`links` CNAME은 [3](#3-cloudflare-tunnel-공개-호스트)에서 Tunnel CNAME으로 바뀝니다.
+- OCI 서버: 서버 공용 edge Caddy(`/opt/edge`)는 다른 프로젝트(aichat)가 계속 쓰므로 그대로 둡니다. 크리링 흔적(`/opt/edge/sites/crelink.caddy`, `/opt/crelink`, `deploy` 사용자와 그 `authorized_keys`)은 지워도 되지만, edge 설정 reload는 그 서버의 모든 사이트에 영향을 주므로 영향을 설명하고 승인받은 뒤 합니다.
+- 로컬 평문 비밀값 파일(`apps/api/.env.prod`, `infra/prod/.env`)은 암호문으로 옮긴 뒤 지웁니다.
 
 ## 로컬 시험
 
-원격 없이 Docker로 이 구성의 동작을 확인합니다([infra/prod/README.md](../prod/README.md#로컬-시험)).
+원격 없이 Docker로 이 구성을 확인하는 방법은 [infra/prod/README.md](../prod/README.md#로컬-시험)에 있습니다.
 
 ## 출처
 
@@ -306,35 +306,24 @@ docker run --rm -v crelink-prod_uploads:/data:ro -v /opt/crelink/backups:/backup
 
 | 사실 | 출처 |
 | --- | --- |
-| OCI Ubuntu 기본 iptables(SSH만 허용)·UFW 금지·`rules.v4` | <https://docs.oracle.com/en-us/iaas/Content/Compute/References/images.htm>, <https://docs.oracle.com/en-us/iaas/Content/Compute/known-issues.htm> |
-| iptables로 80 열기·`netfilter-persistent save`(443·UDP는 같은 방식으로 추론) | <https://docs.oracle.com/en-us/iaas/Content/developer/wp-on-ubuntu/01-summary.htm> |
-| 보안 목록 인그레스 규칙 | <https://docs.oracle.com/en-us/iaas/Content/Network/Concepts/securitylists.htm> |
-| 예약 공인 IP | <https://docs.oracle.com/en-us/iaas/Content/Network/Tasks/managingpublicIPs.htm> |
-| Always Free A1 한도·유휴 회수 | <https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm> |
-| Docker 공식 apt 설치(`docker.sources`, 패키지·충돌 패키지) | <https://docs.docker.com/engine/install/ubuntu/> |
-| publish 포트의 방화벽 우회 | <https://docs.docker.com/engine/network/packet-filtering-firewalls/#docker-and-ufw> |
+| Tailscale workload identity federation(Trust credentials, Subject, Client ID·Audience, GitHub Action `oauth-client-id`·`audience`·`tags`, `id-token: write`) | <https://tailscale.com/docs/features/workload-identity-federation> |
+| Tailscale GitHub Action(ephemeral 노드, `ping`) | <https://github.com/tailscale/github-action> |
+| Tailscale SSH가 tailnet의 22번을 가져감 | <https://tailscale.com/docs/features/tailscale-ssh> |
+| tailnet 정책 grants·tagOwners·hosts | <https://tailscale.com/kb/1324/grants>, <https://tailscale.com/kb/1337/policy-syntax> |
+| Tailscale Personal 비상업 조건 | <https://tailscale.com/pricing> |
+| GitHub OIDC `sub` 형식 | <https://docs.github.com/en/actions/reference/security/oidc> |
+| GitHub Free 비공개 저장소의 environments 제약 | <https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments> |
+| Cloudflare Tunnel 공개 경로·CNAME 자동 생성 | <https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/> |
+| SOPS(`sops edit`·`updatekeys`·`SOPS_AGE_KEY_CMD`·dotenv) | <https://github.com/getsops/sops> |
+| OpenSSH `authorized_keys`의 `restrict`·`command=` | <https://man.openbsd.org/sshd.8#AUTHORIZED_KEYS_FILE_FORMAT> |
 | docker 그룹 = root 권한 | <https://docs.docker.com/engine/install/linux-postinstall/> |
-| Compose `env_file.required`, `!override` | <https://docs.docker.com/reference/compose-file/services/#env_file>, <https://docs.docker.com/reference/compose-file/merge/> |
-| Supabase 세션 풀러·IPv4·트랜잭션 모드 제약·Connect | <https://supabase.com/docs/guides/database/connecting-to-postgres> |
+| Docker 공식 apt 설치 | <https://docs.docker.com/engine/install/ubuntu/> |
+| Compose `up --wait` | <https://docs.docker.com/reference/cli/docker/compose/up/> |
+| Caddy `trusted_proxies`·`client_ip_headers` | <https://caddyserver.com/docs/caddyfile/options#trusted-proxies> |
+| Supabase 세션 풀러·IPv4·트랜잭션 모드 제약 | <https://supabase.com/docs/guides/database/connecting-to-postgres> |
 | Supabase SSL 강제·CA 다운로드 | <https://supabase.com/docs/guides/platform/ssl-enforcement> |
-| Supabase Free 일시정지 | <https://supabase.com/docs/guides/platform/free-project-pausing> |
-| Supabase 백업·PITR | <https://supabase.com/docs/guides/platform/backups> |
-| Vercel Hobby 상업적 사용 금지 | <https://vercel.com/docs/limits/fair-use-guidelines#commercial-usage> |
-| Vercel Root Directory | <https://vercel.com/docs/monorepos> |
-| Vercel Git 자동 배포 끄기·연결 해제 | <https://vercel.com/docs/project-configuration/git-configuration#git.deploymentenabled>, <https://vercel.com/docs/project-configuration/git-settings> |
-| Vercel CLI 배포·`VERCEL_ORG_ID`·`VERCEL_PROJECT_ID` | <https://vercel.com/kb/guide/how-can-i-use-github-actions-with-vercel> |
-| Vercel 도메인 CNAME(프로젝트별 값) | <https://vercel.com/docs/domains/working-with-domains/add-a-domain> |
-| Vercel 환경변수·Sensitive | <https://vercel.com/docs/environment-variables>, <https://vercel.com/docs/environment-variables/sensitive-environment-variables> |
-| Vercel rollback(Hobby는 직전만) | <https://vercel.com/docs/cli/rollback>, <https://vercel.com/docs/instant-rollback> |
-| GitHub Actions secrets | <https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets> |
-| GHCR 인증·기본 private·저장소 연결 | <https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry> |
-| Google OAuth 클라이언트·리디렉션 URI·반영 시간 | <https://support.google.com/cloud/answer/15549257>, <https://developers.google.com/identity/protocols/oauth2/web-server> |
-| Google Publishing status·테스트 제한 예외 | <https://support.google.com/cloud/answer/15549945> |
-| Caddy 자동 HTTPS 조건·data 디렉터리 | <https://caddyserver.com/docs/automatic-https>, <https://caddyserver.com/docs/conventions#data-directory> |
-| Caddy `X-Forwarded-*` 기본 동작(신뢰하지 않는 값은 무시) | <https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#defaults> |
-| Caddy 공식 이미지(`/data` 유지, HTTP/3 UDP 443, `caddy reload`) | <https://hub.docker.com/_/caddy> |
-| Let's Encrypt 같은 이름 집합 7일 5장 | <https://letsencrypt.org/docs/rate-limits/> |
-| DB-IP City Lite(CC BY 4.0, 매월 갱신, 파일 이름) | <https://db-ip.com/db/download/ip-to-city-lite> |
-| ssh-keyscan 결과를 검증 없이 쓰면 MITM 위험 | <https://man.openbsd.org/ssh-keyscan.1> |
+| Supabase Free 일시정지·백업 | <https://supabase.com/docs/guides/platform/free-project-pausing>, <https://supabase.com/docs/guides/platform/backups> |
+| DB-IP City Lite(CC BY 4.0, 매월 갱신) | <https://db-ip.com/db/download/ip-to-city-lite> |
+| GHCR 인증·저장소 연결 | <https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry> |
 
-`[확인 못 함]`: OCI 기본 iptables FORWARD 규칙과 Docker 규칙의 상호작용, OCI 콘솔에서 호스트 키 지문을 확인하는 공식 절차(2-3은 관리자 SSH로 확인), `pg_dump`의 Supabase 버전·풀러 제약.
+`[확인 못 함]`: Tailscale WIF Custom claims의 와일드카드, `pg_dump`의 Supabase 버전·풀러 제약.

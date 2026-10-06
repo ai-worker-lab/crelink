@@ -20,7 +20,7 @@ export const CRELINK_LIMITS = {
   portfolioTitleMax: 60,
   portfolioDescriptionMax: 200,
   blockedReasonMax: 200,
-  /** 업로드 이미지 최대 크기(바이트). 업로드·조회가 웹 BFF(Vercel Function 본문 4.5MB 한도)를 지나므로 4MB. */
+  /** 업로드 이미지 최대 크기(바이트, MVP 임시값 4MB). 운영 스택 Caddy가 웹 요청 본문을 6MB(multipart 여유 포함)로 막으므로 이 값을 그보다 작게 둡니다(infra/prod/Caddyfile). */
   imageMaxBytes: 4 * 1024 * 1024,
   /** 단축 주소 규칙(R8): 영소문자·숫자·`-`, 3~30자. */
   slugMinLength: 3,

@@ -8,7 +8,7 @@
 - 기동하면 `apps/api/migrations/*.sql`을 이름 순으로 한 번씩 적용합니다(`src/database.ts`의 `runMigrations`). 스키마 원본은 [`migrations/0001_crelink_mvp.sql`](../migrations/0001_crelink_mvp.sql)입니다.
 - 확인: `curl -i {API}/api/health/ready`(DB 포함 200), `curl -i {API}/없는주소`(302 `{WEB_URL}/notice?reason=link_not_found`).
 - 테스트: `pnpm --filter @crelink/api test`. 테스트마다 일회용 DB를 만들어 지웁니다(`test/test-database.ts`). 구글 code 교환은 `GoogleOAuth` provider를, 위치 조회는 `GeoIpService`를 테스트용으로 바꿉니다(`test/test-app.ts`). `@crelink/shared`는 ESM 패키지라 Jest(Node 22)가 `require`하지 못하므로, Jest 설정의 `moduleNameMapper`가 공유 패키지 TypeScript 원본을 직접 컴파일해 씁니다. 실행 중인 API는 Node 22의 `require(esm)`로 빌드 결과를 읽습니다.
-- 운영: OCI 서버에서 [컨테이너 이미지](#컨테이너-이미지)로 실행합니다(배포 구성은 [운영 배포 설계](../../../docs/specs/crelink-prod-deploy.md)).
+- 운영: 배포 대상 서버의 Compose 스택에서 [컨테이너 이미지](#컨테이너-이미지)로 실행합니다(배포 구성은 [운영 배포 설계](../../../docs/specs/crelink-prod-deploy.md)).
 
 ## 환경변수
 
@@ -51,23 +51,23 @@
 - 설치된 pg(8.23, pg-connection-string 2.14)는 연결 문자열을 파싱한 결과로 Pool의 `ssl` 옵션을 덮어씁니다(`sslmode`가 있으면 `ssl` 객체를 새로 만들고 `disable`이면 `false`). 그래서 `DATABASE_SSL`이 있으면 URL의 `ssl`·`sslmode`·`sslrootcert`·`sslcert`·`sslkey`·`uselibpqcompat`를 지워 두 설정이 섞이지 않게 합니다. 운영은 `DATABASE_URL`에 TLS 파라미터를 넣지 말고 `DATABASE_SSL`로 정합니다.
 - Supabase 운영 권장: `DATABASE_SSL=verify-full`, `DATABASE_SSL_CA_PATH`=대시보드 Database Settings의 SSL Configuration에서 받은 루트 인증서(`prod-ca-2021.crt`)를 컨테이너에 읽기 전용으로 마운트한 경로. `require`는 중간자 공격을 막지 못합니다. 근거: [Supabase SSL Enforcement](https://supabase.com/docs/guides/platform/ssl-enforcement), [Supabase Connect to your database — SSL](https://supabase.com/docs/guides/database/connecting-to-postgres#connecting-with-ssl).
 
-> **경고: Supabase 트랜잭션 풀러(포트 6543)를 쓰지 마세요.** API는 기동할 때 migration을 세션 advisory lock(`pg_advisory_lock`)으로 한 연결에서 잡고 풉니다(`runMigrations`). Supavisor 트랜잭션 모드는 트랜잭션마다 연결을 풀에 돌려줘 세션 단위 advisory lock·`SET`·prepared statement가 유지되지 않습니다. `DATABASE_URL`은 직접 연결 또는 Supavisor **세션 모드**(`aws-[INDEX]-[REGION].pooler.supabase.com:5432`, 사용자 `postgres.[PROJECT-REF]`)를 씁니다. OCI 서버가 IPv4만 쓰면 Supabase 직접 연결(IPv6)이 안 되므로 세션 모드 풀러가 기본입니다. 근거: [Supabase Connect to your database — Transaction mode limitations·Endpoints](https://supabase.com/docs/guides/database/connecting-to-postgres#transaction-mode-limitations) (2026-10-06 확인).
+> **경고: Supabase 트랜잭션 풀러(포트 6543)를 쓰지 마세요.** API는 기동할 때 migration을 세션 advisory lock(`pg_advisory_lock`)으로 한 연결에서 잡고 풉니다(`runMigrations`). Supavisor 트랜잭션 모드는 트랜잭션마다 연결을 풀에 돌려줘 세션 단위 advisory lock·`SET`·prepared statement가 유지되지 않습니다. `DATABASE_URL`은 직접 연결 또는 Supavisor **세션 모드**(`aws-[INDEX]-[REGION].pooler.supabase.com:5432`, 사용자 `postgres.[PROJECT-REF]`)를 씁니다. Supabase 직접 연결은 IPv6 전용이라 IPv4만 쓰는 서버에서는 안 되므로 운영은 세션 모드 풀러가 기본입니다. 근거: [Supabase Connect to your database — Transaction mode limitations·Endpoints](https://supabase.com/docs/guides/database/connecting-to-postgres#transaction-mode-limitations) (2026-10-06 확인).
 
 ## 컨테이너 이미지
 
-`apps/api/Dockerfile`(멀티 스테이지). 빌드 컨텍스트는 저장소 루트이고, 루트 `.dockerignore`가 허용 목록(`package.json`·`pnpm-lock.yaml`·`pnpm-workspace.yaml`·`.npmrc`·`apps/api`·`packages/shared`)만 넣으며 그 안에서도 `.env*`·`.local`·`node_modules`·`dist`·테스트를 뺍니다. 그래서 `apps/api/.env` 같은 비밀값은 이미지·빌드 캐시에 들어가지 않습니다.
+`apps/api/Dockerfile`(멀티 스테이지). 빌드 컨텍스트는 저장소 루트이고, 루트 `.dockerignore`가 허용 목록(`package.json`·`pnpm-lock.yaml`·`pnpm-workspace.yaml`·`.npmrc`·`apps/api`·`packages/shared`, 웹 이미지용 `apps/web`·`packages/design-tokens`)만 넣으며 그 안에서도 `.env*`·`.local`·`node_modules`·`dist`·테스트를 뺍니다. 그래서 `apps/api/.env` 같은 비밀값은 이미지·빌드 캐시에 들어가지 않습니다. 운영 이미지 플랫폼은 `infra/prod/targets.json`의 사용 대상 플랫폼 합집합(지금 `linux/amd64`)이고, 같은 Dockerfile로 `linux/arm64`도 만듭니다.
 
 ```bash
-# 저장소 루트에서. 운영 대상은 linux/arm64(OCI Ampere).
-docker buildx build --platform linux/arm64 -f apps/api/Dockerfile -t crelink-api:local --load .
+# 저장소 루트에서. --platform은 배포 대상 플랫폼(linux/amd64 또는 linux/arm64).
+docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api:local --load .
 ```
 
-- 빌드 단계(`--platform=$BUILDPLATFORM`, `node:22-slim`): corepack으로 루트 `packageManager`의 pnpm을 켜고 `pnpm install --frozen-lockfile --filter @crelink/api...`, `@crelink/shared`·`@crelink/api` 빌드, `pnpm --filter @crelink/api deploy --prod --legacy /out`으로 API와 운영 의존성만 모읍니다(`.npmrc`의 `node-linker=hoisted`라 평평한 `node_modules`, `@crelink/shared`는 빌드 결과를 포함한 복사본). 빌더가 amd64(GitHub Actions)여도 대상 플랫폼 명령을 실행하지 않으므로 QEMU가 필요 없습니다.
+- 빌드 단계(`--platform=$BUILDPLATFORM`, `node:22-slim`): corepack으로 루트 `packageManager`의 pnpm을 켜고 `pnpm install --frozen-lockfile --filter @crelink/api...`, `@crelink/shared`·`@crelink/api` 빌드, `pnpm --filter @crelink/api deploy --prod --legacy /out`으로 API와 운영 의존성만 모읍니다(`.npmrc`의 `node-linker=hoisted`라 평평한 `node_modules`, `@crelink/shared`는 빌드 결과를 포함한 복사본). 빌더(GitHub Actions는 amd64)와 대상 플랫폼이 달라도 대상 플랫폼 명령을 실행하지 않으므로 API 이미지는 QEMU가 필요 없습니다.
 - 런타임 단계(대상 플랫폼 `node:22-slim`): `/app/apps/api/{package.json,dist,migrations,node_modules}`만 복사. 코드는 root 소유(읽기 전용), 실행은 `node` 사용자(uid 1000), `NODE_ENV=production`, `CMD node apps/api/dist/main.js`, `EXPOSE 3000`. `PORT`는 이미지에 넣지 않으므로 실행 환경에서 `PORT=3000`을 줍니다. `/data/uploads`·`/data/geoip`를 `node` 소유로 만들어 두어 빈 named volume이 처음 붙을 때 그 소유권을 이어받습니다.
 - `HEALTHCHECK`: curl 없이 `node -e` 내장 `fetch`로 `http://127.0.0.1:${PORT:-3000}/api/health/ready`(DB 포함)를 4초 제한으로 확인합니다(간격 10초, 제한 5초, 시작 유예 30초, 재시도 3회). Compose는 이 정의를 재사용합니다.
 - `@crelink/shared`는 ESM이고 API 빌드는 CommonJS라 Node 22의 `require(esm)`로 읽습니다. 이미지 기동과 단축 주소 302(`CRELINK_WEB_PATHS` 사용)로 해석을 확인했습니다.
-- 운영 의존성은 순수 JS입니다(2026-10-06 이미지 안 `node_modules` 127개에 `*.node`·`binding.gyp`·install 스크립트 없음). native 애드온 의존성을 추가하면 빌더 플랫폼의 바이너리가 arm64로 옮겨져 깨지므로 이 구성을 다시 정해야 합니다.
-- 크기(2026-10-06, arm64): 이미지 약 388MB(`docker image ls`), 압축 약 80MB. 대부분 `node:22-slim` 기반이고 앱 레이어는 `node_modules` 37MB·`dist` 0.8MB·`migrations` 33KB.
+- 운영 의존성은 순수 JS입니다(2026-10-06 이미지 안 `node_modules` 127개에 `*.node`·`binding.gyp`·install 스크립트 없음). native 애드온 의존성을 추가하면 빌더 플랫폼의 바이너리가 다른 대상 플랫폼으로 옮겨져 깨지므로 이 구성을 다시 정해야 합니다(이식 규칙: 멀티 아키텍처 유지).
+- 크기(2026-10-06, arm64 측정): 이미지 약 388MB(`docker image ls`), 압축 약 80MB. 대부분 `node:22-slim` 기반이고 앱 레이어는 `node_modules` 37MB·`dist` 0.8MB·`migrations` 33KB.
 - 로컬 확인 예(일회용 DB, 호스트 PostgreSQL은 `host.docker.internal`): `docker run -d --name crelink-api-check -p 3920:3000 -e PORT=3000 -e DATABASE_URL=postgresql://…@host.docker.internal:<포트>/<일회용 DB> -e WEB_URL=https://… -e SHORT_LINK_BASE_URL=https://… -e GOOGLE_CLIENT_ID=… -e GOOGLE_CLIENT_SECRET=… -e OPERATOR_EMAILS=… -e UPLOAD_DIR=/data/uploads crelink-api:local` 후 `docker inspect -f '{{.State.Health.Status}}' crelink-api-check`가 `healthy`, `curl -i http://127.0.0.1:3920/api/health/ready`가 200.
 
 ## 인증과 권한
@@ -95,7 +95,7 @@ docker buildx build --platform linux/arm64 -f apps/api/Dockerfile -t crelink-api
 - `N`: 신뢰할 프록시가 N단이면 각 프록시가 받은 연결 주소를 `X-Forwarded-For` 끝에 덧붙이므로, 오른쪽에서 N번째 값이 가장 바깥 신뢰 프록시가 본 클라이언트 주소입니다. 그 값을 쓰고 앞쪽 값(클라이언트가 넣은 위조 값)은 무시합니다. 운영은 Caddy 1단이라 `1`(마지막 값). 여러 줄로 온 헤더는 쉼표로 이어 한 목록으로 봅니다.
 - 값이 N개보다 적거나, 고른 값이 IP가 아니면(포트가 붙은 값 포함) 소켓 주소로 돌아갑니다.
 - 정규화: IPv4-mapped IPv6(`::ffff:1.2.3.4`)는 IPv4로, IPv6는 소문자로 저장합니다.
-- 이 설정은 API에 들어오는 모든 연결이 그 프록시를 거칠 때만 안전합니다. 운영은 API 포트를 호스트에 공개하지 않고 Compose 내부 네트워크에서 Caddy만 접근합니다([운영 배포 설계](../../../docs/specs/crelink-prod-deploy.md#caddy-공개-정책-goshaulkr)).
+- 이 설정은 방문·클릭을 기록하는 요청이 모두 그 프록시를 거칠 때만 안전합니다. 운영은 API 포트를 호스트에 공개하지 않고 Compose 내부 네트워크에서 스택 Caddy와 웹만 접근하며, 방문·클릭을 기록하는 단축·클릭 경로는 Caddy를 거쳐서만 들어옵니다([운영 배포 설계](../../../docs/specs/crelink-prod-deploy.md#공개-경로와-caddy-정책)).
 
 ### 방문·클릭 기록 항목
 
@@ -106,7 +106,7 @@ docker buildx build --platform linux/arm64 -f apps/api/Dockerfile -t crelink-api
 - 단축 주소(R8, `src/creator/slug.service.ts`): 입력은 앞뒤 공백을 빼고 소문자로 바꾼 뒤 `SLUG_PATTERN`·3~30자·예약어를 봅니다. 다른 단축 URL의 현재 주소나 90일 안의 옛 주소면 409 `slug_taken`. 자기 옛 주소는 되돌릴 수 있습니다. 첫 변경(`slug_changed_at`이 없음)은 바로, 그 뒤에는 마지막 변경에서 30일 뒤부터(429 `slug_change_too_soon`). 자동 주소로 되돌려도 30일 제한은 마지막 변경 시각 기준이라 우회할 수 없습니다. 같은 주소로 바꾸는 요청은 아무것도 바꾸지 않고 200입니다. 예약 기간이 끝난 남의 옛 주소는 행을 지우고 새로 만듭니다.
 - 링크 한도(R13): 보이는(숨기지 않고 차단되지 않은) 링크 ≤ 5 + `extra_link_slots`(409 `link_limit_reached`), 숨긴 링크 포함 ≤ 50(409 `link_total_limit_reached`). 추가와 숨김 해제에서 확인하며, 같은 사용자의 링크 변경은 사용자 행 잠금으로 줄 세웁니다. 운영자 추가 슬롯은 0~45.
 - 차단 도메인(R14): 링크 호스트가 차단 도메인이거나 그 하위 도메인이면 추가·URL 수정이 422 `link_domain_blocked`. 운영자가 도메인을 추가하면 같은 트랜잭션에서 기존 링크의 `blocked_at`을 채웁니다. 목록에서 빼도 이미 차단된 링크는 운영자가 링크별로 풉니다.
-- 이미지(`src/files/`): multipart 필드 `file`, `CRELINK_LIMITS.imageMaxBytes`(4MB, 웹 BFF가 지나는 Vercel Function 본문 4.5MB 한도 때문) 이하. 형식은 클라이언트 Content-Type이 아니라 파일 앞부분(매직 바이트)으로 JPEG·PNG·WebP·GIF만 받습니다. 저장은 `FileStorage` 경계 뒤의 로컬 디스크(`UPLOAD_DIR`)이고, `GET /api/files/{id}`는 누구나 받을 수 있으며 1년 캐시합니다(id는 UUID, 내용 불변).
+- 이미지(`src/files/`): multipart 필드 `file`, `CRELINK_LIMITS.imageMaxBytes`(4MB, MVP 임시값. 운영 스택 Caddy의 웹 호스트 본문 한도는 6MB) 이하. 형식은 클라이언트 Content-Type이 아니라 파일 앞부분(매직 바이트)으로 JPEG·PNG·WebP·GIF만 받습니다. 저장은 `FileStorage` 경계 뒤의 로컬 디스크(`UPLOAD_DIR`)이고, `GET /api/files/{id}`는 누구나 받을 수 있으며 1년 캐시합니다(id는 UUID, 내용 불변).
 
 ## 통계와 보존 작업
 

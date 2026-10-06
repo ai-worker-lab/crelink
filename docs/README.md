@@ -29,10 +29,10 @@
 - [ADR 0007 저장소 work item 실행기](adr/0007-repository-work-item-runner.md) — 저장소 work item을 제어 평면으로, 브랜치를 착수 점유로, 에이전트 명령을 설정으로 두는 결정
 - [ADR 0008 worktree별 로컬 인스턴스](adr/0008-worktree-local-instances.md) — worktree마다 포트 슬롯·Compose project·볼륨을 나누는 결정
 - [ADR 0009 work item을 역할별 폴더에 둠](adr/0009-work-item-role-folders.md) — 에픽은 `docs/work/epics/`, 티켓은 `docs/work/<역할>/`에 두고 계층은 계속 필드로 표현하는 결정
-- [ADR 0010 운영(prod) 배포 구성과 CD](adr/0010-prod-deployment-topology.md) — Vercel 웹·OCI API·Supabase DB, 도메인, main 병합 자동 배포와 롤백(제안)
+- [ADR 0010 운영(prod) 배포 구성과 CD](adr/0010-prod-deployment-topology.md) — 배포 대상 서버 1대의 웹·API Compose 스택, Cloudflare Tunnel 공개, Tailscale OIDC 배포 접속, SOPS/age 비밀값, main 병합 자동 배포와 롤백(제안)
 - [외부 서비스·도구 의존](architecture/external-dependencies.md) — 현재 사용 중이거나 계획된 외부 SaaS·도구와 기준 위치
 - [자주 묻는 질문](faq.md) — 저장소 구조, 개발 도구, 로컬 실행, 배포 목표, 언어 정책
-- [배포 대상 아키텍처](architecture/deployment-target.md) — Vercel, Supabase, Oracle ARM 목표 구성 및 미구현 범위
+- [배포 대상 아키텍처](architecture/deployment-target.md) — 운영 배치(배포 대상 서버·Supabase·Cloudflare Tunnel)와 운영상 경계
 - [NestJS API 구조와 구현 기준](architecture/nestjs-api.md) · [Next.js 웹 구조와 구현 기준](architecture/nextjs-web.md) · [Expo 모바일 구조와 구현 기준](architecture/expo-mobile.md) — 프레임워크별 구조와 현재 골격
 - [Redis와 Valkey 비교](references/redis-vs-valkey.md) — 프로젝트 역사, 라이선스, 호환성, 기능 비교 자료
 - [CHANGELOGS](../CHANGELOGS.md) — 공개 여부와 무관한 내부 전체 변경 기록. 영역별 로그는 `infra/` 및 `apps/` 아래에 있음

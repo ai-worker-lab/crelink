@@ -116,7 +116,7 @@ bring_up() { # bring_up <릴리스 폴더> <API 이미지> <웹 이미지>
 	write_images "$IMAGES_FILE" "$2" "$3"
 	ln -sfn "releases/$(basename "$dir")" "$CURRENT_LINK.tmp" && mv -T "$CURRENT_LINK.tmp" "$CURRENT_LINK"
 	log "기동: $(basename "$dir") (api $2, web $3)"
-	compose "$dir" "$IMAGES_FILE" up -d --remove-orphans --wait --wait-timeout "$CRELINK_WAIT_SECONDS" || status=1
+	compose "$dir" "$IMAGES_FILE" up -d --quiet-pull --remove-orphans --wait --wait-timeout "$CRELINK_WAIT_SECONDS" || status=1
 	if ((status != 0)); then
 		log "헬스 실패. 최근 로그:"
 		compose "$dir" "$IMAGES_FILE" logs --no-color --tail 30 >&2 || true

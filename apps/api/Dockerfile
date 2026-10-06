@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 # 크리링 API 운영 이미지. 빌드 컨텍스트는 저장소 루트입니다(허용 목록: 루트 .dockerignore).
-#   docker buildx build --platform linux/arm64 -f apps/api/Dockerfile -t crelink-api:local .
+#   docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api:local .   (대상 플랫폼: linux/amd64 또는 linux/arm64)
 # 빌드 단계는 빌더 플랫폼($BUILDPLATFORM)에서 TypeScript를 컴파일하고 운영 의존성만 모읍니다. 운영 의존성이 순수 JS라
-# 결과를 대상 플랫폼(linux/arm64) 런타임에 그대로 옮기며, QEMU로 대상 플랫폼 명령을 실행하지 않습니다.
+# 결과를 대상 플랫폼($TARGETPLATFORM) 런타임에 그대로 옮기며, QEMU로 대상 플랫폼 명령을 실행하지 않습니다.
 # native 애드온이 있는 의존성을 추가하면 이 전제가 깨집니다. 설명: apps/api/docs/README.md#컨테이너-이미지
 
 FROM --platform=$BUILDPLATFORM node:22-slim AS build

@@ -18,8 +18,9 @@ if [[ $# -eq 1 ]]; then
 	target="$1"
 else
 	[[ -f "$RELEASES_LOG" ]] || die "$RELEASES_LOG 가 없습니다. 릴리스 SHA를 지정하세요."
-	# 지금 릴리스를 올린 마지막 deploy·rollback 줄의 "이전 릴리스".
-	target="$(awk -F '\t' -v cur="$current" '($2 == "deploy" || $2 == "rollback") && $4 == cur && $3 != cur && $3 != "-" { prev = $3 } END { print prev }' "$RELEASES_LOG")"
+	# 지금 릴리스를 배포한 마지막 deploy 줄의 "이전 릴리스". rollback 줄을 보면 직전 롤백의 출발점으로 되돌아가
+	# 두 릴리스 사이를 오가므로 deploy 줄만 봅니다(연달아 실행하면 배포 이력을 한 단계씩 거슬러 감).
+	target="$(awk -F '\t' -v cur="$current" '$2 == "deploy" && $4 == cur && $3 != cur && $3 != "-" { prev = $3 } END { print prev }' "$RELEASES_LOG")"
 	[[ -n "$target" ]] || die "releases.log에서 $current 이전 릴리스를 찾지 못했습니다. 릴리스 SHA를 지정하세요."
 fi
 [[ "$target" != "$current" ]] || die "이미 $target 입니다."

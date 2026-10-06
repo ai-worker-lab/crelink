@@ -198,3 +198,4 @@ API 통합 테스트(0016): 가입 트랜잭션, 주소 규칙(예약어·중복
 ## 변경 기록
 
 - 2026-10-06: 이미지 한도를 5MB → 4MB로 낮춤. 운영에서 업로드·조회가 웹 BFF(Vercel Function 본문 4.5MB 한도)를 지나기 때문(`docs/work/web/0026-web-internal-token-vercel.md`, 설계 `crelink-prod-deploy.md`).
+- 2026-10-06: 운영 웹을 Vercel이 아닌 배포 대상 서버의 컨테이너로 바꾸면서(`crelink-prod-deploy.md`) 위 4.5MB 근거는 없어짐. 이미지 한도 4MB는 MVP 임시값으로 유지하고, 운영 웹 호스트 본문 상한은 스택 Caddy의 `request_body` 6MB.

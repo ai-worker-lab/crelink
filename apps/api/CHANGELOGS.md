@@ -4,7 +4,7 @@
 
 ## 2026-10-06
 
-- 운영 컨테이너 이미지 `apps/api/Dockerfile`(멀티 스테이지, 빌더 플랫폼에서 빌드·`pnpm deploy --prod --legacy`, `node:22-slim` arm64 런타임, `node` 사용자, `NODE_ENV=production`, `migrations/` 포함, node `fetch`로 `/api/health/ready`를 보는 `HEALTHCHECK`)와 루트 `.dockerignore`(허용 목록, `.env*`·`.local`·`node_modules` 제외). 빌드·크기·구성: `apps/api/docs/README.md#컨테이너-이미지`. 근거: `docs/work/api/0025-api-container-prod-config.md`.
+- 운영 컨테이너 이미지 `apps/api/Dockerfile`(멀티 스테이지, 빌더 플랫폼에서 빌드·`pnpm deploy --prod --legacy`, 대상 플랫폼(amd64·arm64) `node:22-slim` 런타임, `node` 사용자, `NODE_ENV=production`, `migrations/` 포함, node `fetch`로 `/api/health/ready`를 보는 `HEALTHCHECK`)와 루트 `.dockerignore`(허용 목록, `.env*`·`.local`·`node_modules` 제외). 운영은 배포 대상 서버의 Compose 스택에서 스택 Caddy 뒤(`TRUSTED_PROXY_HOPS=1`). 빌드·크기·구성: `apps/api/docs/README.md#컨테이너-이미지`. 근거: `docs/work/api/0025-api-container-prod-config.md`.
 - 환경변수 추가: `TRUSTED_PROXY_HOPS`(기본 0. N이면 방문·클릭 IP를 `X-Forwarded-For` 오른쪽에서 N번째 값으로, 앞쪽 위조 값 무시, 잘못된 값은 소켓 주소), `DATABASE_SSL`(`disable`·`require`·`verify-full`, 설정하면 URL의 `sslmode` 등 TLS 파라미터를 지우고 이 값만 따름)·`DATABASE_SSL_CA_PATH`(verify-full CA). 잘못된 값이면 기동 거부. 비어 있으면 기존 동작과 같음.
 - `NODE_ENV=production`이면 기동 전에 `DATABASE_URL`·`PORT`·`WEB_URL`·`SHORT_LINK_BASE_URL`·`GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET`·`OPERATOR_EMAILS`·`UPLOAD_DIR` 누락과 https가 아닌 `WEB_URL`·`SHORT_LINK_BASE_URL`을 한 번에 모아 거부(키 이름만 출력). 로컬·테스트는 영향 없음.
 - 운영 DB는 Supavisor 세션 모드(5432)만 사용: migration이 세션 advisory lock을 써서 트랜잭션 풀러(6543)에서는 안전하지 않음(문서 경고).

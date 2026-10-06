@@ -1,22 +1,22 @@
-# 0026 웹 내부 토큰 헤더와 Vercel 배포 설정
+# 0026 웹 운영 컨테이너 이미지와 서버 측 API 헤더
 
 - 단계: 티켓
 - 역할: web
 - 상위: 0024
-- 상태: 완료
+- 상태: 검증
 - 종류: 운영
 - 우선순위: P1
 - 작성일: 2026-10-06
 
 ## 목적
 
-웹(Vercel)이 운영 API 호스트의 `/api/*`를 부를 때 내부 토큰 헤더를 붙이고, 모노레포를 Vercel에서 빌드·배포할 수 있게 설정합니다.
+웹을 배포 대상 서버의 Compose 스택에서 컨테이너로 운영할 수 있게 이미지를 만들고, 웹이 API로 보내는 서버 측 요청의 헤더를 한 곳에서 만듭니다(내부 토큰 헤더는 선택 기능으로 남고 운영은 내부 네트워크라 쓰지 않음).
 
 ## 수용 기준
 
 - [x] 서버 컴포넌트 호출(`src/lib/api/server.ts`)과 BFF(`src/app/api/backend/[...path]/route.ts`)가 환경변수 `API_INTERNAL_TOKEN`이 있으면 모든 API 요청에 `X-Crelink-Internal` 헤더를 붙인다(없으면 붙이지 않음, 로컬 동작 불변). 토큰이 브라우저 번들·응답에 새지 않음을 확인한다.
-- [x] `apps/web/vercel.json`(또는 동등한 설정)이 모노레포 설치·빌드(`@crelink/shared`·디자인 토큰 선행 빌드)를 지정하고, 로컬에서 같은 명령으로 빌드가 통과한다. Vercel 프로젝트 설정 값(Root Directory·Node 버전 등)은 문서에 적는다.
-- [x] `apps/web/.env.example`·`apps/web/README.md`·`apps/web/CHANGELOGS.md` 갱신, `pnpm verify`·`pnpm e2e` 통과.
+- [ ] `apps/web/Dockerfile`(Next.js `output: 'standalone'`, `node:22-slim`, `node` 사용자, `HEALTHCHECK` `/privacy`)이 저장소 루트 컨텍스트로 빌드되고, 운영 스택에서 `API_INTERNAL_URL=http://api:3000`(토큰 없음)으로 healthy가 되며 BFF·서버 컴포넌트가 API를 부른다. CI `이미지 빌드 web`이 통과한다.
+- [ ] `apps/web/vercel.json` 삭제, `apps/web/.env.example`·`apps/web/README.md`(운영 컨테이너 이미지 절)·`apps/web/CHANGELOGS.md` 갱신, `pnpm verify`·`pnpm e2e` 통과.
 
 ## 범위
 
@@ -45,3 +45,4 @@
   - 헤더 부착(임시 echo 서버, 저장소에 남기지 않음): 빌드 산출물을 `next start`로 띄워 서버 컴포넌트(`/p/abc` → `GET /api/public/landings/abc`), BFF(`GET api/health`, `POST api/auth/logout`), OAuth(`/auth/google` → `GET /api/auth/google/start`, `/auth/google/callback` → `POST /api/auth/google/callback`) 다섯 요청을 확인. 토큰 있음 + https 외부 주소(자체 서명 인증서, `NODE_EXTRA_CA_CERTS`): 다섯 요청 모두 헤더 값 일치, 응답·HTML·웹 서버 로그에 토큰 없음. 토큰 없음 + http: 다섯 요청 모두 헤더 없음, 응답 동일. 연결 불가 https 주소 + 토큰: BFF 502 `upstream_unavailable`, OAuth `/notice?reason=oauth_failed`, 응답·로그에 토큰 없음.
   - 확인 못 함: 실제 Vercel 프로젝트(계정 없음)에서의 `vercel pull`·`vercel build`·배포, Root Directory·소스 외부 파일 포함 설정, Vercel이 고르는 pnpm 버전, 운영 Caddy와의 연동(0029). `pnpm verify`·`pnpm e2e`는 다른 영역 작업과 같은 작업 트리라 통합 담당이 마지막에 실행.
 - 2026-10-06: 통합 확인(브랜치 `work/0024-prod-deploy`). 이미지 한도를 4MB로 맞춤(shared·API 메시지·테스트·문서). `pnpm verify` 8단계 통과(API 테스트 포함), `make api-restart` 뒤 `pnpm e2e` 6 passed, `pnpm smoke` 5 passed, `infra/prod/tests/caddy-routing.sh` 전 요청 일치. 상태 `완료`. 실서버 적용은 0029.
+- 2026-10-06: 범위 변경(에픽 0024 호스팅 전환). 웹을 Vercel이 아니라 배포 대상 서버의 Compose 스택에서 운영하기로 해 제목·목적·수용 기준을 바꿈. 이전 기준 "`apps/web/vercel.json`과 Vercel 프로젝트 설정 문서"(완료했던 항목)는 대체되어 삭제하고, 웹 컨테이너 이미지와 문서 정리를 새 기준으로 둠. 헤더 공용화(첫 기준)는 그대로 유효. 통합 담당이 `apps/web/Dockerfile`·`next.config.ts` `output: 'standalone'`·루트 `.dockerignore`(웹 허용)를 추가했고, 문서: README `Vercel 배포` 절 → `운영 컨테이너 이미지` 절, `.env.example` 주석, `vercel.json` 삭제(`git rm`). 운영 스택에서 웹 healthy·운영 주소 검사 통과는 0029 진행 기록. 남은 확인(CI `이미지 빌드 web`, 최종 `pnpm verify`·`pnpm e2e`)은 통합 확인에서 하고 `완료`로 바꿈. 파일 이름(브랜치 slug)은 이력 경로를 지키려고 그대로 둠.
