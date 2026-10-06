@@ -37,7 +37,7 @@
 - [CHANGELOGS](../CHANGELOGS.md) — 공개 여부와 무관한 내부 전체 변경 기록. 영역별 로그는 `infra/` 및 `apps/` 아래에 있음
 - [RELEASES](../RELEASES.md) — 사용자에게 공개한 릴리스 노트
 
-제품 참고 자료: [크리링 서비스 기획 및 MVP Handoff](product/crelink-mvp-handoff.md)(PDF 사본 `product/crelink-mvp-handoff.pdf`) — AI가 제안한 검토 재료이며 확정된 결정이 아닙니다. 확정된 PRD는 아직 없습니다. 사용자가 [제품 탐색과 PRD](product/README.md) 절차로 결정하면 `docs/product/`에 PRD를 만들고 이 색인에 링크합니다. 제품 소개는 [루트 README](../README.md)에 둡니다.
+제품 문서: [크리링 PRD](product/crelink.md)(확정, MVP 범위)와 [크리링 MVP 기술 설계](specs/crelink-mvp.md)(승인). 참고 자료: [크리링 서비스 기획 및 MVP Handoff](product/crelink-mvp-handoff.md)(PDF 사본 `product/crelink-mvp-handoff.pdf`) — AI가 제안한 검토 재료이며 확정된 결정이 아닙니다. 작성 절차는 [제품 탐색과 PRD](product/README.md), 제품 소개는 [루트 README](../README.md)에 둡니다.
 
 ## 문서 위치
 
