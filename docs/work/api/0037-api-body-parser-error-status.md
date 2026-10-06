@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: api
-- 상태: 검증
+- 상태: 완료
 - 종류: 결함
 - 우선순위: P2 (AI 제안)
 - 작성일: 2026-10-07
@@ -38,3 +38,4 @@ API에 JSON 본문 한도(express 기본 100KB)를 넘는 요청이 오면 `413 
 ## 진행 기록
 
 - 2026-10-07: 생성·착수(사용자 지시 "413 500 버그 처리"). 재현: 회귀 시험에서 110KB JSON 413 기대 → 500, 문자셋 오류 415 기대 → 500(수정 전 2개 실패, 잘못된 JSON 400·정상 본문 401은 통과). 수정: 필터가 `HttpException`이 아닌 오류 중 `status`가 4xx이고 `expose === true`인 것은 그 상태와 기존 `FALLBACK_CODES`(413 추가 문구 그대로, 415 새 문구)로 응답. 수정 뒤 4개 통과.
+- 2026-10-07: 병합(PR #18, `4fbab57`)·자동 배포 성공. 운영 확인: BFF `POST https://links.shaul.kr/api/backend/api/me/links`(Origin 헤더 포함)에 110KB JSON → 413 `validation_failed`, 90KB → 401 `unauthenticated`, 그동안 API 로그 "처리 중 오류" 0건. 완료.
