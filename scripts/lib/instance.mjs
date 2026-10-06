@@ -34,6 +34,7 @@ export const INSTANCE_KEYS = [
   'EXPO_PUBLIC_API_BASE_URL',
   'API_URL',
   'WEB_URL',
+  'SHORT_LINK_BASE_URL',
 ];
 
 function parseEnv(text) {
@@ -209,6 +210,8 @@ function createInstance(root, basePorts, override, previous) {
     EXPO_PUBLIC_API_BASE_URL: apiUrl,
     API_URL: apiUrl,
     WEB_URL: `http://127.0.0.1:${ports.WEB_PORT}`,
+    // 크리링 단축 도메인(docs/specs/crelink-mvp.md). 로컬은 API 프로세스가 /api 밖 경로로 처리합니다.
+    SHORT_LINK_BASE_URL: apiUrl,
   };
 }
 

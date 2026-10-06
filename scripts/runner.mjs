@@ -50,6 +50,7 @@ const INSTANCE_KEYS = new Set([
   'EXPO_PUBLIC_API_BASE_URL',
   'API_URL',
   'WEB_URL',
+  'SHORT_LINK_BASE_URL',
 ]);
 const LABELS = {
   start: '실행기 시작',

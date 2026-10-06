@@ -8,6 +8,9 @@
 
 - `ai-worker-lab/skeleton-repository` 템플릿에서 `crelink`로 초기화: 패키지 범위 `@crelink/*`, 저장소 `ai-worker-lab/crelink`, 로컬 포트 API 3020·웹 5193·Expo 8101·PostgreSQL 5452·Valkey 6399.
 - 서비스 기획 및 MVP Handoff 제안 문서를 참고 자료(확정 결정 없음)로 `docs/product/crelink-mvp-handoff.md`(PDF 사본 포함)에 두고 문서 색인과 README에 연결.
+- 크리링 PRD 확정(MVP 범위, R1~R16)과 MVP 기술 설계 승인(`docs/specs/crelink-mvp.md`), 에픽 0014·티켓 0015~0018. 근거 `docs/work/epics/0014-crelink-mvp.md`.
+- 크리링 MVP API 계약을 `packages/shared/src/crelink.ts`에 확정: 경로(`CRELINK_API_PATHS`·`CRELINK_WEB_PATHS`), DTO, 오류 코드(`CrelinkErrorCode`), 쿠키 이름, 임시 한도(`CRELINK_LIMITS`), 예약 단축 주소. 근거 `docs/work/api/0015-crelink-mvp-contract.md`.
+- 로컬 인스턴스 키에 `SHORT_LINK_BASE_URL`(로컬은 API 주소) 추가, PM2가 API에 `WEB_URL`·`SHORT_LINK_BASE_URL`을 넘김.
 
 ## 2026-10-02
 

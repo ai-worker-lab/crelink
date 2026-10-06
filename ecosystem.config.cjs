@@ -24,7 +24,7 @@ module.exports = {
       script: 'pnpm',
       args: ['--filter', '@crelink/api', 'start:dev'],
       interpreter: 'none',
-      env: pick('PORT', 'DATABASE_URL'),
+      env: pick('PORT', 'DATABASE_URL', 'WEB_URL', 'SHORT_LINK_BASE_URL'),
       autorestart: false,
     },
     {
