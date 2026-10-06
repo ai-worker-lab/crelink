@@ -92,7 +92,7 @@ flowchart LR
 
 릴리스 = 커밋 SHA의 `infra/prod` 묶음(compose·Caddyfile·인증서·암호문·스크립트) + API 이미지 + 웹 이미지입니다. 설정·비밀값도 릴리스와 함께 배포·롤백됩니다.
 
-1. `ssh-entry.sh deploy <릴리스 SHA> <API SHA|-> <웹 SHA|->`: 인자 형식을 다시 검사하고, stdin 첫 줄(`<GHCR 사용자> <토큰>`) 뒤의 `infra/prod` tar.gz를 `releases/.incoming.*`에 풀어 `releases/<SHA>`로 옮긴 뒤 그 안의 `deploy.sh`를 실행합니다. `-`는 그 영역의 운영 중 이미지를 유지합니다(첫 배포는 둘 다 SHA).
+1. `ssh-entry.sh deploy <릴리스 SHA> <API SHA|-> <웹 SHA|->`: 인자 형식을 다시 검사하고, stdin 첫 줄(`<GHCR 사용자> <토큰>`) 뒤의 `infra/prod` tar.gz를 `releases/.incoming.*`에 풀어 `releases/<SHA>`로 옮긴 뒤 그 안의 `deploy.sh`를 실행합니다. `-`는 그 영역의 운영 중 이미지를 유지합니다(첫 배포는 둘 다 SHA). 롤백 뒤에는 운영 중 이미지가 옛 이미지이므로, 워크플로는 `-`를 쓰지 않고 항상 이미지 SHA(새로 만들었으면 이 커밋, 아니면 마지막 성공 배포 태그 `deploy/prod-api`·`deploy/prod-web`의 커밋)를 넘깁니다. `-`는 운영자가 서버에서 직접 쓸 때만 씁니다.
 2. `deploy.sh`: 이미지 결정 → **아무것도 바꾸기 전에** 복호화·`docker compose config --quiet` 확인 → 레지스트리 로그인·없는 이미지만 pull·로그아웃 → `releases.log` 기록 → app.env 복호화·`images.env`·`current` 교체 → `docker compose up -d --remove-orphans --wait --wait-timeout 120`(caddy·api·web 헬스) → app.env 삭제.
 3. 성공하면 릴리스 폴더에 `.images.env`를 남기고 최근 5개와 운영 중인 것 외의 릴리스 폴더를 지웁니다. 마지막 줄은 `<릴리스> <API 이미지> <웹 이미지>`, 종료 0.
 4. 헬스 실패면 최근 로그 30줄을 출력하고 직전 릴리스·이미지로 다시 올립니다(`restore` 기록). 복구 성공이면 종료 1, 복구도 실패면 종료 2. 되돌릴 이전 상태가 없으면(첫 배포) 실패 상태로 남고 종료 1.
@@ -109,7 +109,7 @@ flowchart LR
 | `deploy.yml` 트리거 | `workflow_run`(`CI` 성공, main push) 또는 main에서 `workflow_dispatch`(`force`: 변경과 무관하게 두 이미지 새로 빌드). 동시 실행 그룹 `deploy-prod`(취소 안 함, `rollback.yml`과 공유) |
 | `plan` | 배포 커밋, 변경 영역(태그 기준: `api` ← `deploy/prod-api` 이후 `apps/api/`·`packages/shared/`·`pnpm-lock.yaml`·`.dockerignore`, `web` ← `deploy/prod-web` 이후 `apps/web/`·`packages/shared/`·`packages/design-tokens/`·같은 두 파일, `release` ← `deploy/prod` 이후 위 경로나 `infra/prod/`. 태그가 없으면 그 영역 예), `targets.json`의 `enabled` 대상 matrix와 플랫폼 합집합, 접속 설정 준비 여부(`vars.TS_OIDC_*`·`DEPLOY_SSH_KEY`가 없으면 배포를 건너뛰고 경고) |
 | `image` | matrix `api`·`web` 중 바뀐 영역만 GHCR `:<SHA>`로 push. 플랫폼에 arm64가 있을 때만 QEMU |
-| `deploy` | 대상 matrix(`max-parallel: 1`, `fail-fast`). `release`가 예이고 접속 설정이 있을 때. Tailscale(OIDC, `tag:ci`, 대상 `ping`) → `ssh deploy@<host> "deploy <SHA> <api SHA|-> <web SHA|->"`, stdin = GHCR 사용자·토큰 + `infra/prod` tar.gz(`tests`·`README.md`·`*.example`·`.env` 제외). 호스트 신원은 Tailscale이 보증하므로 `StrictHostKeyChecking accept-new` |
+| `deploy` | 대상 matrix(`max-parallel: 1`, `fail-fast`). `release`가 예이고 접속 설정이 있을 때. Tailscale(OIDC, `tag:ci`, 대상 `ping`) → `ssh deploy@<host> "deploy <SHA> <api 이미지 SHA> <web 이미지 SHA>"`(이미지 SHA는 plan의 `api_image`·`web_image`), stdin = GHCR 사용자·토큰 + `infra/prod` tar.gz(`tests`·`README.md`·`*.example`·`.env` 제외). 호스트 신원은 Tailscale이 보증하므로 `StrictHostKeyChecking accept-new` |
 | `verify-prod` | 운영 주소 6개: 웹 `/` 200, `/privacy` 200, BFF `/api/backend/api/health` 200, `go.shaul.kr/zzz-e2e-none` 302 → `https://links.shaul.kr/notice?reason=link_not_found`, `go.shaul.kr/api/health` 404 |
 | `rollback-on-failure` | `verify-prod`가 실패하면 대상마다 `rollback`(직전 릴리스) 후 워크플로 실패 |
 | `record` | 성공 시 태그 `deploy/prod`와 바뀐 영역의 `deploy/prod-api`·`deploy/prod-web`를 배포 커밋으로 옮김(다음 변경 비교 기준) |

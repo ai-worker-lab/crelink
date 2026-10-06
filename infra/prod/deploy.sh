@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # 크리링 운영 배포. 이 파일이 들어 있는 릴리스 폴더(/opt/crelink/releases/<SHA>)를 운영으로 올립니다.
 #   사용법: releases/<SHA>/deploy.sh <릴리스 SHA> <API 이미지 SHA|-> <웹 이미지 SHA|->
-#   "-"는 그 영역 이미지를 지금 운영 중인 것으로 둡니다(바뀌지 않은 영역). 첫 배포는 둘 다 SHA여야 합니다.
+#   "-"는 그 영역 이미지를 지금 운영 중인 것으로 둡니다(첫 배포는 둘 다 SHA). 롤백 뒤에는 지금 이미지가 옛 이미지이므로
+#   워크플로는 "-"를 쓰지 않고 항상 이미지 SHA를 넘깁니다. "-"는 운영자가 직접 쓸 때만 씁니다.
 #   워크플로는 ssh-entry.sh(deploy 사용자의 SSH forced command)가 릴리스 폴더를 풀고 이 스크립트를 부릅니다.
 # 순서: 입력·대상 확인 → 이미지 결정 → 복호화·compose 문법 확인 → 레지스트리 로그인·pull → releases.log 기록
 #       → current·images.env 교체 → up --wait(caddy·api·web 헬스) → 성공 시 오래된 릴리스 정리, 실패 시 직전 상태로 복구.

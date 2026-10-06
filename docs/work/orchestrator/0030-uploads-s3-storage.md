@@ -3,7 +3,7 @@
 - 단계: 티켓
 - 역할: orchestrator
 - 선행: 0029
-- 상태: 검증
+- 상태: 완료
 - 종류: 운영
 - 우선순위: P2 (AI 제안)
 - 작성일: 2026-10-06
@@ -15,8 +15,8 @@
 ## 수용 기준
 
 - [x] API에 S3 호환 `FileStorage` 구현이 있고 설정(엔드포인트·버킷·자격 증명)으로 로컬 디스크와 고를 수 있다. DB에는 지금처럼 버킷 상대 키(`files.storage_key`, UUID)만 저장한다. 로컬 개발은 디스크 그대로 동작한다.
-- [ ] 운영 저장소(SeaweedFS `s3.shaul.kr` 또는 Cloudflare R2)를 사용자가 고르고, 자격 증명은 대상별 SOPS 암호문(`infra/prod/secrets/<대상>.sops.env`)에만 둔다.
-- [ ] 기존 볼륨의 파일을 새 저장소로 옮기는 1회 절차와 확인 방법, 되돌리기가 런북에 있고 운영에서 실행해 기록한다. 이후 `uploads` 볼륨을 compose에서 뺀다.
+- [x] 운영 저장소(SeaweedFS `s3.shaul.kr` 또는 Cloudflare R2)를 사용자가 고르고, 자격 증명은 대상별 SOPS 암호문(`infra/prod/secrets/<대상>.sops.env`)에만 둔다.
+- [x] 기존 볼륨의 파일을 새 저장소로 옮기는 1회 절차와 확인 방법, 되돌리기가 런북에 있고 운영에서 실행해 기록한다. 이후 `uploads` 볼륨을 compose에서 뺀다.
 - [x] `pnpm verify`·`pnpm e2e`(업로드·조회) 통과, 설계·런북·API 문서·변경 기록 갱신.
 
 ## 범위
@@ -60,3 +60,10 @@
   - 런북 9-3·9-4의 aws-cli 명령(sync·`--dryrun`·`ls --summarize`·조건부 `put-object` 두 번째 412·역방향 sync)을 로컬 SeaweedFS 4.47과 `amazon/aws-cli` 2.37.9로 리허설. `.sops.yaml` 정규식 재암호화와 `sops set --value-stdin`은 sops 3.13.3 임시 age 키로 확인.
   - 남은 일(통합 담당): 암호문에 키 추가(런북 9-2, 값 출처 서버 `/opt/seaweedfs/config/s3.json`의 identity `crelink`), 배포와 운영 확인(런북 9-3, Cloudflare 경유 412 포함), 서버의 남은 `crelink-prod_uploads` 삭제(런북 9-5) 후 수용 기준 2·3 확인.
 - 2026-10-07: 별도 커밋으로 compose에서 `uploads` 볼륨을 빼고 `api.environment`에 `FILE_STORAGE: s3`를 고정(근거: 운영 볼륨 파일 0개라 이전할 것이 없고, 볼륨 없는 compose에서 `disk`로 뜨는 함정을 compose 안에서 막음). 암호문에 `S3_*`가 없이 배포되면 운영 필수 검사로 api가 기동을 거부해 배포 헬스 실패 → 직전 릴리스 자동 복구가 됨(데이터 손실 없음). 이 커밋을 빼면 첫 커밋만으로 암호문 `FILE_STORAGE=s3`로 전환하고 볼륨은 나중에 런북 9-5로 뺌. `CRELINK_APP_ENV`에 `FILE_STORAGE=disk`를 준 `docker compose config`에서 `FILE_STORAGE: s3`가 남는 것을 확인.
+- 2026-10-07: 운영 전환(통합 담당, 사용자 착수 지시·저장소 선택 SeaweedFS `s3.shaul.kr`).
+  - 암호문: `.sops.yaml` 새 정규식으로 다시 암호화하고 `FILE_STORAGE=s3`·`S3_ENDPOINT`·`S3_REGION`·`S3_BUCKET`(평문), `S3_ACCESS_KEY_ID`·`S3_SECRET_ACCESS_KEY`(서버 `s3.json` identity `crelink` 값을 `sops set --value-stdin`으로, 화면 출력 없음) 추가. 서버 키 해시와 암호문 값 해시 일치, 서버 `deploy` 사용자 복호화 확인. 커밋 `d098c73`.
+  - PR #11 CI 7개 통과 → main 빨리 감기 병합. Tailscale CI 접속 설정 전이라 Deploy 워크플로는 이미지만 만들고 배포를 건너뜀 → 서버에서 이미지를 빌드해 `ssh-entry.sh deploy d098c73 d098c73 d098c73`로 배포. 기동 로그 `파일 저장소 s3 확인: https://s3.shaul.kr/crelink-uploads 접근 가능`, 운영 주소 정상.
+  - 운영 컨테이너 안에서 `S3FileStorage`로 4MB put 0.9초, get 0.5초·같은 바이트, 같은 키 두 번째 put `PreconditionFailed` 412(Cloudflare 경유 조건부 PUT 확인), 없는 키 null. 시험 객체 삭제, 버킷 객체 0개.
+  - 이전할 파일이 없어(볼륨 파일 0개) 복사 없이 서버 `crelink-prod_uploads` 볼륨을 지움.
+  - 서버 롤백 시험: `rollback`(인자 없음) → 직전 릴리스 `8a5f271`(disk·uploads 볼륨 사용, 자기 암호문 사용)로 전환, 운영 주소 정상. 다시 `deploy d098c73 - -`를 했더니 `-`가 롤백된 옛 이미지(`8a5f271`)를 골라 새 설정과 옛 API 이미지가 함께 뜸 → 곧바로 이미지 SHA를 명시해 다시 배포해 복구. 워크플로가 `-` 대신 항상 이미지 SHA(새로 만들었으면 이 커밋, 아니면 `deploy/prod-api`·`deploy/prod-web` 태그 커밋)를 넘기도록 `deploy.yml`을 고침(설계 문서·`deploy.sh` 주석 반영). 롤백 때 다시 생긴 빈 `uploads` 볼륨은 지움.
+  - 남은 확인: 로그인한 사용자의 실제 이미지 업로드·표시(사용자 확인 필요).
