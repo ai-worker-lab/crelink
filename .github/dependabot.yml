@@ -1,0 +1,19 @@
+# 의존성 갱신 PR을 주 1회 엽니다. CI가 통과하는 PR을 main에 병합하면 Deploy가 운영에 반영합니다.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /apps/api
+    schedule:
+      interval: weekly

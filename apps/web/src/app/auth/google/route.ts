@@ -1,6 +1,6 @@
 import { CRELINK_API_PATHS, type ApiError, type GoogleAuthStartResponse } from '@crelink/shared';
 import { noticeLocation, redirectWithCookies } from '../../../lib/api/auth-redirect';
-import { apiOrigin } from '../../../lib/api/server';
+import { apiOrigin, apiRequestHeaders } from '../../../lib/api/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +10,7 @@ export async function GET() {
   let response: Response;
   try {
     response = await fetch(`${apiOrigin}${CRELINK_API_PATHS.authGoogleStart}`, {
-      headers: { Accept: 'application/json' },
+      headers: apiRequestHeaders({ Accept: 'application/json' }),
       cache: 'no-store',
     });
   } catch {

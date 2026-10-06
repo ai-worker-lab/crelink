@@ -19,7 +19,7 @@ import { CRELINK_LIMITS, SessionUser, UploadFileResponse } from '@crelink/shared
 import type { Response } from 'express';
 import { apiError } from '../common/http';
 import { CurrentUser, SessionGuard } from '../auth/session.guard';
-import { FilesService } from './files.service';
+import { FilesService, IMAGE_TOO_LARGE_MESSAGE } from './files.service';
 
 /** multer 크기 제한 초과(413)를 계약의 400 `file_too_large`로 바꿉니다. */
 @Catch(PayloadTooLargeException)
@@ -29,7 +29,7 @@ class FileTooLargeFilter implements ExceptionFilter {
       .switchToHttp()
       .getResponse<Response>()
       .status(HttpStatus.BAD_REQUEST)
-      .json({ code: 'file_too_large', message: '이미지는 5MB 이하만 올릴 수 있습니다.' });
+      .json({ code: 'file_too_large', message: IMAGE_TOO_LARGE_MESSAGE });
   }
 }
 

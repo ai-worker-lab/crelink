@@ -6,6 +6,9 @@ import { Database, Queryable } from '../database';
 import { apiError, UUID_PATTERN } from '../common/http';
 import { FileStorage } from './file-storage';
 
+/** 이미지 한도 초과 안내. 한도는 계약 상수(`CRELINK_LIMITS.imageMaxBytes`)에서 계산합니다. */
+export const IMAGE_TOO_LARGE_MESSAGE = `이미지는 ${CRELINK_LIMITS.imageMaxBytes / (1024 * 1024)}MB 이하만 올릴 수 있습니다.`;
+
 /** 파일 앞부분(매직 바이트)으로 이미지 형식을 판단합니다. 클라이언트가 보낸 Content-Type은 믿지 않습니다. */
 function detectImageType(data: Buffer): string | null {
   if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) return 'image/jpeg';
@@ -36,7 +39,7 @@ export class FilesService {
   async upload(userId: string, file: Express.Multer.File | undefined): Promise<ImageRef> {
     if (!file) throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', '업로드할 이미지 파일(file)을 보내 주세요.');
     if (file.size > CRELINK_LIMITS.imageMaxBytes) {
-      throw apiError(HttpStatus.BAD_REQUEST, 'file_too_large', '이미지는 5MB 이하만 올릴 수 있습니다.');
+      throw apiError(HttpStatus.BAD_REQUEST, 'file_too_large', IMAGE_TOO_LARGE_MESSAGE);
     }
     const contentType = detectImageType(file.buffer);
     if (!contentType) {

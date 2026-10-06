@@ -77,7 +77,7 @@ export class ShortLinkController {
       this.tracking.recordClick(
         { id: link.id, publicId: linkPublicId, shortLinkId: link.short_link_id },
         visitorId,
-        requestFacts(request),
+        requestFacts(request, this.config.trustedProxyHops),
       ),
     );
     // 열린 리디렉트 방지: DB에 저장된(저장 시 http·https만 허용한) URL로만 보냅니다.
@@ -103,7 +103,12 @@ export class ShortLinkController {
     const visitorId = this.visitorId(request, response);
     this.tracking.inBackground(
       '방문',
-      this.tracking.recordVisit(target.short_link_id, slug, visitorId, requestFacts(request)),
+      this.tracking.recordVisit(
+        target.short_link_id,
+        slug,
+        visitorId,
+        requestFacts(request, this.config.trustedProxyHops),
+      ),
     );
     this.redirect(response, `${this.config.webUrl}${CRELINK_WEB_PATHS.landing(target.public_id)}`);
   }

@@ -7,7 +7,7 @@ import {
 } from '@crelink/shared';
 import type { NextRequest } from 'next/server';
 import { noticeLocation, redirectWithCookies } from '../../../../lib/api/auth-redirect';
-import { apiOrigin } from '../../../../lib/api/server';
+import { apiOrigin, apiRequestHeaders } from '../../../../lib/api/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   if (!code || !state) return redirectWithCookies(noticeLocation('oauth_failed'));
   if (!apiOrigin) return redirectWithCookies(noticeLocation('auth_not_configured'));
 
-  const headers = new Headers({ Accept: 'application/json', 'Content-Type': 'application/json' });
+  const headers = apiRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' });
   const stateCookie = request.cookies.get(COOKIE_NAMES.oauthState)?.value;
   if (stateCookie) headers.set('Cookie', `${COOKIE_NAMES.oauthState}=${stateCookie}`);
   const payload: GoogleAuthCallbackRequest = { code, state };

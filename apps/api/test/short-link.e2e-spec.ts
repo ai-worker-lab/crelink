@@ -36,7 +36,7 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
     const response = await get(`/${creator.slug}`, {
       'user-agent': IPHONE_UA,
       referer: 'https://l.instagram.com/?u=x',
-      // 프록시 헤더는 믿지 않고 소켓 주소를 씁니다.
+      // TRUSTED_PROXY_HOPS 기본값(0)에서는 프록시 헤더를 믿지 않고 소켓 주소를 씁니다.
       'x-forwarded-for': '203.0.113.9',
     });
     expect(response.status).toBe(302);
@@ -133,6 +133,40 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
     // 링크를 지워도 클릭 기록은 공개 ID 사본으로 남습니다.
     const kept = await t.pool.query('SELECT link_id, link_public_id FROM link_clicks');
     expect(kept.rows).toEqual([{ link_id: null, link_public_id: publicId }]);
+  });
+
+  it('TRUSTED_PROXY_HOPS: 0이면 위조 X-Forwarded-For 무시, 1이면 마지막 값만 쓰고 앞쪽 위조 값 무시, 잘못된 값은 소켓 주소', async () => {
+    const creator = await newCreator();
+    const link = await addLink(creator.cookie, { title: '프록시', url: 'https://proxy.example/' });
+    const publicId = await publicIdOf(link.id);
+    const visitIps: string[] = [];
+    const visit = async (hops: string, forwardedFor: string) => {
+      process.env.TRUSTED_PROXY_HOPS = hops;
+      expect((await get(`/${creator.slug}`, { 'x-forwarded-for': forwardedFor })).status).toBe(302);
+      const rows = await waitForRows(
+        async () =>
+          (await t.pool.query('SELECT ip FROM visits WHERE slug = $1 ORDER BY occurred_at', [creator.slug])).rows,
+        visitIps.length + 1,
+      );
+      visitIps.push(rows[rows.length - 1].ip);
+    };
+    try {
+      await visit('0', '198.51.100.1');
+      await visit('1', '198.51.100.1, 203.0.113.9');
+      await visit('1', '::ffff:203.0.113.10');
+      await visit('1', '198.51.100.1, not-an-ip');
+      await visit('2', '203.0.113.9');
+      expect(visitIps).toEqual(['127.0.0.1', '203.0.113.9', '203.0.113.10', '127.0.0.1', '127.0.0.1']);
+
+      process.env.TRUSTED_PROXY_HOPS = '1';
+      await get(`/c/${publicId}`, { 'x-forwarded-for': '198.51.100.1, 2001:DB8::7' });
+      const [click] = await waitForRows(
+        async () => (await t.pool.query('SELECT ip FROM link_clicks WHERE link_public_id = $1', [publicId])).rows,
+      );
+      expect(click.ip).toBe('2001:db8::7');
+    } finally {
+      delete process.env.TRUSTED_PROXY_HOPS;
+    }
   });
 
   it('공개 랜딩은 보이는·차단 안 된 링크만 순서대로, 클릭 주소와 함께 준다', async () => {

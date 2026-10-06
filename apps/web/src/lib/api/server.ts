@@ -5,8 +5,21 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { errorMessage } from './errors';
 
-/** Nest API 주소(서버 전용). 비어 있으면 API 호출은 `api_not_configured`입니다. */
+/** Nest API 주소(서버 전용). 비어 있으면 API 호출은 `api_not_configured`입니다. 운영은 https 외부 호스트(Caddy)입니다. */
 export const apiOrigin = (process.env.API_INTERNAL_URL ?? '').replace(/\/$/, '');
+
+/**
+ * 운영 API 호스트(Caddy)가 `/api/*`를 API로 넘길지 판단하는 내부 토큰(서버 전용 `API_INTERNAL_TOKEN`).
+ * 비밀값이라 로그·오류 메시지·응답에 쓰지 않습니다. 근거: docs/specs/crelink-prod-deploy.md "Caddy 공개 정책".
+ */
+const internalToken = process.env.API_INTERNAL_TOKEN ?? '';
+
+/** 웹이 Nest API로 보내는 모든 서버 측 요청의 헤더. 토큰이 있을 때만 `X-Crelink-Internal`을 붙입니다(로컬은 없음). */
+export function apiRequestHeaders(init?: HeadersInit): Headers {
+  const headers = new Headers(init);
+  if (internalToken) headers.set('X-Crelink-Internal', internalToken);
+  return headers;
+}
 
 export class ServerApiError extends Error {
   constructor(
@@ -26,7 +39,7 @@ export interface ServerApiOptions {
 /** Server Component·route handler에서 Nest API를 직접 호출합니다. 204는 undefined를 돌려줍니다. */
 export async function serverApi<T>(path: string, options: ServerApiOptions = {}): Promise<T> {
   if (!apiOrigin) throw new ServerApiError('api_not_configured', errorMessage('api_not_configured', null, 503), 503);
-  const headers = new Headers({ Accept: 'application/json' });
+  const headers = apiRequestHeaders({ Accept: 'application/json' });
   if (options.session) {
     const token = (await cookies()).get(COOKIE_NAMES.session)?.value;
     if (!token) throw new ServerApiError('unauthenticated', errorMessage('unauthenticated', null, 401), 401);

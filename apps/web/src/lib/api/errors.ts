@@ -1,4 +1,7 @@
-import type { CrelinkErrorCode, NoticeReason } from '@crelink/shared';
+import { CRELINK_LIMITS, type CrelinkErrorCode, type NoticeReason } from '@crelink/shared';
+
+/** 업로드 이미지 크기 한도 표시(예: `4MB`). 숫자는 계약 `CRELINK_LIMITS.imageMaxBytes`에서만 옵니다. */
+export const IMAGE_MAX_LABEL = `${Math.floor(CRELINK_LIMITS.imageMaxBytes / (1024 * 1024))}MB`;
 
 /** API 오류 코드별 사용자 안내. 계약(`CrelinkErrorCode`)의 모든 코드를 다룹니다. */
 const API_ERROR_MESSAGES: Record<CrelinkErrorCode, string> = {
@@ -11,7 +14,7 @@ const API_ERROR_MESSAGES: Record<CrelinkErrorCode, string> = {
   account_suspended: '이용이 정지된 계정이에요. 운영자에게 문의해 주세요.',
   file_not_found: '이미지를 찾을 수 없어요. 다시 올려 주세요.',
   file_type_unsupported: 'JPG·PNG·WebP·GIF 이미지만 올릴 수 있어요.',
-  file_too_large: '이미지는 5MB 이하만 올릴 수 있어요.',
+  file_too_large: `이미지는 ${IMAGE_MAX_LABEL} 이하만 올릴 수 있어요.`,
   slug_invalid: '주소는 영소문자·숫자·하이픈(-) 3~30자로, 처음과 끝은 영소문자나 숫자여야 해요.',
   slug_reserved: '크리링이 쓰는 예약 주소라 쓸 수 없어요.',
   slug_taken: '이미 사용 중이거나 다른 크리에이터를 위해 보관 중인 주소예요.',

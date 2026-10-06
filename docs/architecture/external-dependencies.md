@@ -9,7 +9,9 @@ crelink이 의존하는 외부 SaaS와 개발 도구를 한곳에서 찾기 위�
 | 대상 | 종류 | 상태 | 용도 | 기준 위치 |
 | --- | --- | --- | --- | --- |
 | GitHub (`ai-worker-lab/crelink`) | SaaS | 사용 중 | 원격 Git 저장소, Pull Request. Issues는 끔. Release는 선택 | [ADR 0002](../adr/0002-work-items-in-repository.md), `.github/pull_request_template.md` |
-| GitHub Actions | SaaS | 사용 중 | PR·`main` push 검사(Node 22·24·26 matrix, PostgreSQL 서비스 컨테이너) | `.github/workflows/ci.yml` |
+| GitHub Actions | SaaS | 사용 중 | PR·`main` push 검사(Node 22·24·26 matrix, PostgreSQL 서비스 컨테이너, API 이미지 빌드), `main` CI 성공 시 운영 배포·수동 롤백 | `.github/workflows/ci.yml`, `deploy.yml`, `rollback.yml` |
+| GitHub Container Registry(GHCR) | SaaS | 사용 중(첫 배포 때 생성) | 운영 API 이미지 `ghcr.io/ai-worker-lab/crelink-api:<SHA>` | `.github/workflows/deploy.yml`, [prod 런북](../../infra/docs/prod-runbook.md) |
+| Dependabot | SaaS | 사용 중 | npm·Actions·Docker 의존성 갱신 PR(주 1회) | `.github/dependabot.yml` |
 | npm registry | SaaS | 사용 중 | `pnpm install`의 패키지 다운로드 | `pnpm-lock.yaml`, 각 `package.json` |
 | Node.js · pnpm(corepack) | 도구 | 사용 중 | 런타임과 workspace 관리. 지원 버전은 CI matrix, 로컬 기본값은 `.nvmrc` | `.github/workflows/ci.yml`, `.nvmrc`, 루트 `package.json`의 `packageManager` |
 | Docker Engine/Compose · Docker Hub 이미지 | 도구·SaaS | 사용 중 | 로컬 PostgreSQL(`postgres:17-alpine`)·Valkey(`valkey/valkey:8-alpine`) | `infra/local/compose.yaml` |
@@ -29,11 +31,13 @@ crelink이 의존하는 외부 SaaS와 개발 도구를 한곳에서 찾기 위�
 
 | 대상 | 종류 | 상태 | 용도 | 기준 위치 |
 | --- | --- | --- | --- | --- |
-| Vercel | SaaS | 계획 | Next.js 웹 호스팅 | [배포 대상 아키텍처](deployment-target.md) |
-| Oracle Cloud Infrastructure (ARM) | SaaS | 계획 | NestJS API 서버 | [배포 대상 아키텍처](deployment-target.md) |
-| Supabase | SaaS | 계획 | 관리형 PostgreSQL | [배포 대상 아키텍처](deployment-target.md) |
+| Vercel | SaaS | 구성 준비(계정·프로젝트 미생성) | Next.js 웹 호스팅(`links.shaul.kr`). Hobby는 비상업용 | [운영 배포 설계](../specs/crelink-prod-deploy.md), [prod 런북](../../infra/docs/prod-runbook.md) |
+| Oracle Cloud Infrastructure (ARM) | SaaS | 구성 준비(서버 미생성) | API·단축 도메인 서버(Docker Compose + Caddy) | `infra/prod/`, [prod 런북](../../infra/docs/prod-runbook.md) |
+| Supabase | SaaS | 구성 준비(프로젝트 미생성) | 관리형 PostgreSQL(세션 풀러, TLS) | [운영 배포 설계](../specs/crelink-prod-deploy.md), [prod 런북](../../infra/docs/prod-runbook.md) |
+| Caddy(공식 Docker 이미지)·Let's Encrypt | 도구·SaaS | 구성 준비 | `go.shaul.kr` TLS와 공개 경로 제한 | `infra/prod/Caddyfile` |
+| DNS(`shaul.kr`) | 도메인 | 구성 준비 | `links`(Vercel)·`go`(OCI) 레코드 | [prod 런북](../../infra/docs/prod-runbook.md) |
 
-배포 구성·계정·비밀값은 아직 저장소에 없습니다. 로컬 Valkey는 표준 구성으로 유지하지만 API는 아직 사용하지 않으며, 운영 캐시 제품과 위치는 미정입니다([ADR 0005](../adr/0005-keep-valkey-local-infra.md)).
+배포 계정·비밀값은 저장소에 없습니다. 로컬 Valkey는 표준 구성으로 유지하지만 API는 아직 사용하지 않으며, 운영 캐시 제품과 위치는 미정입니다([ADR 0005](../adr/0005-keep-valkey-local-infra.md)).
 
 ## 제품 기능
 

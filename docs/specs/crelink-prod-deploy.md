@@ -13,31 +13,36 @@
 방문자 ──https──▶ links.shaul.kr (Vercel, Next.js)
                      │ BFF·서버 컴포넌트: https://go.shaul.kr/api/... + X-Crelink-Internal 토큰
                      ▼
-인스타 링크 ─https─▶ go.shaul.kr (OCI ARM 1대: Caddy ─▶ API 컨테이너 :3000) ──TLS──▶ Supabase(세션 풀러)
+인스타 링크 ─https─▶ go.shaul.kr ─▶ oci-server: 공용 edge Caddy(/opt/edge, 80·443)
+                                      ├─ go.shaul.kr ──▶ crelink-api:3000 (/opt/crelink, 네트워크 edge) ──TLS──▶ Supabase(세션 풀러)
+                                      └─ aichat-api.shaul.kr ──▶ ai-character-chat-backend-api-1:3000 (기존 다른 프로젝트)
 ```
 
 | 항목 | 값 |
 | --- | --- |
 | 웹 | `https://links.shaul.kr` = `WEB_URL`. Google 리디렉션 URI `https://links.shaul.kr/auth/google/callback` |
 | API·단축 | `https://go.shaul.kr` = `SHORT_LINK_BASE_URL`, 웹의 `API_INTERNAL_URL` `[임시값, 정식 도메인이 정해지면 교체]` |
-| DNS(`shaul.kr` 영역) | `links` CNAME → Vercel이 안내하는 값, `go` A → OCI 공인 IP `[사용자 준비]` |
-| 서버 | OCI ARM(Ampere) Ubuntu, 열린 포트 22(키 인증만)·80·443, 앱은 Docker Compose |
+| DNS(`shaul.kr`, Cloudflare) | `go` A → `193.122.104.153` **DNS only(프록시 끔)**, `links` CNAME → Vercel이 안내하는 값(DNS only) `[사용자 준비]`. 프록시를 켜면 Caddy가 보는 주소가 Cloudflare가 되어 방문 IP 기록(R9)이 틀어지고 `TRUSTED_PROXY_HOPS`·신뢰 프록시 설정이 달라집니다. |
+| 서버 | 기존 `oci-server`(`193.122.104.153`, Ubuntu 26.04 ARM, 2 OCPU·11GB, Docker 29·Compose 2.40). 이미 `ai-character-chat`이 같은 서버에서 동작 중이라 80·443은 서버 공용 edge Caddy가 맡습니다(사용자 결정 2026-10-06). |
+| 배포 접속 | 사용자 `deploy`(docker 그룹, sudo 없음), 배포 전용 ed25519 키. `/opt/crelink`·`/opt/edge` 소유 |
 | DB | Supabase 프로젝트 1개(prod 전용). `DATABASE_URL` = 세션 풀러 주소 + TLS |
 
 ## Caddy 공개 정책 (`go.shaul.kr`)
 
+- 서버 공용 edge Caddy(`infra/prod/edge/`, 서버 `/opt/edge`, Compose project `edge`)가 80·443을 맡고 `sites/*.caddy`를 import합니다. 크리링 사이트 파일은 `infra/prod/crelink.caddy`이고 `deploy.sh`가 `/opt/edge/sites/`로 반영한 뒤 reload합니다.
 - 공개: `GET /{slug}`(3~30자 `[a-z0-9-]`), `GET /c/{id}` → API.
-- `/api/*`: 요청 헤더 `X-Crelink-Internal`이 서버 환경변수 `INTERNAL_TOKEN`과 같을 때만 API로 전달, 아니면 404. 웹(Vercel)이 서버 측 호출마다 이 헤더를 붙입니다. 브라우저는 `go.shaul.kr/api`를 직접 부르지 않습니다.
-- 그 밖의 경로는 404. API 컨테이너 포트는 호스트에 공개하지 않고 Compose 내부 네트워크에서만 Caddy가 접근합니다.
+- `/api/*`: 요청 헤더 `X-Crelink-Internal`이 edge의 환경변수 `CRELINK_INTERNAL_TOKEN`과 같을 때만 API로 전달, 아니면 404. 웹(Vercel)이 서버 측 호출마다 이 헤더를 붙입니다. 브라우저는 `go.shaul.kr/api`를 직접 부르지 않습니다.
+- 그 밖의 경로는 404. 크리링 API 컨테이너는 호스트 포트를 열지 않고 외부 네트워크 `edge`(alias `crelink-api`)에서만 Caddy가 접근합니다.
 - 클라이언트 IP: Caddy가 `X-Forwarded-For`를 덧붙이고 API는 `TRUSTED_PROXY_HOPS=1`일 때만 그 값을 신뢰합니다(기본 0=소켓 주소, 로컬·테스트와 같음). 방문 기록의 IP·위치(R9)가 Caddy 주소가 되지 않게 합니다.
 
 ## 환경변수
 
 | 위치 | 키 | 설명 |
 | --- | --- | --- |
-| 서버 `/opt/crelink/.env`(Git 제외, 권한 600) | `API_IMAGE`(GHCR 이미지·태그, 배포가 갱신), `DATABASE_URL`, `DATABASE_SSL`·`DATABASE_SSL_CA_PATH`(Supabase TLS), `PORT=3000`, `WEB_URL`, `SHORT_LINK_BASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPERATOR_EMAILS`, `UPLOAD_DIR=/data/uploads`, `GEOIP_MMDB_PATH=/data/geoip/dbip-city-lite.mmdb`, `TRUSTED_PROXY_HOPS=1`, `INTERNAL_TOKEN`, `API_DOMAIN=go.shaul.kr` | API·Caddy가 읽음 |
-| Vercel(production) | `API_INTERNAL_URL=https://go.shaul.kr`, `API_INTERNAL_TOKEN`(=서버 `INTERNAL_TOKEN`) | 서버 전용 변수, `NEXT_PUBLIC_*` 아님 |
-| GitHub Actions secrets | `OCI_HOST`, `OCI_USER`, `OCI_SSH_KEY`(배포 전용 키), `OCI_KNOWN_HOSTS`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `GHCR_PULL_USER`·`GHCR_PULL_TOKEN`(서버가 이미지를 받을 읽기 전용 토큰, 배포 때 서버에 로그인) | 이미지 푸시는 `GITHUB_TOKEN`(`packages: write`) |
+| 서버 `/opt/crelink/.env`(Git 제외, 권한 600) | `API_IMAGE`(GHCR 이미지·태그, 배포가 갱신), `DATABASE_URL`, `DATABASE_SSL`·`DATABASE_SSL_CA_PATH`(Supabase TLS), `PORT=3000`, `WEB_URL`, `SHORT_LINK_BASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPERATOR_EMAILS`, `UPLOAD_DIR=/data/uploads`, `GEOIP_MMDB_PATH=/data/geoip/dbip-city-lite.mmdb`, `TRUSTED_PROXY_HOPS=1` | API가 읽음 |
+| 서버 `/opt/edge/.env` | `CRELINK_DOMAIN=go.shaul.kr`, `CRELINK_INTERNAL_TOKEN` | edge Caddy가 읽음 |
+| Vercel(production) | `API_INTERNAL_URL=https://go.shaul.kr`, `API_INTERNAL_TOKEN`(=`CRELINK_INTERNAL_TOKEN`) | 서버 전용 변수, `NEXT_PUBLIC_*` 아님 |
+| GitHub Actions secrets | `OCI_HOST`, `OCI_USER`, `OCI_SSH_KEY`(배포 전용 키), `OCI_KNOWN_HOSTS` — **등록 완료(2026-10-06)**. `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` — 미등록 | GHCR 푸시·서버 pull 모두 job의 `GITHUB_TOKEN`(푸시 `packages: write`, 서버 pull은 `packages: read` 토큰을 stdin으로 넘겨 일회성 로그인). 서버에 장기 레지스트리 토큰을 두지 않습니다. |
 
 ## 변경 범위
 
@@ -45,16 +50,16 @@
 | --- | --- | --- |
 | 0025 | api | `apps/api/Dockerfile`(arm64 런타임, 빌드는 빌더 플랫폼에서 해 QEMU 없이), 컨테이너 헬스체크, `TRUSTED_PROXY_HOPS`, Supabase TLS 접속(`DATABASE_SSL`·CA), 운영 필수 설정 검증(`NODE_ENV=production`에서 필수 키 누락 시 기동 거부), 통합 테스트 |
 | 0026 | web | 서버 측 API 호출·BFF에 `X-Crelink-Internal` 헤더(`API_INTERNAL_TOKEN`), Vercel 배포 설정(`vercel.json`·모노레포 빌드), 환경변수 문서 |
-| 0027 | infra | `infra/prod/`: `compose.yaml`(API + Caddy + 볼륨), `Caddyfile`, `.env.example`, 서버 부트스트랩 스크립트, 배포·롤백 스크립트(`deploy.sh`), 런북(OCI·Supabase·Vercel·DNS·Google 콘솔 설정, 백업·복구, 롤백), `infra/CHANGELOGS.md` |
+| 0027 | infra | `infra/prod/`: `compose.yaml`(API만, 네트워크 `edge`), `crelink.caddy`, `edge/`(공용 edge Caddy compose·Caddyfile·`sites/aichat.caddy`), `.env.example`, 서버 부트스트랩, 배포·롤백 스크립트(`deploy.sh`), 런북(OCI·Supabase·Vercel·DNS·Google 콘솔, edge 전환·롤백, 백업·복구), `infra/CHANGELOGS.md` |
 | 0028 | orchestrator | `.github/workflows/deploy.yml`(이미지 빌드 → API 배포 → 웹 배포 → 배포 후 검사, 자동 롤백), `rollback.yml`(수동), CI에 이미지 빌드 검증, `dependabot.yml`, 문서 |
 | 0029 | orchestrator | 사용자 계정·시크릿이 준비된 뒤 최초 prod 프로비저닝 실행과 실서비스 검증(사용자 준비물 필요) |
 
 ## CD 흐름 (`deploy.yml`)
 
 1. 트리거: `workflow_run`(`CI` 성공, `main`) 또는 `workflow_dispatch`. 동시 실행 그룹 `deploy-prod`(취소 안 함).
-2. `changes`: 직전 배포 커밋(없으면 직전 커밋)과 비교해 `apps/api/**`·`packages/shared/**`·`infra/prod/**` 변경 시 API 배포, `apps/web/**`·`packages/shared/**`·`packages/design-tokens/**` 변경 시 웹 배포. 문서만 바뀌면 배포 안 함.
+2. `plan`: 영역별 마지막 성공 배포 태그(`deploy/prod-api`·`deploy/prod-web`)와 비교해 `apps/api/**`·`packages/shared/**`·`infra/prod/**` 변경 시 API 배포, `apps/web/**`·`packages/shared/**`·`packages/design-tokens/**` 변경 시 웹 배포. 시크릿이 없으면 해당 영역을 건너뜁니다.
 3. `api-image`: buildx로 `linux/arm64` 이미지를 빌드해 `ghcr.io/ai-worker-lab/crelink-api:<SHA>`로 푸시.
-4. `deploy-api`: SSH로 서버의 `deploy.sh <SHA>` 실행: GHCR 로그인 → pull → 이전 태그 기록 → `docker compose up -d` → `http://127.0.0.1` 컨테이너 헬스(`/api/health/ready`)를 최대 60초 확인 → 실패하면 이전 태그로 되돌리고 워크플로를 실패 처리.
+4. `deploy-api`: `infra/prod/`(edge 제외)를 `/opt/crelink`로 rsync하고 SSH로 `deploy.sh <SHA>` 실행: GHCR 로그인(일회용 토큰) → pull → 이전 태그 기록 → `docker compose up -d` → 컨테이너 헬스를 최대 60초 확인 → 실패하면 이전 태그로 되돌리고 워크플로를 실패 처리 → 성공하면 크리링 사이트 파일을 edge에 반영·reload → 로그아웃.
 5. `deploy-web`: `vercel pull`·`vercel build --prod`·`vercel deploy --prebuilt --prod`. 배포 URL이 아니라 운영 도메인으로 `/`·`/api/backend/api/health`를 확인하고 실패하면 이전 배포로 `vercel rollback`.
 6. `verify-prod`: 운영 주소 smoke(`GET https://links.shaul.kr/` 200, `GET https://go.shaul.kr/zzzz` 302 notice, `GET https://go.shaul.kr/api/health` 404 — 토큰 없이 닫혀 있음).
 7. 수동 롤백 `rollback.yml`: 입력 `target`(api|web|both), `api_tag`(기본 서버가 기록한 이전 태그), 웹은 `vercel rollback`.

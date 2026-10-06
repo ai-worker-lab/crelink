@@ -46,19 +46,37 @@ interface RequestFacts {
   userAgent: string | null;
 }
 
-/**
- * 방문자 IP. 프록시 헤더(`X-Forwarded-For`)는 클라이언트가 마음대로 넣을 수 있어, 신뢰할 프록시 설정이 생기기 전까지 쓰지 않고
- * TCP 연결의 소켓 주소만 씁니다. 근거: apps/api/docs/README.md#방문자-ip
- */
-function socketIp(request: Request): string | null {
-  const address = request.socket.remoteAddress?.replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '') ?? null;
+/** IPv4-mapped IPv6(`::ffff:1.2.3.4`)는 IPv4로, IPv6는 소문자로 바꿉니다. IP가 아니면 null. */
+function normalizeIp(value: string | undefined): string | null {
+  const address = value
+    ?.trim()
+    .toLowerCase()
+    .replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '');
   return address && isIP(address) ? address : null;
 }
 
-export function requestFacts(request: Request): RequestFacts {
+/**
+ * 방문자 IP. `trustedProxyHops`(`TRUSTED_PROXY_HOPS`)가 0이면 TCP 연결의 소켓 주소만 씁니다. N이면 앞단의 신뢰할 프록시 N단이
+ * `X-Forwarded-For` 끝에 차례로 덧붙인다고 보고 오른쪽에서 N번째 값(가장 바깥 신뢰 프록시가 본 클라이언트 주소)을 씁니다.
+ * 그보다 앞의 값은 클라이언트가 넣을 수 있어 무시하고, 값이 N개보다 적거나 IP가 아니면 소켓 주소로 돌아갑니다.
+ * 근거: apps/api/docs/README.md#방문자-ip
+ */
+export function clientIp(
+  socketAddress: string | undefined,
+  forwardedFor: string | string[] | undefined,
+  trustedProxyHops: number,
+): string | null {
+  const socket = normalizeIp(socketAddress);
+  if (trustedProxyHops === 0 || forwardedFor === undefined) return socket;
+  const hops = (Array.isArray(forwardedFor) ? forwardedFor.join(',') : forwardedFor).split(',');
+  if (hops.length < trustedProxyHops) return socket;
+  return normalizeIp(hops[hops.length - trustedProxyHops]) ?? socket;
+}
+
+export function requestFacts(request: Request, trustedProxyHops: number): RequestFacts {
   const referrer = request.headers.referer?.slice(0, REFERRER_MAX) || null;
   return {
-    ip: socketIp(request),
+    ip: clientIp(request.socket.remoteAddress, request.headers['x-forwarded-for'], trustedProxyHops),
     referrer,
     referrerHost: referrer && URL.canParse(referrer) ? new URL(referrer).hostname || null : null,
     userAgent: request.headers['user-agent']?.slice(0, USER_AGENT_MAX) || null,

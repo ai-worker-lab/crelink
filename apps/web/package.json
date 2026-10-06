@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "start": "WEB_PORT=${WEB_PORT:-$(node ../../scripts/instance.mjs --get WEB_PORT)} && NEXT_DIST_DIR=.next-dev next dev --port $WEB_PORT",
     "build": "next build",

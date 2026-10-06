@@ -1,6 +1,6 @@
 import { COOKIE_NAMES } from '@crelink/shared';
 import { NextRequest, NextResponse } from 'next/server';
-import { apiOrigin } from '../../../../lib/api/server';
+import { apiOrigin, apiRequestHeaders } from '../../../../lib/api/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,7 +65,7 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
 
   const target = new URL(`${apiOrigin}/${path}`);
   request.nextUrl.searchParams.forEach((value, key) => target.searchParams.append(key, value));
-  const headers = new Headers({ Accept: request.headers.get('accept') ?? 'application/json' });
+  const headers = apiRequestHeaders({ Accept: request.headers.get('accept') ?? 'application/json' });
   const session = request.cookies.get(COOKIE_NAMES.session)?.value;
   if (session) headers.set('Cookie', `${COOKIE_NAMES.session}=${session}`);
   let body: ArrayBuffer | string | undefined;

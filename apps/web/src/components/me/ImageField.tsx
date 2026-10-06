@@ -9,7 +9,7 @@ import {
 } from '@crelink/shared';
 import { type ReactNode, useId, useState } from 'react';
 import { browserApi } from '../../lib/api/browser';
-import { errorMessage } from '../../lib/api/errors';
+import { errorMessage, IMAGE_MAX_LABEL } from '../../lib/api/errors';
 import { useAction } from '../../lib/use-action';
 import { RemoteImage } from '../RemoteImage';
 
@@ -84,7 +84,7 @@ export function ImageField({
         </div>
       </div>
       <p id={helpId} className="field-help">
-        {pending ? '올리는 중…' : 'JPG·PNG·WebP·GIF, 5MB 이하. 저장해야 반영돼요.'}
+        {pending ? '올리는 중…' : `JPG·PNG·WebP·GIF, ${IMAGE_MAX_LABEL} 이하. 저장해야 반영돼요.`}
       </p>
       {error ? (
         <p className="form-error" role="alert">

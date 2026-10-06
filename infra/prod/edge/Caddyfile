@@ -1,0 +1,8 @@
+# 서버 공용 edge Caddy 설정. 사이트는 sites/*.caddy 한 파일에 하나씩 두고 여기서 모두 불러옵니다.
+# 사이트 파일 안의 명명 matcher는 사이트 블록 안에서만 유효하므로 이름이 겹쳐도 되지만, 읽기 쉽게 사이트 접두사를 붙입니다.
+{
+	# reload·종료 때 기존 연결을 최대 10초 기다린 뒤 닫습니다(기본은 무기한).
+	grace_period 10s
+}
+
+import /etc/caddy/sites/*.caddy

@@ -1,11 +1,13 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { assertProductionConfig } from './config.service';
 import { loadLocalEnvironment } from './database';
 import { AppModule } from './app.module';
 import { configureApp } from './app.setup';
 
 async function bootstrap() {
   loadLocalEnvironment();
+  assertProductionConfig(process.env);
   const port = process.env.PORT;
   if (!port) {
     throw new Error(

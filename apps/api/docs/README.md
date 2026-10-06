@@ -8,6 +8,7 @@
 - 기동하면 `apps/api/migrations/*.sql`을 이름 순으로 한 번씩 적용합니다(`src/database.ts`의 `runMigrations`). 스키마 원본은 [`migrations/0001_crelink_mvp.sql`](../migrations/0001_crelink_mvp.sql)입니다.
 - 확인: `curl -i {API}/api/health/ready`(DB 포함 200), `curl -i {API}/없는주소`(302 `{WEB_URL}/notice?reason=link_not_found`).
 - 테스트: `pnpm --filter @crelink/api test`. 테스트마다 일회용 DB를 만들어 지웁니다(`test/test-database.ts`). 구글 code 교환은 `GoogleOAuth` provider를, 위치 조회는 `GeoIpService`를 테스트용으로 바꿉니다(`test/test-app.ts`). `@crelink/shared`는 ESM 패키지라 Jest(Node 22)가 `require`하지 못하므로, Jest 설정의 `moduleNameMapper`가 공유 패키지 TypeScript 원본을 직접 컴파일해 씁니다. 실행 중인 API는 Node 22의 `require(esm)`로 빌드 결과를 읽습니다.
+- 운영: OCI 서버에서 [컨테이너 이미지](#컨테이너-이미지)로 실행합니다(배포 구성은 [운영 배포 설계](../../../docs/specs/crelink-prod-deploy.md)).
 
 ## 환경변수
 
@@ -15,14 +16,59 @@
 
 | 키 | 필수 | 설명 |
 | --- | --- | --- |
-| `DATABASE_URL` | 예 | PostgreSQL 연결 문자열. |
-| `PORT` | 예 | API 포트. |
-| `WEB_URL` | 예 | 본 도메인. 랜딩 302 대상 `{WEB_URL}/p/{publicId}`, 안내 `{WEB_URL}/notice?reason=`, 이미지 주소 `{WEB_URL}/api/backend/api/files/{id}`, 구글 리디렉션 URI `{WEB_URL}/auth/google/callback`. https면 세션·state 쿠키에 `Secure`. |
-| `SHORT_LINK_BASE_URL` | 예 | 단축 도메인. 단축 URL `{SHORT}/{slug}`, 클릭 주소 `{SHORT}/c/{linkPublicId}`. 로컬은 API 주소. https면 `cl_vid`에 `Secure`. |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 로그인에 필요 | 사용자가 Google Cloud 콘솔에서 발급. 비면 로그인 API가 503 `auth_not_configured`. 콘솔에 등록할 리디렉션 URI는 `{WEB_URL}/auth/google/callback`. |
-| `OPERATOR_EMAILS` | 아니오 | 운영자 구글 이메일(쉼표 구분, 대소문자 무시). |
-| `UPLOAD_DIR` | 아니오 | 이미지 저장 디렉터리. 비면 저장소 루트 `.local/uploads`(git 제외). |
-| `GEOIP_MMDB_PATH` | 아니오 | mmdb(DB-IP Lite City 등, CC BY 4.0이라 웹 `/privacy`에 출처 표시) 경로. 비면 국가·도시를 null로 두고 기동 시 경고를 한 번 남김. 파일을 열지 못해도 같은 동작에 오류 로그. |
+| `NODE_ENV` | 아니오 | `production`이면 [운영 필수 설정](#운영-필수-설정)을 기동 전에 검사합니다. 이미지 기본값이 `production`입니다. |
+| `DATABASE_URL` | 예 | PostgreSQL 연결 문자열. 운영(Supabase)은 세션 풀러(5432) 주소. [DB TLS](#db-tls) 참고. |
+| `DATABASE_SSL` | 아니오 | `disable`·`require`·`verify-full`. 비면 URL을 그대로 씁니다(로컬, TLS 없음). 값이 있으면 URL의 `sslmode` 등 TLS 파라미터를 지우고 이 값만 따릅니다. 다른 값이면 기동 거부. [DB TLS](#db-tls). |
+| `DATABASE_SSL_CA_PATH` | 아니오 | `verify-full`일 때 서버 인증서를 확인할 CA(PEM) 파일 경로(Supabase 루트 인증서). 다른 모드와 함께 쓰거나 파일을 읽지 못하면 기동 거부. |
+| `PORT` | 예 | API 포트. 컨테이너 운영은 `3000`. |
+| `WEB_URL` | 예(운영은 https) | 본 도메인. 랜딩 302 대상 `{WEB_URL}/p/{publicId}`, 안내 `{WEB_URL}/notice?reason=`, 이미지 주소 `{WEB_URL}/api/backend/api/files/{id}`, 구글 리디렉션 URI `{WEB_URL}/auth/google/callback`. https면 세션·state 쿠키에 `Secure`. |
+| `SHORT_LINK_BASE_URL` | 예(운영은 https) | 단축 도메인. 단축 URL `{SHORT}/{slug}`, 클릭 주소 `{SHORT}/c/{linkPublicId}`. 로컬은 API 주소. https면 `cl_vid`에 `Secure`. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 로그인에 필요(운영 필수) | 사용자가 Google Cloud 콘솔에서 발급. 비면 로그인 API가 503 `auth_not_configured`. 콘솔에 등록할 리디렉션 URI는 `{WEB_URL}/auth/google/callback`. |
+| `OPERATOR_EMAILS` | 운영 필수 | 운영자 구글 이메일(쉼표 구분, 대소문자 무시). |
+| `UPLOAD_DIR` | 운영 필수 | 이미지 저장 디렉터리. 비면 저장소 루트 `.local/uploads`(git 제외). 컨테이너는 볼륨 `/data/uploads`. |
+| `GEOIP_MMDB_PATH` | 아니오 | mmdb(DB-IP Lite City 등, CC BY 4.0이라 웹 `/privacy`에 출처 표시) 경로. 비면 국가·도시를 null로 두고 기동 시 경고를 한 번 남김. 파일을 열지 못해도 같은 동작에 오류 로그. 컨테이너는 볼륨 `/data/geoip`. |
+| `TRUSTED_PROXY_HOPS` | 아니오 | 앞단의 신뢰할 리버스 프록시 수(기본 0). 0이면 소켓 주소, N이면 `X-Forwarded-For`의 오른쪽에서 N번째 값을 방문·클릭 IP로 씁니다([방문자 IP](#방문자-ip)). 운영(Caddy 1단)은 `1`. 0 이상의 정수가 아니면 기동 거부. |
+
+### 운영 필수 설정
+
+`NODE_ENV=production`이면 `main.ts`가 Nest 모듈(DB 연결)보다 먼저 `assertProductionConfig`(`src/config.service.ts`)로 검사하고, 문제가 있으면 모두 모아 한 번에 오류를 내고 종료 코드 1로 끝납니다. 로컬·테스트(`NODE_ENV`가 `production`이 아님)는 영향이 없습니다.
+
+- 비어 있거나 공백뿐이면 거부: `DATABASE_URL`, `PORT`, `WEB_URL`, `SHORT_LINK_BASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPERATOR_EMAILS`(쉼표로 나눠 이메일이 하나도 없으면 비어 있음), `UPLOAD_DIR`.
+- `WEB_URL`·`SHORT_LINK_BASE_URL`이 https URL이 아니면 거부.
+- 오류 메시지에는 키 이름만 넣고 값(비밀번호·클라이언트 비밀값·이메일)은 넣지 않습니다. 예: `NODE_ENV=production 설정 오류로 기동을 거부합니다. 비어 있음: DATABASE_URL, GOOGLE_CLIENT_ID / https URL이 아님: WEB_URL.`
+
+### DB TLS
+
+`src/database.ts`의 `databaseConnectionConfig`가 `DATABASE_URL`·`DATABASE_SSL`·`DATABASE_SSL_CA_PATH`를 pg Pool 설정으로 바꿉니다.
+
+| `DATABASE_SSL` | pg `ssl` | 의미 |
+| --- | --- | --- |
+| 비어 있음 | 정하지 않음 | URL을 그대로 넘깁니다. URL에 TLS 파라미터가 없으면 평문(로컬 PostgreSQL). |
+| `disable` | `false` | 평문. |
+| `require` | `{ rejectUnauthorized: false }` | 암호화만 하고 서버 인증서는 확인하지 않습니다(libpq `sslmode=require`와 같음). |
+| `verify-full` | `{ rejectUnauthorized: true, ca }` | CA 체인과 호스트 이름을 확인합니다. `DATABASE_SSL_CA_PATH`가 있으면 그 PEM을 `ca`로, 없으면 Node 기본 신뢰 저장소를 씁니다. |
+
+- 설치된 pg(8.23, pg-connection-string 2.14)는 연결 문자열을 파싱한 결과로 Pool의 `ssl` 옵션을 덮어씁니다(`sslmode`가 있으면 `ssl` 객체를 새로 만들고 `disable`이면 `false`). 그래서 `DATABASE_SSL`이 있으면 URL의 `ssl`·`sslmode`·`sslrootcert`·`sslcert`·`sslkey`·`uselibpqcompat`를 지워 두 설정이 섞이지 않게 합니다. 운영은 `DATABASE_URL`에 TLS 파라미터를 넣지 말고 `DATABASE_SSL`로 정합니다.
+- Supabase 운영 권장: `DATABASE_SSL=verify-full`, `DATABASE_SSL_CA_PATH`=대시보드 Database Settings의 SSL Configuration에서 받은 루트 인증서(`prod-ca-2021.crt`)를 컨테이너에 읽기 전용으로 마운트한 경로. `require`는 중간자 공격을 막지 못합니다. 근거: [Supabase SSL Enforcement](https://supabase.com/docs/guides/platform/ssl-enforcement), [Supabase Connect to your database — SSL](https://supabase.com/docs/guides/database/connecting-to-postgres#connecting-with-ssl).
+
+> **경고: Supabase 트랜잭션 풀러(포트 6543)를 쓰지 마세요.** API는 기동할 때 migration을 세션 advisory lock(`pg_advisory_lock`)으로 한 연결에서 잡고 풉니다(`runMigrations`). Supavisor 트랜잭션 모드는 트랜잭션마다 연결을 풀에 돌려줘 세션 단위 advisory lock·`SET`·prepared statement가 유지되지 않습니다. `DATABASE_URL`은 직접 연결 또는 Supavisor **세션 모드**(`aws-[INDEX]-[REGION].pooler.supabase.com:5432`, 사용자 `postgres.[PROJECT-REF]`)를 씁니다. OCI 서버가 IPv4만 쓰면 Supabase 직접 연결(IPv6)이 안 되므로 세션 모드 풀러가 기본입니다. 근거: [Supabase Connect to your database — Transaction mode limitations·Endpoints](https://supabase.com/docs/guides/database/connecting-to-postgres#transaction-mode-limitations) (2026-10-06 확인).
+
+## 컨테이너 이미지
+
+`apps/api/Dockerfile`(멀티 스테이지). 빌드 컨텍스트는 저장소 루트이고, 루트 `.dockerignore`가 허용 목록(`package.json`·`pnpm-lock.yaml`·`pnpm-workspace.yaml`·`.npmrc`·`apps/api`·`packages/shared`)만 넣으며 그 안에서도 `.env*`·`.local`·`node_modules`·`dist`·테스트를 뺍니다. 그래서 `apps/api/.env` 같은 비밀값은 이미지·빌드 캐시에 들어가지 않습니다.
+
+```bash
+# 저장소 루트에서. 운영 대상은 linux/arm64(OCI Ampere).
+docker buildx build --platform linux/arm64 -f apps/api/Dockerfile -t crelink-api:local --load .
+```
+
+- 빌드 단계(`--platform=$BUILDPLATFORM`, `node:22-slim`): corepack으로 루트 `packageManager`의 pnpm을 켜고 `pnpm install --frozen-lockfile --filter @crelink/api...`, `@crelink/shared`·`@crelink/api` 빌드, `pnpm --filter @crelink/api deploy --prod --legacy /out`으로 API와 운영 의존성만 모읍니다(`.npmrc`의 `node-linker=hoisted`라 평평한 `node_modules`, `@crelink/shared`는 빌드 결과를 포함한 복사본). 빌더가 amd64(GitHub Actions)여도 대상 플랫폼 명령을 실행하지 않으므로 QEMU가 필요 없습니다.
+- 런타임 단계(대상 플랫폼 `node:22-slim`): `/app/apps/api/{package.json,dist,migrations,node_modules}`만 복사. 코드는 root 소유(읽기 전용), 실행은 `node` 사용자(uid 1000), `NODE_ENV=production`, `CMD node apps/api/dist/main.js`, `EXPOSE 3000`. `PORT`는 이미지에 넣지 않으므로 실행 환경에서 `PORT=3000`을 줍니다. `/data/uploads`·`/data/geoip`를 `node` 소유로 만들어 두어 빈 named volume이 처음 붙을 때 그 소유권을 이어받습니다.
+- `HEALTHCHECK`: curl 없이 `node -e` 내장 `fetch`로 `http://127.0.0.1:${PORT:-3000}/api/health/ready`(DB 포함)를 4초 제한으로 확인합니다(간격 10초, 제한 5초, 시작 유예 30초, 재시도 3회). Compose는 이 정의를 재사용합니다.
+- `@crelink/shared`는 ESM이고 API 빌드는 CommonJS라 Node 22의 `require(esm)`로 읽습니다. 이미지 기동과 단축 주소 302(`CRELINK_WEB_PATHS` 사용)로 해석을 확인했습니다.
+- 운영 의존성은 순수 JS입니다(2026-10-06 이미지 안 `node_modules` 127개에 `*.node`·`binding.gyp`·install 스크립트 없음). native 애드온 의존성을 추가하면 빌더 플랫폼의 바이너리가 arm64로 옮겨져 깨지므로 이 구성을 다시 정해야 합니다.
+- 크기(2026-10-06, arm64): 이미지 약 388MB(`docker image ls`), 압축 약 80MB. 대부분 `node:22-slim` 기반이고 앱 레이어는 `node_modules` 37MB·`dist` 0.8MB·`migrations` 33KB.
+- 로컬 확인 예(일회용 DB, 호스트 PostgreSQL은 `host.docker.internal`): `docker run -d --name crelink-api-check -p 3920:3000 -e PORT=3000 -e DATABASE_URL=postgresql://…@host.docker.internal:<포트>/<일회용 DB> -e WEB_URL=https://… -e SHORT_LINK_BASE_URL=https://… -e GOOGLE_CLIENT_ID=… -e GOOGLE_CLIENT_SECRET=… -e OPERATOR_EMAILS=… -e UPLOAD_DIR=/data/uploads crelink-api:local` 후 `docker inspect -f '{{.State.Health.Status}}' crelink-api-check`가 `healthy`, `curl -i http://127.0.0.1:3920/api/health/ready`가 200.
 
 ## 인증과 권한
 
@@ -43,7 +89,13 @@
 
 ### 방문자 IP
 
-`X-Forwarded-For`는 클라이언트가 임의로 넣을 수 있는 헤더라, 앞단에 신뢰할 프록시가 있다는 설정 없이 첫 값을 쓰면 방문 기록의 IP와 위치를 누구나 위조할 수 있습니다. 그래서 MVP는 TCP 연결의 소켓 주소(`request.socket.remoteAddress`, IPv4-mapped IPv6는 IPv4로)만 기록합니다. 운영에서 리버스 프록시·CDN 뒤에 두면 소켓 주소가 프록시 주소가 되므로, 그때는 신뢰할 프록시 목록을 설정으로 받아 그 프록시가 붙인 값만 쓰도록 바꿉니다(운영 단축 도메인과 배포 구성이 정해질 때 결정).
+`X-Forwarded-For`는 클라이언트가 임의로 넣을 수 있는 헤더라, 첫 값을 쓰면 방문 기록의 IP와 위치를 누구나 위조할 수 있습니다. 그래서 `src/short-link/tracking.service.ts`의 `clientIp`는 `TRUSTED_PROXY_HOPS`(앞단의 신뢰할 프록시 수)만큼만 헤더를 믿습니다.
+
+- `0`(기본, 로컬·테스트): 헤더를 무시하고 TCP 연결의 소켓 주소(`request.socket.remoteAddress`)를 씁니다.
+- `N`: 신뢰할 프록시가 N단이면 각 프록시가 받은 연결 주소를 `X-Forwarded-For` 끝에 덧붙이므로, 오른쪽에서 N번째 값이 가장 바깥 신뢰 프록시가 본 클라이언트 주소입니다. 그 값을 쓰고 앞쪽 값(클라이언트가 넣은 위조 값)은 무시합니다. 운영은 Caddy 1단이라 `1`(마지막 값). 여러 줄로 온 헤더는 쉼표로 이어 한 목록으로 봅니다.
+- 값이 N개보다 적거나, 고른 값이 IP가 아니면(포트가 붙은 값 포함) 소켓 주소로 돌아갑니다.
+- 정규화: IPv4-mapped IPv6(`::ffff:1.2.3.4`)는 IPv4로, IPv6는 소문자로 저장합니다.
+- 이 설정은 API에 들어오는 모든 연결이 그 프록시를 거칠 때만 안전합니다. 운영은 API 포트를 호스트에 공개하지 않고 Compose 내부 네트워크에서 Caddy만 접근합니다([운영 배포 설계](../../../docs/specs/crelink-prod-deploy.md#caddy-공개-정책-goshaulkr)).
 
 ### 방문·클릭 기록 항목
 
@@ -54,7 +106,7 @@
 - 단축 주소(R8, `src/creator/slug.service.ts`): 입력은 앞뒤 공백을 빼고 소문자로 바꾼 뒤 `SLUG_PATTERN`·3~30자·예약어를 봅니다. 다른 단축 URL의 현재 주소나 90일 안의 옛 주소면 409 `slug_taken`. 자기 옛 주소는 되돌릴 수 있습니다. 첫 변경(`slug_changed_at`이 없음)은 바로, 그 뒤에는 마지막 변경에서 30일 뒤부터(429 `slug_change_too_soon`). 자동 주소로 되돌려도 30일 제한은 마지막 변경 시각 기준이라 우회할 수 없습니다. 같은 주소로 바꾸는 요청은 아무것도 바꾸지 않고 200입니다. 예약 기간이 끝난 남의 옛 주소는 행을 지우고 새로 만듭니다.
 - 링크 한도(R13): 보이는(숨기지 않고 차단되지 않은) 링크 ≤ 5 + `extra_link_slots`(409 `link_limit_reached`), 숨긴 링크 포함 ≤ 50(409 `link_total_limit_reached`). 추가와 숨김 해제에서 확인하며, 같은 사용자의 링크 변경은 사용자 행 잠금으로 줄 세웁니다. 운영자 추가 슬롯은 0~45.
 - 차단 도메인(R14): 링크 호스트가 차단 도메인이거나 그 하위 도메인이면 추가·URL 수정이 422 `link_domain_blocked`. 운영자가 도메인을 추가하면 같은 트랜잭션에서 기존 링크의 `blocked_at`을 채웁니다. 목록에서 빼도 이미 차단된 링크는 운영자가 링크별로 풉니다.
-- 이미지(`src/files/`): multipart 필드 `file`, 5MB 이하. 형식은 클라이언트 Content-Type이 아니라 파일 앞부분(매직 바이트)으로 JPEG·PNG·WebP·GIF만 받습니다. 저장은 `FileStorage` 경계 뒤의 로컬 디스크(`UPLOAD_DIR`)이고, `GET /api/files/{id}`는 누구나 받을 수 있으며 1년 캐시합니다(id는 UUID, 내용 불변).
+- 이미지(`src/files/`): multipart 필드 `file`, `CRELINK_LIMITS.imageMaxBytes`(4MB, 웹 BFF가 지나는 Vercel Function 본문 4.5MB 한도 때문) 이하. 형식은 클라이언트 Content-Type이 아니라 파일 앞부분(매직 바이트)으로 JPEG·PNG·WebP·GIF만 받습니다. 저장은 `FileStorage` 경계 뒤의 로컬 디스크(`UPLOAD_DIR`)이고, `GET /api/files/{id}`는 누구나 받을 수 있으며 1년 캐시합니다(id는 UUID, 내용 불변).
 
 ## 통계와 보존 작업
 

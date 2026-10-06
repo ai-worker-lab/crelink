@@ -1,0 +1,52 @@
+# 크리링 운영(prod) API. 서버 /opt/crelink에서 deploy.sh가 실행합니다. 공개 TLS·경로 정책은 서버 공용 edge Caddy(edge/, 서버 /opt/edge)가
+# crelink.caddy로 맡고, 이 구성은 호스트 포트를 열지 않고 외부 네트워크 edge에 별칭 crelink-api로만 참가합니다.
+# 값은 같은 폴더의 .env(Git 제외, 권한 600)에서 오고 키 목록은 .env.example이 원본입니다.
+# 저장소에서 문법 확인: docker compose -f infra/prod/compose.yaml --env-file infra/prod/.env.example config --quiet
+name: crelink-prod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '5'
+
+services:
+  api:
+    image: ${API_IMAGE:?API_IMAGE가 없습니다. /opt/crelink/.env를 확인하세요(deploy.sh가 갱신)}
+    restart: unless-stopped
+    # .env가 없으면 위 API_IMAGE 보간이 먼저 실패하므로 서버에서 .env 없이 기동되지 않습니다.
+    # required: false는 저장소에서 --env-file .env.example로 문법을 확인할 수 있게 하려는 것입니다.
+    env_file:
+      - path: .env
+        required: false
+    # PID 1이 node라 신호 전달·좀비 정리를 위해 init을 둡니다.
+    init: true
+    # HEALTHCHECK는 이미지(apps/api/Dockerfile)에 정의된 것을 그대로 씁니다. 여기서 다시 정의하지 않습니다.
+    volumes:
+      - uploads:/data/uploads
+      - geoip:/data/geoip:ro
+      # Supabase CA 인증서(공개 정보, 서버 /opt/crelink/certs에만 둠). DATABASE_SSL=verify-full일 때 DATABASE_SSL_CA_PATH가 가리킵니다.
+      - ./certs:/etc/crelink/certs:ro
+    networks:
+      edge:
+        aliases: [crelink-api]
+    logging: *logging
+
+  # GeoIP 파일을 geoip 볼륨에 쓰는 일회성 도구(geoip.sh가 docker compose run으로만 실행, up 대상 아님).
+  geoip-writer:
+    image: alpine:3.22
+    profiles: [tools]
+    network_mode: none
+    volumes:
+      - geoip:/data/geoip
+    logging: *logging
+
+networks:
+  # edge Compose(edge/compose.yaml)가 만드는 공용 네트워크. edge를 먼저 올려야 합니다.
+  edge:
+    external: true
+    name: ${EDGE_NETWORK:-edge}
+
+volumes:
+  uploads:
+  geoip:

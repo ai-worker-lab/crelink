@@ -47,9 +47,24 @@
 | --- | --- |
 | `check` | 지원 Node.js LTS(`matrix.node`: 22·24·26)마다 `pnpm install --frozen-lockfile` 후 `pnpm verify --keep-going`. PostgreSQL 17 서비스 컨테이너에 `TEST_DATABASE_URL`로 연결합니다. 한 버전이 실패해도 나머지 버전 결과를 끝까지 봅니다. |
 | `smoke` | `.nvmrc` Node로 `node scripts/instance.mjs --print-env`의 슬롯 0 포트·주소(`API_PORT`·`WEB_PORT`·`API_URL`·`WEB_URL`, 원본 `infra/local/.env.example`)를 job 환경에 넣고, 공용 패키지·API·웹을 빌드해 PostgreSQL 서비스에 연결한 API(`node apps/api/dist/main.js`, `PORT=$API_PORT`)와 웹(`next start --port $WEB_PORT`)을 백그라운드로 띄운 뒤 준비를 기다려 `pnpm smoke`를 실행합니다. 실패하면 API·웹 로그를 출력합니다. |
+| `API 이미지 빌드` | 운영 API 이미지(`apps/api/Dockerfile`, `linux/arm64`, QEMU·buildx)가 빌드되는지 확인합니다. 푸시하지 않습니다. |
 | `work scope` | `work/NNNN-*` 브랜치의 PR에서만 전체 이력을 받아 `pnpm work:scope --base origin/<기준 브랜치>`로 변경 파일이 티켓 역할의 소유 경로 안에 있는지 검사합니다. |
 
 지원 Node.js 버전을 바꾸면 workflow의 `matrix.node`와 README 요구사항을 함께 고칩니다.
+
+## CD(운영 배포)
+
+[`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml)이 `main` push의 `CI`가 성공하면 운영에 배포합니다(수동 실행 `force`로 전체 배포 가능). 설계는 [운영 배포·CD 기술 설계](../specs/crelink-prod-deploy.md), 계정·시크릿 준비와 장애 대응은 [prod 런북](../../infra/docs/prod-runbook.md)입니다.
+
+| job | 내용 |
+| --- | --- |
+| `plan` | 배포 커밋, 영역별 변경(태그 `deploy/prod-api`·`deploy/prod-web` 이후 `apps/api`·`packages/shared`·`infra/prod` / `apps/web`·`packages/*`), 시크릿 준비 여부. 시크릿이 없으면 배포 job을 건너뛰고 경고만 남깁니다. |
+| `API 이미지` | `linux/arm64` 이미지를 `ghcr.io/ai-worker-lab/crelink-api:<SHA>`로 푸시 |
+| `API 배포` | `infra/prod/`를 서버 `/opt/crelink`로 rsync한 뒤 SSH로 `deploy.sh <SHA>`. 헬스체크 실패 시 서버가 이전 이미지로 되돌리고 job이 실패합니다. 성공하면 태그 `deploy/prod-api`를 옮깁니다. |
+| `웹 배포` | API 배포가 실패하지 않았을 때 `vercel pull·build·deploy --prebuilt --prod`, 운영 도메인 검사, 실패 시 `vercel rollback`. 성공하면 태그 `deploy/prod-web`를 옮깁니다. |
+| `운영 주소 검사` | `https://links.shaul.kr/`·BFF health 200, `https://go.shaul.kr/<없는 주소>` 302 → notice, `https://go.shaul.kr/api/health` 404(토큰 없이 닫힘) |
+
+수동 롤백은 [`.github/workflows/rollback.yml`](../../.github/workflows/rollback.yml)(대상 api·web·both, API 태그·웹 배포 URL 선택)입니다. 의존성 갱신 PR은 [`.github/dependabot.yml`](../../.github/dependabot.yml)이 주 1회 엽니다. 워크플로 문법은 `actionlint`로 검사합니다(로컬 설치 시 `actionlint .github/workflows/*.yml`).
 
 ## 완료 보고 전 확인 범위
 

@@ -102,7 +102,7 @@ migration은 `apps/api/migrations/`의 SQL 파일(기존 실행기). 모든 시�
 | `PUT /api/me/links/order` | 크리에이터 | `{ ids }` | 링크 목록 | 400 `order_mismatch` |
 | `PUT /api/me/socials` | 크리에이터 | `{ items: [{ platform, url }] }`(전체 교체) | 목록 | 400 |
 | `POST·PATCH·DELETE /api/me/portfolio[/{id}]`, `PUT /api/me/portfolio/order` | 크리에이터 | `{ title, url?, imageFileId?, description? }` | 항목·목록 | 400, 404, 409 `portfolio_limit_reached` |
-| `POST /api/me/files` | 크리에이터 | multipart `file`(jpeg·png·webp·gif, 5MB 이하 `[임시값]`) | `{ fileId, url }` | 400 `file_type_unsupported`·`file_too_large` |
+| `POST /api/me/files` | 크리에이터 | multipart `file`(jpeg·png·webp·gif, 4MB 이하 `[임시값]`) | `{ fileId, url }` | 400 `file_type_unsupported`·`file_too_large` |
 | `GET /api/files/{id}` | 누구나 | — | 이미지 바이트 | 404 |
 | `GET /api/public/landings/{publicId}` | 누구나 | — | 공개 랜딩(보이는·차단 안 된 링크만, 각 링크의 `clickUrl`) | 404 `landing_not_found`, 410 `creator_suspended` |
 | `GET {SHORT}/{slug}` | 누구나 | — | 302 랜딩 | 없는 주소·정지: 302 `{WEB}/notice?reason=…` |
@@ -196,3 +196,5 @@ API 통합 테스트(0016): 가입 트랜잭션, 주소 규칙(예약어·중복
 - 2026-10-06: 빠른 MVP 요청에 따라 역할별 설계 검토(api·web·product)를 생략했습니다. 사용자가 설계를 수정 없이 진행하기로 하고(구현에 필요한 결정 외 미정 사항은 다음 phase) 승인했습니다.
 
 ## 변경 기록
+
+- 2026-10-06: 이미지 한도를 5MB → 4MB로 낮춤. 운영에서 업로드·조회가 웹 BFF(Vercel Function 본문 4.5MB 한도)를 지나기 때문(`docs/work/web/0026-web-internal-token-vercel.md`, 설계 `crelink-prod-deploy.md`).

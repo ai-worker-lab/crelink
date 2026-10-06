@@ -1,5 +1,6 @@
 import {
   ApiError,
+  CRELINK_LIMITS,
   CreatorLandingState,
   LinkView,
   PortfolioItemView,
@@ -407,7 +408,7 @@ describe('크리에이터 편집 API', () => {
     expect([over.status, over.body.code]).toEqual([409, 'portfolio_limit_reached']);
   });
 
-  it('이미지 업로드: 내용으로 형식을 판단하고 5MB를 넘으면 400, 올린 이미지는 공개 주소로 받는다', async () => {
+  it('이미지 업로드: 내용으로 형식을 판단하고 한도(CRELINK_LIMITS.imageMaxBytes)를 넘으면 400, 올린 이미지는 공개 주소로 받는다', async () => {
     const { cookie } = await newCreator();
     const uploaded = await upload(cookie, PNG, 'application/octet-stream');
     expect(uploaded.status).toBe(201);
@@ -420,7 +421,7 @@ describe('크리에이터 편집 API', () => {
 
     const text = await upload(cookie, Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), 'image/png');
     expect([text.status, text.body.code]).toEqual([400, 'file_type_unsupported']);
-    const big = await upload(cookie, Buffer.concat([PNG, Buffer.alloc(5 * 1024 * 1024)]));
+    const big = await upload(cookie, Buffer.concat([PNG, Buffer.alloc(CRELINK_LIMITS.imageMaxBytes)]));
     expect([big.status, big.body.code]).toEqual([400, 'file_too_large']);
     const missing = await fetch(`${t.baseUrl}/api/files/00000000-0000-0000-0000-000000000000`);
     expect(missing.status).toBe(404);

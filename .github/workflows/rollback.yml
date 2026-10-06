@@ -1,0 +1,78 @@
+# 운영(prod) 수동 롤백. API는 서버의 rollback.sh(이전 또는 지정 태그), 웹은 Vercel의 직전 운영 배포로 되돌립니다.
+# 기준: docs/specs/crelink-prod-deploy.md, infra/docs/prod-runbook.md
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 되돌릴 대상
+        type: choice
+        options: [api, web, both]
+        default: api
+      api_tag:
+        description: API 이미지 태그(커밋 SHA). 비우면 서버 releases.log의 직전 배포
+        type: string
+        required: false
+      web_url:
+        description: 웹 Vercel 배포 URL(https://….vercel.app). 비우면 직전 운영 배포
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  api:
+    name: API 롤백
+    if: inputs.target == 'api' || inputs.target == 'both'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read # 서버가 GHCR 이미지를 받을 때 이 job의 GITHUB_TOKEN을 일회용으로 넘김
+    steps:
+      - name: SSH 준비
+        env:
+          OCI_SSH_KEY: ${{ secrets.OCI_SSH_KEY }}
+          OCI_KNOWN_HOSTS: ${{ secrets.OCI_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$OCI_SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$OCI_KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+      - name: rollback.sh
+        env:
+          OCI_HOST: ${{ secrets.OCI_HOST }}
+          OCI_USER: ${{ secrets.OCI_USER }}
+          GHCR_PULL_USER: ${{ github.actor }}
+          GHCR_PULL_TOKEN: ${{ github.token }}
+          API_TAG: ${{ inputs.api_tag }}
+        run: |
+          if [[ -n "$API_TAG" && ! "$API_TAG" =~ ^[0-9a-f]{7,40}$ ]]; then echo "::error::api_tag는 커밋 SHA여야 합니다."; exit 1; fi
+          printf '%s\n' "$GHCR_PULL_TOKEN" | ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$OCI_USER@$OCI_HOST" \
+            "cd /opt/crelink && GHCR_PULL_USER='$GHCR_PULL_USER' GHCR_PULL_TOKEN_STDIN=1 ./rollback.sh $API_TAG"
+
+  web:
+    name: 웹 롤백
+    if: inputs.target == 'web' || inputs.target == 'both'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: vercel rollback
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          WEB_TARGET: ${{ inputs.web_url }}
+        run: |
+          if [[ -n "$WEB_TARGET" && ! "$WEB_TARGET" =~ ^https://[a-z0-9.-]+\.vercel\.app$ ]]; then echo "::error::web_url 형식이 아닙니다."; exit 1; fi
+          if [[ -n "$WEB_TARGET" ]]; then npx --yes vercel@62 rollback "$WEB_TARGET" --token "$VERCEL_TOKEN" --yes
+          else npx --yes vercel@62 rollback --token "$VERCEL_TOKEN" --yes; fi
