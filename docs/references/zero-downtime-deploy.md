@@ -50,8 +50,8 @@ B·C·D·E는 구·신 API가 수 초에서 수십 초 함께 돕니다. A도 �
 | 주기 작업 | `@Cron` 없음. `RetentionService`(기동 시 1회 + 24시간 `setInterval`)만 있고 트랜잭션 advisory lock으로 직렬화·멱등 | 두 인스턴스가 함께 돌아도 안전. `enableShutdownHooks` 뒤에는 `onModuleDestroy`의 clearInterval이 실행됨 |
 | 세션·업로드·인메모리 상태 | 세션은 `sessions` 테이블, 업로드는 `FILE_STORAGE: s3`, API에 rate limit·캐시 Map 없음 | 무관 |
 | **DB 연결 수** | `new Pool({ max: 15 })`, `DATABASE_URL` = Supavisor **세션 모드**(5432). 세션 모드는 클라이언트 수가 대시보드 "Pool Size"로 제한됨([discussion #22305](https://github.com/orgs/supabase/discussions/22305), [Supavisor FAQ](https://supabase.com/docs/guides/troubleshooting/supavisor-faq-YyP5tI), [connection management](https://supabase.com/docs/guides/database/connection-management)) | **위험.** 겹치는 동안 최대 15×2=30개. Pool Size가 15라면(작은 compute 기본값 [추정: 대시보드 확인 필요]) 새 인스턴스의 readiness가 `max clients reached`로 실패할 수 있음. pg Pool idle 연결은 기본 10초 뒤 정리되어([node-postgres Pool](https://node-postgres.com/apis/pool)) 한가할 때는 드러나지 않음. 조치: `max`를 환경변수로 빼고 `2×max ≤ Pool Size − 여유`로 맞추거나 Pool Size를 올림 |
-| API graceful shutdown | 없음 | `app.enableShutdownHooks()`. `app.close()`가 HTTP 서버를 닫고 진행 중 요청을 기다리며, Node 19+ `server.close()`는 idle keep-alive 연결도 닫음([Node http](https://nodejs.org/api/http.html#serverclosecallback)). compose `stop_grace_period: 30s`(기본 10초) |
-| 웹 graceful shutdown | Next standalone `server.js` | Next 문서: SIGTERM·SIGINT를 받으면 진행 중 요청과 `after()`를 마치고 종료, 10~30초 drain 권장([Next self-hosting](https://nextjs.org/docs/app/guides/self-hosting)). standalone 실제 동작은 실측 필요 [추정] |
+| API graceful shutdown | 없음 | SIGTERM → `server.close()`(새 연결 거부, idle keep-alive 닫기, [Node http](https://nodejs.org/api/http.html#serverclosecallback)) → 진행 중 요청 완료 → `app.close()`(`onModuleDestroy`) 순서가 필요. Nest 11.2의 `enableShutdownHooks()`는 `onModuleDestroy`를 HTTP 서버를 닫기 전에 실행하고 같은 신호로 다시 종료해 이 순서를 지키지 못함(티켓 0032 확인 뒤 정정, 처음 조사는 `enableShutdownHooks()`로 충분하다고 봤음). compose `stop_grace_period: 30s`(기본 10초) |
+| 웹 graceful shutdown | Next standalone `server.js` | Next 문서: SIGTERM·SIGINT를 받으면 진행 중 요청과 `after()`를 마치고 종료([Next self-hosting](https://nextjs.org/docs/app/guides/self-hosting)). 티켓 0033 실측(Next 15.5.27): SIGTERM에 새 연결 거부, 진행 중 BFF·SSR 요청 200으로 완료, 종료 코드 0. 자체 상한이 없어 Docker 유예 시간이 상한이므로 `stop_grace_period`를 명시해야 함(Docker Desktop 기본 약 3초에서는 SIGKILL로 끊김) |
 | Next 버전 차이(skew) | `deploymentId` 미설정 | 전환 뒤 옛 HTML의 브라우저가 옛 chunk를 요청하면 404. 지금도 배포마다 있는 별개 문제. `deploymentId`(또는 `NEXT_DEPLOYMENT_ID`)에 이미지 SHA를 넣으면 불일치 때 hard navigation([deploymentId](https://nextjs.org/docs/app/api-reference/config/next-config-js/deploymentId)). Server Actions 미사용(`'use server'` 0건) |
 | Cloudflare Tunnel | 호스트 cloudflared → `127.0.0.1:18080` | 18080 리스너가 사라지지 않는 한 그대로. 원본 응답 제한 100초(524)라 Caddy 대기(`lb_try_duration`)는 30초 이하면 충분([524](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-524/)) |
 
@@ -110,7 +110,7 @@ B·C·D·E는 구·신 API가 수 초에서 수십 초 함께 돕니다. A도 �
 ## 스택 확인
 
 - 확인한 것: 위 로컬 실험 1~7(Caddy reload 중 진행 중 요청 완료, 재시도의 메서드별 동작, graceful 유무 차이, Docker DNS가 unhealthy 컨테이너를 돌려줌). 저장소 코드(`apps/api/src/main.ts`·`database.ts`·`retention/retention.service.ts`, 두 Dockerfile, `infra/prod/compose.yaml`·`Caddyfile`·`lib.sh`)를 읽어 원인과 동시 실행 조건을 확인.
-- 확인하지 못한 것: 운영 Supabase Pool Size 값, Next standalone `server.js`의 SIGTERM 실제 동작, compose `healthcheck`에 `start_interval`만 줄 때 이미지 `test` 상속 여부, Compose가 서비스 이름을 외부 네트워크 별칭으로도 붙이는지, docker-rollout의 Compose v5.5.1 동작, Swarm 단일 노드의 healthy 전 VIP 편입 여부. 실제 앱 이미지로 한 실험은 없음(모형 백엔드).
+- 확인하지 못한 것(조사 시점): 운영 Supabase Pool Size 값, Compose가 서비스 이름을 외부 네트워크 별칭으로도 붙이는지, docker-rollout의 Compose v5.5.1 동작, Swarm 단일 노드의 healthy 전 VIP 편입 여부. 실제 앱 이미지로 한 실험은 없음(모형 백엔드). 이후 확인: 웹 standalone SIGTERM 동작(티켓 0033, graceful), compose `healthcheck`에 `start_interval`을 줄 때 이미지 `test` 상속(티켓 0034, 상속되나 `start_period`도 함께 줘야 `up`이 받아들임), API 종료 순서(티켓 0032).
 
 ## 결론
 

@@ -32,7 +32,7 @@
 
 | 번호 | 역할 | 내용 |
 | --- | --- | --- |
-| 0032 | api | graceful shutdown(`enableShutdownHooks`), `DATABASE_POOL_MAX` |
+| 0032 | api | graceful shutdown(`enableGracefulShutdown`: 새 연결 거부 → 진행 중 요청 완료 → pool 종료), `DATABASE_POOL_MAX` |
 | 0033 | web | standalone SIGTERM 실측·필요 시 처리, (선택) `deploymentId` |
 | 0034 | infra | 0단계 compose: `stop_grace_period`, healthcheck `start_interval`, 운영 `DATABASE_POOL_MAX` |
 | 0035 | infra | edge 스택 분리, 앱 스택 색상화, 배포·롤백·GeoIP·bootstrap 전환 흐름, 무중단 시험, 문서 |

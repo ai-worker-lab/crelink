@@ -13,14 +13,14 @@
   1. **Caddy 재생성**: Caddyfile bind 원본이 릴리스 폴더 경로라 배포마다 설정 해시가 바뀌어 caddy 컨테이너를 다시 만들고, `admin off`라 reload로 바꿀 수도 없습니다. 18080이 잠깐 사라지면 cloudflared가 502를 냅니다.
   2. **api·web 정지 후 시작**: Compose 재생성은 기존 컨테이너를 멈춘 뒤 새 것을 띄우고, 서비스당 컨테이너가 1개라 부팅·migration 확인·첫 헬스 통과까지 비어 있습니다. web→api 호출(`http://api:3000`)은 Caddy를 거치지 않아 재시도로도 보호되지 않습니다.
   3. **늦은 헬스 판정**: 이미지 HEALTHCHECK `--interval=10s`(start-period api 30초·web 20초)이고 `start_interval`이 없어 준비된 뒤에도 최대 약 10초 더 기다립니다.
-  4. **API 즉시 종료**: `main.ts`에 `enableShutdownHooks()`가 없어 SIGTERM에 진행 중 요청이 끊기고 `onModuleDestroy`(pool 종료·주기 작업 정리)가 돌지 않습니다.
+  4. **API 즉시 종료**: `main.ts`에 SIGTERM 처리가 없어 진행 중 요청이 끊기고 `onModuleDestroy`(pool 종료·주기 작업 정리)가 돌지 않습니다.
 - 로컬 실험(2026-10-07, Docker 29.8.1·Compose v5.5.1·`caddy:2.11.7-alpine`·모형 Node 백엔드): Caddy `import`한 업스트림 파일을 바꾸고 `caddy reload`하면 0.16초에 끝나고 진행 중이던 5초 요청은 옛 업스트림에서 200으로 끝났습니다. SIGTERM 핸들러가 없는 백엔드는 정지 중 진행 중 POST가 502(동시 20건 중 5건), `server.close()` graceful이면 20/20 200이었습니다. Docker DNS는 unhealthy 컨테이너 IP도 돌려줘 DNS 기반 Caddy는 Docker health를 모릅니다.
 - 구·신 API가 동시에 돌 때: migration은 세션 advisory lock으로 한 번만 적용되고, 유일한 주기 작업(보존 작업)은 트랜잭션 advisory lock으로 직렬화·멱등이라 안전합니다. 세션은 DB, 업로드는 S3라 인메모리 상태가 없습니다. 위험은 DB 연결 수입니다: pool `max: 15`이고 `DATABASE_URL`은 Supavisor 세션 모드(클라이언트 수 = 대시보드 Pool Size 상한)라 겹치는 동안 최대 30개가 됩니다.
 
 ## 결정
 
 1. **0단계(선행, 단독 배포)**: 어느 전환 방식이든 필요한 공통 전제를 먼저 넣습니다.
-   - API `app.enableShutdownHooks()`로 SIGTERM 때 새 연결을 거부하고 진행 중 요청을 마친 뒤 pool을 닫습니다.
+   - API가 SIGTERM 때 새 연결을 거부하고 진행 중 요청을 마친 뒤 pool을 닫습니다. Nest 11의 `enableShutdownHooks()`는 `onModuleDestroy`(pool 종료)를 HTTP 서버를 닫기 전에 실행해 진행 중 요청이 닫힌 pool을 쓰게 되므로 쓰지 않고, 이 순서를 지키는 자체 처리(`apps/api/src/shutdown.ts` `enableGracefulShutdown`)를 둡니다(티켓 0032에서 확인).
    - 웹 standalone 서버의 SIGTERM 동작을 실측하고, 진행 중 요청을 끊으면 Next 문서의 수동 신호 처리로 고칩니다.
    - compose api·web에 `stop_grace_period: 30s`와 healthcheck `start_interval: 1s`.
    - API pool 상한을 환경변수 `DATABASE_POOL_MAX`(기본 15)로 빼고 운영값은 `2 × DATABASE_POOL_MAX ≤ Supabase Pool Size − 여유(관리 접속·migration 도구용, 최소 2)`로 정합니다. 맞출 수 없으면 Pool Size를 올립니다.
