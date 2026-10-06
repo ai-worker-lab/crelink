@@ -19,6 +19,7 @@
     "work:run": "node scripts/runner.mjs",
     "instance": "node scripts/instance.mjs",
     "logs": "node scripts/logs.mjs",
+    "geoip:download": "node scripts/geoip.mjs",
     "verify": "node scripts/verify.mjs",
     "smoke": "node scripts/smoke.mjs",
     "docs:check": "node scripts/docs-check.mjs",

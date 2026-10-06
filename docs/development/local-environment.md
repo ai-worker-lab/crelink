@@ -45,6 +45,12 @@ checkout마다 인스턴스 설정 `.local/instance.env`(Git 제외)가 Compose 
 
 Compose는 Valkey 서비스를 제공하지만 API 소스(`apps/api/src`)에는 Valkey/Redis 연결 소비 코드가 없어 현재 API는 이를 사용하지 않습니다([ADR 0005](../adr/0005-keep-valkey-local-infra.md)). Compose 기본 자격 증명은 로컬 전용이며 프로덕션에 복사하지 않습니다.
 
+## 크리링 로컬 설정
+
+- 단축 도메인: 로컬은 API 주소가 단축 도메인입니다(`SHORT_LINK_BASE_URL`, 인스턴스 값 = `API_URL`). 단축 URL `http://127.0.0.1:<API 포트>/<주소>`는 본 도메인 랜딩 `WEB_URL/p/<ID>`로 넘깁니다([MVP 기술 설계](../specs/crelink-mvp.md)). `make`로 띄운 API는 PM2에서 `WEB_URL`·`SHORT_LINK_BASE_URL`을 받습니다.
+- 위치 데이터: `pnpm geoip:download`가 DB-IP IP to City Lite(MMDB, CC BY 4.0, 약 120MB)를 `.local/geoip/dbip-city-lite.mmdb`(Git 제외)에 받습니다. 파일이 있으면 PM2가 API에 `GEOIP_MMDB_PATH`로 넘기고, 없으면 방문 기록의 국가·도시는 비어 있습니다. 웹 `/privacy`가 DB-IP 출처 링크를 표시합니다. 받은 뒤 `make api-restart`.
+- 구글 로그인: `apps/api/.env`의 `GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET`을 채우고, Google Cloud 콘솔 OAuth 클라이언트(웹 애플리케이션)의 승인된 리디렉션 URI에 `WEB_URL/auth/google/callback`(슬롯 0: `http://127.0.0.1:5193/auth/google/callback`)을 등록합니다. 쿠키가 본 도메인 기준이므로 브라우저도 `localhost`가 아니라 `WEB_URL`(`127.0.0.1`)로 엽니다. 운영자 계정은 `OPERATOR_EMAILS`(쉼표 구분)에 구글 이메일을 넣습니다.
+
 ## 로그
 
 ```sh

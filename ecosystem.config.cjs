@@ -15,6 +15,9 @@ const instance = Object.fromEntries(
     .map((match) => [match[1], match[2]]),
 );
 const pick = (...keys) => Object.fromEntries(keys.map((key) => [key, instance[key]]));
+// pnpm geoip:download가 받은 DB-IP Lite 파일이 있으면 API에 넘깁니다. 없으면 방문 기록의 국가·도시는 비워 둡니다.
+const geoipFile = join(root, '.local', 'geoip', 'dbip-city-lite.mmdb');
+const geoip = existsSync(geoipFile) ? { GEOIP_MMDB_PATH: geoipFile } : {};
 
 module.exports = {
   apps: [
@@ -24,7 +27,7 @@ module.exports = {
       script: 'pnpm',
       args: ['--filter', '@crelink/api', 'start:dev'],
       interpreter: 'none',
-      env: pick('PORT', 'DATABASE_URL', 'WEB_URL', 'SHORT_LINK_BASE_URL'),
+      env: { ...pick('PORT', 'DATABASE_URL', 'WEB_URL', 'SHORT_LINK_BASE_URL'), ...geoip },
       autorestart: false,
     },
     {
