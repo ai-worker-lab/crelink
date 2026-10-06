@@ -19,7 +19,7 @@
 - [x] Cloudflare Tunnel `my-home-server`에 공개 호스트 `go.shaul.kr`·`links.shaul.kr` → `http://localhost:18080`(proxied CNAME).
 - [x] 최초 배포가 `ssh-entry.sh` 경로로 성공하고 caddy·api·web이 healthy, 운영 주소 검사 6개가 기대대로, GeoIP가 로드된다.
 - [x] GitHub: 쓰지 않는 secrets(`OCI_*`) 삭제, `DEPLOY_SSH_KEY` 등록. 로컬 평문 비밀값 파일 삭제.
-- [ ] Tailscale 관리 화면: `tagOwners` `tag:ci`, grant `tag:ci` → `home-server` tcp:22, workload identity federation 자격 증명(Subject `repo:ai-worker-lab/crelink:ref:refs/heads/main`), GitHub variables `TS_OIDC_CLIENT_ID`·`TS_OIDC_AUDIENCE`(사용자 작업).
+- [ ] Tailscale 관리 화면: `tagOwners` `tag:ci`, grant `tag:ci` → `home-server` tcp:22, workload identity federation 자격 증명(Subject `repo:ai-worker-lab@271170671/crelink@1406726921:ref:refs/heads/main`, GitHub 불변 subject 형식), GitHub variables `TS_OIDC_CLIENT_ID`·`TS_OIDC_AUDIENCE`(사용자 작업).
 - [ ] `https://links.shaul.kr`에서 구글 로그인, 링크 관리, 랜딩, 단축 URL 클릭 기록(IP가 방문자 IP)을 확인한다.
 - [ ] `deploy.yml` 자동 배포 1회(GHCR 이미지), 의도적 헬스 실패의 자동 복구 1회, `rollback.yml` 수동 롤백 1회를 실제로 실행해 결과를 기록한다.
 
@@ -48,3 +48,4 @@
 - 2026-10-06: 범위 변경(사용자 결정, 에픽 0024 호스팅 전환). 운영 대상을 `home-server` 단일 서버(웹·API 스택, Cloudflare Tunnel, Tailscale OIDC SSH, SOPS/age)로 바꿈. OCI 서버의 edge Caddy는 aichat이 계속 쓰고 크리링은 OCI에 배포하지 않음. 목적·수용 기준을 home-server 기준 체크리스트로 고침(이전 기준: OCI·Vercel·DNS 준비, 서버 부트스트랩·Vercel 최초 배포).
 - 2026-10-06: work scope 처리. 에픽 브랜치 `work/0024-prod-deploy`는 에픽에 `역할`이 없어 `pnpm work:scope`가 실패하므로, 통합 PR을 이 티켓(`orchestrator`) 브랜치 `work/0029-first-prod-provision-verify`로 옮기기로 함(브랜치·PR 교체는 통합 담당). 규칙은 `docs/work/README.md` "착수와 점유".
 - 2026-10-06: home-server 준비·최초 배포(통합 담당). `bootstrap.sh` 완료(`deploy` uid 1000·docker 그룹, 다른 서비스 seaweedfs 데이터도 uid 1000이라 겹치지만 docker 그룹이라 추가 위험 없음), `RunSSH: false`(OpenSSH가 tailnet 22번을 받음), tailscale 1.102.4. Cloudflare Tunnel `my-home-server`에 `go`·`links` → `http://localhost:18080` 공개 호스트와 proxied CNAME 추가. 서버에서 이미지를 직접 빌드해 `ssh-entry.sh` 경로로 첫 배포 성공: 릴리스 `8a5f271`, caddy·api·web healthy, 운영 주소 6개 기대대로, GeoIP 로드. 로컬 평문 `apps/api/.env.prod`·`infra/prod/.env` 삭제, GitHub secrets `OCI_*` 삭제, `DEPLOY_SSH_KEY` 등록. 남은 것: Tailscale 관리 화면 설정(`tagOwners`·grant·workload identity)과 GitHub variables(사용자 작업 대기), 워크플로 경로 배포·롤백 실행, 실서비스 로그인·클릭 확인.
+- 2026-10-07: 사용자가 Tailscale workload identity 자격 증명을 만들어 Client ID·Audience 전달(비밀 아님) → GitHub variables `TS_OIDC_CLIENT_ID`·`TS_OIDC_AUDIENCE` 등록. Deploy 수동 실행(run 37496907108): plan·이미지 api/web 성공, 배포 job의 Tailscale 토큰 교환 403. 원인: 이 저장소는 GitHub OIDC 불변 subject(`use_immutable_subject: true`, 접두사 `repo:ai-worker-lab@271170671/crelink@1406726921`)라 실제 `sub`가 `repo:ai-worker-lab@271170671/crelink@1406726921:ref:refs/heads/main`인데 자격 증명 Subject를 옛 형식으로 안내했음. 런북 2-2·설계 문서의 Subject를 고침. 사용자가 자격 증명 Subject를 고친 뒤 다시 실행.

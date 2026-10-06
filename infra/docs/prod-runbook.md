@@ -74,7 +74,7 @@ Tailscale SSH(`tailscale up --ssh`)가 켜져 있으면 tailnet에서 오는 22�
 | 항목 | 값 |
 | --- | --- |
 | Issuer | GitHub(`https://token.actions.githubusercontent.com`) |
-| Subject | `repo:ai-worker-lab/crelink:ref:refs/heads/main` — main 브랜치에서 실행된 job만. Deploy(`workflow_run`·main 수동 실행)·Rollback(main만 허용)이 이 형식입니다 |
+| Subject | `repo:ai-worker-lab@271170671/crelink@1406726921:ref:refs/heads/main` — main 브랜치에서 실행된 job만. Deploy(`workflow_run`·main 수동 실행)·Rollback(main만 허용)이 이 형식입니다. 이 저장소는 GitHub의 불변 subject(`use_immutable_subject`)를 써서 조직·저장소 이름 뒤에 숫자 ID가 붙습니다. 접두사 확인: `gh api repos/ai-worker-lab/crelink/actions/oidc/customization/sub`의 `sub_claim_prefix`. 옛 형식 `repo:ai-worker-lab/crelink:…`로 두면 토큰 교환이 403입니다 |
 | Scope | `auth_keys` 쓰기, 태그 `tag:ci` |
 
 **Generate credential** 뒤 표시되는 **Client ID**와 **Audience**를 복사합니다(비밀 아님). 토큰 교환이 실패하면 같은 화면의 자격 증명 항목에 마지막 오류가 표시됩니다.

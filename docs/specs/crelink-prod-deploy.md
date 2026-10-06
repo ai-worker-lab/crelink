@@ -121,7 +121,7 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 
 ## 보안 경계와 한계
 
-- **GitHub Free 조직의 비공개 저장소**: 브랜치 보호·environment secrets·deployment branches가 없어 push 권한이 있으면 워크플로를 고쳐 모든 secret을 읽을 수 있습니다. 그래서 CI에는 앱 비밀값을 두지 않고, tailnet 진입은 Tailscale workload identity의 `sub` 조건(`repo:ai-worker-lab/crelink:ref:refs/heads/main`)으로 main 브랜치 job만 허용합니다. `DEPLOY_SSH_KEY`가 새도 tailnet 밖에서는 쓸 수 없고, tailnet 안에서도 forced command 세 가지만 됩니다.
+- **GitHub Free 조직의 비공개 저장소**: 브랜치 보호·environment secrets·deployment branches가 없어 push 권한이 있으면 워크플로를 고쳐 모든 secret을 읽을 수 있습니다. 그래서 CI에는 앱 비밀값을 두지 않고, tailnet 진입은 Tailscale workload identity의 `sub` 조건(`repo:ai-worker-lab@271170671/crelink@1406726921:ref:refs/heads/main`, GitHub 불변 subject 형식)으로 main 브랜치 job만 허용합니다. `DEPLOY_SSH_KEY`가 새도 tailnet 밖에서는 쓸 수 없고, tailnet 안에서도 forced command로 배포·롤백·상태 조회만 됩니다.
 - **main 병합 = 서버 실행 권한**: main의 `infra/prod/compose.yaml`이 서버에서 복호화된 비밀값과 함께 실행됩니다. main에 병합할 수 있는 사람(에이전트 포함)은 비밀값을 읽는 컨테이너를 넣을 수 있습니다. 운영자가 `infra/prod/` 변경을 리뷰하는 것이 통제 수단입니다(별도 운영 저장소 대안은 ADR 0010).
 - **docker 그룹 = root**: `deploy`는 docker 그룹이라 서버 root와 같습니다. 배포 키는 forced command(`restrict`, 셸·포워딩 없음)로 줄이고, 운영자 관리 접속은 Tailscale로 별도입니다.
 - **Tailscale Personal 무료 플랜은 비상업 조건**입니다. 상업 운영 전 Standard 등으로 바꿉니다. ephemeral 노드 사용량 한도도 이 플랜 기준입니다.
