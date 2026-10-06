@@ -4,7 +4,7 @@
 - 역할: orchestrator
 - 상위: 0024
 - 선행: 0028
-- 상태: 분류 대기
+- 상태: 진행
 - 종류: 운영
 - 우선순위: P1
 - 작성일: 2026-10-06
@@ -36,3 +36,7 @@
 ## 진행 기록
 
 - 2026-10-06: 생성.
+- 2026-10-06: 서버 준비(사용자 승인). 기존 `oci-server`(193.122.104.153, Ubuntu 26.04 ARM)를 씀. 배포 전용 사용자 `deploy`·ed25519 키 생성, 호스트 키를 기존 신뢰 지문과 대조해 GitHub secrets `OCI_HOST`·`OCI_USER`·`OCI_SSH_KEY`·`OCI_KNOWN_HOSTS` 등록(로컬 키 사본 삭제). `bootstrap.sh` 실행(Docker 기존 설치 유지). Supabase CA(`Supabase Root 2021 CA`, 2031-04-26 만료)를 `/opt/crelink/certs/supabase-ca.crt`에 둠. 서버에서 `verify-full`로 Supabase 세션 풀러 접속 확인(PostgreSQL 17.11, TLSv1.3). `/opt/crelink/.env`(사용자 `apps/api/.env.prod`의 DB·구글 값 + 운영 주소)·`/opt/edge/.env`(내부 토큰 새로 생성) 작성, 값은 출력하지 않음.
+- 2026-10-06: edge 전환. `/opt/edge` 배치·`caddy validate` 통과 → 기존 aichat Caddy 인증서 볼륨을 `edge_data`로 복사 → aichat Caddy 중지 → `edge-caddy-1` 기동(80·443). `aichat-api.shaul.kr`은 edge를 거쳐 aichat API로 전달되며, 응답 503은 aichat API 자체 헬스 응답(호스트 `127.0.0.1:3000`에서도 503)이라 전환과 무관. 확인 중 aichat Caddy 재시작 명령을 한 번 잘못 실행했으나 포트 충돌로 시작되지 않았고 edge에는 영향 없음(현재 `Exited`).
+- 2026-10-06: PR #1 CI: check 3종·smoke·`API 이미지 빌드`(amd64 러너에서 arm64 교차 빌드 3분 20초) 통과. `work scope`는 에픽 브랜치(역할 없음)라 실패(여러 역할 변경을 한 브랜치에 묶은 결과).
+- 남은 사용자 준비물: Cloudflare DNS(`go` A → 193.122.104.153 DNS only, `links` → Vercel), Vercel 프로젝트·토큰(`VERCEL_TOKEN`·`VERCEL_ORG_ID`·`VERCEL_PROJECT_ID`), Google 콘솔 리디렉션 URI `https://links.shaul.kr/auth/google/callback`.
