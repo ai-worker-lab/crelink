@@ -5,7 +5,7 @@
 # 결과를 대상 플랫폼($TARGETPLATFORM) 런타임에 그대로 옮기며, QEMU로 대상 플랫폼 명령을 실행하지 않습니다.
 # native 애드온이 있는 의존성을 추가하면 이 전제가 깨집니다. 설명: apps/api/docs/README.md#컨테이너-이미지
 
-FROM --platform=$BUILDPLATFORM node:22-slim AS build
+FROM --platform=$BUILDPLATFORM node:25-slim AS build
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
     PNPM_HOME=/pnpm \
     PATH=/pnpm:$PATH
@@ -26,7 +26,7 @@ RUN --mount=type=cache,id=crelink-pnpm-store,target=/pnpm/store \
     pnpm --filter @crelink/api build && \
     pnpm --filter @crelink/api deploy --prod --legacy /out
 
-FROM node:22-slim AS runtime
+FROM node:25-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 # 코드는 root 소유(읽기 전용)로 두고 실행은 node 사용자로 합니다. 업로드·GeoIP 볼륨 경로는 node가 쓸 수 있게 미리 만듭니다
