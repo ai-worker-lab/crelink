@@ -218,6 +218,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' -H 'Host: go.shaul.kr' http://127.0.0.
 
 - 종료 코드: 0 성공(마지막 줄 = `<릴리스> <API 이미지> <웹 이미지>`), 1 실패(직전 상태로 복구했거나 아무것도 바꾸지 않음), 2 복구도 실패(즉시 [11](#11-장애-대응)).
 - 서버에 남지 않은 오래된 릴리스로 가려면 main에서 해당 변경을 되돌리는 커밋을 병합해 새로 배포합니다.
+- 롤백 뒤 최신 커밋으로 다시 올리기: Deploy를 main에서 `force` 켜고 실행하거나(배포 기록 태그가 이미 최신이라 `force` 없이는 "변경 없음"으로 건너뜀), Rollback을 `release=<최신 SHA>`로 실행합니다.
 - DB migration은 롤백되지 않습니다. 이전 코드가 새 스키마에서 동작하도록 expand/contract를 지킵니다([설계](../../docs/specs/crelink-prod-deploy.md#db-migration-운영-규칙)).
 
 ## 8. GeoIP
