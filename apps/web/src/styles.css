@@ -578,6 +578,11 @@ textarea.input {
 .social-row > .field.grow {
   flex: 3 1 220px;
 }
+.social-row-icon {
+  width: 24px;
+  height: 24px;
+  margin-bottom: var(--ds-space-12);
+}
 .item-card {
   padding: var(--ds-space-16);
   border: 2px solid var(--ds-color-border-default);
@@ -894,6 +899,15 @@ textarea.input {
 .social-link:hover {
   border-color: var(--ds-color-action-primary);
   text-decoration: none;
+}
+/* SNS 아이콘 자산을 mask로 그려 글자색을 따른다(src/components/SocialIcon.tsx). 크기는 기본 22px. */
+.social-icon {
+  display: block;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  background-color: currentColor;
+  mask: var(--social-icon) center / contain no-repeat;
 }
 .link-list {
   display: flex;

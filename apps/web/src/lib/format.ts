@@ -32,13 +32,14 @@ export function recentRange(days: number): { from: string; to: string } {
   };
 }
 
-export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, { name: string; mark: string }> = {
-  instagram: { name: '인스타그램', mark: 'IG' },
-  youtube: { name: '유튜브', mark: 'YT' },
-  tiktok: { name: '틱톡', mark: 'TT' },
-  naver_blog: { name: '네이버 블로그', mark: 'N' },
-  x: { name: 'X', mark: 'X' },
-  threads: { name: '스레드', mark: '@' },
-  facebook: { name: '페이스북', mark: 'f' },
-  other: { name: '기타', mark: '↗' },
+/** SNS 플랫폼 이름과 아이콘 자산(`public/icons/sns/`, 출처는 apps/web/docs/sns-icons.md). */
+export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, { name: string; icon: string }> = {
+  instagram: { name: '인스타그램', icon: '/icons/sns/instagram.svg' },
+  youtube: { name: '유튜브', icon: '/icons/sns/youtube.svg' },
+  tiktok: { name: '틱톡', icon: '/icons/sns/tiktok.svg' },
+  naver_blog: { name: '네이버 블로그', icon: '/icons/sns/naver_blog.svg' },
+  x: { name: 'X', icon: '/icons/sns/x.svg' },
+  threads: { name: '스레드', icon: '/icons/sns/threads.svg' },
+  facebook: { name: '페이스북', icon: '/icons/sns/facebook.svg' },
+  other: { name: '기타', icon: '/icons/sns/other.svg' },
 };

@@ -15,6 +15,8 @@ Next.js App Router와 TypeScript 기반 크리링(CreLink) 웹 클라이언트�
 | `/privacy` | 개인정보 수집·보관·쿠키 고지(법률 검토 전 문구) |
 | `/admin`, `/admin/creators/[userId]`, `/admin/blocked-domains` | 운영자 화면. 401이면 `/`, 403이면 권한 없음 안내 |
 
+SNS 채널 아이콘 자산의 출처·상표 사용 규칙은 [SNS 채널 아이콘](docs/sns-icons.md)에 있습니다.
+
 ## BFF(`src/app/api/backend/[...path]/route.ts`)
 
 - 허용 목록(메서드·경로)에 있는 요청만 전달하고 나머지는 404 `route_not_allowed`입니다. 로그인 시작·콜백은 BFF가 아니라 위 route handler가 부릅니다.

@@ -42,6 +42,7 @@ crelink이 의존하는 외부 SaaS와 개발 도구를 한곳에서 찾기 위�
 | Google OAuth 2.0 / OpenID Connect | SaaS | 사용 중(키는 사용자가 발급, 없으면 로그인 503) | 크리에이터·운영자 구글 로그인(R15). `google-auth-library`로 code 교환·ID 토큰 검증 | [MVP 기술 설계](../specs/crelink-mvp.md), [API 문서](../../apps/api/docs/README.md#환경변수), [로컬 개발 환경](../development/local-environment.md#크리링-로컬-설정) |
 | DB-IP IP to City Lite (MMDB) | 데이터(CC BY 4.0) | 선택 | 방문·클릭 IP의 국가·도시(R9). 결과를 쓰는 웹 `/privacy`에 출처 링크 필요. 파일이 없으면 위치는 비움 | `scripts/geoip.mjs`, [로컬 개발 환경](../development/local-environment.md#크리링-로컬-설정) |
 | 링크된 외부 사이트의 `favicon.ico` | 외부 사이트 | 사용 중 | 랜딩·편집 화면의 사이트 아이콘(R5). 방문자 브라우저가 직접 요청 | [MVP 기술 설계](../specs/crelink-mvp.md#화면-상태와-api-대응) |
+| Simple Icons(`simple-icons` 16.34.0의 SVG) · 각 SNS 브랜드 로고 | 데이터(CC0-1.0) · 상표 | 사용 중 | SNS 채널 아이콘 자산(R12). 저장소에 SVG를 복사해 두며 패키지 의존성은 없음. 상표권은 각 회사 | [SNS 채널 아이콘](../../apps/web/docs/sns-icons.md), `apps/web/public/icons/sns/` |
 
 ## AI 작업 도구
 

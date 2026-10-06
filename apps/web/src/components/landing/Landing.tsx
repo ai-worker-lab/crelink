@@ -4,6 +4,7 @@ import { SOCIAL_PLATFORM_LABELS } from '../../lib/format';
 import { DefaultAvatar } from '../DefaultAvatar';
 import { Favicon } from '../Favicon';
 import { RemoteImage } from '../RemoteImage';
+import { SocialIcon } from '../SocialIcon';
 
 /**
  * 크리에이터 랜딩페이지 본문(프로필 머리·SNS·리스트형 링크 구역·포트폴리오). 공개 랜딩(`/p/{publicId}`)과
@@ -57,9 +58,7 @@ export function Landing({
           {landing.socials.map((social, index) => (
             <li key={`${social.platform}-${index}`}>
               <a className="social-link" href={social.url} rel="noopener">
-                <span className="social-mark" aria-hidden="true">
-                  {SOCIAL_PLATFORM_LABELS[social.platform].mark}
-                </span>
+                <SocialIcon platform={social.platform} />
                 <span className="visually-hidden">{SOCIAL_PLATFORM_LABELS[social.platform].name}</span>
               </a>
             </li>

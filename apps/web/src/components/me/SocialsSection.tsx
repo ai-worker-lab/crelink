@@ -13,6 +13,7 @@ import { browserApi } from '../../lib/api/browser';
 import { SOCIAL_PLATFORM_LABELS } from '../../lib/format';
 import { useAction } from '../../lib/use-action';
 import { ActionStatus } from '../ActionStatus';
+import { SocialIcon } from '../SocialIcon';
 
 interface Row extends SocialLinkView {
   key: number;
@@ -62,6 +63,7 @@ export function SocialsSection({ socials, reload }: { socials: SocialLinkView[];
         <ul className="edit-list">
           {rows.map((row, index) => (
             <li key={row.key} className="social-row">
+              <SocialIcon platform={row.platform} className="social-row-icon" />
               <div className="field">
                 <label htmlFor={`${baseId}-platform-${row.key}`}>플랫폼 {index + 1}</label>
                 <select
