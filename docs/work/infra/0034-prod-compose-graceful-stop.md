@@ -4,7 +4,7 @@
 - 역할: infra
 - 상위: 0031
 - 선행: 0032
-- 상태: 검증
+- 상태: 완료
 - 종류: 운영
 - 우선순위: P1 (AI 제안)
 - 작성일: 2026-10-07
@@ -17,9 +17,9 @@ blue/green(0035) 전에 단독으로 배포할 수 있는 0단계입니다. 지�
 
 - [x] `infra/prod/compose.yaml`의 api·web에 `stop_grace_period: 30s`를 둔다(기본 10초. 진행 중 요청을 마칠 시간, Cloudflare 524 한도 100초보다 충분히 짧음).
 - [x] api·web healthcheck에 `start_interval: 1s`를 둔다. compose에 `test`를 다시 쓰지 않고 이미지 `HEALTHCHECK`의 test·interval·start-period를 그대로 쓰는지 `docker inspect --format '{{json .Config.Healthcheck}}'`로 확인한다. 상속되지 않으면 compose에 test를 복사하지 말고 Dockerfile `HEALTHCHECK --start-interval=1s`(api·web 소유) 변경을 진행 기록에 인계한다[추정: 상속 여부 미확인].
-- [ ] `DATABASE_POOL_MAX` 운영값을 정해 넣는다. 사용자가 Supabase 대시보드(Database Settings → Connection pooling)의 Pool Size를 확인해 알려 주면 `2 × 값 ≤ Pool Size − 2`를 만족하는 값으로 둔다. 기본안: 모든 대상이 같은 Supabase를 쓰므로 `api.environment`에 고정하고 주석에 식과 확인한 Pool Size·날짜를 남긴다. 대상별로 달라지면 암호문 평문 키로 옮긴다(`.sops.yaml` `unencrypted_regex` 변경은 orchestrator 몫).
+- [x] `DATABASE_POOL_MAX` 운영값을 정해 넣는다. 사용자가 Supabase 대시보드(Database Settings → Connection pooling)의 Pool Size를 확인해 알려 주면 `2 × 값 ≤ Pool Size − 2`를 만족하는 값으로 둔다. 기본안: 모든 대상이 같은 Supabase를 쓰므로 `api.environment`에 고정하고 주석에 식과 확인한 Pool Size·날짜를 남긴다. 대상별로 달라지면 암호문 평문 키로 옮긴다(`.sops.yaml` `unencrypted_regex` 변경은 orchestrator 몫).
 - [x] `CRELINK_APP_ENV=/dev/null docker compose -f infra/prod/compose.yaml --env-file infra/prod/images.env.example config --quiet`, `infra/prod/tests/*.sh` 통과.
-- [ ] 운영 배포 뒤(main 병합 → 자동 배포) 서버에서 `127.0.0.1:18080`에 0.2초 간격 curl 루프를 걸고 배포 1회의 502 구간 길이를 이전(약 30~40초)과 비교해 진행 기록에 남긴다. 배포는 트래픽이 적은 시각에 한다.
+- [x] 운영 배포 뒤(main 병합 → 자동 배포) 서버에서 `127.0.0.1:18080`에 0.2초 간격 curl 루프를 걸고 배포 1회의 502 구간 길이를 이전(약 30~40초)과 비교해 진행 기록에 남긴다. 배포는 트래픽이 적은 시각에 한다.
 - [x] `infra/docs/prod-runbook.md`(값 표·종료 유예 설명), `infra/CHANGELOGS.md`.
 
 ## 범위
@@ -57,3 +57,10 @@ blue/green(0035) 전에 단독으로 배포할 수 있는 0단계입니다. 지�
   - 실패는 대부분 `000`(caddy 재생성으로 리스너 없음, 운영에서는 cloudflared가 502로 응답)이고 `502`는 회당 2~5건. 공백은 배포 시작 0.2초 뒤부터 api·web 헬스 통과 뒤 caddy가 다시 뜰 때까지라 0035(caddy 고정)에서 없어질 몫입니다. 운영 값은 실제 api 기동(migration 포함)·Next 기동 시간에 따라 다릅니다.
   - 위험·복구 3번째 항목(0032 전 이미지는 SIGTERM 무시 → 30초 뒤 SIGKILL)과 달리, 핸들러가 없는 node는 tini가 넘긴 SIGTERM에 바로 끝나 `stop_grace_period`가 정지를 늦추지 않았습니다(위 "핸들러 없음" 2회 모두 배포 명령 17~20초). 실제 API 이미지(Nest, `enableShutdownHooks` 없음)도 같을 것으로 봅니다[추정]. 그래도 병합 순서는 0032 선행을 유지합니다.
 - 2026-10-07: 검증 [실측]: `config --quiet` 통과, `bash -n`·`shellcheck -x infra/prod/*.sh infra/prod/tests/*.sh` 통과, `tests/caddy-routing.sh` 통과 42·실패 0, `tests/deploy-rollback.sh` 통과 88·실패 0(헬스체크 상속 확인 2건 포함), `measure-gap.sh` 단독 확인(`-d`·SIGTERM·`-- 명령` 종료, 잘못된 인자 종료 2), `pnpm verify` 통과 8·실패 0(worktree 인스턴스 DB). 남은 것(통합 담당): 암호문에 `DATABASE_POOL_MAX=6` 추가와 정규식 변경 뒤 재암호화(런북 12·9-2), Supabase Pool Size 대시보드 확인, 서버 Docker Engine 25 이상 확인(`docker version`), 0032 이미지 배포 뒤 병합·운영 배포 1회 공백 측정(런북 6-1)과 `pg_stat_activity` 확인.
+- 2026-10-07: 운영 적용(통합 담당). 0032~0034를 통합 브랜치(`work/0036-…`, PR #13)로 병합 → 자동 배포(run, 릴리스 `433dc88`) 성공. 서버 Docker Engine 29.8.1.
+  - `DATABASE_POOL_MAX=6`은 compose 고정 대신 암호문 평문 키로 넣음(`.sops.yaml` 정규식 추가·재암호화). 근거: 운영 DB `max_connections` 60(Supabase Nano/Micro compute), 그 compute의 Supavisor 기본 Pool Size 15로 보고 `2×6=12 ≤ 15−2`. Pool Size 자체는 대시보드 확인 전이라 `[추정]`(사용자 확인 대기). 배포 뒤 운영 api `DATABASE_POOL_MAX=6`, `pg_stat_activity` 전체 15·이 사용자 3.
+  - 컨테이너 설정 확인: api `StopTimeout` 30, healthcheck `StartInterval` 1s.
+  - 공백 측정 [실측](서버 `measure-gap.sh -r 5`, 대상 go `/zzzz`·links `/privacy`·links BFF health, 이미지가 바뀌는 릴리스 전환):
+    - 0단계 전(2026-10-07 같은 날, `021f81e`↔`d098c73` 롤백 2회, 0.2초 curl 루프): 최장 연속 실패 12.9초·12.9초.
+    - 0단계 뒤 graceful 이미지에서 전환(`433dc88`→`021f81e`): 12.6초(대부분 `000`, 502 1~3건). 그 반대(`021f81e`→`433dc88`, 옛 이미지 정지): 15.6초.
+    - 사용자가 본 30~40초는 공개 주소(Cloudflare 경유) 체감이고 원본(`127.0.0.1:18080`) 기준으로는 약 13초. 0단계는 진행 중 요청을 지키지만 공백 길이는 거의 그대로: 공백의 대부분은 caddy 재생성과 api·web 정지→기동 순서(이번 배포 기준 api 기동 → 2.7초 뒤 web → 1.7초 뒤 caddy)이고, 0035(고정 edge Caddy + blue/green)에서 없어질 몫입니다.
