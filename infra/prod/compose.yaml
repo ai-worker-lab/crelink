@@ -48,10 +48,12 @@ services:
       - path: ${CRELINK_APP_ENV:-/run/crelink/app.env}
     # PID 1이 node라 신호 전달·좀비 정리를 위해 init을 둡니다. HEALTHCHECK는 이미지(apps/api/Dockerfile) 것을 씁니다.
     init: true
+    environment:
+      # 업로드는 S3 호환 저장소만 씁니다(app.env의 S3_*, 런북 9). 이 compose에는 uploads 볼륨이 없어 disk면 이미지가 컨테이너 안에만
+      # 저장되고 다음 배포에 사라지므로 app.env 값과 관계없이 s3로 고정합니다(environment가 env_file보다 우선). disk로 되돌리기는
+      # uploads 볼륨이 있는 릴리스로 롤백합니다(런북 9-4·9-5).
+      FILE_STORAGE: s3
     volumes:
-      # 업로드 저장소는 app.env의 FILE_STORAGE가 고릅니다. s3면 api가 S3_ENDPOINT(https://s3.shaul.kr)로 나가며 이 볼륨을 쓰지 않습니다.
-      # disk(기본)면 UPLOAD_DIR=/data/uploads가 이 볼륨입니다. s3 전환·이전이 끝나면 런북 9-5로 이 줄과 아래 volumes.uploads를 함께 뺍니다.
-      - uploads:/data/uploads
       - geoip:/data/geoip:ro
       # Supabase 루트 CA(공개 인증서). app.env의 DATABASE_SSL_CA_PATH가 /etc/crelink/certs/supabase-ca.crt를 가리킵니다.
       - ./certs:/etc/crelink/certs:ro
@@ -83,5 +85,4 @@ services:
     logging: *logging
 
 volumes:
-  uploads:
   geoip:

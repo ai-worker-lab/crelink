@@ -8,7 +8,7 @@ CD 워크플로(`.github/workflows/deploy.yml`)는 이 폴더에서 `tests/`·`R
 
 | 파일 | 내용 |
 | --- | --- |
-| `compose.yaml` | Compose project `crelink-prod`: `caddy`(호스트 `127.0.0.1:${CRELINK_HTTP_PORT:-18080}`만), `api`(`${API_IMAGE}`, 볼륨 uploads(`FILE_STORAGE=disk`일 때만 사용, S3 전환·이전 뒤 제거)·geoip(ro)·`./certs`(ro), `env_file` = 복호화한 `/run/crelink/app.env`), `web`(`${WEB_IMAGE}`, `API_INTERNAL_URL=http://api:3000`), 도구 프로필 `geoip-writer`. 헬스체크는 각 이미지의 `HEALTHCHECK` |
+| `compose.yaml` | Compose project `crelink-prod`: `caddy`(호스트 `127.0.0.1:${CRELINK_HTTP_PORT:-18080}`만), `api`(`${API_IMAGE}`, `FILE_STORAGE=s3` 고정(업로드는 S3, 볼륨 없음), 볼륨 geoip(ro)·`./certs`(ro), `env_file` = 복호화한 `/run/crelink/app.env`), `web`(`${WEB_IMAGE}`, `API_INTERNAL_URL=http://api:3000`), 도구 프로필 `geoip-writer`. 헬스체크는 각 이미지의 `HEALTHCHECK` |
 | `Caddyfile` | 공개 정책: `go.shaul.kr`은 `GET /{slug}`·`GET /c/{id}`만 api, 나머지 404. `links.shaul.kr`은 전부 web(본문 6MB). `CF-Connecting-IP`(사설 대역에서 온 것만)를 방문자 IP로 `X-Forwarded-For`에 넣음 |
 | `targets.json` | 배포 대상 목록(`name`·`host`(Tailscale MagicDNS)·`platform`·`enabled`). 워크플로가 대상 matrix와 이미지 플랫폼을 여기서 정함 |
 | `secrets/<대상>.sops.env` | 대상별 앱 설정·비밀값(SOPS + age 암호문, 비밀이 아닌 키는 평문). 규칙은 루트 `.sops.yaml` |

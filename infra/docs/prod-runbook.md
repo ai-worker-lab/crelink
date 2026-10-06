@@ -18,7 +18,7 @@
 | 스택 입구 | `127.0.0.1:18080`(caddy). cloudflared가 여기로 보냄 |
 | 비밀값 원본 | `infra/prod/secrets/<대상>.sops.env`(SOPS + age, 수신자는 `.sops.yaml`) |
 | 운영자 age 키 | macOS 키체인 서비스 `crelink-sops-age`, 계정 `operator` + 운영자 비밀번호 관리자 백업 |
-| 업로드 저장소 | 암호문 `FILE_STORAGE`(`s3`: SeaweedFS `https://s3.shaul.kr` 버킷 `crelink-uploads`, 없거나 `disk`: 볼륨 `crelink-prod_uploads`). [9](#9-업로드-저장소) |
+| 업로드 저장소 | `s3`(compose `api.environment`의 `FILE_STORAGE=s3` 고정): SeaweedFS `https://s3.shaul.kr` 버킷 `crelink-uploads`, 접근 키는 암호문 `S3_*`. 볼륨 `crelink-prod_uploads`는 쓰지 않음. [9](#9-업로드-저장소) |
 | GitHub | variables `TS_OIDC_CLIENT_ID`·`TS_OIDC_AUDIENCE`, secret `DEPLOY_SSH_KEY`. 그 밖의 배포 secret 없음 |
 
 ## 1. 서버 준비 (bootstrap)
@@ -232,7 +232,7 @@ sudo crontab -u deploy -e   # 매월 3일 04:17 UTC: 17 4 3 * * /opt/crelink/cur
 
 ## 9. 업로드 저장소
 
-업로드 이미지는 API 설정 `FILE_STORAGE`로 고른 저장소에 있습니다([API 문서 "이미지 저장소"](../../apps/api/docs/README.md#이미지-저장소)). 운영 목표는 `s3`(SeaweedFS `https://s3.shaul.kr`, 버킷 `crelink-uploads`)이고, `disk`면 서버 볼륨 `crelink-prod_uploads`(api `/data/uploads`, 소유 uid 1000)입니다. 지금 어느 쪽인지는 그 릴리스 암호문의 평문 키 `FILE_STORAGE`(없으면 `disk`)와 api 기동 로그(`s3`면 `[S3FileStorage] 파일 저장소 s3 확인: …`)로 봅니다. 키(DB `files.storage_key`)는 UUID라 두 저장소 사이에서 그대로 옮길 수 있습니다.
+업로드 이미지는 API 설정 `FILE_STORAGE`로 고른 저장소에 있습니다([API 문서 "이미지 저장소"](../../apps/api/docs/README.md#이미지-저장소)). 운영은 `s3`(SeaweedFS `https://s3.shaul.kr`, 버킷 `crelink-uploads`)이고 지금 compose가 `api.environment`로 고정합니다(볼륨 없음). 그보다 앞선 릴리스는 암호문의 평문 키 `FILE_STORAGE`(없으면 `disk`)를 따르고, `disk`면 서버 볼륨 `crelink-prod_uploads`(api `/data/uploads`, 소유 uid 1000)입니다. 실제 저장소는 api 기동 로그(`s3`면 `[S3FileStorage] 파일 저장소 s3 확인: …`)로 봅니다. 키(DB `files.storage_key`)는 UUID라 두 저장소 사이에서 그대로 옮길 수 있습니다.
 
 | 항목 | 값 |
 | --- | --- |
@@ -313,13 +313,13 @@ s3 s3 sync /data s3://crelink-uploads --no-progress                             
 
 ### 9-4. 되돌리기(S3 → 디스크)
 
-1. GitHub Actions **Rollback**으로 `FILE_STORAGE=s3` 이전 릴리스를 고르거나, 암호문의 `FILE_STORAGE`를 `disk`로 바꿔 병합합니다(어느 쪽이든 그 릴리스 compose에 `uploads` 볼륨이 있어야 합니다).
-2. 전환 뒤 버킷에만 올라온 파일을 볼륨으로 복사합니다: 9-3의 `key`·`s3` 함수를 준비하고 `MODE=rw s3 s3 sync s3://crelink-uploads /data --no-progress` 후 `sudo docker run --rm -v crelink-prod_uploads:/data alpine:3.22 chown -R 1000:1000 /data`.
+1. GitHub Actions **Rollback**으로 `uploads` 볼륨이 있고 `FILE_STORAGE=s3`가 아닌 릴리스를 고릅니다(지금 compose는 `s3`를 고정하므로 암호문만 `disk`로 바꾸는 것으로는 되돌아가지 않습니다). 서버에 남은 릴리스가 없으면 그런 compose·암호문으로 되돌리는 커밋을 병합합니다.
+2. 전환 뒤 버킷에만 올라온 파일을 볼륨으로 복사합니다: 9-3의 `key`·`s3` 함수를 준비하고 `MODE=rw s3 s3 sync s3://crelink-uploads /data --no-progress` 후 `sudo docker run --rm -v crelink-prod_uploads:/data alpine:3.22 chown -R 1000:1000 /data`(볼륨을 지웠다면 이 명령이 빈 볼륨을 새로 만듭니다).
 3. 확인은 9-3의 5번(이미지 200·새 업로드가 볼륨에 생김)과 같습니다.
 
 ### 9-5. 전환 뒤 볼륨 정리
 
-`s3` 운영이 안정되면(운영 확인 뒤, 볼륨이 9-3 동기화 이후 바뀌지 않음) compose에서 `uploads` 볼륨(api 마운트와 `volumes:` 항목)을 뺀 릴리스를 배포합니다. 배포 뒤 `sudo docker volume rm crelink-prod_uploads`로 지웁니다(볼륨 파일이 있었다면 9-6 백업을 먼저). 볼륨을 뺀 뒤에는 `disk`로 되돌리려면 `uploads` 볼륨이 있는 릴리스로 롤백하고(빈 볼륨이 새로 생김) 9-4의 2번으로 버킷에서 복사합니다. 볼륨 없는 compose에서 `FILE_STORAGE=disk`를 쓰면 이미지가 컨테이너 안에만 저장되어 다음 배포에 사라지므로, 두 설정은 같은 릴리스에서만 바꿉니다.
+compose에서는 `uploads` 볼륨을 뺐고 `FILE_STORAGE=s3`를 고정했습니다(볼륨 없이 `disk`로 뜨면 이미지가 컨테이너 안에만 저장되어 다음 배포에 사라지므로). 9-3 확인이 끝나고 볼륨이 동기화 이후 바뀌지 않았으면 서버에 남은 볼륨을 지웁니다: 볼륨 파일이 있었다면 9-6 백업을 먼저 하고 `sudo docker volume rm crelink-prod_uploads`. 볼륨이 있던 릴리스로 롤백하면 빈 볼륨이 새로 생기므로 9-4의 2번으로 버킷에서 복사합니다.
 
 ### 9-6. 볼륨 백업·복구(`disk`인 동안)
 

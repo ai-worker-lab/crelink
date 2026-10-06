@@ -36,7 +36,7 @@ flowchart LR
 | 관리·배포 접속 | Tailscale. CI는 임시 노드(`tag:ci`)로 서버 `deploy` 사용자 SSH(22)만 |
 | DB | Supabase 프로젝트 1개(prod 전용). `DATABASE_URL` = Supavisor 세션 모드(5432), TLS `verify-full` |
 | 이미지 | `ghcr.io/ai-worker-lab/crelink-api:<SHA>`(`apps/api/Dockerfile`), `ghcr.io/ai-worker-lab/crelink-web:<SHA>`(`apps/web/Dockerfile`, Next.js `output: 'standalone'`) |
-| 업로드 저장소 | `FILE_STORAGE=s3`: SeaweedFS(home-server의 별도 스택 [home-seaweedfs](https://github.com/shaul1991/home-seaweedfs)) `https://s3.shaul.kr`, 버킷 `crelink-uploads`, identity `crelink`(버킷 범위 읽기·쓰기). 전환 전·되돌리기는 `disk`(볼륨 `crelink-prod_uploads`). 절차: [런북 9](../../infra/docs/prod-runbook.md#9-업로드-저장소) |
+| 업로드 저장소 | `FILE_STORAGE=s3`(compose `api.environment`로 고정): SeaweedFS(home-server의 별도 스택 [home-seaweedfs](https://github.com/shaul1991/home-seaweedfs)) `https://s3.shaul.kr`, 버킷 `crelink-uploads`, identity `crelink`(버킷 범위 읽기·쓰기). 볼륨 `crelink-prod_uploads`(`disk`)는 쓰지 않으며 되돌리기는 볼륨이 있던 릴리스로 롤백. 절차: [런북 9](../../infra/docs/prod-runbook.md#9-업로드-저장소) |
 
 스택은 대상 서버의 다른 서비스(home-server의 호스트 Caddy 등)와 독립입니다. 호스트에 여는 포트는 caddy의 `127.0.0.1:${CRELINK_HTTP_PORT:-18080}` 하나입니다.
 
@@ -66,16 +66,17 @@ flowchart LR
 | `/run/crelink/` | tmpfs(systemd-tmpfiles, deploy 0700). 복호화한 `app.env`를 compose 실행 동안만 둠 |
 | `/usr/local/lib/crelink/ssh-entry.sh` | `deploy` SSH forced command(root 소유, `bootstrap.sh`만 설치) |
 
-- Compose project 이름은 `crelink-prod`로 고정이라 릴리스 폴더가 바뀌어도 볼륨 `crelink-prod_uploads`·`crelink-prod_geoip`가 유지됩니다. `uploads`는 `FILE_STORAGE=disk`일 때만 쓰며 S3 전환·이전 뒤 compose에서 뺍니다([런북 9-5](../../infra/docs/prod-runbook.md#9-5-전환-뒤-볼륨-정리)).
-- 서비스: `caddy`(`caddy:2.11.7-alpine`, 읽기 전용 루트), `api`(이미지 HEALTHCHECK `/api/health/ready`(DB만, 업로드 저장소 제외), 볼륨 uploads·geoip(ro)·`./certs`(ro)), `web`(이미지 HEALTHCHECK `/privacy`, 읽기 전용 루트), 도구 프로필 `geoip-writer`(`alpine:3.22`, `geoip.sh`만 사용). `caddy`는 `api`·`web`이 healthy일 때 뜹니다.
+- Compose project 이름은 `crelink-prod`로 고정이라 릴리스 폴더가 바뀌어도 볼륨 `crelink-prod_geoip`가 유지됩니다. 업로드 볼륨 `crelink-prod_uploads`는 S3 전환과 함께 compose에서 뺐습니다(서버의 남은 볼륨 삭제는 [런북 9-5](../../infra/docs/prod-runbook.md#9-5-전환-뒤-볼륨-정리)).
+- 서비스: `caddy`(`caddy:2.11.7-alpine`, 읽기 전용 루트), `api`(이미지 HEALTHCHECK `/api/health/ready`(DB만, 업로드 저장소 제외), `FILE_STORAGE=s3` 고정, 볼륨 geoip(ro)·`./certs`(ro)), `web`(이미지 HEALTHCHECK `/privacy`, 읽기 전용 루트), 도구 프로필 `geoip-writer`(`alpine:3.22`, `geoip.sh`만 사용). `caddy`는 `api`·`web`이 healthy일 때 뜹니다.
 
 ## 비밀값과 환경변수
 
 | 위치 | 키 | 비고 |
 | --- | --- | --- |
 | `infra/prod/secrets/<대상>.sops.env`(암호화) | `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPERATOR_EMAILS`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | API가 읽음(compose `env_file` = `/run/crelink/app.env`). S3 키 원본은 서버 `/opt/seaweedfs/config/s3.json`의 identity `crelink` |
-| 같은 파일(평문, `.sops.yaml`의 `unencrypted_regex`) | `PORT=3000`, `WEB_URL`, `SHORT_LINK_BASE_URL`, `DATABASE_SSL=verify-full`, `DATABASE_SSL_CA_PATH=/etc/crelink/certs/supabase-ca.crt`, `FILE_STORAGE=s3`, `S3_ENDPOINT=https://s3.shaul.kr`, `S3_REGION=us-east-1`, `S3_BUCKET=crelink-uploads`, `UPLOAD_DIR=/data/uploads`(`disk` 되돌리기용), `GEOIP_MMDB_PATH=/data/geoip/dbip-city-lite.mmdb`, `TRUSTED_PROXY_HOPS=1` | diff로 검토할 수 있게 평문. 정규식을 바꾸면 그 파일을 한 번 다시 암호화합니다([런북 9-2](../../infra/docs/prod-runbook.md#9-2-암호문에-키-넣기)) |
+| 같은 파일(평문, `.sops.yaml`의 `unencrypted_regex`) | `PORT=3000`, `WEB_URL`, `SHORT_LINK_BASE_URL`, `DATABASE_SSL=verify-full`, `DATABASE_SSL_CA_PATH=/etc/crelink/certs/supabase-ca.crt`, `FILE_STORAGE=s3`, `S3_ENDPOINT=https://s3.shaul.kr`, `S3_REGION=us-east-1`, `S3_BUCKET=crelink-uploads`, `UPLOAD_DIR=/data/uploads`(볼륨이 있던 릴리스로 롤백할 때용), `GEOIP_MMDB_PATH=/data/geoip/dbip-city-lite.mmdb`, `TRUSTED_PROXY_HOPS=1` | diff로 검토할 수 있게 평문. 정규식을 바꾸면 그 파일을 한 번 다시 암호화합니다([런북 9-2](../../infra/docs/prod-runbook.md#9-2-암호문에-키-넣기)) |
 | `infra/prod/certs/supabase-ca.crt` | Supabase 루트 CA(공개 인증서) | api 컨테이너 `/etc/crelink/certs`에 읽기 전용 마운트 |
+| `compose.yaml` `api.environment` | `FILE_STORAGE=s3` | `env_file`보다 우선. uploads 볼륨이 없는 compose에서 `disk`로 기동해 이미지가 컨테이너 안에만 저장되는 일을 막음 |
 | `compose.yaml` `web.environment` | `API_INTERNAL_URL=http://api:3000` | `API_INTERNAL_TOKEN`은 두지 않음 |
 | `compose.yaml` 변수 기본값 | `CRELINK_HTTP_PORT`(18080), `CRELINK_SHORT_HOST`(`go.shaul.kr`), `CRELINK_WEB_HOST`(`links.shaul.kr`) | 지금은 기본값만 씀. 대상별로 달라지면 전달 경로를 추가(후속) |
 | 서버 `state/images.env` | `API_IMAGE`, `WEB_IMAGE` | `deploy.sh`·`rollback.sh`만 씀. 형식 `infra/prod/images.env.example` |
