@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "WEB_PORT=${WEB_PORT:-$(node ../../scripts/instance.mjs --get WEB_PORT)} && next dev --port $WEB_PORT",
+    "start": "WEB_PORT=${WEB_PORT:-$(node ../../scripts/instance.mjs --get WEB_PORT)} && NEXT_DIST_DIR=.next-dev next dev --port $WEB_PORT",
     "build": "next build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@crelink/design-tokens": "workspace:*",

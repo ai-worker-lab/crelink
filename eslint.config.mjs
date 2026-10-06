@@ -34,6 +34,7 @@ export default defineConfig([
     '**/node_modules/',
     '**/dist/',
     '**/.next/',
+    '**/.next-dev/',
     '**/.expo/',
     '.local/',
     'design/',

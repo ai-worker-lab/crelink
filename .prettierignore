@@ -7,6 +7,7 @@ design/
 .local/
 **/dist/
 **/.next/
+**/.next-dev/
 **/.expo/
 apps/web/next-env.d.ts
 apps/app/expo-env.d.ts
