@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { resolve } from 'node:path';
 
-/** `NODE_ENV=production`에서 비어 있으면 기동을 거부하는 키. 근거: docs/specs/crelink-prod-deploy.md#환경변수 */
+/** `NODE_ENV=production`에서 비어 있으면 기동을 거부하는 공통 키. 저장소 키(`UPLOAD_DIR` 또는 `S3_REQUIRED_KEYS`)는 `FILE_STORAGE`에 따라 더합니다. 근거: docs/specs/crelink-prod-deploy.md#비밀값과-환경변수 */
 export const PRODUCTION_REQUIRED_KEYS = [
   'DATABASE_URL',
   'PORT',
@@ -10,8 +10,58 @@ export const PRODUCTION_REQUIRED_KEYS = [
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
   'OPERATOR_EMAILS',
-  'UPLOAD_DIR',
 ] as const;
+
+/** `FILE_STORAGE` 값. 비면 `disk`(로컬 디스크 `UPLOAD_DIR`), `s3`면 S3 호환 저장소. */
+export const FILE_STORAGE_KINDS = ['disk', 's3'] as const;
+export type FileStorageKind = (typeof FILE_STORAGE_KINDS)[number];
+
+/** `FILE_STORAGE=s3`에 필요한 키. `S3_REGION`은 비면 `us-east-1`이라 여기 없습니다. */
+export const S3_REQUIRED_KEYS = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'] as const;
+export const S3_DEFAULT_REGION = 'us-east-1';
+
+export interface S3StorageConfig {
+  /** path-style로 부르는 엔드포인트(예: `https://s3.shaul.kr`). 끝의 `/`는 뺍니다. */
+  endpoint: string;
+  region: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+}
+
+export type FileStorageConfig = { kind: 'disk' } | ({ kind: 's3' } & S3StorageConfig);
+
+/** `FILE_STORAGE`: 비면 `disk`, `disk`·`s3`가 아니면 오류. */
+export function parseFileStorageKind(value: string | undefined): FileStorageKind {
+  const text = value?.trim() || 'disk';
+  if (!(FILE_STORAGE_KINDS as readonly string[]).includes(text)) {
+    throw new Error(`FILE_STORAGE는 ${FILE_STORAGE_KINDS.join(' 또는 ')}여야 합니다(기본 disk).`);
+  }
+  return text as FileStorageKind;
+}
+
+/**
+ * 파일 저장소 설정. `s3`인데 필수 키가 비거나 `S3_ENDPOINT`가 http(s) URL이 아니면 오류입니다.
+ * 비밀값이 섞이지 않도록 오류에는 키 이름만 넣습니다.
+ */
+export function parseFileStorageConfig(env: NodeJS.ProcessEnv): FileStorageConfig {
+  const kind = parseFileStorageKind(env.FILE_STORAGE);
+  if (kind === 'disk') return { kind };
+  const missing = S3_REQUIRED_KEYS.filter((key) => !env[key]?.trim());
+  if (missing.length) throw new Error(`FILE_STORAGE=s3에는 ${missing.join(', ')}가 필요합니다.`);
+  const endpoint = env.S3_ENDPOINT!.trim().replace(/\/+$/, '');
+  if (!URL.canParse(endpoint) || !['http:', 'https:'].includes(new URL(endpoint).protocol)) {
+    throw new Error('S3_ENDPOINT는 http(s) URL이어야 합니다(예: https://s3.shaul.kr).');
+  }
+  return {
+    kind,
+    endpoint,
+    region: env.S3_REGION?.trim() || S3_DEFAULT_REGION,
+    bucket: env.S3_BUCKET!.trim(),
+    accessKeyId: env.S3_ACCESS_KEY_ID!.trim(),
+    secretAccessKey: env.S3_SECRET_ACCESS_KEY!.trim(),
+  };
+}
 
 /**
  * 운영 설정 문제 목록. `NODE_ENV=production`이 아니면 빈 목록입니다(로컬·테스트 영향 없음).
@@ -19,14 +69,23 @@ export const PRODUCTION_REQUIRED_KEYS = [
  */
 export function productionConfigProblems(env: NodeJS.ProcessEnv): string[] {
   if (env.NODE_ENV !== 'production') return [];
-  const missing = PRODUCTION_REQUIRED_KEYS.filter((key) =>
+  let storage: FileStorageKind | null = null;
+  try {
+    storage = parseFileStorageKind(env.FILE_STORAGE);
+  } catch {
+    // 아래 문제 목록에 넣습니다.
+  }
+  const storageKeys = storage === 's3' ? S3_REQUIRED_KEYS : storage === 'disk' ? ['UPLOAD_DIR'] : [];
+  const missing = [...PRODUCTION_REQUIRED_KEYS, ...storageKeys].filter((key) =>
     key === 'OPERATOR_EMAILS' ? !parseOperatorEmails(env[key]).size : !env[key]?.trim(),
   );
-  const notHttps = (['WEB_URL', 'SHORT_LINK_BASE_URL'] as const).filter((key) => {
+  const httpsKeys = ['WEB_URL', 'SHORT_LINK_BASE_URL', ...(storage === 's3' ? ['S3_ENDPOINT'] : [])];
+  const notHttps = httpsKeys.filter((key) => {
     const value = env[key]?.trim();
     return value && !(URL.canParse(value) && new URL(value).protocol === 'https:');
   });
   return [
+    ...(storage ? [] : [`FILE_STORAGE가 ${FILE_STORAGE_KINDS.join('·')} 중 하나가 아님`]),
     ...(missing.length ? [`비어 있음: ${missing.join(', ')}`] : []),
     ...(notHttps.length ? [`https URL이 아님: ${notHttps.join(', ')}`] : []),
   ];
@@ -74,6 +133,7 @@ export class AppConfig implements OnModuleInit {
       }
     }
     parseTrustedProxyHops(process.env.TRUSTED_PROXY_HOPS);
+    parseFileStorageConfig(process.env);
   }
 
   /** 앞단의 신뢰할 리버스 프록시 수. 방문·클릭 IP를 `X-Forwarded-For`에서 고르는 기준(`clientIp`). */
@@ -117,6 +177,11 @@ export class AppConfig implements OnModuleInit {
   get uploadDir(): string {
     const value = process.env.UPLOAD_DIR?.trim();
     return value ? resolve(value) : resolve(__dirname, '../../../.local/uploads');
+  }
+
+  /** 업로드 이미지 저장소(`FILE_STORAGE`·`S3_*`). FilesModule이 이 값으로 구현을 고릅니다. */
+  get fileStorage(): FileStorageConfig {
+    return parseFileStorageConfig(process.env);
   }
 
   /** DB-IP Lite City 등 mmdb 파일 경로. 비면 국가·도시를 기록하지 않습니다. */

@@ -49,6 +49,8 @@ services:
     # PID 1이 node라 신호 전달·좀비 정리를 위해 init을 둡니다. HEALTHCHECK는 이미지(apps/api/Dockerfile) 것을 씁니다.
     init: true
     volumes:
+      # 업로드 저장소는 app.env의 FILE_STORAGE가 고릅니다. s3면 api가 S3_ENDPOINT(https://s3.shaul.kr)로 나가며 이 볼륨을 쓰지 않습니다.
+      # disk(기본)면 UPLOAD_DIR=/data/uploads가 이 볼륨입니다. s3 전환·이전이 끝나면 런북 9-5로 이 줄과 아래 volumes.uploads를 함께 뺍니다.
       - uploads:/data/uploads
       - geoip:/data/geoip:ro
       # Supabase 루트 CA(공개 인증서). app.env의 DATABASE_SSL_CA_PATH가 /etc/crelink/certs/supabase-ca.crt를 가리킵니다.

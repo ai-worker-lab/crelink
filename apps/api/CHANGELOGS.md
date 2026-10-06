@@ -2,6 +2,12 @@
 
 내부 참고용으로 백엔드 API의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-10-07
+
+- 업로드 저장소 선택: 환경변수 `FILE_STORAGE`(`disk` 기본, `s3`), `S3_ENDPOINT`·`S3_REGION`(기본 `us-east-1`)·`S3_BUCKET`·`S3_ACCESS_KEY_ID`·`S3_SECRET_ACCESS_KEY`. 잘못된 값·`s3`인데 빠진 키면 기동 거부. 운영 필수 검사는 `disk`면 `UPLOAD_DIR`, `s3`면 `S3_*` 4개와 https `S3_ENDPOINT`. `FilesModule`이 설정으로 구현을 고름.
+- `S3FileStorage`(`src/files/s3-file-storage.ts`, 의존성 `@aws-sdk/client-s3`, 순수 JS): path-style, 설정 자격 증명만 사용, put은 `If-None-Match: *`(같은 key면 412로 실패), get은 `NoSuchKey`·404면 null, 연결 3초·시도당 15초·최대 3번(SDK standard 재시도), 기동 시 HeadBucket을 5초 안에 한 번 확인해 로그만 남김(readiness 제외). `LocalDiskFileStorage`의 ENOENT 판별을 realm과 무관하게 바꿈.
+- 시험: 설정 파싱 단위 시험, `test/file-storage.e2e-spec.ts`(disk·s3 공통 계약: 같은 바이트, 없는 key null, 재put 실패, 동시 put 하나만 성공 / 자격 증명·버킷 확인 / `FILE_STORAGE=s3` API 업로드·조회·객체 삭제 시 404). s3는 `test/test-s3.ts`가 Docker로 `chrislusf/seaweedfs:4.47`을 띄움. `createTestApp({ env })`. 근거 `docs/work/orchestrator/0030-uploads-s3-storage.md`.
+
 ## 2026-10-06
 
 - 운영 컨테이너 이미지 `apps/api/Dockerfile`(멀티 스테이지, 빌더 플랫폼에서 빌드·`pnpm deploy --prod --legacy`, 대상 플랫폼(amd64·arm64) `node:22-slim` 런타임, `node` 사용자, `NODE_ENV=production`, `migrations/` 포함, node `fetch`로 `/api/health/ready`를 보는 `HEALTHCHECK`)와 루트 `.dockerignore`(허용 목록, `.env*`·`.local`·`node_modules` 제외). 운영은 배포 대상 서버의 Compose 스택에서 스택 Caddy 뒤(`TRUSTED_PROXY_HOPS=1`). 빌드·크기·구성: `apps/api/docs/README.md#컨테이너-이미지`. 근거: `docs/work/api/0025-api-container-prod-config.md`.

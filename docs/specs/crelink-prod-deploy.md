@@ -20,6 +20,7 @@ flowchart LR
     W -->|"API_INTERNAL_URL=http://api:3000"| A
   end
   A -->|"TLS verify-full"| DB[("Supabase 세션 풀러 :5432")]
+  A -->|"https S3 (FILE_STORAGE=s3)"| S3[("SeaweedFS s3.shaul.kr · 버킷 crelink-uploads (home-server)")]
   GHA["GitHub Actions (호스트 러너)"] -->|"Tailscale tag:ci → tcp/22"| E["deploy 사용자 forced command (ssh-entry.sh)"]
   E -->|"deploy.sh · rollback.sh"| S
   GHA -->|"이미지 push"| R["GHCR"]
@@ -35,6 +36,7 @@ flowchart LR
 | 관리·배포 접속 | Tailscale. CI는 임시 노드(`tag:ci`)로 서버 `deploy` 사용자 SSH(22)만 |
 | DB | Supabase 프로젝트 1개(prod 전용). `DATABASE_URL` = Supavisor 세션 모드(5432), TLS `verify-full` |
 | 이미지 | `ghcr.io/ai-worker-lab/crelink-api:<SHA>`(`apps/api/Dockerfile`), `ghcr.io/ai-worker-lab/crelink-web:<SHA>`(`apps/web/Dockerfile`, Next.js `output: 'standalone'`) |
+| 업로드 저장소 | `FILE_STORAGE=s3`: SeaweedFS(home-server의 별도 스택 [home-seaweedfs](https://github.com/shaul1991/home-seaweedfs)) `https://s3.shaul.kr`, 버킷 `crelink-uploads`, identity `crelink`(버킷 범위 읽기·쓰기). 전환 전·되돌리기는 `disk`(볼륨 `crelink-prod_uploads`). 절차: [런북 9](../../infra/docs/prod-runbook.md#9-업로드-저장소) |
 
 스택은 대상 서버의 다른 서비스(home-server의 호스트 Caddy 등)와 독립입니다. 호스트에 여는 포트는 caddy의 `127.0.0.1:${CRELINK_HTTP_PORT:-18080}` 하나입니다.
 
@@ -64,15 +66,15 @@ flowchart LR
 | `/run/crelink/` | tmpfs(systemd-tmpfiles, deploy 0700). 복호화한 `app.env`를 compose 실행 동안만 둠 |
 | `/usr/local/lib/crelink/ssh-entry.sh` | `deploy` SSH forced command(root 소유, `bootstrap.sh`만 설치) |
 
-- Compose project 이름은 `crelink-prod`로 고정이라 릴리스 폴더가 바뀌어도 볼륨 `crelink-prod_uploads`·`crelink-prod_geoip`가 유지됩니다.
-- 서비스: `caddy`(`caddy:2.11.7-alpine`, 읽기 전용 루트), `api`(이미지 HEALTHCHECK `/api/health/ready`, 볼륨 uploads·geoip(ro)·`./certs`(ro)), `web`(이미지 HEALTHCHECK `/privacy`, 읽기 전용 루트), 도구 프로필 `geoip-writer`(`alpine:3.22`, `geoip.sh`만 사용). `caddy`는 `api`·`web`이 healthy일 때 뜹니다.
+- Compose project 이름은 `crelink-prod`로 고정이라 릴리스 폴더가 바뀌어도 볼륨 `crelink-prod_uploads`·`crelink-prod_geoip`가 유지됩니다. `uploads`는 `FILE_STORAGE=disk`일 때만 쓰며 S3 전환·이전 뒤 compose에서 뺍니다([런북 9-5](../../infra/docs/prod-runbook.md#9-5-전환-뒤-볼륨-정리)).
+- 서비스: `caddy`(`caddy:2.11.7-alpine`, 읽기 전용 루트), `api`(이미지 HEALTHCHECK `/api/health/ready`(DB만, 업로드 저장소 제외), 볼륨 uploads·geoip(ro)·`./certs`(ro)), `web`(이미지 HEALTHCHECK `/privacy`, 읽기 전용 루트), 도구 프로필 `geoip-writer`(`alpine:3.22`, `geoip.sh`만 사용). `caddy`는 `api`·`web`이 healthy일 때 뜹니다.
 
 ## 비밀값과 환경변수
 
 | 위치 | 키 | 비고 |
 | --- | --- | --- |
-| `infra/prod/secrets/<대상>.sops.env`(암호화) | `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPERATOR_EMAILS` | API가 읽음(compose `env_file` = `/run/crelink/app.env`) |
-| 같은 파일(평문, `.sops.yaml`의 `unencrypted_regex`) | `PORT=3000`, `WEB_URL`, `SHORT_LINK_BASE_URL`, `DATABASE_SSL=verify-full`, `DATABASE_SSL_CA_PATH=/etc/crelink/certs/supabase-ca.crt`, `UPLOAD_DIR=/data/uploads`, `GEOIP_MMDB_PATH=/data/geoip/dbip-city-lite.mmdb`, `TRUSTED_PROXY_HOPS=1` | diff로 검토할 수 있게 평문 |
+| `infra/prod/secrets/<대상>.sops.env`(암호화) | `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPERATOR_EMAILS`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | API가 읽음(compose `env_file` = `/run/crelink/app.env`). S3 키 원본은 서버 `/opt/seaweedfs/config/s3.json`의 identity `crelink` |
+| 같은 파일(평문, `.sops.yaml`의 `unencrypted_regex`) | `PORT=3000`, `WEB_URL`, `SHORT_LINK_BASE_URL`, `DATABASE_SSL=verify-full`, `DATABASE_SSL_CA_PATH=/etc/crelink/certs/supabase-ca.crt`, `FILE_STORAGE=s3`, `S3_ENDPOINT=https://s3.shaul.kr`, `S3_REGION=us-east-1`, `S3_BUCKET=crelink-uploads`, `UPLOAD_DIR=/data/uploads`(`disk` 되돌리기용), `GEOIP_MMDB_PATH=/data/geoip/dbip-city-lite.mmdb`, `TRUSTED_PROXY_HOPS=1` | diff로 검토할 수 있게 평문. 정규식을 바꾸면 그 파일을 한 번 다시 암호화합니다([런북 9-2](../../infra/docs/prod-runbook.md#9-2-암호문에-키-넣기)) |
 | `infra/prod/certs/supabase-ca.crt` | Supabase 루트 CA(공개 인증서) | api 컨테이너 `/etc/crelink/certs`에 읽기 전용 마운트 |
 | `compose.yaml` `web.environment` | `API_INTERNAL_URL=http://api:3000` | `API_INTERNAL_TOKEN`은 두지 않음 |
 | `compose.yaml` 변수 기본값 | `CRELINK_HTTP_PORT`(18080), `CRELINK_SHORT_HOST`(`go.shaul.kr`), `CRELINK_WEB_HOST`(`links.shaul.kr`) | 지금은 기본값만 씀. 대상별로 달라지면 전달 경로를 추가(후속) |
@@ -123,7 +125,7 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 - **docker 그룹 = root**: `deploy`는 docker 그룹이라 서버 root와 같습니다. 배포 키는 forced command(`restrict`, 셸·포워딩 없음)로 줄이고, 운영자 관리 접속은 Tailscale로 별도입니다.
 - **Tailscale Personal 무료 플랜은 비상업 조건**입니다. 상업 운영 전 Standard 등으로 바꿉니다. ephemeral 노드 사용량 한도도 이 플랜 기준입니다.
 - **방문자 IP 신뢰**: Caddy는 사설 대역에서 온 `CF-Connecting-IP`를 믿습니다. 호스트 포트를 127.0.0.1에만 열어 외부 위조를 막고, 이 포트를 공인 주소에 열지 않습니다.
-- **단일 서버·가정 회선**: 서버·회선 장애가 곧 서비스 장애입니다. 업로드는 서버 볼륨에 있습니다.
+- **단일 서버·가정 회선**: 서버·회선 장애가 곧 서비스 장애입니다. 업로드 저장소(SeaweedFS)도 같은 home-server·회선에 있어 S3로 옮겨도 데이터 위치와 가용성은 그 서버에 묶입니다(아래 위험).
 - 평문 비밀값은 실행 중 컨테이너 환경(`docker inspect`)에서는 보입니다. 서버 root·docker 그룹 접근을 줄이는 것으로 막습니다.
 
 ## 이식 규칙
@@ -133,7 +135,7 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 1. 배포 단위는 불변 이미지 SHA + 저장소 `infra/prod` + 대상별 sops 파일뿐입니다. 서버에서 손으로 고친 파일·서버에만 있는 스크립트·`latest` 태그를 두지 않습니다. 대상별 차이는 `targets.json` 항목과 `secrets/<대상>.sops.env`에만 둡니다.
 2. 이미지는 멀티 아키텍처로 만들 수 있게 유지합니다. API는 `$BUILDPLATFORM` 교차 빌드를 유지하고 native 애드온 의존성을 피합니다. 런타임 베이스는 amd64·arm64를 모두 내는 이미지만 씁니다.
 3. 공개는 어디서나 Cloudflare Tunnel → 스택 Caddy입니다. 서버에 공인 인바운드를 열지 않고 Caddyfile을 대상별로 나누지 않습니다. 호스트 이전은 Tunnel 공개 호스트(또는 CNAME)를 새 대상 Tunnel로 바꾸는 것으로 합니다.
-4. 업로드는 S3 호환 저장소(SeaweedFS `s3.shaul.kr` 또는 Cloudflare R2)로 옮깁니다(후속). 그 전까지 이전에는 `uploads` 볼륨 복사가 필요합니다.
+4. 업로드는 서버 볼륨이 아니라 S3 호환 저장소에 둡니다(`FILE_STORAGE=s3`, 지금 SeaweedFS `https://s3.shaul.kr`). 대상은 같은 `S3_*` 키를 암호문에 넣기만 하면 되고 볼륨 복사가 없으며, 여러 대상이 같은 버킷을 함께 쓸 수 있습니다. 저장소를 바꿀 때(예: Cloudflare R2, `S3_REGION=auto`)는 `aws s3 sync`로 버킷을 복사하고 키만 바꿉니다. 저장소는 조건부 PUT(`If-None-Match: *`)을 지원해야 합니다([API 문서](../../apps/api/docs/README.md#이미지-저장소)).
 5. 관리 접속은 Tailscale 하나로 통일합니다.
 6. 비밀 원본은 sops 암호문이고 CI에 두지 않습니다.
 7. 헬스·롤백 계약(이미지 HEALTHCHECK, `up --wait`, 실패 시 직전 릴리스, `releases.log`)을 대상과 무관하게 유지합니다.
@@ -148,11 +150,12 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 | 0027 | infra | `infra/prod/`: `compose.yaml`(caddy·api·web), `Caddyfile`, `targets.json`, `secrets/`·`certs/`, `lib.sh`·`deploy.sh`·`rollback.sh`·`ssh-entry.sh`·`geoip.sh`·`bootstrap.sh`, 로컬 시험, 런북, `infra/CHANGELOGS.md` |
 | 0028 | orchestrator | `.github/workflows/deploy.yml`·`rollback.yml`, CI `이미지 빌드`, `.sops.yaml`, `.dockerignore`, `dependabot.yml`, 문서 |
 | 0029 | orchestrator | home-server 준비(bootstrap·age 키·Tailscale·Tunnel), 최초 배포와 실서비스 검증 |
+| 0030 | orchestrator | 업로드 S3 호환 저장소: API `S3FileStorage`·`FILE_STORAGE`·`S3_*`, 저장소 계약 시험(SeaweedFS 컨테이너), `.sops.yaml` 평문 키, compose 주석·볼륨 정리 절차, 런북 9 |
 
 ## 위험·후속 `[임시값]`
 
 - Supabase 무료 플랜: 자동 일시정지·백업 제한. 출시 전 유료 전환 또는 백업 절차 필요.
-- 업로드 S3 이전(`docs/work/orchestrator/0030-uploads-s3-storage.md`). 그 전까지 `uploads` 볼륨 백업은 런북 절차.
+- 업로드 저장소 SeaweedFS는 home-server 한 대(단일 master·volume·filer, 복제 없음)와 가정 회선·Cloudflare Tunnel에 의존합니다. 서버·회선·SeaweedFS 장애면 이미지 업로드·조회가 500이 되고(단축 이동은 영향 없음, readiness에 넣지 않음), 디스크가 망가지면 데이터를 잃습니다. 백업은 SeaweedFS 데이터 디렉터리 백업(home-seaweedfs README "운영")이 맡고 아직 정기 실행·서버 밖 보관이 정해지지 않았습니다. API를 다른 대상으로 옮겨도 이미지 가용성은 home-server에 남으므로, 그때 Cloudflare R2 등 관리형 저장소로 옮길지 정합니다(사용자 결정).
 - OCI 대상 추가는 필요할 때 `targets.json`에 `enabled: false`로 준비한 뒤 런북대로. 웹 이미지 arm64 빌드(QEMU) 시간은 그때 확인하고, 느리면 네이티브 arm64 러너로 나눕니다.
 - 대상별로 다른 호스트·포트가 필요해지면 compose 변수 전달 경로를 추가합니다(지금은 기본값).
 - GeoIP 파일은 서버에서 월 1회 갱신(`geoip.sh --restart`, 런북). 없으면 위치만 비어 있음.
@@ -165,6 +168,7 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 - 로컬: 두 이미지 빌드, `CRELINK_APP_ENV=/dev/null docker compose -f infra/prod/compose.yaml --env-file infra/prod/images.env.example config --quiet`, `bash -n`·`shellcheck`, `infra/prod/tests/*.sh`(Caddy 공개 정책, 배포·롤백·복구 시뮬레이션), `pnpm verify`·`pnpm e2e`.
 - 워크플로: `actionlint`, 로컬에서 실행할 수 없는 단계는 서버 준비 후 0029에서 실제 실행.
 - 실서비스(0029): 최초 배포, 운영 주소 smoke, 구글 로그인, 단축 URL 클릭 기록(IP가 방문자 IP), 자동 배포·자동 롤백·수동 롤백 각 1회.
+- 업로드 저장소(0030): API 저장소 계약 시험(disk·SeaweedFS 4.47 컨테이너), 운영 전환 때 런북 9-3의 확인(파일 수·`--dryrun`·이미지 200·운영 경로 조건부 PUT 412).
 
 ## 검토 기록
 
@@ -173,3 +177,4 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 ## 변경 기록
 
 - 2026-10-06: 처음 설계(웹 Vercel + API OCI 서버 공용 edge Caddy, 웹→API 내부 토큰 헤더, GitHub secrets `OCI_*`·`VERCEL_*`, 서버 `.env`)를 home-server 단일 서버 + Tailscale OIDC SSH + SOPS/age + 스택 안 Caddy + Cloudflare Tunnel로 바꿈(사용자 결정). 대안과 이유는 ADR 0010.
+- 2026-10-07: 업로드 저장소를 서버 볼륨에서 S3 호환 저장소(SeaweedFS `https://s3.shaul.kr`, 버킷 `crelink-uploads`)로 바꿀 수 있게 함(`FILE_STORAGE`·`S3_*`, 이식 규칙 4, SeaweedFS 의존 위험, 런북 9). 근거: `docs/work/orchestrator/0030-uploads-s3-storage.md`.

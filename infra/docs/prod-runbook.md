@@ -18,6 +18,7 @@
 | 스택 입구 | `127.0.0.1:18080`(caddy). cloudflared가 여기로 보냄 |
 | 비밀값 원본 | `infra/prod/secrets/<대상>.sops.env`(SOPS + age, 수신자는 `.sops.yaml`) |
 | 운영자 age 키 | macOS 키체인 서비스 `crelink-sops-age`, 계정 `operator` + 운영자 비밀번호 관리자 백업 |
+| 업로드 저장소 | 암호문 `FILE_STORAGE`(`s3`: SeaweedFS `https://s3.shaul.kr` 버킷 `crelink-uploads`, 없거나 `disk`: 볼륨 `crelink-prod_uploads`). [9](#9-업로드-저장소) |
 | GitHub | variables `TS_OIDC_CLIENT_ID`·`TS_OIDC_AUDIENCE`, secret `DEPLOY_SSH_KEY`. 그 밖의 배포 secret 없음 |
 
 ## 1. 서버 준비 (bootstrap)
@@ -229,9 +230,98 @@ sudo crontab -u deploy -e   # 매월 3일 04:17 UTC: 17 4 3 * * /opt/crelink/cur
 
 `--restart`를 빼면 다음 배포부터 새 파일을 읽습니다. 파일이 없으면 방문 기록의 국가·도시만 비어 있습니다. `geoip` 볼륨은 릴리스가 바뀌어도 유지됩니다.
 
-## 9. 업로드 볼륨 백업·복구
+## 9. 업로드 저장소
 
-업로드 이미지는 서버 볼륨 `crelink-prod_uploads`(api `/data/uploads`, 소유 uid 1000)에 있습니다. S3 호환 저장소로 옮기기 전까지 정기적으로 서버 밖에 복사합니다.
+업로드 이미지는 API 설정 `FILE_STORAGE`로 고른 저장소에 있습니다([API 문서 "이미지 저장소"](../../apps/api/docs/README.md#이미지-저장소)). 운영 목표는 `s3`(SeaweedFS `https://s3.shaul.kr`, 버킷 `crelink-uploads`)이고, `disk`면 서버 볼륨 `crelink-prod_uploads`(api `/data/uploads`, 소유 uid 1000)입니다. 지금 어느 쪽인지는 그 릴리스 암호문의 평문 키 `FILE_STORAGE`(없으면 `disk`)와 api 기동 로그(`s3`면 `[S3FileStorage] 파일 저장소 s3 확인: …`)로 봅니다. 키(DB `files.storage_key`)는 UUID라 두 저장소 사이에서 그대로 옮길 수 있습니다.
+
+| 항목 | 값 |
+| --- | --- |
+| SeaweedFS 스택 | home-server `/opt/seaweedfs`(Compose project `seaweedfs`). 설정·운영·백업 원본은 [home-seaweedfs README](https://github.com/shaul1991/home-seaweedfs#readme) |
+| 경로 | api 컨테이너 → `https://s3.shaul.kr`(Cloudflare, 캐시 우회 규칙) → Tunnel → 서버 Caddy → `127.0.0.1:8333`. 같은 서버여도 공개 주소를 써서 다른 대상에서도 같은 설정이 됩니다 |
+| 접근 키 | 서버 `/opt/seaweedfs/config/s3.json`의 identity `crelink`(버킷 `crelink-uploads` 범위 `Read`·`Write`·`List`·`Tagging`만, 버킷 생성 불가). 저장소에는 암호문(`S3_ACCESS_KEY_ID`·`S3_SECRET_ACCESS_KEY`)으로만 둡니다 |
+| 헬스 | 저장소 장애는 readiness·배포 헬스에 넣지 않습니다(단축 이동을 막지 않게). 업로드·이미지 조회 500과 api 로그 `파일 저장소 s3 확인 실패`로 드러납니다 |
+| 백업 | SeaweedFS 데이터 디렉터리(`/mnt/storage/seaweedfs`) 백업이 업로드 백업입니다(home-seaweedfs README "운영"의 정지 → tar → 시작). `disk`인 동안은 아래 9-6 |
+
+### 9-1. 버킷·접근 키 발급(한 번)
+
+```bash
+ssh home-server
+cd /opt/seaweedfs
+sudo docker compose exec master weed shell   # 프롬프트에서: s3.bucket.create -name crelink-uploads   (확인: s3.bucket.list), exit
+openssl rand -hex 10; openssl rand -hex 20   # access·secret 키. 화면 밖으로 옮기지 않고 바로 s3.json에 넣습니다
+sudo -e config/s3.json                       # identities에 아래 항목 추가(소유 1000:1000, 권한 400 유지)
+sudo docker compose restart s3 && scripts/check.sh
+```
+
+```json
+{ "name": "crelink", "credentials": [{ "accessKey": "<access>", "secretKey": "<secret>" }],
+  "actions": ["Read:crelink-uploads", "Write:crelink-uploads", "List:crelink-uploads", "Tagging:crelink-uploads"] }
+```
+
+접근 키를 바꾸면 새 identity(또는 credentials 항목)를 먼저 추가하고 9-2로 암호문을 바꿔 배포한 뒤 옛 항목을 지웁니다.
+
+### 9-2. 암호문에 키 넣기
+
+저장소 루트에서 운영자 키로 합니다. 비밀이 아닌 `FILE_STORAGE`·`S3_ENDPOINT`·`S3_REGION`·`S3_BUCKET`은 `.sops.yaml`의 `unencrypted_regex`에 있어 평문입니다. 이 정규식은 암호화할 때 파일 메타데이터(`sops_unencrypted_regex`)에 기록되고 `sops edit`·`sops set`은 그 기록을 따르므로, 정규식을 바꾼 뒤 처음 한 번은 먼저 다시 암호화합니다(sops 3.13.3에서 확인).
+
+```bash
+export SOPS_AGE_KEY_CMD='security find-generic-password -s crelink-sops-age -a operator -w'
+f=infra/prod/secrets/home-server.sops.env
+# 정규식을 바꾼 뒤 처음 한 번: 같은 수신자로 다시 암호화(평문은 파이프에만 있음). 모든 암호 값이 새로 바뀝니다.
+grep -q '^sops_unencrypted_regex=.*S3_BUCKET' "$f" || {
+  sops decrypt "$f" | sops encrypt --input-type dotenv --output-type dotenv --filename-override "$f" /dev/stdin > "$f.new" && mv "$f.new" "$f"; }
+# 접근 키: 서버 s3.json에서 바로 암호문으로(화면·셸 기록·프로세스 목록에 남지 않음)
+for pair in S3_ACCESS_KEY_ID:accessKey S3_SECRET_ACCESS_KEY:secretKey; do
+  ssh home-server "sudo python3 -c 'import json,sys; print(json.dumps(next(i for i in json.load(open(\"/opt/seaweedfs/config/s3.json\"))[\"identities\"] if i[\"name\"]==\"crelink\")[\"credentials\"][0][sys.argv[1]]))' ${pair#*:}" \
+    | sops set --value-stdin "$f" "[\"${pair%%:*}\"]"
+done
+sops set "$f" '["S3_ENDPOINT"]' '"https://s3.shaul.kr"'
+sops set "$f" '["S3_REGION"]' '"us-east-1"'
+sops set "$f" '["S3_BUCKET"]' '"crelink-uploads"'
+sops set "$f" '["FILE_STORAGE"]' '"s3"'      # 전환 스위치. 9-3 순서대로
+grep -E '^(FILE_STORAGE|S3_)' "$f" | cut -c1-40   # 평문 4개, S3_ACCESS_KEY_ID·S3_SECRET_ACCESS_KEY는 ENC[...]
+```
+
+`UPLOAD_DIR`은 되돌리기(9-4)용으로 남겨 둡니다(`s3`면 쓰지 않음). 서버 복호화 확인은 [5](#5-최초-배포)의 2번 명령입니다.
+
+### 9-3. 전환(디스크 → S3)과 볼륨 이전(한 번)
+
+볼륨 파일을 버킷으로 복사한 뒤 `FILE_STORAGE=s3` 릴리스를 배포하고, 그 사이에 볼륨에 올라온 파일을 한 번 더 복사합니다. key가 UUID이고 내용이 바뀌지 않아 `aws s3 sync`를 여러 번 해도 안전합니다. 아래 `s3` 함수의 sync·`--dryrun`·`ls --summarize`·조건부 `put-object`·역방향 sync는 2026-10-07 로컬 SeaweedFS 4.47(운영과 같은 버킷 범위 identity)과 `amazon/aws-cli` 2.37.9로 리허설했습니다(`sudo`·`ssh`·공개 주소 제외).
+
+```bash
+ssh home-server
+# 접근 키를 화면에 내지 않고 이 셸 변수로만 읽습니다(9-2와 같은 식).
+key() { sudo python3 -c 'import json,sys; print(next(i for i in json.load(open("/opt/seaweedfs/config/s3.json"))["identities"] if i["name"]=="crelink")["credentials"][0][sys.argv[1]])' "$1"; }
+AWS_ACCESS_KEY_ID=$(key accessKey) AWS_SECRET_ACCESS_KEY=$(key secretKey); export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+# 볼륨(/data, 기본 읽기 전용)과 조건부 PUT 확인용 작은 파일(/probe)을 붙인 aws-cli. 되돌리기(9-4)는 MODE=rw로 볼륨을 쓰기 가능하게 붙입니다.
+s3() { sudo --preserve-env=AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY docker run --rm -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
+  -e AWS_DEFAULT_REGION=us-east-1 -v "crelink-prod_uploads:/data:${MODE:-ro}" -v /etc/hostname:/probe:ro \
+  amazon/aws-cli --endpoint-url https://s3.shaul.kr "$@"; }
+sudo docker run --rm -v crelink-prod_uploads:/data:ro alpine:3.22 sh -c 'find /data -type f | wc -l'   # 볼륨 파일 수
+s3 s3 sync /data s3://crelink-uploads --no-progress                                                  # 1차 복사
+```
+
+1. 볼륨이 비어 있지 않으면 먼저 9-6으로 백업합니다.
+2. 위 1차 복사.
+3. 9-2의 `FILE_STORAGE=s3`를 넣은 커밋을 main에 병합해 배포합니다(Deploy). `sudo docker logs crelink-prod-api-1 2>&1 | grep S3FileStorage`가 `접근 가능`이어야 합니다.
+4. 곧바로 `s3 s3 sync /data s3://crelink-uploads --no-progress`를 다시 실행합니다(1차 복사와 배포 사이에 볼륨에 올라온 파일).
+5. 확인:
+   - `s3 s3 sync /data s3://crelink-uploads --dryrun`이 아무것도 출력하지 않고, `s3 s3 ls s3://crelink-uploads --recursive --summarize`의 `Total Objects`가 볼륨 파일 수 이상입니다(전환 뒤 새 업로드는 버킷에만 있음).
+   - 옛 이미지 하나(`select id from files order by created_at limit 1`)가 `https://links.shaul.kr/api/backend/api/files/<id>`에서 200이고, 웹에서 새 이미지를 올리면 그 id가 `s3 s3 ls s3://crelink-uploads/<id>`에 보입니다.
+   - 운영 경로(Cloudflare 경유)의 조건부 PUT: `k=zz-check-$(date -u +%Y%m%d%H%M)` 후 `s3 s3api put-object --bucket crelink-uploads --key "$k" --body /probe --if-none-match '*'`를 두 번 실행해 두 번째가 `PreconditionFailed`(412)인지 보고 `s3 s3api delete-object --bucket crelink-uploads --key "$k"`로 지웁니다. 412가 아니라 성공하면 경로가 조건부 헤더를 지우는 것이므로 전환을 되돌리고(9-4) 원인을 봅니다.
+6. `unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY` 후 나옵니다. 실행 시각·파일 수·결과를 운영 work item에 기록합니다.
+
+### 9-4. 되돌리기(S3 → 디스크)
+
+1. GitHub Actions **Rollback**으로 `FILE_STORAGE=s3` 이전 릴리스를 고르거나, 암호문의 `FILE_STORAGE`를 `disk`로 바꿔 병합합니다(어느 쪽이든 그 릴리스 compose에 `uploads` 볼륨이 있어야 합니다).
+2. 전환 뒤 버킷에만 올라온 파일을 볼륨으로 복사합니다: 9-3의 `key`·`s3` 함수를 준비하고 `MODE=rw s3 s3 sync s3://crelink-uploads /data --no-progress` 후 `sudo docker run --rm -v crelink-prod_uploads:/data alpine:3.22 chown -R 1000:1000 /data`.
+3. 확인은 9-3의 5번(이미지 200·새 업로드가 볼륨에 생김)과 같습니다.
+
+### 9-5. 전환 뒤 볼륨 정리
+
+`s3` 운영이 안정되면(운영 확인 뒤, 볼륨이 9-3 동기화 이후 바뀌지 않음) compose에서 `uploads` 볼륨(api 마운트와 `volumes:` 항목)을 뺀 릴리스를 배포합니다. 배포 뒤 `sudo docker volume rm crelink-prod_uploads`로 지웁니다(볼륨 파일이 있었다면 9-6 백업을 먼저). 볼륨을 뺀 뒤에는 `disk`로 되돌리려면 `uploads` 볼륨이 있는 릴리스로 롤백하고(빈 볼륨이 새로 생김) 9-4의 2번으로 버킷에서 복사합니다. 볼륨 없는 compose에서 `FILE_STORAGE=disk`를 쓰면 이미지가 컨테이너 안에만 저장되어 다음 배포에 사라지므로, 두 설정은 같은 릴리스에서만 바꿉니다.
+
+### 9-6. 볼륨 백업·복구(`disk`인 동안)
 
 ```bash
 ssh home-server
@@ -257,7 +347,7 @@ DB 백업은 [12](#12-supabase-주의사항)입니다.
 5. tailnet 정책: `hosts`에 새 서버를 넣고 `tag:ci` grant의 `dst`에 추가합니다(tcp:22만).
 6. `infra/prod/targets.json`에 `{ "name": "<새 이름>", "host": "<MagicDNS 이름>", "platform": "linux/arm64"(또는 amd64), "enabled": false }`를 넣어 병합합니다. 준비가 끝나면 `enabled: true`로 바꿔 병합하면 Deploy가 플랫폼 합집합으로 이미지를 만들고 대상마다 차례로 배포합니다(arm64는 QEMU라 웹 빌드가 느려질 수 있음).
 7. 검증: 새 Tunnel에 임시 공개 호스트(예: `go-oci.shaul.kr` → `HTTP localhost:18080`, Additional application settings > HTTP Settings > **HTTP Host Header** = `go.shaul.kr`)를 두고 단축 302를 확인합니다. 웹도 같은 방식(`links.shaul.kr`).
-8. 업로드 복사(S3 이전 전까지): 전환 직전에 [9](#9-업로드-볼륨-백업복구)로 옛 서버 볼륨을 백업해 새 서버 볼륨에 복구합니다. 복사 뒤 전환까지 옛 서버에 올라온 업로드는 새 서버에 없으므로 전환 창을 짧게 둡니다. 두 대상을 동시에 공개하지 않습니다(업로드가 갈라짐).
+8. 업로드: `FILE_STORAGE=s3`면 새 대상 암호문에 같은 `FILE_STORAGE`·`S3_*` 키를 넣으면 되고 복사할 것이 없습니다(새 서버에서 `https://s3.shaul.kr`로 나가는 HTTPS 확인). `disk`면 전환 직전에 [9-6](#9-6-볼륨-백업복구disk인-동안)으로 옛 서버 볼륨을 백업해 새 서버 볼륨에 복구하고, 복사 뒤 전환까지 옛 서버에 올라온 업로드는 새 서버에 없으므로 전환 창을 짧게 두며 두 대상을 동시에 공개하지 않습니다(업로드가 갈라짐).
 9. 전환: 옛 Tunnel에서 `go.shaul.kr`·`links.shaul.kr` 경로를 지우고 새 Tunnel에 같은 경로(`HTTP localhost:18080`)를 추가합니다(CNAME이 새 Tunnel UUID로 바뀜). 되돌리기는 반대로 합니다. 임시 호스트는 지웁니다.
 10. 옛 대상은 하루 정도 그대로 둔 뒤 `targets.json`에서 `enabled: false`로 바꾸거나 빼고, tailnet 정책의 grant에서 뺍니다.
 
@@ -270,9 +360,10 @@ DB 백업은 [12](#12-supabase-주의사항)입니다.
 5. 종료 2(복구도 실패): `ls -t /opt/crelink/releases`에서 `.images.env`가 있는 릴리스를 골라 `sudo -u deploy /opt/crelink/current/rollback.sh <SHA>`(`current`가 없으면 `/opt/crelink/releases/<SHA>/rollback.sh`).
 6. "복호화 실패": `/etc/crelink/age.key` 공개키(`sudo age-keygen -y /etc/crelink/age.key`)가 그 릴리스 암호문의 수신자인지 확인하고, 아니면 [4-4](#4-4-새-대상수신자-추가)의 `updatekeys` 후 다시 배포합니다.
 7. DB: Supabase 대시보드(일시정지·장애·연결 수), 세션 풀러 문자열(5432), `infra/prod/certs/supabase-ca.crt`.
-8. CI가 서버에 못 붙음: Tailscale 단계 오류면 Trust credentials의 오류 표시·Subject·태그, SSH 단계면 tailnet 정책(`tag:ci` → 22)·`RunSSH`·`DEPLOY_SSH_KEY`·`authorized_keys`를 봅니다.
-9. 서버 자원: `df -h`, `sudo docker system df`, `free -h`, `uptime`. 이미지를 지울 때는 남은 릴리스의 `.images.env`(`cat /opt/crelink/releases/*/.images.env`)에 없는 `ghcr.io/ai-worker-lab/crelink-*` 태그만 `sudo docker rmi`로 지웁니다.
-10. 복구 뒤 원인·조치를 운영 work item에 기록합니다.
+8. 이미지 업로드·조회만 500: api 로그의 `S3FileStorage`·오류 줄, home-server SeaweedFS 상태([home-seaweedfs README](https://github.com/shaul1991/home-seaweedfs#readme) "운영": `docker compose ps`·`logs s3`·`scripts/check.sh`), Cloudflare 캐시 우회 규칙. 저장소가 오래 멈추면 [9-4](#9-4-되돌리기s3--디스크)로 디스크로 되돌릴 수 있지만 그동안 버킷에만 있는 이미지는 보이지 않습니다.
+9. CI가 서버에 못 붙음: Tailscale 단계 오류면 Trust credentials의 오류 표시·Subject·태그, SSH 단계면 tailnet 정책(`tag:ci` → 22)·`RunSSH`·`DEPLOY_SSH_KEY`·`authorized_keys`를 봅니다.
+10. 서버 자원: `df -h`, `sudo docker system df`, `free -h`, `uptime`. 이미지를 지울 때는 남은 릴리스의 `.images.env`(`cat /opt/crelink/releases/*/.images.env`)에 없는 `ghcr.io/ai-worker-lab/crelink-*` 태그만 `sudo docker rmi`로 지웁니다.
+11. 복구 뒤 원인·조치를 운영 work item에 기록합니다.
 
 ## 12. Supabase 주의사항
 
@@ -325,5 +416,8 @@ docker run --rm -e PGURL='<세션 풀러 연결 문자열>?sslmode=require' -v "
 | Supabase Free 일시정지·백업 | <https://supabase.com/docs/guides/platform/free-project-pausing>, <https://supabase.com/docs/guides/platform/backups> |
 | DB-IP City Lite(CC BY 4.0, 매월 갱신) | <https://db-ip.com/db/download/ip-to-city-lite> |
 | GHCR 인증·저장소 연결 | <https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry> |
+| S3 조건부 쓰기(`If-None-Match: *` → 412), aws-cli `put-object --if-none-match`(2026-10-07) | <https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html>, <https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html> |
+| Cloudflare R2 PutObject의 `If-None-Match` 지원(2026-10-07) | <https://developers.cloudflare.com/r2/api/s3/api/> |
+| SeaweedFS 스택 운영(접근 키·버킷·백업)(2026-10-07) | <https://github.com/shaul1991/home-seaweedfs#readme> |
 
 `[확인 못 함]`: Tailscale WIF Custom claims의 와일드카드, `pg_dump`의 Supabase 버전·풀러 제약.

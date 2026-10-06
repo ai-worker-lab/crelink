@@ -49,12 +49,17 @@ export interface TestApp {
   close(): Promise<void>;
 }
 
-/** 일회용 DB에 앱을 띄웁니다. 구글과 GeoIP 조회만 테스트용으로 바꿉니다(국가 KR, 도시 Seoul). */
-export async function createTestApp(): Promise<TestApp> {
+/**
+ * 일회용 DB에 앱을 띄웁니다. 구글과 GeoIP 조회만 테스트용으로 바꿉니다(국가 KR, 도시 Seoul).
+ * 업로드는 기본으로 임시 디렉터리(`FILE_STORAGE=disk`)이고, `env`로 저장소 설정(예: `startTestS3().env`)을 덮어씁니다.
+ */
+export async function createTestApp(options: { env?: Record<string, string> } = {}): Promise<TestApp> {
   const database = await createTestDatabase();
   setTestEnvironment(database.url);
   const uploadDir = mkdtempSync(join(tmpdir(), 'crelink-uploads-'));
+  process.env.FILE_STORAGE = 'disk';
   process.env.UPLOAD_DIR = uploadDir;
+  Object.assign(process.env, options.env);
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(GoogleOAuth)
     .useValue(fakeGoogle)

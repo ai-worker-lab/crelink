@@ -4,6 +4,10 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-10-07
+
+- 업로드 이미지 저장소를 S3 호환 저장소로 바꿀 수 있게 함: API `FILE_STORAGE`(`disk` 기본·`s3`)·`S3_*`와 `S3FileStorage`(조건부 PUT), 저장소 계약 시험(일회용 SeaweedFS 4.47 컨테이너), `.sops.yaml` 평문 키(`FILE_STORAGE`·`S3_ENDPOINT`·`S3_REGION`·`S3_BUCKET`), 운영 설계(이식 규칙 4·SeaweedFS 의존 위험)·런북 9(키 발급·암호문·전환·되돌리기·볼륨 이전·정리)·외부 의존·환경 문서. 웹·앱 계약 변경 없음. 근거 `docs/work/orchestrator/0030-uploads-s3-storage.md`.
+
 ## 2026-10-06
 
 - `ai-worker-lab/skeleton-repository` 템플릿에서 `crelink`로 초기화: 패키지 범위 `@crelink/*`, 저장소 `ai-worker-lab/crelink`, 로컬 포트 API 3020·웹 5193·Expo 8101·PostgreSQL 5452·Valkey 6399.

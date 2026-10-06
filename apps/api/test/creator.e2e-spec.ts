@@ -8,6 +8,7 @@ import {
   SocialLinkView,
   UploadFileResponse,
 } from '@crelink/shared';
+import { FileStorage, LocalDiskFileStorage } from '../src/files/file-storage';
 import { api, createTestApp, login, SHORT_URL, TestApp, WEB_URL } from './test-app';
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d]);
@@ -409,6 +410,7 @@ describe('크리에이터 편집 API', () => {
   });
 
   it('이미지 업로드: 내용으로 형식을 판단하고 한도(CRELINK_LIMITS.imageMaxBytes)를 넘으면 400, 올린 이미지는 공개 주소로 받는다', async () => {
+    expect(t.app.get(FileStorage)).toBeInstanceOf(LocalDiskFileStorage);
     const { cookie } = await newCreator();
     const uploaded = await upload(cookie, PNG, 'application/octet-stream');
     expect(uploaded.status).toBe(201);

@@ -1,4 +1,9 @@
-import { assertProductionConfig, parseTrustedProxyHops, productionConfigProblems } from './config.service';
+import {
+  assertProductionConfig,
+  parseFileStorageConfig,
+  parseTrustedProxyHops,
+  productionConfigProblems,
+} from './config.service';
 
 const PRODUCTION = {
   NODE_ENV: 'production',
@@ -52,6 +57,29 @@ describe('운영 설정 검증', () => {
       expect(message).not.toContain(secret);
     }
   });
+
+  it('FILE_STORAGE=s3면 UPLOAD_DIR 대신 S3 키가 필수이고 S3_ENDPOINT도 https여야 한다', () => {
+    const s3 = {
+      ...PRODUCTION,
+      UPLOAD_DIR: undefined,
+      FILE_STORAGE: 's3',
+      S3_ENDPOINT: 'https://s3.example',
+      S3_BUCKET: 'crelink-uploads',
+      S3_ACCESS_KEY_ID: 'access-id',
+      S3_SECRET_ACCESS_KEY: 's3-secret',
+    };
+    expect(productionConfigProblems(s3)).toEqual([]);
+    expect(
+      productionConfigProblems({ ...s3, S3_BUCKET: ' ', S3_SECRET_ACCESS_KEY: '', S3_ENDPOINT: 'http://s3.example' }),
+    ).toEqual(['비어 있음: S3_BUCKET, S3_SECRET_ACCESS_KEY', 'https URL이 아님: S3_ENDPOINT']);
+    expect(productionConfigProblems({ ...s3, FILE_STORAGE: 'disk' })).toEqual(['비어 있음: UPLOAD_DIR']);
+  });
+
+  it('FILE_STORAGE가 disk·s3가 아니면 거부한다', () => {
+    expect(productionConfigProblems({ ...PRODUCTION, FILE_STORAGE: 'S3' })).toEqual([
+      'FILE_STORAGE가 disk·s3 중 하나가 아님',
+    ]);
+  });
 });
 
 describe('TRUSTED_PROXY_HOPS', () => {
@@ -61,6 +89,50 @@ describe('TRUSTED_PROXY_HOPS', () => {
     expect(parseTrustedProxyHops('1')).toBe(1);
     for (const value of ['-1', '1.5', 'one', '1e2']) {
       expect(() => parseTrustedProxyHops(value)).toThrow('TRUSTED_PROXY_HOPS');
+    }
+  });
+});
+
+describe('파일 저장소 설정(FILE_STORAGE·S3_*)', () => {
+  const S3 = {
+    FILE_STORAGE: 's3',
+    S3_ENDPOINT: 'https://s3.example/',
+    S3_BUCKET: 'crelink-uploads',
+    S3_ACCESS_KEY_ID: 'access-id',
+    S3_SECRET_ACCESS_KEY: 's3-secret',
+  };
+
+  it('비거나 disk면 로컬 디스크다(S3 키는 보지 않음)', () => {
+    expect(parseFileStorageConfig({})).toEqual({ kind: 'disk' });
+    expect(parseFileStorageConfig({ FILE_STORAGE: ' disk ', S3_ENDPOINT: 'not a url' })).toEqual({ kind: 'disk' });
+  });
+
+  it('s3면 엔드포인트 끝 /를 빼고 지역은 비면 us-east-1이다', () => {
+    expect(parseFileStorageConfig(S3)).toEqual({
+      kind: 's3',
+      endpoint: 'https://s3.example',
+      region: 'us-east-1',
+      bucket: 'crelink-uploads',
+      accessKeyId: 'access-id',
+      secretAccessKey: 's3-secret',
+    });
+    expect(parseFileStorageConfig({ ...S3, S3_REGION: 'auto' })).toMatchObject({ region: 'auto' });
+  });
+
+  it('알 수 없는 종류, 빠진 S3 키, http(s)가 아닌 엔드포인트는 키 이름만 담아 거부한다', () => {
+    expect(() => parseFileStorageConfig({ FILE_STORAGE: 'gcs' })).toThrow('FILE_STORAGE는 disk 또는 s3');
+    expect(() => parseFileStorageConfig({ ...S3, S3_BUCKET: '', S3_ACCESS_KEY_ID: ' ' })).toThrow(
+      'FILE_STORAGE=s3에는 S3_BUCKET, S3_ACCESS_KEY_ID가 필요합니다.',
+    );
+    for (const endpoint of ['s3.example', 'ftp://s3.example']) {
+      let message = '';
+      try {
+        parseFileStorageConfig({ ...S3, S3_ENDPOINT: endpoint });
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).toContain('S3_ENDPOINT는 http(s) URL');
+      expect(message).not.toContain('s3-secret');
     }
   });
 });

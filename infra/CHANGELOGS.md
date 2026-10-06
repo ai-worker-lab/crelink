@@ -2,6 +2,10 @@
 
 내부 참고용으로 인프라의 모든 변경을 적용 여부와 관계없이 기록합니다. 환경별 적용 시각·결과·복구 정보는 운영 work item이나 배포 플랫폼에 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-10-07
+
+- 업로드 S3 전환 준비: `prod/compose.yaml`의 api `uploads` 볼륨에 `FILE_STORAGE` 설명 주석(값은 app.env), 루트 `.sops.yaml` `unencrypted_regex`에 `FILE_STORAGE`·`S3_ENDPOINT`·`S3_REGION`·`S3_BUCKET` 추가(파일 메타데이터에 기록되므로 바꾼 뒤 한 번 다시 암호화). 런북 9를 "업로드 저장소"로 바꿔 SeaweedFS 버킷·identity 발급, 암호문 키 넣기(`sops set --value-stdin`), 전환·볼륨 이전(`amazon/aws-cli` `s3 sync`, 로컬 SeaweedFS로 리허설)·확인(조건부 PUT 412 포함), 되돌리기, 볼륨 정리, `disk` 볼륨 백업을 둠. 대상 추가(10-8)·장애 대응(11-8) 갱신. 근거 `docs/work/orchestrator/0030-uploads-s3-storage.md`.
+
 ## 2026-10-06
 
 - 운영(prod) 스택 추가: `prod/compose.yaml`(project `crelink-prod`: `caddy`(`caddy:2.11.7-alpine`, 호스트 `127.0.0.1:${CRELINK_HTTP_PORT:-18080}`만, 읽기 전용)·`api`·`web`, 볼륨 uploads·geoip, `./certs`, `env_file` = 복호화한 `/run/crelink/app.env`, 도구 프로필 `geoip-writer`), `prod/Caddyfile`(http, admin off, `go` 호스트는 `GET /{slug}`·`/c/{id}`만 api·나머지 404, `links` 호스트는 전부 web·본문 6MB, 사설 대역의 `CF-Connecting-IP`를 `X-Forwarded-For: {client_ip}`로), `prod/targets.json`(배포 대상 목록), `prod/secrets/home-server.sops.env`(SOPS·age 암호문, 비밀 아닌 키는 평문), `prod/certs/supabase-ca.crt`, `prod/images.env.example`. 공개는 Cloudflare Tunnel → `127.0.0.1:18080`, 서버 인바운드 포트 없음.

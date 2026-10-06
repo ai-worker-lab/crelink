@@ -7,7 +7,7 @@
 - 로컬: 저장소 루트에서 `make infra-up` 후 `make up`(또는 `make api-up`). PM2가 `pnpm --filter @crelink/api start:dev`를 실행하고 `.local/instance.env`의 `PORT`·`DATABASE_URL`·`WEB_URL`·`SHORT_LINK_BASE_URL`을 넘깁니다. 나머지 키는 `apps/api/.env`에서 읽습니다.
 - 기동하면 `apps/api/migrations/*.sql`을 이름 순으로 한 번씩 적용합니다(`src/database.ts`의 `runMigrations`). 스키마 원본은 [`migrations/0001_crelink_mvp.sql`](../migrations/0001_crelink_mvp.sql)입니다.
 - 확인: `curl -i {API}/api/health/ready`(DB 포함 200), `curl -i {API}/없는주소`(302 `{WEB_URL}/notice?reason=link_not_found`).
-- 테스트: `pnpm --filter @crelink/api test`. 테스트마다 일회용 DB를 만들어 지웁니다(`test/test-database.ts`). 구글 code 교환은 `GoogleOAuth` provider를, 위치 조회는 `GeoIpService`를 테스트용으로 바꿉니다(`test/test-app.ts`). `@crelink/shared`는 ESM 패키지라 Jest(Node 22)가 `require`하지 못하므로, Jest 설정의 `moduleNameMapper`가 공유 패키지 TypeScript 원본을 직접 컴파일해 씁니다. 실행 중인 API는 Node 22의 `require(esm)`로 빌드 결과를 읽습니다.
+- 테스트: `pnpm --filter @crelink/api test`. 테스트마다 일회용 DB를 만들어 지웁니다(`test/test-database.ts`). 구글 code 교환은 `GoogleOAuth` provider를, 위치 조회는 `GeoIpService`를 테스트용으로 바꿉니다(`test/test-app.ts`). 이미지 저장소 계약 시험(`test/file-storage.e2e-spec.ts`)은 Docker로 일회용 SeaweedFS(`chrislusf/seaweedfs:4.47`, `test/test-s3.ts`)를 띄우므로 Docker가 실행 중이어야 합니다. `@crelink/shared`는 ESM 패키지라 Jest(Node 22)가 `require`하지 못하므로, Jest 설정의 `moduleNameMapper`가 공유 패키지 TypeScript 원본을 직접 컴파일해 씁니다. 실행 중인 API는 Node 22의 `require(esm)`로 빌드 결과를 읽습니다.
 - 운영: 배포 대상 서버의 Compose 스택에서 [컨테이너 이미지](#컨테이너-이미지)로 실행합니다(배포 구성은 [운영 배포 설계](../../../docs/specs/crelink-prod-deploy.md)).
 
 ## 환경변수
@@ -25,7 +25,12 @@
 | `SHORT_LINK_BASE_URL` | 예(운영은 https) | 단축 도메인. 단축 URL `{SHORT}/{slug}`, 클릭 주소 `{SHORT}/c/{linkPublicId}`. 로컬은 API 주소. https면 `cl_vid`에 `Secure`. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 로그인에 필요(운영 필수) | 사용자가 Google Cloud 콘솔에서 발급. 비면 로그인 API가 503 `auth_not_configured`. 콘솔에 등록할 리디렉션 URI는 `{WEB_URL}/auth/google/callback`. |
 | `OPERATOR_EMAILS` | 운영 필수 | 운영자 구글 이메일(쉼표 구분, 대소문자 무시). |
-| `UPLOAD_DIR` | 운영 필수 | 이미지 저장 디렉터리. 비면 저장소 루트 `.local/uploads`(git 제외). 컨테이너는 볼륨 `/data/uploads`. |
+| `FILE_STORAGE` | 아니오 | 업로드 이미지 저장소. `disk`(기본, `UPLOAD_DIR`) 또는 `s3`(S3 호환 저장소, `S3_*`). 다른 값이면 기동 거부. [이미지 저장소](#이미지-저장소). |
+| `UPLOAD_DIR` | `disk`면 운영 필수 | 이미지 저장 디렉터리. 비면 저장소 루트 `.local/uploads`(git 제외). 컨테이너는 `/data/uploads`. |
+| `S3_ENDPOINT` | `s3`면 필수(운영은 https) | S3 호환 엔드포인트. path-style(`{S3_ENDPOINT}/{S3_BUCKET}/{key}`)로 부릅니다. 운영 SeaweedFS `https://s3.shaul.kr`. http(s) URL이 아니면 기동 거부. |
+| `S3_REGION` | 아니오 | 서명 지역. 비면 `us-east-1`(SeaweedFS는 아무 값이나 받음, Cloudflare R2는 `auto`). |
+| `S3_BUCKET` | `s3`면 필수 | 버킷 이름. 운영 `crelink-uploads`. API는 버킷을 만들지 않습니다. |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | `s3`면 필수(비밀) | 버킷 범위 읽기·쓰기 자격 증명. 운영 값은 SeaweedFS `s3.json`의 identity `crelink`이고 대상별 SOPS 암호문에만 둡니다. |
 | `GEOIP_MMDB_PATH` | 아니오 | mmdb(DB-IP Lite City 등, CC BY 4.0이라 웹 `/privacy`에 출처 표시) 경로. 비면 국가·도시를 null로 두고 기동 시 경고를 한 번 남김. 파일을 열지 못해도 같은 동작에 오류 로그. 컨테이너는 볼륨 `/data/geoip`. |
 | `TRUSTED_PROXY_HOPS` | 아니오 | 앞단의 신뢰할 리버스 프록시 수(기본 0). 0이면 소켓 주소, N이면 `X-Forwarded-For`의 오른쪽에서 N번째 값을 방문·클릭 IP로 씁니다([방문자 IP](#방문자-ip)). 운영(Caddy 1단)은 `1`. 0 이상의 정수가 아니면 기동 거부. |
 
@@ -33,8 +38,9 @@
 
 `NODE_ENV=production`이면 `main.ts`가 Nest 모듈(DB 연결)보다 먼저 `assertProductionConfig`(`src/config.service.ts`)로 검사하고, 문제가 있으면 모두 모아 한 번에 오류를 내고 종료 코드 1로 끝납니다. 로컬·테스트(`NODE_ENV`가 `production`이 아님)는 영향이 없습니다.
 
-- 비어 있거나 공백뿐이면 거부: `DATABASE_URL`, `PORT`, `WEB_URL`, `SHORT_LINK_BASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPERATOR_EMAILS`(쉼표로 나눠 이메일이 하나도 없으면 비어 있음), `UPLOAD_DIR`.
-- `WEB_URL`·`SHORT_LINK_BASE_URL`이 https URL이 아니면 거부.
+- 비어 있거나 공백뿐이면 거부: `DATABASE_URL`, `PORT`, `WEB_URL`, `SHORT_LINK_BASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPERATOR_EMAILS`(쉼표로 나눠 이메일이 하나도 없으면 비어 있음), 그리고 `FILE_STORAGE`에 따라 `disk`(기본)면 `UPLOAD_DIR`, `s3`면 `S3_ENDPOINT`·`S3_BUCKET`·`S3_ACCESS_KEY_ID`·`S3_SECRET_ACCESS_KEY`.
+- `FILE_STORAGE`가 `disk`·`s3`가 아니면 거부.
+- `WEB_URL`·`SHORT_LINK_BASE_URL`(그리고 `s3`면 `S3_ENDPOINT`)이 https URL이 아니면 거부.
 - 오류 메시지에는 키 이름만 넣고 값(비밀번호·클라이언트 비밀값·이메일)은 넣지 않습니다. 예: `NODE_ENV=production 설정 오류로 기동을 거부합니다. 비어 있음: DATABASE_URL, GOOGLE_CLIENT_ID / https URL이 아님: WEB_URL.`
 
 ### DB TLS
@@ -66,8 +72,8 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 - 런타임 단계(대상 플랫폼 `node:22-slim`): `/app/apps/api/{package.json,dist,migrations,node_modules}`만 복사. 코드는 root 소유(읽기 전용), 실행은 `node` 사용자(uid 1000), `NODE_ENV=production`, `CMD node apps/api/dist/main.js`, `EXPOSE 3000`. `PORT`는 이미지에 넣지 않으므로 실행 환경에서 `PORT=3000`을 줍니다. `/data/uploads`·`/data/geoip`를 `node` 소유로 만들어 두어 빈 named volume이 처음 붙을 때 그 소유권을 이어받습니다.
 - `HEALTHCHECK`: curl 없이 `node -e` 내장 `fetch`로 `http://127.0.0.1:${PORT:-3000}/api/health/ready`(DB 포함)를 4초 제한으로 확인합니다(간격 10초, 제한 5초, 시작 유예 30초, 재시도 3회). Compose는 이 정의를 재사용합니다.
 - `@crelink/shared`는 ESM이고 API 빌드는 CommonJS라 Node 22의 `require(esm)`로 읽습니다. 이미지 기동과 단축 주소 302(`CRELINK_WEB_PATHS` 사용)로 해석을 확인했습니다.
-- 운영 의존성은 순수 JS입니다(2026-10-06 이미지 안 `node_modules` 127개에 `*.node`·`binding.gyp`·install 스크립트 없음). native 애드온 의존성을 추가하면 빌더 플랫폼의 바이너리가 다른 대상 플랫폼으로 옮겨져 깨지므로 이 구성을 다시 정해야 합니다(이식 규칙: 멀티 아키텍처 유지).
-- 크기(2026-10-06, arm64 측정): 이미지 약 388MB(`docker image ls`), 압축 약 80MB. 대부분 `node:22-slim` 기반이고 앱 레이어는 `node_modules` 37MB·`dist` 0.8MB·`migrations` 33KB.
+- 운영 의존성은 순수 JS입니다(2026-10-06 이미지 안 `node_modules` 127개에 `*.node`·`binding.gyp`·install 스크립트 없음. 2026-10-07 `@aws-sdk/client-s3`(`@aws-sdk/*`·`@smithy/*`) 추가 뒤 amd64 교차 빌드 이미지에서 다시 확인해도 없음). native 애드온 의존성을 추가하면 빌더 플랫폼의 바이너리가 다른 대상 플랫폼으로 옮겨져 깨지므로 이 구성을 다시 정해야 합니다(이식 규칙: 멀티 아키텍처 유지).
+- 크기(2026-10-06, arm64 측정): 이미지 약 388MB(`docker image ls`), 압축 약 80MB. 대부분 `node:22-slim` 기반이고 앱 레이어는 `node_modules` 37MB·`dist` 0.8MB·`migrations` 33KB. 2026-10-07 S3 SDK 추가 뒤(amd64): 이미지 약 392MB, `node_modules` 57MB.
 - 로컬 확인 예(일회용 DB, 호스트 PostgreSQL은 `host.docker.internal`): `docker run -d --name crelink-api-check -p 3920:3000 -e PORT=3000 -e DATABASE_URL=postgresql://…@host.docker.internal:<포트>/<일회용 DB> -e WEB_URL=https://… -e SHORT_LINK_BASE_URL=https://… -e GOOGLE_CLIENT_ID=… -e GOOGLE_CLIENT_SECRET=… -e OPERATOR_EMAILS=… -e UPLOAD_DIR=/data/uploads crelink-api:local` 후 `docker inspect -f '{{.State.Health.Status}}' crelink-api-check`가 `healthy`, `curl -i http://127.0.0.1:3920/api/health/ready`가 200.
 
 ## 인증과 권한
@@ -106,7 +112,23 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 - 단축 주소(R8, `src/creator/slug.service.ts`): 입력은 앞뒤 공백을 빼고 소문자로 바꾼 뒤 `SLUG_PATTERN`·3~30자·예약어를 봅니다. 다른 단축 URL의 현재 주소나 90일 안의 옛 주소면 409 `slug_taken`. 자기 옛 주소는 되돌릴 수 있습니다. 첫 변경(`slug_changed_at`이 없음)은 바로, 그 뒤에는 마지막 변경에서 30일 뒤부터(429 `slug_change_too_soon`). 자동 주소로 되돌려도 30일 제한은 마지막 변경 시각 기준이라 우회할 수 없습니다. 같은 주소로 바꾸는 요청은 아무것도 바꾸지 않고 200입니다. 예약 기간이 끝난 남의 옛 주소는 행을 지우고 새로 만듭니다.
 - 링크 한도(R13): 보이는(숨기지 않고 차단되지 않은) 링크 ≤ 5 + `extra_link_slots`(409 `link_limit_reached`), 숨긴 링크 포함 ≤ 50(409 `link_total_limit_reached`). 추가와 숨김 해제에서 확인하며, 같은 사용자의 링크 변경은 사용자 행 잠금으로 줄 세웁니다. 운영자 추가 슬롯은 0~45.
 - 차단 도메인(R14): 링크 호스트가 차단 도메인이거나 그 하위 도메인이면 추가·URL 수정이 422 `link_domain_blocked`. 운영자가 도메인을 추가하면 같은 트랜잭션에서 기존 링크의 `blocked_at`을 채웁니다. 목록에서 빼도 이미 차단된 링크는 운영자가 링크별로 풉니다.
-- 이미지(`src/files/`): multipart 필드 `file`, `CRELINK_LIMITS.imageMaxBytes`(4MB, MVP 임시값. 운영 스택 Caddy의 웹 호스트 본문 한도는 6MB) 이하. 형식은 클라이언트 Content-Type이 아니라 파일 앞부분(매직 바이트)으로 JPEG·PNG·WebP·GIF만 받습니다. 저장은 `FileStorage` 경계 뒤의 로컬 디스크(`UPLOAD_DIR`)이고, `GET /api/files/{id}`는 누구나 받을 수 있으며 1년 캐시합니다(id는 UUID, 내용 불변).
+- 이미지(`src/files/`): multipart 필드 `file`, `CRELINK_LIMITS.imageMaxBytes`(4MB, MVP 임시값. 운영 스택 Caddy의 웹 호스트 본문 한도는 6MB) 이하. 형식은 클라이언트 Content-Type이 아니라 파일 앞부분(매직 바이트)으로 JPEG·PNG·WebP·GIF만 받습니다. 저장은 `FileStorage` 경계 뒤의 로컬 디스크 또는 S3 호환 저장소([이미지 저장소](#이미지-저장소))이고, `GET /api/files/{id}`는 누구나 받을 수 있으며 1년 캐시합니다(id는 UUID, 내용 불변).
+
+## 이미지 저장소
+
+`src/files/file-storage.ts`의 `FileStorage` 경계(`put(key, data)`: 같은 key가 있으면 실패, `get(key)`: 없으면 null) 뒤에 두 구현이 있고, `FilesModule`이 `FILE_STORAGE`로 고릅니다. key는 업로드마다 API가 만든 UUID(확장자 없음)이고 DB `files.storage_key`에는 그 key만 저장하므로 구현을 바꿔도 DB는 그대로입니다. 웹·앱 계약은 바뀌지 않고 API가 `GET /api/files/{id}`로 바이트를 줍니다(저장소 공개 URL·CDN 직접 서빙은 쓰지 않음).
+
+| `FILE_STORAGE` | 구현 | 같은 key 거부 | 없는 key |
+| --- | --- | --- | --- |
+| `disk`(기본, 로컬 개발) | `LocalDiskFileStorage`: `UPLOAD_DIR/<key>` 파일 | `writeFile` `flag: 'wx'`(O_EXCL) | `ENOENT` → null |
+| `s3`(운영) | `S3FileStorage`(`src/files/s3-file-storage.ts`, AWS SDK v3 `@aws-sdk/client-s3`): `<bucket>/<key>` 객체 | 조건부 PUT `If-None-Match: *` → 저장소가 412 `PreconditionFailed` | `NoSuchKey`·404 → null |
+
+- 연결: path-style(`forcePathStyle`), 자격 증명은 `S3_ACCESS_KEY_ID`·`S3_SECRET_ACCESS_KEY`만 씁니다(SDK 기본 체인의 `AWS_*` 환경변수·`~/.aws`를 보지 않음).
+- 조건부 PUT 확인(2026-10-07, `chrislusf/seaweedfs:4.47` 로컬 컨테이너, 운영과 같은 버킷 범위 identity): 같은 key 두 번째 PUT은 412, 같은 key 동시 PUT 10개 중 1개만 성공. 이 동작은 계약 시험(`test/file-storage.e2e-spec.ts`)이 매번 확인합니다. Cloudflare R2·AWS S3도 `If-None-Match: *`를 지원합니다. 운영 경로(Cloudflare Tunnel 경유)에서의 412는 런북 [업로드 저장소](../../../infra/docs/prod-runbook.md#9-업로드-저장소) 전환 절차에서 확인합니다.
+- 요청 한도(`S3_REQUEST_POLICY`): 연결 3초, 시도당 요청 15초(넘으면 `TimeoutError`), 최대 3번 시도(SDK `standard` 재시도: 연결 오류·시간 초과·5xx·스로틀만 지수 백오프로 다시 시도, 412 등 4xx는 바로 실패). 최악의 경우 요청 하나가 약 1분 걸립니다. 실패하면 업로드·이미지 조회는 500 `internal_error`와 오류 로그입니다(DB 행은 저장 성공 뒤에만 넣음).
+- 한계: 첫 PUT이 저장된 뒤 응답만 잃어 재시도가 412를 받으면 업로드는 실패하고 DB에 없는 객체가 버킷에 남습니다(다시 올리면 새 UUID라 사용자 영향은 없음). 지운 이미지 객체 정리는 디스크와 마찬가지로 아직 없습니다.
+- 기동 확인: `s3`면 `onApplicationBootstrap`에서 HeadBucket을 5초 한도로 한 번 보내고 결과를 로그로 남깁니다(`[S3FileStorage] 파일 저장소 s3 확인: <endpoint>/<bucket> 접근 가능` 또는 `… 확인 실패: … (오류 이름 HTTP 상태)`, 비밀값은 넣지 않음). 실패해도 기동은 계속합니다.
+- readiness에 넣지 않음: `/api/health/ready`는 DB만 봅니다. 이 결과가 이미지 HEALTHCHECK·배포 `up --wait`·Caddy 기동 조건이라, 저장소(home-server SeaweedFS) 장애나 회선 문제를 넣으면 업로드와 무관한 단축 이동(서비스의 핵심 경로)까지 배포 실패·롤백으로 막히기 때문입니다. 저장소 장애는 업로드·이미지 조회 500과 위 로그로 드러나고, 전환 직후 확인은 런북 절차가 맡습니다.
 
 ## 통계와 보존 작업
 

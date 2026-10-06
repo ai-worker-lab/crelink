@@ -14,7 +14,7 @@ crelink이 의존하는 외부 SaaS와 개발 도구를 한곳에서 찾기 위�
 | Dependabot | SaaS | 사용 중 | npm·Actions·Docker(`apps/api`·`apps/web` Dockerfile)·Docker Compose(`infra/prod`) 의존성 갱신 PR(주 1회) | `.github/dependabot.yml` |
 | npm registry | SaaS | 사용 중 | `pnpm install`의 패키지 다운로드 | `pnpm-lock.yaml`, 각 `package.json` |
 | Node.js · pnpm(corepack) | 도구 | 사용 중 | 런타임과 workspace 관리. 지원 버전은 CI matrix, 로컬 기본값은 `.nvmrc` | `.github/workflows/ci.yml`, `.nvmrc`, 루트 `package.json`의 `packageManager` |
-| Docker Engine/Compose · Docker Hub 이미지 | 도구·SaaS | 사용 중 | 로컬 PostgreSQL(`postgres:17-alpine`)·Valkey(`valkey/valkey:8-alpine`), 운영 이미지 베이스(`node:22-slim`)와 운영 스택(`caddy`, `alpine`) | `infra/local/compose.yaml`, `apps/*/Dockerfile`, `infra/prod/compose.yaml` |
+| Docker Engine/Compose · Docker Hub 이미지 | 도구·SaaS | 사용 중 | 로컬 PostgreSQL(`postgres:17-alpine`)·Valkey(`valkey/valkey:8-alpine`), API 저장소 계약 시험의 일회용 SeaweedFS(`chrislusf/seaweedfs:4.47`, 테스트가 `docker run`), 운영 이미지 베이스(`node:22-slim`)와 운영 스택(`caddy`, `alpine`), 업로드 이전 도구(`amazon/aws-cli`, 런북 9) | `infra/local/compose.yaml`, `apps/api/test/test-s3.ts`, `apps/*/Dockerfile`, `infra/prod/compose.yaml` |
 | PM2 | 도구 | 사용 중 | 로컬 API·웹·Expo 개발 서버 실행 | `ecosystem.config.cjs`, `Makefile` |
 | Next.js 텔레메트리 | SaaS | 사용 중(기본값, 운영 이미지 빌드는 끔) | 로컬·CI `next build`가 익명 사용 통계를 Next.js 운영사(Vercel)에 전송. 빌드 출력에서 확인. 웹 이미지는 `NEXT_TELEMETRY_DISABLED=1` | `apps/web`, `apps/web/Dockerfile` |
 
@@ -35,6 +35,7 @@ crelink이 의존하는 외부 SaaS와 개발 도구를 한곳에서 찾기 위�
 | Cloudflare(DNS·Tunnel) | SaaS | 사용 중 | `shaul.kr` DNS, TLS 종료, 원격 관리형 Tunnel로 `go`·`links` 공개(서버 인바운드 없음) | [운영 배포 설계](../specs/crelink-prod-deploy.md), [prod 런북](../../infra/docs/prod-runbook.md#3-cloudflare-tunnel-공개-호스트) |
 | Tailscale | SaaS | 사용 중(CI 접속은 관리 화면 설정 후) | 운영자 관리 접속, CI 배포 접속(workload identity federation, `tag:ci`). Personal 무료 플랜은 비상업 조건 | [prod 런북](../../infra/docs/prod-runbook.md#2-ci-접속-설정-tailscalegithub) |
 | Supabase | SaaS | 사용 중 | 관리형 PostgreSQL(세션 풀러, TLS `verify-full`) | [운영 배포 설계](../specs/crelink-prod-deploy.md), [prod 런북](../../infra/docs/prod-runbook.md#12-supabase-주의사항) |
+| SeaweedFS(home-server 자체 운영, `https://s3.shaul.kr`) | 서버(S3 호환 API) | 사용 중(`FILE_STORAGE=s3`로 전환한 뒤) | 업로드 이미지 저장(버킷 `crelink-uploads`, identity `crelink`). 같은 home-server·가정 회선·Cloudflare Tunnel에 의존하고 단일 노드라 그 서버 장애·디스크 손상이 곧 이미지 장애·손실입니다. API는 AWS SDK v3(`@aws-sdk/client-s3`)로 path-style 접근 | [API 문서](../../apps/api/docs/README.md#이미지-저장소), [prod 런북](../../infra/docs/prod-runbook.md#9-업로드-저장소), [home-seaweedfs](https://github.com/shaul1991/home-seaweedfs) |
 | SOPS · age | 도구 | 사용 중 | 운영 비밀값 암호문(`infra/prod/secrets/`)과 서버 복호화 | `.sops.yaml`, `infra/prod/bootstrap.sh` |
 | Caddy(공식 Docker 이미지) | 도구 | 사용 중 | 운영 스택의 공개 경로 정책(http, TLS는 Cloudflare) | `infra/prod/Caddyfile` |
 
