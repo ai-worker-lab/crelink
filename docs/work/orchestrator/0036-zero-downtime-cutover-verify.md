@@ -4,7 +4,7 @@
 - 역할: orchestrator
 - 상위: 0031
 - 선행: 0035
-- 상태: 진행
+- 상태: 완료
 - 종류: 운영
 - 우선순위: P1 (AI 제안)
 - 작성일: 2026-10-07
@@ -17,7 +17,7 @@
 
 ### 준비
 
-- [ ] 사용자 확인을 기록한다: Supabase Pool Size와 운영 `DATABASE_POOL_MAX`(0034), cutover 날짜·시각(트래픽이 적은 시간), 공백 알림 여부·대상, 구 색을 drain 뒤 멈출지 롤백 대기용으로 켜 둘지(기본 멈춤).
+- [x] 사용자 확인을 기록한다: Supabase Pool Size와 운영 `DATABASE_POOL_MAX`(0034), cutover 날짜·시각(트래픽이 적은 시간), 공백 알림 여부·대상, 구 색을 drain 뒤 멈출지 롤백 대기용으로 켜 둘지(기본 멈춤).
 - [x] 0032·0033·0034가 운영에 배포되어 있고(배포 기록 태그·`status`), 0035가 `검증` 이상이다.
 - [x] 병합·적용 순서를 정해 기록한다. 기본안: 운영 창에서 0035를 main에 병합 → 자동 배포가 새 릴리스를 서버 `releases/<SHA>`에 풀고 edge 미준비로 아무것도 바꾸지 않은 채 실패(0035 수용 기준, 운영 영향 없음) → 서버에서 `bootstrap.sh` 재실행(네트워크·edge 폴더·`ssh-entry.sh`) → 런북 cutover 절 실행. 대안: Deploy 워크플로를 잠시 끄고 수동 실행.
 - [x] 되돌리기를 먼저 리허설한다(로컬 또는 0035 시험 환경): edge 정지 → 옛 `crelink-prod` 릴리스로 `up --wait` → `verify` 6개 ok. 걸린 시간을 기록한다.
@@ -41,7 +41,7 @@
 
 - [x] `docs/specs/crelink-prod-deploy.md`를 현재 동작으로 고친다: 구성·서버 배치(project·`state/active-color`·edge 폴더), "릴리스·배포·롤백"의 무중단 아님 문장과 흐름, 이식 규칙 7·8, 위험·후속, 변경 범위 표, 변경 기록.
 - [x] `infra/docs/prod-runbook.md` 머리말의 "배포 중 약 30~40초 502" 현재 제약 문구를 실제 결과로 바꾼다(cutover 결과가 다르면 0035 절차와 함께 갱신).
-- [ ] ADR 0011 상태를 사용자 확인에 따라 `승인`으로 바꾸고 `docs/README.md` 색인 설명을 맞춘다. 0033에서 `deploymentId`를 넣었으면 `.github/workflows/` 웹 이미지 빌드 인자(커밋 SHA)를 연결한다.
+- [x] ADR 0011 상태를 사용자 확인에 따라 `승인`으로 바꾸고 `docs/README.md` 색인 설명을 맞춘다. 0033에서 `deploymentId`를 넣었으면 `.github/workflows/` 웹 이미지 빌드 인자(커밋 SHA)를 연결한다.
 - [x] 루트 `CHANGELOGS.md`, 에픽 0031 수용 기준 체크와 상태.
 
 ## 범위
@@ -79,6 +79,7 @@
   - Rollback 2회 연속(기본 `a9be871` → `5e3e847` run 37537631275, `release=a9be871` run 37537818831): 실패 0/5,307건, 느린 요청 59/59, DB 최대 20·8.
   - 공개 주소 루프(운영자 PC, Cloudflare 경유, 0.5초마다 웹 `/privacy`·단축 302·BFF health)를 걸고 Rollback 2회(run 37538036416, 37538176919): 실패 0/240건.
   - 앞서 기록한 자동 배포 2회(실패 0/4,749·0/7,872)와 합쳐 배포 4회·롤백 6회·헬스 실패 배포 1회·GeoIP 1회 모두 오류 0건. 성공 응답 최장 0.08초 이하(평시와 같은 수준, p99 기준 + 1초 이내). 매 전환 뒤 옛 색 `Exited (0)`, 워크플로 `verify` 6개 ok, 마지막 상태 `a9be871`·blue·`verify` 6개 ok.
-  - DB 연결: `pg_stat_activity` 전체 최대 20(`max_connections` 60), 크리링 사용자 최대 8(Pool Size 15 [추정] 미만).
+  - DB 연결: `pg_stat_activity` 전체 최대 20(`max_connections` 60), 크리링 사용자 최대 8(Pool Size 15 미만).
   - 곁가지 발견: BFF로 100KB를 넘는 JSON 본문을 보내면 API가 `PayloadTooLargeError`를 413이 아니라 500으로 응답(`ApiExceptionFilter`). 무중단과 무관한 기존 동작이라 별도 처리 대상(사용자 결정).
-- 남은 것: Supabase Pool Size 대시보드 확인(수용 기준 1), ADR 0011 `승인`(사용자 확인).
+- 2026-10-07: ADR 0011 승인(사용자). ADR 상태·결과 줄, `docs/README.md` 색인, 운영 설계 "운영 결과"·위험·후속·이식 규칙 8, 에픽 0031 결정 표기를 `승인`과 검증 결과로 맞춤. `deploymentId`는 넣지 않음(사용자 미결정).
+- 2026-10-07: 사용자 확인: Supabase Pool Size 15(대시보드). `DATABASE_POOL_MAX=6`(`2 × 6 = 12 ≤ 15 − 2`) 그대로. 런북 12·설계 위험의 `[확인 못 함]`을 확인값으로 바꿈. 수용 기준 전부 충족, 완료.

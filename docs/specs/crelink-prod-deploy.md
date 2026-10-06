@@ -117,7 +117,7 @@ Tunnel은 edge Caddy 하나로만 들어오고, edge Caddy는 활성 색의 `api
 7. `ssh-entry.sh status`: 운영 릴리스, 활성 색(`color blue|green|-`), `images.env`, `releases.log` 마지막 5줄.
 8. cutover(서버마다 한 번): blue/green 이전 단일 스택 `crelink-prod`(스택 안 caddy가 18080을 쥠)에서 edge + `crelink-blue`로 옮기는 일은 운영자가 서버에서 직접 실행하는 `cutover.sh`(사전 점검·`--dry-run`·멱등·자동 원복, `--revert`로 되돌리기)입니다. 워크플로·`ssh-entry.sh`로는 실행되지 않습니다. 절차: [런북 14](../../infra/docs/prod-runbook.md#14-bluegreen-cutover).
 
-**운영 결과(무중단)**: home-server는 2026-10-06T21:16Z에 cutover했고 그때 한 번 생긴 공백은 0.5초였습니다(대상마다 0.1초 간격 측정). 그 뒤 자동 배포 2회(blue → green, green → blue) 동안 서버에서 부하를 흘리며 잰 요청 4,749건·7,872건이 모두 성공했고(5xx·연결 오류 0건), 옛 색 api·web은 drain 20초 뒤 `Exited (0)`(강제 종료 아님)로 멈췄습니다. 측정 방법은 [런북 6-1](../../infra/docs/prod-runbook.md#6-1-배포-공백-측정), 실행 기록(시각·릴리스·run)은 `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`입니다. 남는 공백은 edge 재생성(Caddy 이미지·포트·마운트 변경, 1~2초[추정])뿐이고 아래 "위험·후속"에 있습니다.
+**운영 결과(무중단)**: home-server는 2026-10-06T21:16Z에 cutover했고 그때 한 번 생긴 공백은 0.5초였습니다(대상마다 0.1초 간격 측정). 그 뒤 서버에서 부하(3개 경로 합계 초당 30건, 약 9초 걸리는 느린 요청, 운영자 회선의 공개 주소 루프)를 흘리며 배포 4회·롤백 6회·헬스 실패 배포 1회·`geoip.sh --restart` 1회를 했고 모든 요청이 성공했습니다(5xx·연결 오류 0건, 느린 요청 전부 완료, 성공 응답 최장 0.08초 이하). 헬스 실패 배포는 새 색만 내리고 활성 색·트래픽을 바꾸지 않았고(종료 1), 옛 색 api·web은 매번 drain 20초 뒤 `Exited (0)`(강제 종료 아님)로 멈췄으며, DB 연결은 겹치는 구간에도 전체 20·크리링 8 이하였습니다. 측정 방법은 [런북 6-1](../../infra/docs/prod-runbook.md#6-1-배포-공백-측정), 실행 기록(시각·릴리스·run)은 `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`입니다. 남는 공백은 edge 재생성(Caddy 이미지·포트·마운트 변경, 1~2초[추정])뿐이고 아래 "위험·후속"에 있습니다.
 
 ## 워크플로
 
@@ -157,7 +157,7 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 5. 관리 접속은 Tailscale 하나로 통일합니다.
 6. 비밀 원본은 sops 암호문이고 CI에 두지 않습니다.
 7. 헬스·전환 계약을 대상과 무관하게 유지합니다: 이미지 HEALTHCHECK, 비활성 색 `up --wait` → edge 안 내부 헬스 → `caddy validate`·`reload`로만 트래픽 전환, 실패하면 새 색만 내리고 활성 색·`current`·트래픽 불변(종료 1), 성공했을 때만 `state/active-color`·`releases.log` 갱신, 롤백도 같은 전환. `deploy.sh`·`rollback.sh`·`ssh-entry.sh`의 인자·종료 코드(0/1/2)·마지막 줄과 `releases.log` 형식은 바꾸지 않습니다. web→api는 같은 색 별칭만 씁니다.
-8. 서버 준비는 `bootstrap.sh`(패키지·`deploy` 사용자·`ssh-entry.sh`, 네트워크 `crelink-edge`, 볼륨 `crelink-prod_geoip`, `/opt/crelink/edge/conf`)로 재현하고, 새 대상의 첫 edge·blue 기동은 `cutover.sh`(옛 스택이 없으면 공백 단계를 건너뜀)로 합니다([런북 5](../../infra/docs/prod-runbook.md#5-최초-배포)·[10](../../infra/docs/prod-runbook.md#10-배포-대상-추가와-tunnel-전환)). 서버가 2대 이상이 되거나 관리형으로 옮기면 OpenTofu를 검토합니다. 무중단 배포 방식은 [ADR 0011](../adr/0011-zero-downtime-deploy.md)(제안, home-server에 적용됨: 고정 edge Caddy + Blue/Green)입니다.
+8. 서버 준비는 `bootstrap.sh`(패키지·`deploy` 사용자·`ssh-entry.sh`, 네트워크 `crelink-edge`, 볼륨 `crelink-prod_geoip`, `/opt/crelink/edge/conf`)로 재현하고, 새 대상의 첫 edge·blue 기동은 `cutover.sh`(옛 스택이 없으면 공백 단계를 건너뜀)로 합니다([런북 5](../../infra/docs/prod-runbook.md#5-최초-배포)·[10](../../infra/docs/prod-runbook.md#10-배포-대상-추가와-tunnel-전환)). 서버가 2대 이상이 되거나 관리형으로 옮기면 OpenTofu를 검토합니다. 무중단 배포 방식은 [ADR 0011](../adr/0011-zero-downtime-deploy.md)(승인, home-server에 적용됨: 고정 edge Caddy + Blue/Green)입니다.
 
 ## 변경 범위
 
@@ -179,10 +179,10 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 ## 위험·후속 `[임시값]`
 
 - Supabase 무료 플랜: 자동 일시정지·백업 제한. 출시 전 유료 전환 또는 백업 절차 필요.
-- **배포 중 502 → 해소(0036)**: 배포·롤백·`geoip.sh --restart`는 Blue/Green 무중단 전환이고, 운영에서 cutover 뒤 배포 2회 동안 부하 요청 실패 0건이었습니다(위 "운영 결과"). 남은 위험:
+- **배포 중 502 → 해소(0036)**: 배포·롤백·`geoip.sh --restart`는 Blue/Green 무중단 전환이고, 운영에서 cutover 뒤 부하 중 배포 4회·롤백 6회·헬스 실패 배포 1회·GeoIP 재기동 1회 동안 요청 실패 0건이었습니다(위 "운영 결과"). 남은 위험:
   - **이전 형식 릴리스로 롤백 불가**: cutover 전 릴리스(compose에 `caddy`가 있거나 `name: crelink-prod`, 예: `433dc88`)는 `rollback.sh`가 거부합니다(종료 1, 무변경). 그 릴리스로 돌아가려면 `cutover.sh --revert`(수십 초 공백이 있던 옛 구조로 돌아감)이고, 최근 5개 정리로 그 릴리스 폴더가 지워지면 [런북 14-6](../../infra/docs/prod-runbook.md#14-6-종료-2와-수동-복구)의 수동 복구만 남습니다. 옛 구조의 코드·설정이 필요하면 그 변경을 main에 새로 병합해 배포합니다.
   - **edge 재생성 1~2초 공백**: edge compose(Caddy 이미지·포트·마운트·환경변수) 변경은 reload로 반영되지 않아 edge 컨테이너를 다시 만들어야 하고 그동안 18080 리스너가 없습니다(1~2초[추정], cutover의 caddy 교체는 운영 0.5초). 배포가 하지 않고 운영자가 트래픽이 적은 시각에 [런북 6-3](../../infra/docs/prod-runbook.md#6-3-edge-설정-갱신caddy-이미지-업그레이드)으로 합니다. Dependabot이 `infra/prod/edge`의 Caddy 이미지 갱신 PR을 열어도 병합 배포만으로는 서버 edge가 바뀌지 않습니다.
-  - **DB 연결 2배**: 새 색 기동부터 옛 색 정지까지 구·신 API가 함께 돌아 연결이 최대 `2 × DATABASE_POOL_MAX`(12)입니다. Supabase Pool Size(15로 봄, `[확인 못 함]`)를 넘으면 새 색 readiness가 실패해 배포가 실패합니다(트래픽 영향 없음). Pool Size·compute·`DATABASE_POOL_MAX`를 바꿀 때 [런북 12](../../infra/docs/prod-runbook.md#12-supabase-주의사항)의 식을 다시 봅니다. 같은 구간에 Node 프로세스 메모리도 2벌입니다.
+  - **DB 연결 2배**: 새 색 기동부터 옛 색 정지까지 구·신 API가 함께 돌아 연결이 최대 `2 × DATABASE_POOL_MAX`(12)입니다. Supabase Pool Size(15, 대시보드 확인)를 넘으면 새 색 readiness가 실패해 배포가 실패합니다(트래픽 영향 없음). Pool Size·compute·`DATABASE_POOL_MAX`를 바꿀 때 [런북 12](../../infra/docs/prod-runbook.md#12-supabase-주의사항)의 식을 다시 봅니다. 같은 구간에 Node 프로세스 메모리도 2벌입니다.
   - **`cutover.sh`는 서버마다 1회용**: blue/green 이전 서버를 옮기거나(이미 옮긴 home-server는 다시 실행해도 "이미 cutover됨"으로 종료 0) 새 대상의 첫 edge·blue를 띄울 때만 씁니다. 되돌리기(`--revert`)는 옛 릴리스 폴더·`.images.env`·이미지가 서버에 남아 있을 때만 됩니다.
 - 업로드 저장소 SeaweedFS는 home-server 한 대(단일 master·volume·filer, 복제 없음)와 가정 회선·Cloudflare Tunnel에 의존합니다. 서버·회선·SeaweedFS 장애면 이미지 업로드·조회가 500이 되고(단축 이동은 영향 없음, readiness에 넣지 않음), 디스크가 망가지면 데이터를 잃습니다. 백업은 SeaweedFS 데이터 디렉터리 백업(home-seaweedfs README "운영")이 맡고 아직 정기 실행·서버 밖 보관이 정해지지 않았습니다. API를 다른 대상으로 옮겨도 이미지 가용성은 home-server에 남으므로, 그때 Cloudflare R2 등 관리형 저장소로 옮길지 정합니다(사용자 결정).
 - OCI 대상 추가는 필요할 때 `targets.json`에 `enabled: false`로 준비한 뒤 런북대로. 웹 이미지 arm64 빌드(QEMU) 시간은 그때 확인하고, 느리면 네이티브 arm64 러너로 나눕니다.
@@ -211,3 +211,4 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 - 2026-10-07: 배포 중 502 현황을 실제 관측(약 30~40초)과 원인으로 고치고, 무중단 배포 계획(ADR 0011 제안, 에픽 0031)을 이식 규칙 8·위험·후속에 연결. 현재 동작은 바뀌지 않음. 근거: `docs/work/epics/0031-zero-downtime-deploy.md`.
 - 2026-10-07: 0단계(에픽 0031 티켓 0034): compose api·web `stop_grace_period: 30s`·healthcheck `start_interval: 1s`(+ 이미지와 같은 `start_period`), 암호문 평문 키 `DATABASE_POOL_MAX=6`, 배포 공백 측정 도구(`infra/prod/measure-gap.sh`, 런북 6-1). 근거: `docs/work/infra/0034-prod-compose-graceful-stop.md`.
 - 2026-10-07: Blue/Green 무중단 배포(에픽 0031, 0035 구현·0036 운영 적용)에 맞춤: 구성도(Tunnel → edge Caddy `crelink-edge` → 활성 색 `api-<색>`·`web-<색>`), 공개 경로(업스트림 스니펫·같은 색 web→api `http://api-<색>:3000`·헬스 포트), 서버 배치(`state/active-color`·`edge/`·project·네트워크·외부 볼륨), 색 전환 흐름·실패 시 활성 색 불변·종료 코드, "무중단 아님"을 운영 실측(cutover 공백 0.5초, 배포 2회 실패 0건)으로, DB migration 규칙, 이식 규칙 3·7·8, 변경 범위 0031~0036, 위험·후속(502 해소, 남은 위험 4가지). 근거: `docs/work/infra/0035-prod-blue-green-edge.md`, `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`.
+- 2026-10-07: ADR 0011 승인(사용자). 운영 검증 결과(배포 4회·롤백 6회·헬스 실패 배포·GeoIP 재기동 모두 요청 실패 0건)를 위험·후속에 반영. 근거: `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`.

@@ -1,7 +1,7 @@
 # ADR 0011: 운영 배포 무중단 방식(고정 edge Caddy + Blue/Green 앱 스택)
 
 - 날짜: 2026-10-07
-- 상태: 제안 (구현과 운영 적용(home-server, 0036)을 마쳤고 `승인`은 사용자 확인 후)
+- 상태: 승인 (2026-10-07 사용자 승인. home-server에 구현·운영 적용·검증 완료)
 - 범위: 운영 배포·롤백·GeoIP 재시작의 전환 방식(`infra/prod/`의 compose·Caddyfile·`lib.sh`·`deploy.sh`·`rollback.sh`·`geoip.sh`·`bootstrap.sh`·시험), API·웹의 종료 동작(`apps/api/src/main.ts`·`database.ts`, `apps/web` standalone 서버)
 - 관계: [ADR 0010](0010-prod-deployment-topology.md)의 서버 1대 배치·공개 경로 정책(Tunnel, 호스트별 경로)·CI 접속·비밀값·릴리스 단위는 그대로 두고, 검토한 대안 "Kamal 2"의 "무중단 배포가 필요해질 때 … 후보로 둡니다"와 ADR 0010 결정 1의 단일 project·결정 2의 스택 안 Caddy·결정 6의 헬스 실패 복구 방식을 이 결정이 대체합니다.
 
@@ -49,4 +49,4 @@
 - **cutover 1회 공백**: `crelink-prod`(스택 안 Caddy)에서 `crelink-edge` + 색 스택으로 처음 옮길 때 18080을 쥔 Caddy를 바꾸는 수 초 공백이 한 번 생깁니다[추정]. 트래픽이 적은 시각에 알리고 하며, 되돌리기 절차(옛 `crelink-prod` 재기동)를 먼저 준비합니다. 운영 실측은 0.5초였습니다.
 - **남는 공백**: Caddy 이미지 업그레이드와 edge 설정 중 reload로 반영할 수 없는 변경(포트·마운트)은 edge 재생성(1~2초)이 필요하므로 드물게 따로 수행합니다. 서버·회선 장애(단일 장애점)는 이 결정의 범위 밖입니다.
 - **이식성 유지**: compose와 Caddy만 쓰므로 OCI·AWS VM에서도 `bootstrap.sh`(네트워크·edge 폴더 준비)만 같으면 같은 절차입니다.
-- **운영 적용·실측(0036)**: home-server는 2026-10-06에 cutover했고(공백 0.5초), 그 뒤 부하를 흘리며 한 배포 2회(blue → green, green → blue)에서 요청 실패가 0건이었습니다. 결정 5의 롤백 2회·헬스 실패 배포 운영 검증은 남아 있습니다. 결과 요약은 [운영 배포 설계 "릴리스·배포·롤백"](../specs/crelink-prod-deploy.md#릴리스배포롤백)에 있습니다.
+- **운영 적용·실측(0036)**: home-server는 2026-10-06에 cutover했고(공백 0.5초), 그 뒤 부하(서버 초당 30건 + 약 9초 걸리는 느린 요청 + 공개 주소 루프)를 흘리며 한 배포 4회·롤백 6회·헬스 실패 배포 1회·GeoIP 재기동 1회에서 요청 실패가 0건이었습니다(결정 5의 검증 기준 충족). 결과 요약은 [운영 배포 설계 "릴리스·배포·롤백"](../specs/crelink-prod-deploy.md#릴리스배포롤백)에 있습니다.
