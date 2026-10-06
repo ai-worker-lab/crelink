@@ -3,7 +3,7 @@
 - 단계: 티켓
 - 역할: web
 - 상위: 0031
-- 상태: 검증
+- 상태: 완료
 - 종류: 운영
 - 우선순위: P1 (AI 제안)
 - 작성일: 2026-10-07
@@ -53,3 +53,4 @@
   - 문서: `apps/web/README.md` "종료 동작(SIGTERM)", `apps/web/CHANGELOGS.md`.
   - 0035 인계: 정지 중 새 연결은 거부되므로 edge(Caddy)는 구 색을 멈추기 전에 새 색으로 보내기를 마쳐야 함. 또 진행 중이던 keep-alive 연결로 새 요청이 계속 오면 구 웹이 grace까지 남고 grace에서 끊기므로, 전환 뒤 Caddy가 구 upstream 연결로 더 보내지 않는지(설정 reload 때 옛 transport 연결 정리 여부)를 0035 실측에서 확인할 것 [추정: reload가 옛 handler의 쉬는 연결을 닫음].
   - 후속(사용자 결정 필요): `deploymentId`(`next.config.ts` `deploymentId: process.env.NEXT_DEPLOYMENT_ID`, Dockerfile 빌드 인자, 워크플로가 커밋 SHA 전달은 orchestrator). 값이 바뀌면 열린 탭이 전체 새로고침해 작성 중 입력을 잃을 수 있어 도입 여부를 사용자가 정한 뒤 별도 work item으로 진행.
+- 2026-10-07: 운영 반영(통합 담당, PR #13 → 자동 배포 릴리스 `433dc88`, compose `stop_grace_period: 30s`). `deploymentId`(선택)는 사용자 결정 대기로 남김.

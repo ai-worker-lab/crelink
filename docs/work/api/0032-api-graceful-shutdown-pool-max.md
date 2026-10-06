@@ -3,7 +3,7 @@
 - 단계: 티켓
 - 역할: api
 - 상위: 0031
-- 상태: 검증
+- 상태: 완료
 - 종류: 운영
 - 우선순위: P1 (AI 제안)
 - 작성일: 2026-10-07
@@ -53,3 +53,4 @@ API는 SIGTERM을 받으면 바로 죽습니다(`apps/api/src/main.ts`에 `enabl
   - 기준(main `3c9ed95`): 5건 **0/5**(curl `000`, 응답 없이 연결 끊김), `docker stop` 0.16초, 종료 코드 **143**, 종료 로그 없음.
   - 운영 compose의 `FILE_STORAGE: s3`가 아니라 disk로 실측함. 업로드의 느린 구간은 클라이언트 본문 수신이라 종료 순서 검증에는 차이가 없다고 판단 [추정]. Caddy 뒤 keep-alive 동작은 e2e(`Connection: close`, idle 연결 종료)로 확인했고 실제 Caddy와는 0034·0035에서 확인.
 - 2026-10-07: 후속(이 티켓 범위 밖, 통합 담당에 전달). `.sops.yaml` `unencrypted_regex`와 `docs/specs/crelink-prod-deploy.md` 평문 키 목록에 `DATABASE_POOL_MAX` 추가(0034). `docs/references/zero-downtime-deploy.md` "API graceful shutdown" 행과 ADR 0011의 "`app.enableShutdownHooks()`" 표현은 위 범위 변경과 맞게 고칠 필요가 있음.
+- 2026-10-07: 운영 반영(통합 담당, PR #13 → 자동 배포 릴리스 `433dc88`). 운영 api `DATABASE_POOL_MAX=6`. 이후 롤백 측정에서 이 이미지의 정지는 오류 없이 끝났고 공백은 caddy 재생성·기동 순서 몫(티켓 0034 진행 기록). 위 후속 항목(정규식·평문 키 목록·ADR·조사 문서 표현)은 통합 브랜치에서 반영함.
