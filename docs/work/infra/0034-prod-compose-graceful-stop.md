@@ -4,7 +4,7 @@
 - 역할: infra
 - 상위: 0031
 - 선행: 0032
-- 상태: 분류 대기
+- 상태: 진행
 - 종류: 운영
 - 우선순위: P1 (AI 제안)
 - 작성일: 2026-10-07
@@ -45,3 +45,4 @@ blue/green(0035) 전에 단독으로 배포할 수 있는 0단계입니다. 지�
 ## 진행 기록
 
 - 2026-10-07: 생성(에픽 0031 계획). 선행 0032(graceful shutdown·`DATABASE_POOL_MAX`). 사용자 확인 필요: Supabase Pool Size.
+- 2026-10-07: 착수(브랜치 `work/0034-prod-compose-graceful-stop`). 에픽 공유 계약: `DATABASE_POOL_MAX` 운영값 6은 통합 담당이 암호문 평문 키로 넣고, 이 티켓은 `.sops.yaml` `unencrypted_regex`에 키만 추가.
