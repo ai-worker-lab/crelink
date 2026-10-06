@@ -33,6 +33,10 @@
 
 실패한 테스트의 trace는 `.local/smoke/test-results/`에 남습니다. `pnpm exec playwright show-trace <trace.zip>`으로 엽니다.
 
+## `pnpm e2e`
+
+기능 시나리오 E2E는 `pnpm smoke`와 분리해 [`tests/e2e/`](../../tests/e2e/README.md)에 둡니다. [`scripts/e2e.mjs`](../../scripts/e2e.mjs)가 실행 중인 인스턴스(`make up`)의 웹·API·DB에 Playwright로 크리링 MVP 시나리오([MVP 기술 설계 검증 계획](../specs/crelink-mvp.md#검증-계획))를 실행합니다. 로그인 상태는 DB fixture가 세션 행을 넣어 만들고, 테스트 데이터는 끝에 지웁니다. `pnpm verify`의 웹 빌드가 실행 중인 개발 서버를 깨뜨릴 수 있으므로(0019) verify 뒤에는 `make web-restart` 후 `pnpm smoke`·`pnpm e2e`를 실행합니다.
+
 ## CI
 
 [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)이 `main` 대상 PR과 `main` push에서 실행합니다.

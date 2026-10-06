@@ -80,7 +80,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # 포트·주소는 이 checkout 인스턴스(슬롯 0, 원본 infra/local/.env.example) 값을 다음 단계 환경으로 넘깁니다.
       - name: 인스턴스 포트
-        run: node scripts/instance.mjs --print-env | grep -E '^(API_PORT|WEB_PORT|API_URL|WEB_URL)=' >> "$GITHUB_ENV"
+        run: node scripts/instance.mjs --print-env | grep -E '^(API_PORT|WEB_PORT|API_URL|WEB_URL|SHORT_LINK_BASE_URL)=' >> "$GITHUB_ENV"
       - run: pnpm --filter @crelink/shared build
       - run: pnpm --filter @crelink/api build
       - run: pnpm --filter @crelink/web build

@@ -11,6 +11,8 @@
 - 크리링 PRD 확정(MVP 범위, R1~R16)과 MVP 기술 설계 승인(`docs/specs/crelink-mvp.md`), 에픽 0014·티켓 0015~0018. 근거 `docs/work/epics/0014-crelink-mvp.md`.
 - 크리링 MVP API 계약을 `packages/shared/src/crelink.ts`에 확정: 경로(`CRELINK_API_PATHS`·`CRELINK_WEB_PATHS`), DTO, 오류 코드(`CrelinkErrorCode`), 쿠키 이름, 임시 한도(`CRELINK_LIMITS`), 예약 단축 주소. 근거 `docs/work/api/0015-crelink-mvp-contract.md`.
 - 로컬 인스턴스 키에 `SHORT_LINK_BASE_URL`(로컬은 API 주소) 추가, PM2가 API에 `WEB_URL`·`SHORT_LINK_BASE_URL`을 넘김.
+- 크리링 MVP E2E: `pnpm e2e`(`scripts/e2e.mjs`)가 실행 중인 웹·API·DB에 설계 검증 계획 E2E 1~4(`tests/e2e/`)를 Playwright로 실행. 구글 로그인 대신 개발 DB에 가입 결과 행·세션을 넣고 `cl_session` 쿠키를 심는 fixture, 고유 이메일·주소·도메인과 테스트 끝 정리, 390px 가로 넘침·콘솔 오류 확인. 루트 devDependency `pg`·`@types/pg`. 근거 `docs/work/orchestrator/0018-crelink-mvp-integration.md`, 사용법 `tests/e2e/README.md`.
+- 크리링 MVP 통합: API(0016)·웹(0017) 연결, `pnpm geoip:download`(DB-IP Lite MMDB → `.local/geoip/`, 있으면 PM2가 `GEOIP_MMDB_PATH` 전달), CI smoke 작업에 `SHORT_LINK_BASE_URL` 전달, 로컬 설정·비밀값·외부 의존·검증 문서 갱신, `pnpm verify` 웹 빌드가 개발 서버를 깨뜨리는 문제 0019 등록. 근거 `docs/work/orchestrator/0018-crelink-mvp-integration.md`.
 
 ## 2026-10-02
 

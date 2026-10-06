@@ -5,6 +5,7 @@ import { Client } from 'pg';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/app.setup';
 import { createTestDatabase, TestDatabase } from './test-database';
+import { setTestEnvironment, WEB_URL } from './test-app';
 
 describe('API 기동과 health', () => {
   let database: TestDatabase;
@@ -13,7 +14,7 @@ describe('API 기동과 health', () => {
 
   beforeAll(async () => {
     database = await createTestDatabase();
-    process.env.DATABASE_URL = database.url;
+    setTestEnvironment(database.url);
     app = await NestFactory.create(AppModule, { logger: false });
     configureApp(app);
     await app.listen(0, '127.0.0.1');
@@ -31,17 +32,47 @@ describe('API 기동과 health', () => {
     expect(await response.json()).toEqual({ status: 'ok' });
   });
 
-  it('prefix 없는 /health는 존재하지 않는다', async () => {
-    const response = await fetch(`${baseUrl}/health`);
-    expect(response.status).toBe(404);
+  it('prefix 없는 /health는 health가 아니라 단축 도메인이 처리한다(예약어라 없는 주소 안내)', async () => {
+    const response = await fetch(`${baseUrl}/health`, { redirect: 'manual' });
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(`${WEB_URL}/notice?reason=link_not_found`);
   });
 
-  it('기동 시 빈 데이터베이스에 migration 기록 테이블을 만든다', async () => {
+  it('없는 /api 경로는 404와 ApiError를 반환한다', async () => {
+    const response = await fetch(`${baseUrl}/api/nope`);
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ code: 'not_found', message: '요청한 경로를 찾을 수 없습니다.' });
+  });
+
+  it('기동 시 빈 데이터베이스에 migration을 적용해 크리링 테이블을 만든다', async () => {
     const client = new Client({ connectionString: database.url });
     await client.connect();
     try {
-      const result = await client.query("SELECT to_regclass('public.schema_migrations') AS table_name");
-      expect(result.rows[0].table_name).toBe('schema_migrations');
+      const tables = await client.query<{ table_name: string }>(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'",
+      );
+      expect(tables.rows.map((row) => row.table_name).sort()).toEqual([
+        'blocked_domains',
+        'files',
+        'landing_blocks',
+        'landings',
+        'link_click_rollups',
+        'link_clicks',
+        'links',
+        'portfolio_items',
+        'schema_migrations',
+        'sessions',
+        'short_links',
+        'short_slugs',
+        'social_links',
+        'user_identities',
+        'users',
+        'visit_daily_rollups',
+        'visit_dimension_rollups',
+        'visits',
+      ]);
+      const applied = await client.query('SELECT version FROM schema_migrations');
+      expect(applied.rows).toEqual([{ version: '0001_crelink_mvp' }]);
     } finally {
       await client.end();
     }
@@ -55,7 +86,7 @@ describe('readiness', () => {
 
   beforeAll(async () => {
     database = await createTestDatabase();
-    process.env.DATABASE_URL = database.url;
+    setTestEnvironment(database.url);
     app = await NestFactory.create(AppModule, { logger: false });
     configureApp(app);
     await app.listen(0, '127.0.0.1');

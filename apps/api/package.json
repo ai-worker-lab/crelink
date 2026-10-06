@@ -10,17 +10,23 @@
     "test": "jest"
   },
   "dependencies": {
+    "@crelink/shared": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
-    "@crelink/shared": "workspace:*",
+    "bowser": "^2.14.1",
+    "google-auth-library": "^11.1.0",
+    "maxmind": "^5.0.7",
     "pg": "^8.13.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
+    "@nestjs/testing": "^11.2.7",
+    "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
+    "@types/multer": "^2.3.0",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.10",
     "jest": "^30.5.2",
@@ -33,6 +39,10 @@
     "testRegex": "test/.*\\.e2e-spec\\.ts$|src/.*\\.spec\\.ts$",
     "transform": {
       "^.+\\.ts$": "ts-jest"
+    },
+    "moduleNameMapper": {
+      "^@crelink/shared$": "<rootDir>/../../packages/shared/src/index.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "moduleFileExtensions": [
       "ts",

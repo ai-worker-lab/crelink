@@ -15,8 +15,9 @@
 - `infra/` — [local·dev·prod 인프라 관리](infra/README.md). 현재 실행 가능한 구성은 local입니다.
 - `packages/shared/` — 클라이언트와 API가 공유하는 TypeScript 계약.
 - `packages/design-tokens/` — 디자인·웹·앱이 함께 쓰는 디자인 토큰 원본과 생성물. [사용법](packages/design-tokens/docs/usage.md)
-- `scripts/` — 저장소 도구: work item 검사·착수 목록·소유 범위·실행기(`work.mjs`, `work-scope.mjs`, `runner.mjs`), 검증(`verify.mjs`, `smoke.mjs`, `docs-check.mjs`), 로컬 인스턴스·로그(`instance.mjs`, `logs.mjs`).
+- `scripts/` — 저장소 도구: work item 검사·착수 목록·소유 범위·실행기(`work.mjs`, `work-scope.mjs`, `runner.mjs`), 검증(`verify.mjs`, `smoke.mjs`, `e2e.mjs`, `docs-check.mjs`), 로컬 인스턴스·로그(`instance.mjs`, `logs.mjs`).
 - `tests/smoke/` — 실행 중인 API·웹을 확인하는 Playwright smoke 테스트.
+- `tests/e2e/` — 실행 중인 웹·API·DB에 크리링 MVP 시나리오를 실행하는 Playwright E2E 테스트. [실행 방법](tests/e2e/README.md)
 - [WORKFLOW.md](WORKFLOW.md) — work item 실행기의 정책과 에이전트 프롬프트.
 
 에이전트용 지도는 [루트 AGENTS.md](AGENTS.md), 공통 정책 원문은 [저장소 공통 정책](docs/development/repository-policy.md), 영역별 추가 규칙은 각 하위 `AGENTS.md`가 기준입니다.
@@ -38,6 +39,7 @@ make down          # 전체 종료(데이터 볼륨 유지)
 make infra-restart # 인프라만 재시작 (api-·web-·app-restart도 같은 형식)
 pnpm format        # Prettier 서식 적용 후 ESLint 자동 수정
 pnpm tokens:generate # 디자인 토큰 원본에서 CSS 변수·앱 객체·디자인 tokens.css·OpenDesign 디자인 시스템 생성
+pnpm e2e           # 실행 중인 웹·API·DB에 크리링 MVP E2E 시나리오(tests/e2e/README.md)
 ```
 
 `make up`은 없는 로컬 설정 파일(`infra/local/.env`, `apps/api/.env`, `apps/web/.env.local`, `apps/app/.env`)을 예시에서 만듭니다. 이 checkout의 API·웹·Expo·PostgreSQL·Valkey 포트와 주소는 `pnpm instance`가 보여 줍니다. 주 checkout(슬롯 0)의 포트 원본은 [`infra/local/.env.example`](infra/local/.env.example)이고, git worktree는 슬롯마다 100씩 더한 포트와 별도 DB를 씁니다.

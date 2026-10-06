@@ -19,7 +19,7 @@
 | 영역 | 로컬 설정 위치·주입 방식 | 현재 소비 범위 |
 | --- | --- | --- |
 | 인프라 | `infra/local/.env` / 추적하는 예시는 `infra/local/.env.example` | Compose의 PostgreSQL 계정·DB명과 호스트 포트. Makefile의 `--env-file`로 명시적으로 전달하며, 호스트 포트는 `.local/instance.env`의 값이 셸 환경으로 넘어가 `--env-file` 값보다 우선함. 추적 예시의 `API_PORT`·`WEB_PORT`·`EXPO_PORT`·`POSTGRES_PORT`·`VALKEY_PORT`는 슬롯 0 포트의 유일한 원본([로컬 개발 환경](local-environment.md#인스턴스와-포트)) |
-| API | `apps/api/.env` / 추적되는 안전한 예시 `apps/api/.env.example`; 원격 배포는 프로세스 환경변수 | `loadLocalEnvironment()`가 Nest 생성 전에 로컬 `.env`를 읽고 이미 주입된 값을 덮어쓰지 않음. `DATABASE_URL`·`PORT` 필수(기본값 없음, 로컬은 `pnpm instance`가 채움) |
+| API | `apps/api/.env` / 추적되는 안전한 예시 `apps/api/.env.example`; 원격 배포는 프로세스 환경변수 | `loadLocalEnvironment()`가 Nest 생성 전에 로컬 `.env`를 읽고 이미 주입된 값을 덮어쓰지 않음. `DATABASE_URL`·`PORT`·`WEB_URL`·`SHORT_LINK_BASE_URL` 필수(기본값 없음, 로컬은 `pnpm instance`가 채우고 `make`는 PM2로 넘김). 비밀값 `GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET`과 `OPERATOR_EMAILS`는 사용자가 채우며 비면 로그인 API가 503. 선택 `UPLOAD_DIR`(기본 `.local/uploads`), `GEOIP_MMDB_PATH`(`pnpm geoip:download` 파일이 있으면 PM2가 넘김). 키 설명은 [API 문서](../../apps/api/docs/README.md#환경변수) |
 | 웹 | `apps/web/.env.local`; 웹 영역 소유의 추적 예시 `apps/web/.env.example`; 원격 배포에서는 웹 호스팅 환경 설정 | 서버 전용 `API_INTERNAL_URL`로 Nest API에 연결. 현재 `NEXT_PUBLIC_*` 공개 변수는 없음 |
 | 모바일 앱 | `apps/app/.env`; 앱 영역 소유의 추적 예시 `apps/app/.env.example` | Expo client의 `EXPO_PUBLIC_API_BASE_URL`. 서명 자격 증명은 앱 번들에 넣지 않음 |
 

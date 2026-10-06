@@ -1,7 +1,15 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { Pool, PoolClient, QueryResultRow } from 'pg';
+import { DatabaseError, Pool, PoolClient, QueryResultRow } from 'pg';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+/** 트랜잭션 client와 pool 모두 받는 질의 대상. */
+export type Queryable = Pick<PoolClient, 'query'>;
+
+/** PostgreSQL UNIQUE 제약 위반(23505). 동시 요청이 같은 값을 만들 때 오류 코드로 바꾸는 데 씁니다. */
+export function isUniqueViolation(error: unknown): boolean {
+  return error instanceof DatabaseError && error.code === '23505';
+}
 
 export function loadLocalEnvironment(): void {
   const file = resolve(__dirname, '../.env');

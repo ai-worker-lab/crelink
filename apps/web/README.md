@@ -1,8 +1,27 @@
 # crelink 웹
 
-Next.js App Router와 TypeScript 기반 웹 클라이언트입니다. 서버 컴포넌트는 서버 전용 `API_INTERNAL_URL`로 Nest API를 직접 읽고, 브라우저 요청은 same-origin BFF(`/api/backend`)를 거쳐 Nest API로 전달합니다. BFF는 허용 목록에 있는 요청만 전달하며 현재는 `GET /api/health`만 허용합니다.
+Next.js App Router와 TypeScript 기반 크리링(CreLink) 웹 클라이언트입니다. 서버 컴포넌트는 서버 전용 `API_INTERNAL_URL`로 Nest API를 직접 읽고(`src/lib/api/server.ts`, 로그인 화면은 요청의 `cl_session` 쿠키를 함께 보냄), 브라우저 요청은 same-origin BFF(`/api/backend`)를 거쳐 Nest API로 전달합니다. 화면·API 계약의 기준은 [크리링 MVP 기술 설계](../../docs/specs/crelink-mvp.md)와 [`packages/shared/src/crelink.ts`](../../packages/shared/src/crelink.ts)입니다.
 
-현재 시작 화면(서비스 이름, 한 줄 컨셉, API·DB 준비 상태 표시)은 초기 시작점이며 제품 기능이 아닙니다.
+## 화면
+
+| 경로 | 내용 |
+| --- | --- |
+| `/` | 소개, 로그인 전 `구글로 시작하기`, 로그인 후 `/me`(운영자는 `/admin`) 링크 |
+| `/auth/google`, `/auth/google/callback` | 구글 로그인 route handler. API의 `cl_oauth_state`·`cl_session` `Set-Cookie`를 그대로 붙여 302 |
+| `/me` | 크리에이터 편집(단축 URL 복사·주소 변경, 프로필, 외부 링크, SNS, 포트폴리오). 401이면 `/` |
+| `/p/[publicId]` | 공개 랜딩(SSR). 404·410 안내 |
+| `/notice?reason=` | 단축 주소·로그인 오류 안내 |
+| `/privacy` | 개인정보 수집·보관·쿠키 고지(법률 검토 전 문구) |
+| `/admin`, `/admin/creators/[userId]`, `/admin/blocked-domains` | 운영자 화면. 401이면 `/`, 403이면 권한 없음 안내 |
+
+## BFF(`src/app/api/backend/[...path]/route.ts`)
+
+- 허용 목록(메서드·경로)에 있는 요청만 전달하고 나머지는 404 `route_not_allowed`입니다. 로그인 시작·콜백은 BFF가 아니라 위 route handler가 부릅니다.
+- 요청 쿠키 중 `cl_session`만 API로 넘기고, API 응답의 `Set-Cookie`·`Content-Type`·`Cache-Control`·`ETag`·`Last-Modified`와 본문(이미지 바이너리 포함)을 그대로 돌려줍니다. 204는 본문 없이 돌려줍니다.
+- `POST api/me/files`만 multipart 본문과 `Content-Type`(boundary 포함)을 그대로 넘기고, 그 밖의 본문은 JSON으로 넘깁니다.
+- POST·PUT·PATCH·DELETE는 `Origin` 헤더의 호스트가 요청 호스트와 같아야 하며, 없거나 다르면 403 `forbidden`입니다.
+
+## 실행
 
 저장소 루트에서 `pnpm dev:web` 또는 `pnpm --filter @crelink/web start`로 개발 서버를 `http://localhost:<웹 포트>`에서 실행하고, `pnpm --filter @crelink/web build`로 프로덕션 빌드를 생성합니다. `<웹 포트>`는 `WEB_PORT` 환경변수, 없으면 이 checkout 인스턴스의 웹 포트(`pnpm instance --get WEB_PORT`)이고, API는 `http://127.0.0.1:<API 포트>`를 사용합니다. 실제 포트는 `pnpm instance`로 확인합니다.
 
