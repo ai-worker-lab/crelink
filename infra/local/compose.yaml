@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-crelink}
+      POSTGRES_USER: ${POSTGRES_USER:-crelink}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crelink-local-only}
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:?POSTGRES_PORT가 없습니다. 저장소 루트에서 make infra-up으로 실행하거나 pnpm instance가 만든 infra/local/.env를 --env-file로 넘기세요}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command: ['valkey-server', '--appendonly', 'yes']
+    ports:
+      - '127.0.0.1:${VALKEY_PORT:?VALKEY_PORT가 없습니다. 저장소 루트에서 make infra-up으로 실행하거나 pnpm instance가 만든 infra/local/.env를 --env-file로 넘기세요}:6379'
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
+  valkey_data:

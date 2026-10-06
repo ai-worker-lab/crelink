@@ -1,0 +1,133 @@
+# PR과 main push에서 저장소 검사와 smoke 테스트를 실행합니다. 기준: docs/development/verification.md#ci
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # 지원하는 Node.js LTS 메이저 버전. 로컬 개발 기본값은 .nvmrc입니다.
+        node: [22, 24, 26]
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: crelink
+          POSTGRES_USER: crelink
+          POSTGRES_PASSWORD: crelink-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U crelink -d crelink"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://crelink:crelink-ci-only@127.0.0.1:5432/crelink
+    steps:
+      - uses: actions/checkout@v7
+      # pnpm 버전은 package.json의 packageManager를 읽습니다.
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # 로컬과 같은 단계(scripts/verify.mjs)를 실행합니다. 실패해도 남은 단계 결과까지 보고합니다.
+      - run: pnpm verify --keep-going
+
+  smoke:
+    name: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: crelink
+          POSTGRES_USER: crelink
+          POSTGRES_PASSWORD: crelink-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U crelink -d crelink"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # 포트·주소는 이 checkout 인스턴스(슬롯 0, 원본 infra/local/.env.example) 값을 다음 단계 환경으로 넘깁니다.
+      - name: 인스턴스 포트
+        run: node scripts/instance.mjs --print-env | grep -E '^(API_PORT|WEB_PORT|API_URL|WEB_URL)=' >> "$GITHUB_ENV"
+      - run: pnpm --filter @crelink/shared build
+      - run: pnpm --filter @crelink/api build
+      - run: pnpm --filter @crelink/web build
+      - name: API·웹 시작
+        env:
+          DATABASE_URL: postgresql://crelink:crelink-ci-only@127.0.0.1:5432/crelink
+        run: |
+          mkdir -p .local/ci
+          PORT="$API_PORT" nohup node apps/api/dist/main.js > .local/ci/api.log 2>&1 &
+          API_INTERNAL_URL="$API_URL" nohup pnpm --filter @crelink/web exec next start --port "$WEB_PORT" > .local/ci/web.log 2>&1 &
+      - name: 서비스 준비 대기
+        run: |
+          for _ in $(seq 60); do
+            if curl -fsS "$API_URL/api/health/ready" > /dev/null && curl -fsS "$WEB_URL" > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          echo "API·웹이 2분 안에 준비되지 않았습니다. 아래 'API·웹 로그' 단계를 확인하세요."
+          exit 1
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm smoke
+      - name: API·웹 로그
+        if: failure()
+        run: |
+          echo '::group::API 로그'; cat .local/ci/api.log || true; echo '::endgroup::'
+          echo '::group::웹 로그'; cat .local/ci/web.log || true; echo '::endgroup::'
+
+  # work item 브랜치(work/NNNN-*) PR은 변경 파일이 티켓 역할의 소유 경로 안에 있는지 검사합니다.
+  work-scope:
+    name: work scope
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'work/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # 브랜치 이름은 PR 작성자가 정하므로 표현식에 직접 넣지 않고 환경변수로 읽습니다.
+      - name: pnpm work:scope
+        run: |
+          if [[ ! "$GITHUB_HEAD_REF" =~ ^work/[0-9]{4} ]]; then
+            echo "work item 브랜치(work/NNNN-*)가 아니므로 소유 경로 검사를 건너뜁니다: $GITHUB_HEAD_REF"
+            exit 0
+          fi
+          pnpm work:scope --base "origin/$GITHUB_BASE_REF"

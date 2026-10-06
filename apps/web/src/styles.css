@@ -1,0 +1,217 @@
+/*
+ * crelink 웹 스타일.
+ * 색·간격·글자 크기·모서리·글자 굵기는 @crelink/design-tokens의 --ds-* 변수만 쓴다(app/layout.tsx에서 tokens.css를 먼저 불러온다).
+ * 1px·2px 선 두께, 레이아웃 폭·높이, line-height, letter-spacing, 아이콘·이모지 크기는 토큰 대상이 아니다.
+ */
+
+@font-face {
+  font-family: Pretendard;
+  src: url('/Pretendard-ExtraBold.woff2') format('woff2');
+  font-weight: 800;
+  font-display: swap;
+}
+
+/* ---------- 기본 ---------- */
+:root {
+  /* 계단 모서리(corner md) 다각형 */
+  --notch-md: polygon(
+    0 var(--ds-corner-md),
+    var(--ds-corner-md) var(--ds-corner-md),
+    var(--ds-corner-md) 0,
+    calc(100% - var(--ds-corner-md)) 0,
+    calc(100% - var(--ds-corner-md)) var(--ds-corner-md),
+    100% var(--ds-corner-md),
+    100% calc(100% - var(--ds-corner-md)),
+    calc(100% - var(--ds-corner-md)) calc(100% - var(--ds-corner-md)),
+    calc(100% - var(--ds-corner-md)) 100%,
+    var(--ds-corner-md) 100%,
+    var(--ds-corner-md) calc(100% - var(--ds-corner-md)),
+    0 calc(100% - var(--ds-corner-md))
+  );
+  font-family: var(--ds-font-sans);
+  font-weight: var(--ds-font-weight-regular);
+  font-optical-sizing: auto;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  color: var(--ds-color-text-primary);
+  background: var(--ds-color-background-stage);
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  min-width: 320px;
+  margin: 0;
+  line-height: 1.65;
+  color: var(--ds-color-text-primary);
+  background: var(--ds-color-background-stage);
+}
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+/* 한국어 제목·본문은 단어(어절) 단위로 줄바꿈하고, 한 어절이 폭보다 길 때만 어절 안에서 끊는다. */
+h1,
+h2,
+h3,
+p {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+h1,
+h2,
+h3 {
+  font-weight: var(--ds-font-weight-extrabold);
+  letter-spacing: 0;
+  color: var(--ds-color-text-primary);
+}
+p {
+  color: var(--ds-color-text-secondary);
+}
+a {
+  color: var(--ds-color-action-primary);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+button {
+  font: inherit;
+  color: var(--ds-color-text-primary);
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+:is(button, a):focus-visible {
+  outline: 3px solid var(--ds-color-action-primary);
+  outline-offset: 3px;
+}
+
+/* ---------- 공통 UI ---------- */
+/* 버튼: primary(CTA) */
+.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-space-8);
+  min-height: 44px;
+  padding: var(--ds-space-12) var(--ds-space-16);
+  border: 0;
+  border-radius: 0;
+  background: var(--ds-color-action-primary);
+  color: var(--ds-color-text-on-action);
+  font-weight: var(--ds-font-weight-extrabold);
+  text-decoration: none;
+  clip-path: var(--notch-md);
+}
+.primary:hover:not(:disabled) {
+  filter: brightness(1.07);
+  text-decoration: none;
+}
+/* 계단 모서리(clip-path)가 바깥 포커스 링을 자르므로 링을 요소 안쪽에 그린다. */
+.primary:focus-visible {
+  outline-color: currentColor;
+  outline-offset: calc(-3px - var(--ds-corner-md));
+}
+
+/* 빈 상태·경로 오류 */
+.empty-state {
+  padding: var(--ds-space-20);
+  border: 2px solid var(--ds-color-border-default);
+  border-radius: 0;
+  background: var(--ds-color-surface-default);
+  color: var(--ds-color-text-secondary);
+  clip-path: var(--notch-md);
+}
+.empty-state > .primary {
+  margin-top: var(--ds-space-16);
+  padding: 0 var(--ds-space-20);
+  white-space: nowrap;
+}
+.error-badge {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: var(--ds-space-12);
+  border: 2px solid var(--ds-color-status-danger);
+  background: var(--ds-color-surface-default);
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-font-size-22);
+  font-weight: var(--ds-font-weight-extrabold);
+  color: var(--ds-color-status-danger);
+}
+
+/* 오류 알림 */
+.error {
+  padding: var(--ds-space-12);
+  border: 2px solid var(--ds-color-border-danger);
+  background: var(--ds-color-status-danger-subtle);
+  color: var(--ds-color-status-danger);
+}
+.error p {
+  margin: 0;
+  color: inherit;
+}
+
+/* ---------- 공개 화면 ---------- */
+/* 80px 아래 여백은 공개 화면 레이아웃 값이다. */
+.public-page {
+  max-width: 1060px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: var(--ds-space-32) var(--ds-space-24) 80px;
+  background: var(--ds-color-background-stage);
+  color: var(--ds-color-text-primary);
+}
+.landing {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 65vh;
+}
+.landing h1 {
+  margin-bottom: var(--ds-space-20);
+  font-size: clamp(var(--ds-font-size-38), 7vw, var(--ds-font-size-64));
+  line-height: 1.15;
+}
+.landing > p {
+  max-width: 540px;
+  font-size: var(--ds-font-size-16);
+  color: var(--ds-color-text-secondary);
+}
+
+/* ---------- 불러오기 ---------- */
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-space-12);
+  min-height: 40vh;
+  color: var(--ds-color-text-secondary);
+}
+.loading-indicator p {
+  margin: 0;
+}
+
+/* ---------- 반응형 ---------- */
+@media (max-width: 700px) {
+  /* 60px 아래 여백은 공개 화면 모바일 레이아웃 값이다. */
+  .public-page {
+    padding: var(--ds-space-16) var(--ds-space-16) 60px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

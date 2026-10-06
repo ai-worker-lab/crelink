@@ -1,0 +1,14 @@
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+.expo/
+.next/
+*.tsbuildinfo
+.DS_Store
+.env
+.env.*
+!.env.example
+design/.file-versions/
+.local/
+.playwright-mcp

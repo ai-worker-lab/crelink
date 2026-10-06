@@ -1,0 +1,54 @@
+# 외부 서비스·도구 의존
+
+crelink이 의존하는 외부 SaaS와 개발 도구를 한곳에서 찾기 위한 색인입니다. 버전·설정 값은 여기 복사하지 않고 각 항목의 기준 위치가 원본입니다. 의존을 추가·제거·교체하면 같은 변경에서 이 표와 기준 위치를 함께 갱신합니다.
+
+상태는 `사용 중`(현재 저장소 동작에 필요), `선택`(특정 작업 방식에서만 사용), `계획`(문서에 목표로만 있고 저장소에 구성되지 않음)으로 구분합니다.
+
+## 개발·빌드
+
+| 대상 | 종류 | 상태 | 용도 | 기준 위치 |
+| --- | --- | --- | --- | --- |
+| GitHub (`ai-worker-lab/crelink`) | SaaS | 사용 중 | 원격 Git 저장소, Pull Request. Issues는 끔. Release는 선택 | [ADR 0002](../adr/0002-work-items-in-repository.md), `.github/pull_request_template.md` |
+| GitHub Actions | SaaS | 사용 중 | PR·`main` push 검사(Node 22·24·26 matrix, PostgreSQL 서비스 컨테이너) | `.github/workflows/ci.yml` |
+| npm registry | SaaS | 사용 중 | `pnpm install`의 패키지 다운로드 | `pnpm-lock.yaml`, 각 `package.json` |
+| Node.js · pnpm(corepack) | 도구 | 사용 중 | 런타임과 workspace 관리. 지원 버전은 CI matrix, 로컬 기본값은 `.nvmrc` | `.github/workflows/ci.yml`, `.nvmrc`, 루트 `package.json`의 `packageManager` |
+| Docker Engine/Compose · Docker Hub 이미지 | 도구·SaaS | 사용 중 | 로컬 PostgreSQL(`postgres:17-alpine`)·Valkey(`valkey/valkey:8-alpine`) | `infra/local/compose.yaml` |
+| PM2 | 도구 | 사용 중 | 로컬 API·웹·Expo 개발 서버 실행 | `ecosystem.config.cjs`, `Makefile` |
+| Next.js 텔레메트리 | SaaS | 사용 중(기본값) | `next build`가 익명 사용 통계를 Vercel에 전송. 빌드 출력에서 확인 | `apps/web` |
+
+## 모바일 개발·검증
+
+| 대상 | 종류 | 상태 | 용도 | 기준 위치 |
+| --- | --- | --- | --- | --- |
+| Expo CLI · Expo Go | 도구 | 사용 중 | 개발 서버와 기기·시뮬레이터 실행 | `apps/app/package.json`, [기기 검증](../../apps/app/docs/device-testing.md) |
+| Xcode · Android SDK/에뮬레이터 | 도구 | 선택 | iOS 시뮬레이터·Android 에뮬레이터 검증 | [기기 검증](../../apps/app/docs/device-testing.md) |
+| Orca · serve-sim | 도구 | 선택 | 에뮬레이터·시뮬레이터 자동 조작 | [기기 검증](../../apps/app/docs/device-testing.md) |
+| EAS · Apple Developer/App Store Connect · Google Play Console | SaaS | 계획 | 앱 빌드·서명·스토어 제출. 식별자·계정 미설정 | [런타임 설정](../../apps/app/docs/runtime-configuration.md) |
+
+## 배포·운영
+
+| 대상 | 종류 | 상태 | 용도 | 기준 위치 |
+| --- | --- | --- | --- | --- |
+| Vercel | SaaS | 계획 | Next.js 웹 호스팅 | [배포 대상 아키텍처](deployment-target.md) |
+| Oracle Cloud Infrastructure (ARM) | SaaS | 계획 | NestJS API 서버 | [배포 대상 아키텍처](deployment-target.md) |
+| Supabase | SaaS | 계획 | 관리형 PostgreSQL | [배포 대상 아키텍처](deployment-target.md) |
+
+배포 구성·계정·비밀값은 아직 저장소에 없습니다. 로컬 Valkey는 표준 구성으로 유지하지만 API는 아직 사용하지 않으며, 운영 캐시 제품과 위치는 미정입니다([ADR 0005](../adr/0005-keep-valkey-local-infra.md)).
+
+## AI 작업 도구
+
+| 대상 | 종류 | 상태 | 용도 | 기준 위치 |
+| --- | --- | --- | --- | --- |
+| OMP | 도구 | 선택 | agent 위임과 격리 작업 | `.omp/`, [영역별 병렬 개발](../development/parallel-work.md) |
+| jev_route · TypeSafe Jev API | 도구·SaaS | 선택 | OMP 요청 분류·라우팅. 요청 문장을 TypeSafe API로 전송 | `.jev.config.json`, [영역별 병렬 개발](../development/parallel-work.md) |
+| OpenDesign 데스크톱 앱(OpenDesign Cloud 또는 Local Codex 실행) | 도구·SaaS | 선택 | `designer`의 산출물 생성·검토. MCP `mcp__open_design_*`, `pnpm od`·`pnpm design:sync`·`pnpm design:check`(실행 중일 때 `od lint`)로 연결. 없어도 `design:check`의 나머지 검사는 동작 | [OpenDesign 사용 기준](../../design/docs/opendesign.md), `.omp/agents/designer.md`, `.omp/skills/opendesign/SKILL.md`, `.jev.config.json` |
+
+이 도구들이 없어도 저장소의 빌드·실행·검증은 동작해야 합니다. 문서·코드의 원본은 저장소에 두고 도구 내부 상태에 의존하지 않습니다.
+
+## 폰트
+
+| 대상 | 종류 | 상태 | 용도 | 기준 위치 |
+| --- | --- | --- | --- | --- |
+| Pretendard | 폰트 파일 | 사용 중 | 웹 제목용 굵은 글꼴(`apps/web/public/Pretendard-ExtraBold.woff2`), 토큰 글꼴 목록 | `apps/web/src/styles.css`, `packages/design-tokens/src/tokens.json` |
+
+Pretendard는 SIL Open Font License 1.1로 배포되며, 글꼴 파일을 재배포할 때 저작권 고지와 라이선스를 함께 포함해야 합니다. 저작권 고지와 라이선스 전문은 글꼴과 함께 공개되도록 [`apps/web/public/Pretendard-OFL.txt`](../../apps/web/public/Pretendard-OFL.txt)에 둡니다. 출처는 [orioncactus/pretendard](https://github.com/orioncactus/pretendard)이며, 포함된 `Pretendard-ExtraBold.woff2`는 글꼴 메타데이터 기준 버전 1.309(릴리스 v1.3.9), SHA-256 `dd7c1e156f508eb962acc7a33a7a1896d1e0b71e11156fad96e731689ceb6dc3`입니다. 라이선스 전문은 2026-10-01에 해당 저장소의 `LICENSE`에서 가져왔습니다. 글꼴 파일을 바꾸면 이 기록과 라이선스 파일을 함께 갱신합니다.

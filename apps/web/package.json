@@ -1,0 +1,23 @@
+{
+  "name": "@crelink/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "WEB_PORT=${WEB_PORT:-$(node ../../scripts/instance.mjs --get WEB_PORT)} && next dev --port $WEB_PORT",
+    "build": "next build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@crelink/design-tokens": "workspace:*",
+    "@crelink/shared": "workspace:*",
+    "next": "^15.5.6",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.0",
+    "@types/react-dom": "~19.1.0",
+    "typescript": "~5.9.2"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "od-design-system-project/v1",
+  "id": "crelink",
+  "name": "crelink",
+  "category": "Product",
+  "description": "crelink 서비스의 디자인 시스템. 값은 packages/design-tokens/src/tokens.json에서 생성합니다.",
+  "source": {
+    "type": "local",
+    "origin": "packages/design-tokens/src/tokens.json + src/opendesign.json (pnpm tokens:generate)"
+  },
+  "files": {
+    "design": "DESIGN.md",
+    "tokens": "tokens.css"
+  }
+}

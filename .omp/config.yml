@@ -1,0 +1,8 @@
+task:
+  isolation:
+    enabled: true
+    apply: true
+    merge: patch
+
+isolation:
+  backend: auto

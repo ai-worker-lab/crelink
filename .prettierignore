@@ -1,0 +1,12 @@
+# 문서는 표·줄바꿈을 사람이 관리합니다.
+*.md
+# 생성물과 도구 산출물
+pnpm-lock.yaml
+packages/design-tokens/generated/
+design/
+.local/
+**/dist/
+**/.next/
+**/.expo/
+apps/web/next-env.d.ts
+apps/app/expo-env.d.ts
