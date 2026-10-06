@@ -23,10 +23,6 @@ concurrency:
   group: deploy-prod
   cancel-in-progress: false
 
-env:
-  WEB_URL: https://links.shaul.kr
-  SHORT_URL: https://go.shaul.kr
-
 jobs:
   rollback:
     name: 롤백 ${{ inputs.target }}
@@ -65,14 +61,11 @@ jobs:
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
-          printf '%s %s\n' "$GHCR_PULL_USER" "$GHCR_PULL_TOKEN" |
-            ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o BatchMode=yes "deploy@$HOST" "rollback $RELEASE"
+          printf 'Host *\n  IdentityFile ~/.ssh/id_deploy\n  IdentitiesOnly yes\n  StrictHostKeyChecking accept-new\n  BatchMode yes\n' > ~/.ssh/config
+          # shellcheck disable=SC2029 # 인자는 러너에서 펼쳐 보냅니다(서버 forced command가 형식을 다시 검사).
+          printf '%s %s\n' "$GHCR_PULL_USER" "$GHCR_PULL_TOKEN" | ssh "deploy@$HOST" "rollback $RELEASE"
+      # 서버의 verify.sh가 Cloudflare를 거쳐 공개 주소를 부릅니다(러너 IP는 Cloudflare가 403으로 막음).
       - name: 운영 주소 검사
-        run: |
-          set -u
-          fail=0
-          check() { local name=$1 expect=$2 got=$3; if [[ "$got" == "$expect" ]]; then echo "ok   $name ($got)"; else echo "FAIL $name: 기대 $expect, 실제 $got"; fail=1; fi; }
-          check "웹 /" 200 "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_URL/")"
-          check "웹 BFF health" 200 "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_URL/api/backend/api/health")"
-          check "단축 없는 주소 302" 302 "$(curl -s -o /dev/null -w '%{http_code}' "$SHORT_URL/zzz-e2e-none")"
-          exit $fail
+        env:
+          HOST: ${{ steps.input.outputs.host }}
+        run: ssh "deploy@$HOST" verify

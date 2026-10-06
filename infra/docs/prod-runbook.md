@@ -114,7 +114,7 @@ gh secret list && gh variable list
 - 경로를 추가하면 Cloudflare가 `<Tunnel UUID>.cfargotunnel.com`을 가리키는 proxied CNAME을 만듭니다. 같은 이름의 기존 레코드(처음 설계의 `go` A 레코드, `links` CNAME 등)가 있으면 먼저 지웁니다.
 - TLS는 Cloudflare 엣지가 맡고 스택 Caddy는 http만 받습니다. Caddy는 요청의 Host로 사이트를 고르므로 Host를 바꾸지 않습니다(다른 이름으로 시험할 때만 [10](#10-배포-대상-추가와-tunnel-전환)처럼 HTTP Host Header를 지정).
 - `localhost:18080`은 호스트에서 도는 cloudflared(systemd 서비스) 기준입니다. cloudflared를 컨테이너로 돌리는 서버라면 이 주소가 닿지 않으므로 호스트 서비스로 둡니다.
-- 배포 후 검사(`deploy.yml` `verify-prod`)는 GitHub 러너에서 Cloudflare를 거쳐 요청합니다. Bot Fight Mode 등이 러너를 막으면 검사가 실패하니 끄거나 예외를 둡니다.
+- 배포 후 운영 주소 검사는 배포 대상 서버의 `verify.sh`가 Cloudflare를 거쳐 부릅니다(`ssh deploy@<host> verify`). GitHub 러너에서 부르면 Cloudflare가 데이터센터 IP를 403으로 막기 때문입니다.
 
 확인(배포 전에는 Cloudflare 502가 정상): `curl -sS -o /dev/null -w '%{http_code}\n' https://go.shaul.kr/zzzz`.
 
@@ -180,7 +180,7 @@ SOPS_AGE_KEY_CMD='security find-generic-password -s crelink-sops-age -a operator
 3. GitHub Actions에서 **Deploy**를 main으로 `Run workflow`(`force` 켬). 배포 태그가 아직 없으므로 두 이미지를 만들고 배포합니다. 이후에는 main CI 성공 시 자동입니다.
 4. 첫 배포가 헬스 실패하면 되돌릴 이전 릴리스가 없어 실패 상태로 남습니다(종료 1). [6](#6-운영-확인)의 로그로 원인(대개 비밀값·DB 접속)을 고쳐 다시 실행합니다.
 5. GeoIP를 넣습니다([8](#8-geoip)).
-6. 확인: `verify-prod` job 결과(운영 주소 6개), 구글 로그인, 단축 주소 생성·방문, 링크 클릭 기록의 IP가 내 공인 IP인지(Caddy·cloudflared 주소가 아닌지).
+6. 확인: 배포 job의 `운영 주소 검사` 단계 결과(운영 주소 6개), 구글 로그인, 단축 주소 생성·방문, 링크 클릭 기록의 IP가 내 공인 IP인지(Caddy·cloudflared 주소가 아닌지).
 
 ## 6. 운영 확인
 
@@ -205,7 +205,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' -H 'Host: go.shaul.kr' http://127.0.0.
 ## 7. 롤백
 
 - **자동(서버)**: `deploy.sh`·`rollback.sh`가 헬스 실패 시 직전 릴리스·이미지로 스스로 복구하고 실패(종료 1)합니다.
-- **자동(워크플로)**: 배포 뒤 운영 주소 검사가 실패하면 `rollback-on-failure` job이 대상마다 직전 릴리스로 되돌리고 워크플로를 실패로 끝냅니다.
+- **자동(워크플로)**: 배포 뒤 운영 주소 검사(`verify`)가 실패하면 같은 배포 job의 `자동 롤백` 단계가 그 대상을 직전 릴리스로 되돌리고 job을 실패로 끝냅니다.
 - **수동(권장)**: GitHub Actions **Rollback**을 main에서 실행합니다. `target`(기본 `home-server`), `release`(비우면 지금 릴리스를 배포한 마지막 `deploy` 줄의 이전 릴리스, 지정하면 그 SHA). 설정·비밀값·이미지가 함께 돌아갑니다.
 - **서버에서 직접**(Actions를 쓸 수 없을 때, 이미지가 서버에 남아 있으면 토큰 없이 동작):
 

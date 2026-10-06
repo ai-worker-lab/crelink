@@ -7,6 +7,8 @@
 #       stdin: 첫 줄 "<GHCR 사용자> <GHCR 토큰>"(이미지가 서버에 없을 때만 씀). 지금 릴리스의 rollback.sh를 실행합니다.
 #   status
 #       지금 릴리스·이미지와 releases.log 마지막 5줄.
+#   verify
+#       지금 릴리스의 verify.sh(공개 주소 검사, 이 서버에서 Cloudflare를 거쳐 호출)를 실행합니다.
 # 이 파일을 바꾸면 서버에서 bootstrap.sh를 다시 실행해야 반영됩니다(워크플로가 바꿀 수 없음).
 set -euo pipefail
 
@@ -53,7 +55,12 @@ status)
 	cat "$CRELINK_ROOT/state/images.env" 2>/dev/null || true
 	tail -n 5 "$CRELINK_ROOT/state/releases.log" 2>/dev/null || true
 	;;
+verify)
+	((${#cmd[@]} == 1)) || die "사용법: verify"
+	[[ -x "$CRELINK_ROOT/current/verify.sh" ]] || die "운영 중인 릴리스에 verify.sh가 없습니다."
+	exec "$CRELINK_ROOT/current/verify.sh"
+	;;
 *)
-	die "허용되지 않은 명령입니다. deploy | rollback | status"
+	die "허용되지 않은 명령입니다. deploy | rollback | status | verify"
 	;;
 esac

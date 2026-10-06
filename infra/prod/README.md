@@ -14,7 +14,8 @@ CD 워크플로(`.github/workflows/deploy.yml`)는 이 폴더에서 `tests/`·`R
 | `secrets/<대상>.sops.env` | 대상별 앱 설정·비밀값(SOPS + age 암호문, 비밀이 아닌 키는 평문). 규칙은 루트 `.sops.yaml` |
 | `certs/supabase-ca.crt` | Supabase 루트 CA(공개 인증서) |
 | `images.env.example` | 서버 `state/images.env` 형식(`API_IMAGE`·`WEB_IMAGE`). compose 문법 확인용 |
-| `ssh-entry.sh` | `deploy` 사용자의 SSH forced command(`deploy`·`rollback`·`status`). `bootstrap.sh`가 `/usr/local/lib/crelink/`에 설치하며 워크플로로는 바뀌지 않음 |
+| `ssh-entry.sh` | `deploy` 사용자의 SSH forced command(`deploy`·`rollback`·`status`·`verify`). `bootstrap.sh`가 `/usr/local/lib/crelink/`에 설치하며 워크플로로는 바뀌지 않음 |
+| `verify.sh` | 운영 주소 검사(서버에서 Cloudflare를 거쳐 공개 주소 6개). 주소는 릴리스 암호문의 평문 `WEB_URL`·`SHORT_LINK_BASE_URL`. 워크플로가 `ssh deploy@<host> verify`로 부름 |
 | `deploy.sh` | `releases/<SHA>/deploy.sh <릴리스 SHA> <API SHA\|-> <웹 SHA\|->`: 복호화·문법 확인 → 이미지 pull → `releases.log` → `current`·`images.env` 교체 → `up --wait` → 실패 시 직전 릴리스로 복구 → 성공 시 최근 5개 외 릴리스 정리 |
 | `rollback.sh` | `rollback.sh [릴리스 SHA]`: 기본은 `releases.log`에서 지금 릴리스를 배포한 마지막 `deploy` 줄의 이전 릴리스. 그 릴리스의 설정·비밀값·이미지 전체로 되돌림 |
 | `geoip.sh` | `geoip.sh [--restart]`: DB-IP City Lite(`scripts/geoip.mjs`와 같은 월 후보 규칙)를 `geoip` 볼륨에 넣음 |

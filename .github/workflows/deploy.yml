@@ -1,6 +1,8 @@
 # main의 CI가 성공하면 운영(prod)에 배포합니다: 이미지(API·웹, GHCR :<SHA>) → 배포 대상마다 Tailscale+SSH로 릴리스 배포 → 운영 주소 검사.
 # 배포 대상은 infra/prod/targets.json(enabled), 서버 쪽은 deploy 사용자의 forced command(infra/prod/ssh-entry.sh)만 실행됩니다.
-# 서버 deploy.sh가 헬스 실패 시 스스로 직전 릴리스로 복구하고, 운영 주소 검사가 실패하면 이 워크플로가 직전 릴리스로 롤백합니다. 수동 롤백은 rollback.yml.
+# 서버 deploy.sh가 헬스 실패 시 스스로 직전 릴리스로 복구합니다. 운영 주소 검사(서버의 verify.sh가 Cloudflare를 거쳐 공개 주소 호출)가
+# 실패하면 같은 job이 그 대상을 직전 릴리스로 롤백하고 실패로 끝납니다. 수동 롤백은 rollback.yml.
+# 운영 주소 검사를 러너에서 하지 않는 이유: Cloudflare가 GitHub 러너(데이터센터 IP)의 요청을 403으로 막습니다(2026-10-07 확인).
 # CI에는 앱 비밀값이 없습니다(서버가 infra/prod/secrets/<대상>.sops.env를 복호화). 이 워크플로가 쓰는 값:
 #   vars.TS_OIDC_CLIENT_ID·vars.TS_OIDC_AUDIENCE  Tailscale workload identity federation(main 브랜치 job만 허용, tag:ci)
 #   secrets.DEPLOY_SSH_KEY                         서버 deploy 사용자 SSH 개인키(forced command로 배포 명령만 가능)
@@ -29,8 +31,6 @@ concurrency:
 
 env:
   IMAGE_PREFIX: ghcr.io/ai-worker-lab/crelink
-  WEB_URL: https://links.shaul.kr
-  SHORT_URL: https://go.shaul.kr
 
 jobs:
   plan:
@@ -202,68 +202,28 @@ jobs:
           { printf '%s %s\n' "$GHCR_PULL_USER" "$GHCR_PULL_TOKEN"
             tar -czf - -C infra/prod --exclude ./tests --exclude ./README.md --exclude '*.example' --exclude ./.env .
           } | ssh "deploy@$HOST" "deploy $SHA $API $WEB"
-
-  verify-prod:
-    name: 운영 주소 검사
-    needs: [plan, deploy]
-    if: always() && needs.deploy.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: smoke
-        run: |
-          set -u
-          fail=0
-          check() { local name=$1 expect=$2 got=$3; if [[ "$got" == "$expect" ]]; then echo "ok   $name ($got)"; else echo "FAIL $name: 기대 $expect, 실제 $got"; fail=1; fi; }
-          check "웹 /" 200 "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_URL/")"
-          check "웹 /privacy" 200 "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_URL/privacy")"
-          check "웹 BFF health" 200 "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_URL/api/backend/api/health")"
-          check "단축 없는 주소 302" 302 "$(curl -s -o /dev/null -w '%{http_code}' "$SHORT_URL/zzz-e2e-none")"
-          check "단축 → notice" "$WEB_URL/notice?reason=link_not_found" "$(curl -s -o /dev/null -w '%{redirect_url}' "$SHORT_URL/zzz-e2e-none")"
-          check "API 직접 접근 차단" 404 "$(curl -s -o /dev/null -w '%{http_code}' "$SHORT_URL/api/health")"
-          exit $fail
-
-  # 운영 주소 검사가 실패하면 대상마다 직전 릴리스로 되돌립니다(서버 rollback.sh). 이 job이 돌면 워크플로는 실패로 끝납니다.
-  rollback-on-failure:
-    name: 자동 롤백 ${{ matrix.target.name }}
-    needs: [plan, deploy, verify-prod]
-    if: always() && needs.deploy.result == 'success' && needs.verify-prod.result == 'failure'
-    strategy:
-      max-parallel: 1
-      matrix:
-        target: ${{ fromJSON(needs.plan.outputs.targets) }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      packages: read
-      id-token: write
-    steps:
-      - uses: tailscale/github-action@v4
-        with:
-          oauth-client-id: ${{ vars.TS_OIDC_CLIENT_ID }}
-          audience: ${{ vars.TS_OIDC_AUDIENCE }}
-          tags: tag:ci
-          ping: ${{ matrix.target.host }}
-      - name: rollback
+      - name: 운영 주소 검사
+        id: verify
         env:
           HOST: ${{ matrix.target.host }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: ssh "deploy@$HOST" verify
+      # 배포는 성공했는데 운영 주소 검사가 실패했을 때만 직전 릴리스로 되돌립니다(배포 자체 실패는 서버가 이미 복구함).
+      - name: 자동 롤백
+        if: failure() && steps.verify.outcome == 'failure'
+        env:
+          HOST: ${{ matrix.target.host }}
           GHCR_PULL_USER: ${{ github.actor }}
           GHCR_PULL_TOKEN: ${{ github.token }}
         run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
-          printf '%s %s\n' "$GHCR_PULL_USER" "$GHCR_PULL_TOKEN" |
-            ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o BatchMode=yes "deploy@$HOST" rollback
+          printf '%s %s\n' "$GHCR_PULL_USER" "$GHCR_PULL_TOKEN" | ssh "deploy@$HOST" rollback
+          ssh "deploy@$HOST" verify || echo "::warning::롤백 뒤에도 운영 주소 검사가 실패합니다. 런북 \"장애 대응\"을 보세요."
           echo "::error::운영 주소 검사가 실패해 $HOST 를 직전 릴리스로 되돌렸습니다."
-          exit 1
 
   # 모든 대상 배포와 운영 주소 검사가 성공했을 때만 배포 기록 태그를 옮깁니다(다음 실행의 변경 비교 기준).
   record:
     name: 배포 기록 태그
-    needs: [plan, verify-prod]
-    if: always() && needs.verify-prod.result == 'success'
+    needs: [plan, deploy]
+    if: always() && needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
