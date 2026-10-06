@@ -22,7 +22,7 @@
 | --- | --- |
 | 웹 | `https://links.shaul.kr` = `WEB_URL`. Google 리디렉션 URI `https://links.shaul.kr/auth/google/callback` |
 | API·단축 | `https://go.shaul.kr` = `SHORT_LINK_BASE_URL`, 웹의 `API_INTERNAL_URL` `[임시값, 정식 도메인이 정해지면 교체]` |
-| DNS(`shaul.kr`, Cloudflare) | `go` A → `193.122.104.153` **DNS only(프록시 끔)**, `links` CNAME → Vercel이 안내하는 값(DNS only) `[사용자 준비]`. 프록시를 켜면 Caddy가 보는 주소가 Cloudflare가 되어 방문 IP 기록(R9)이 틀어지고 `TRUSTED_PROXY_HOPS`·신뢰 프록시 설정이 달라집니다. |
+| DNS(`shaul.kr`, Cloudflare) | `go` A → `193.122.104.153` **프록시 켬(주황 구름)**, `links` CNAME → Vercel이 안내하는 값(**DNS only 권장**, Vercel이 앞단 리버스 프록시를 권장하지 않음) `[사용자 준비]`(사용자 결정 2026-10-06: Cloudflare 프록시 사용). Cloudflare SSL/TLS 모드는 **Full (strict)**. 방문자 IP는 edge Caddy가 Cloudflare 대역에서 온 요청만 `CF-Connecting-IP`를 믿어 `{client_ip}`로 정하고, API에는 `X-Forwarded-For: <client_ip>` 하나만 보냅니다(`TRUSTED_PROXY_HOPS=1` 그대로). |
 | 서버 | 기존 `oci-server`(`193.122.104.153`, Ubuntu 26.04 ARM, 2 OCPU·11GB, Docker 29·Compose 2.40). 이미 `ai-character-chat`이 같은 서버에서 동작 중이라 80·443은 서버 공용 edge Caddy가 맡습니다(사용자 결정 2026-10-06). |
 | 배포 접속 | 사용자 `deploy`(docker 그룹, sudo 없음), 배포 전용 ed25519 키. `/opt/crelink`·`/opt/edge` 소유 |
 | DB | Supabase 프로젝트 1개(prod 전용). `DATABASE_URL` = 세션 풀러 주소 + TLS |
@@ -75,7 +75,7 @@ API 기동 시 migration이 돌고(advisory lock) 새 컨테이너가 헬스체�
 - 업로드 이미지는 서버 볼륨. 서버 교체 대비 `FileStorage`를 Supabase Storage로 옮기는 후속 작업과 볼륨 백업 필요.
 - GeoIP 파일은 서버에서 월 1회 갱신(`deploy.sh geoip` 또는 크론). 없으면 위치만 비어 있음.
 - 단축 도메인(`go.shaul.kr`)은 임시. 정식 도메인이 정해지면 `SHORT_LINK_BASE_URL`·Caddy 도메인·Vercel `API_INTERNAL_URL`·DNS를 함께 바꿉니다. 이미 인스타그램에 걸린 링크는 옛 도메인이 유지되어야 합니다.
-- 속도 제한(rate limit)·WAF 없음. 공개 단축 주소가 남용되면 Caddy 또는 Cloudflare 앞단을 추가합니다(후속).
+- 속도 제한(rate limit)·WAF는 Cloudflare 앞단 기능(무료 플랜 범위)으로 시작하고, 부족하면 Caddy 쪽을 추가합니다(후속). Cloudflare 대역 목록(`infra/prod/edge/Caddyfile`의 `trusted_proxies`)은 바뀔 수 있어 분기마다 확인합니다. 서버 IP로 직접 들어오는 요청은 Cloudflare를 우회하지만 그 경우 방문자 IP는 접속 주소로 기록됩니다(위조 불가). 원본 서버를 Cloudflare 대역만 허용하도록 막는 것은 후속.
 - SSH 키 방식 배포는 서버 접근 권한을 CI에 위임합니다. 배포 전용 키와 사용자를 쓰고 키는 정기 교체합니다.
 
 ## 검증 계획

@@ -124,12 +124,18 @@ echo | openssl s_client -connect aichat-api.shaul.kr:443 -servername aichat-api.
 
 ### 4-1. DNS (`shaul.kr` 영역)
 
-| 이름 | 유형 | 값 |
-| --- | --- | --- |
-| `go` | A | 서버 예약 공인 IP |
-| `links` | CNAME | Vercel 프로젝트 Settings > Domains에 표시되는 **프로젝트별** 값(예전의 공용 `cname.vercel-dns.com`이 아님) |
+| 이름 | 유형 | 값 | 프록시 |
+| --- | --- | --- | --- |
+| `go` | A | 서버 예약 공인 IP | 켬(주황 구름) |
+| `links` | CNAME | Vercel 프로젝트 Settings > Domains에 표시되는 **프로젝트별** 값(예전의 공용 `cname.vercel-dns.com`이 아님) | 끔 권장(아래) |
 
-Caddy는 `go.shaul.kr`이 서버를 가리키고 80·443이 외부에서 열려 있어야 인증서를 받습니다. 확인: `dig +short go.shaul.kr`.
+- Cloudflare 프록시를 씁니다(사용자 결정 2026-10-06). SSL/TLS 모드는 **Full (strict)**로 둡니다(원본 Caddy·Vercel 모두 유효한 인증서가 있음). Flexible을 쓰면 원본으로 HTTP가 가서 Caddy의 HTTPS 리디렉트와 반복됩니다.
+- 방문자 IP: edge Caddy(`edge/Caddyfile`)는 Cloudflare 대역에서 온 요청만 `CF-Connecting-IP`를 믿습니다. 대역 목록(<https://www.cloudflare.com/ips-v4>, <https://www.cloudflare.com/ips-v6>)이 바뀌면 `trusted_proxies` 줄을 갱신하고 reload합니다.
+- 인증서: Caddy가 Let's Encrypt HTTP 검증으로 받습니다(같은 서버의 `aichat-api.shaul.kr`도 프록시 켠 상태로 발급·유지 중). 발급이 실패하면 Cloudflare의 **Always Use HTTPS**가 `/.well-known/acme-challenge/` 요청을 막는지 확인하고, 막으면 첫 발급 동안 그 레코드만 DNS only로 바꿨다가 되돌립니다.
+- Vercel은 앞단 리버스 프록시(Cloudflare 프록시 포함)를 권장하지 않습니다. 방문자 IP·Vercel 방화벽·캐시가 가려지기 때문입니다([Reverse Proxy Servers and Vercel](https://vercel.com/docs/security/reverse-proxy), [Should I use Cloudflare in front of Vercel?](https://vercel.com/kb/guide/cloudflare-with-vercel), 확인일 2026-10-06). 그래서 `links`는 **DNS only를 권장**하고, 프록시를 켜려면 Vercel KB의 설정(SSL Full (strict), 캐시 우회)을 따릅니다. `go`(OCI)는 프록시를 켭니다.
+- 배포 후 검사(`deploy.yml`의 운영 주소 검사)는 GitHub 러너에서 Cloudflare를 거쳐 요청합니다. Bot Fight Mode 등이 러너를 막으면 검사가 실패하니 해당 기능을 끄거나 예외를 둡니다.
+
+확인: `dig +short go.shaul.kr`(Cloudflare IP가 나오면 정상).
 
 ### 4-2. Supabase
 
@@ -152,7 +158,7 @@ Google Auth Platform > Clients(<https://console.developers.google.com/auth/clien
 
 웹 빌드 설정과 환경변수 표의 원본은 [apps/web/README.md "Vercel 배포"](../../apps/web/README.md#vercel-배포)입니다. 여기서는 순서만 적습니다.
 
-1. Git 연동 없이 프로젝트를 만듭니다: 저장소 루트에서 `pnpm dlx vercel@62 link`(팀·프로젝트 선택) → 생성된 `.vercel/project.json`의 `orgId`·`projectId`가 GitHub secret `VERCEL_ORG_ID`·`VERCEL_PROJECT_ID`입니다. `.vercel/`은 커밋하지 않습니다. 대시보드에서 Git을 연결했다면 Settings > Git > **Disconnect**로 끊습니다(CI와 이중 배포 방지).
+1. Git 연동 없이 프로젝트를 만듭니다: 저장소 루트에서 `pnpm dlx vercel@62 link`(팀·프로젝트 선택) → 생성된 `.vercel/project.json`의 `orgId`·`projectId`가 GitHub secret `VERCEL_ORG_ID`·`VERCEL_PROJECT_ID`입니다. `.vercel/`은 커밋하지 않습니다. 대시보드에서 Git을 연결했다면 Settings > Git > **Disconnect**로 끊습니다(CI와 이중 배포 방지). 저장소가 GitHub 조직(`ai-worker-lab`) 소유이고 Vercel이 개인 Hobby 계정이어도 됩니다. Hobby가 막는 것은 **Git 연동 배포**(커밋 작성자가 Hobby 팀 소유자여야 함, 비공개 저장소 협업 불가)이고, CI가 토큰으로 `vercel deploy --prebuilt`하는 방식에는 저장소 소유자 조건이 없습니다([Troubleshoot project collaboration](https://vercel.com/docs/deployments/troubleshoot-project-collaboration), 확인일 2026-10-06). 그래서 Git을 연결하지 않습니다.
 2. Settings > Build and Deployment > **Root Directory** = `apps/web`.
 3. Settings > Environment Variables(**Production**만): `API_INTERNAL_URL=https://go.shaul.kr`, `API_INTERNAL_TOKEN=<edge CRELINK_INTERNAL_TOKEN과 같은 값>`(Sensitive 켬). 환경변수 변경은 다음 배포부터 적용됩니다.
 4. Settings > Domains에 `links.shaul.kr` 추가 → 표시되는 CNAME을 DNS에 넣습니다.

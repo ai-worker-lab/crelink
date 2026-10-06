@@ -128,14 +128,27 @@ check 'GET /%61pi/health (인코딩, 토큰 없음)' 404 - "$base/%61pi/health"
 check 'POST /myslug' 404 - -X POST "$base/myslug"
 check 'HEAD /myslug' 404 - -I "$base/myslug"
 
-# X-Forwarded-For: 위조 값은 버려지고 Caddy가 본 접속 주소만 남아야 합니다.
-"${CURL[@]}" -o "$body" -H 'X-Forwarded-For: 6.6.6.6, 7.7.7.7' "$base/myslug"
+# X-Forwarded-For(Cloudflare 밖 접속): 위조 XFF·CF-Connecting-IP는 버려지고 접속 주소 하나만 남아야 합니다.
+"${CURL[@]}" -o "$body" -H 'X-Forwarded-For: 6.6.6.6, 7.7.7.7' -H 'CF-Connecting-IP: 8.8.8.8' "$base/myslug"
 xff="$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).xff))' "$body")"
-if [[ "$xff" != *6.6.6.6* && "$xff" != *7.7.7.7* && -n "$xff" && "$xff" != null ]]; then ok=일치; else
+if [[ "$xff" != *6.6.6.6* && "$xff" != *7.7.7.7* && "$xff" != *8.8.8.8* && "$xff" != *,* && -n "$xff" && "$xff" != null ]]; then ok=일치; else
 	ok=불일치
 	failures=$((failures + 1))
 fi
-printf '| %s | %s | %s | %s |\n' 'GET /myslug + 위조 X-Forwarded-For: 6.6.6.6, 7.7.7.7' '업스트림 XFF = 접속 주소 하나(위조 값 없음)' "XFF=$xff" "$ok"
+printf '| %s | %s | %s | %s |\n' 'GET /myslug + 위조 XFF·CF-Connecting-IP (신뢰 프록시 아님)' '업스트림 XFF = 접속 주소 하나' "XFF=$xff" "$ok"
+
+# X-Forwarded-For(Cloudflare 경유 흉내): 신뢰 프록시 목록을 이 시험 접속 대역으로 바꾼 설정으로 같은 요청을 보내면
+# CF-Connecting-IP가 방문자 주소가 되어야 합니다. 실제 Cloudflare 대역은 로컬에서 만들 수 없어 목록만 바꿉니다.
+sed -E 's#trusted_proxies static .*#trusted_proxies static private_ranges#' "$prod/edge/Caddyfile" >"$work/edge/Caddyfile"
+edge exec -T caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1
+sleep 1
+"${CURL[@]}" -o "$body" -H 'X-Forwarded-For: 6.6.6.6' -H 'CF-Connecting-IP: 203.0.113.9' "$base/myslug"
+xff="$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).xff))' "$body")"
+if [[ "$xff" == 203.0.113.9 ]]; then ok=일치; else
+	ok=불일치
+	failures=$((failures + 1))
+fi
+printf '| %s | %s | %s | %s |\n' 'GET /myslug + CF-Connecting-IP: 203.0.113.9 (신뢰 프록시)' '업스트림 XFF = 203.0.113.9' "XFF=$xff" "$ok"
 
 "${CURL[@]}" -o "$body" -H "X-Crelink-Internal: $token" "$base/api/health"
 internal="$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).internal))' "$body")"

@@ -6,6 +6,7 @@
 
 - 운영(prod) 서버 구성 추가(원격 미적용): `prod/compose.yaml`(API만, project `crelink-prod`, 호스트 포트 없음, 외부 네트워크 `edge`에 별칭 `crelink-api`, 볼륨 uploads·geoip·CA), `prod/crelink.caddy`(단축 `GET /{slug}`·`/c/{id}` 공개, `/api/*`는 `X-Crelink-Internal` 일치 시만, 나머지 404), 서버 공용 edge Caddy `prod/edge/`(80·443, `sites/*.caddy` import, 기존 aichat 사이트 이관), `.env.example` 두 개. 다른 프로젝트가 서버 80·443을 쓰고 있어 공용 edge 구조로 결정(사용자 결정 2026-10-06).
 - 배포 스크립트: `deploy.sh <SHA>`(토큰 stdin 로그인·pull·`releases.log`·헬스 60초·실패 시 이전 이미지 복구·edge 사이트 갱신·로그아웃), `rollback.sh [SHA]`, `geoip.sh [--restart]`, 공용 `lib.sh`, `bootstrap.sh`(Docker는 없을 때만 설치, `deploy` 사용자, `/opt/crelink`·`/opt/edge`, 방화벽 미변경). 로컬 시험 `prod/tests/caddy-routing.sh`·`deploy-rollback.sh`, 런북 `docs/prod-runbook.md`. 인프라 작업 규칙의 "실행 설정은 local만" 문장을 prod 현황과 검증 규칙으로 교체. 근거: `docs/work/infra/0027-infra-prod-compose-runbook.md`.
+- Cloudflare 프록시 대응(사용자 결정 2026-10-06): edge `Caddyfile`에 Cloudflare 대역 `trusted_proxies`와 `client_ip_headers CF-Connecting-IP`, `crelink.caddy`가 업스트림에 `X-Forwarded-For: {client_ip}` 하나만 보냄(API `TRUSTED_PROXY_HOPS=1` 유지). `tests/caddy-routing.sh`에 신뢰 프록시 경유·비경유 XFF 시험 추가. 서버 edge에 적용(reload). 런북 DNS 절(프록시·Full (strict)·Vercel 도메인은 DNS only 권장). 근거: `docs/work/orchestrator/0029-first-prod-provision-verify.md`.
 
 ## 2026-10-01
 
