@@ -37,3 +37,8 @@
 ## 진행 기록
 
 - 2026-10-06: 생성(에픽 0024 호스팅 전환 때 후속으로 분리, AI 제안).
+- 2026-10-06: SeaweedFS(`s3.shaul.kr`) 연동 사전 시험(사용자 요청, 코드 변경 없음).
+  - 준비: 버킷 `crelink-uploads`(weed shell `s3.bucket.create`), 그 버킷만 쓰는 identity `crelink`(`Read`·`Write`·`List`·`Tagging:crelink-uploads`, 버킷 생성 권한 없음). 키는 home-server `/opt/seaweedfs/config/s3.json`에만 있고 이 티켓 구현 때 SOPS 암호문으로 옮깁니다.
+  - 결과(크리링 운영 Docker 네트워크 `crelink-prod_default`의 컨테이너 → 공개 엔드포인트 `https://s3.shaul.kr`, AWS CLI): 4MB 객체 put 2.2~2.6초, get 3회 SHA-256 일치, Content-Type 유지. 다른 버킷 목록·버킷 생성은 `AccessDenied`, 익명 GET 403. 운영자 PC에서 presigned GET 200·SHA 일치.
+  - **문제**: 키가 `.jpg`·`.webp`처럼 Cloudflare가 정적 파일로 보는 확장자면 서명된 `HEAD`가 간헐적으로 403(3회 중 1~2회), 확장자 없는 키는 항상 정상. Cloudflare Cache Rule(`s3.shaul.kr` Bypass cache) 미적용 상태라 생긴 일로 봅니다(home-seaweedfs README "Cloudflare 캐시 우회 규칙"). 구현 전 규칙을 적용하고, 키는 지금처럼 확장자 없는 UUID로 둡니다.
+  - 시험 객체·도구 이미지는 지웠습니다.
