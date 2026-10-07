@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { Client } from 'pg';
-import { loadLocalEnvironment } from '../src/database';
+import { loadLocalEnvironment } from '../src/local-env';
 
 /**
  * 테스트마다 일회용 PostgreSQL 데이터베이스를 만들고 지웁니다. 개발 DB의 데이터는 건드리지 않습니다.

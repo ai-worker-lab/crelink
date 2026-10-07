@@ -7,7 +7,12 @@
 # CI에는 앱 비밀값이 없습니다(서버가 infra/prod/secrets/<대상>.sops.env를 복호화). 이 워크플로가 쓰는 값:
 #   vars.TS_OIDC_CLIENT_ID·vars.TS_OIDC_AUDIENCE  Tailscale workload identity federation(main 브랜치 job만 허용, tag:ci)
 #   secrets.DEPLOY_SSH_KEY                         서버 deploy 사용자 SSH 개인키(forced command로 배포 명령만 가능)
-# 기준: docs/specs/crelink-prod-deploy.md, 런북 infra/docs/prod-runbook.md, 결정 docs/adr/0010-prod-deployment-topology.md
+#   vars.SENTRY_ORG·vars.SENTRY_PROJECT_API·vars.SENTRY_PROJECT_WEB  Sentry 조직·프로젝트 slug(소스맵 업로드 대상, 공개 값)
+#   vars.SENTRY_WEB_DSN                            웹 Sentry DSN(이벤트 전송만 허용하는 공개 값, 웹 이미지 빌드 시점에 번들에 들어감)
+#   secrets.SENTRY_AUTH_TOKEN                      Sentry 조직 토큰(org:ci, 소스맵 업로드·릴리스 생성 전용). 앱 비밀값이 아니고 앱은 쓰지 않습니다.
+#                                                  environment 보호가 없는 Free 조직이라 push 권한자가 워크플로를 고쳐 읽을 수 있습니다(ADR 0012).
+#   비어 있으면 소스맵 업로드를 건너뛰고 웹 이미지는 Sentry가 꺼진 채 만들어집니다. API DSN은 서버 암호문의 SENTRY_DSN입니다.
+# 기준: docs/specs/crelink-prod-deploy.md, 런북 infra/docs/prod-runbook.md, 결정 docs/adr/0010-prod-deployment-topology.md·0012-error-monitoring-sentry.md
 name: Deploy
 
 on:
@@ -141,6 +146,9 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
+      # Sentry(ADR 0012): release는 배포 커밋 SHA. 웹만 DSN을 빌드 시점에 넣습니다(API DSN은 서버 SOPS 암호문의 SENTRY_DSN).
+      # 소스맵은 SENTRY_AUTH_TOKEN이 있을 때만 올립니다. vars·secret이 비어 있으면 빈 값이 넘어가 업로드를 건너뛰고(빈 secret은 action이
+      # "is not a valid secret" 경고만 내고 넘기지 않음) 웹은 Sentry가 꺼진 이미지가 됩니다. 토큰이 있는데 업로드가 실패하면 이 job이 실패합니다.
       - uses: docker/build-push-action@v7
         if: steps.want.outputs.build == 'true'
         with:
@@ -151,6 +159,13 @@ jobs:
           tags: ${{ env.IMAGE_PREFIX }}-${{ matrix.area }}:${{ needs.plan.outputs.sha }}
           cache-from: type=gha,scope=${{ matrix.area }}
           cache-to: type=gha,mode=max,scope=${{ matrix.area }}
+          build-args: |
+            SENTRY_RELEASE=${{ needs.plan.outputs.sha }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ matrix.area == 'api' && vars.SENTRY_PROJECT_API || '' }}${{ matrix.area == 'web' && vars.SENTRY_PROJECT_WEB || '' }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ matrix.area == 'web' && vars.SENTRY_WEB_DSN || '' }}
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
 
   deploy:
     name: 배포 ${{ matrix.target.name }}

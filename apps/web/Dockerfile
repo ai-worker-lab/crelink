@@ -3,6 +3,12 @@
 #   docker build -f apps/web/Dockerfile -t crelink-web:local .
 # 서버 전용 환경변수(API_INTERNAL_URL·API_INTERNAL_TOKEN)는 실행 시점에만 읽으므로 이미지에 넣지 않습니다.
 # 정적으로 미리 렌더링되는 화면(/privacy, 404)은 API를 부르지 않습니다(next build 경로 표 ○).
+# Sentry: NEXT_PUBLIC_SENTRY_DSN(서버·브라우저 공용, 공개 값)과 SENTRY_RELEASE(배포 커밋 SHA)는 빌드 시점에 번들에 들어가므로
+# 이미지가 배포 대상(Sentry 프로젝트)별이 됩니다. DSN이 비면 Sentry를 켜지 않습니다. BuildKit secret sentry_auth_token이 있을 때만
+# 소스맵을 올리고 지웁니다(SENTRY_ORG·SENTRY_PROJECT 필요, 업로드 실패면 빌드 실패). 없으면 소스맵을 만들지 않습니다(로컬·PR CI).
+#   docker build --build-arg NEXT_PUBLIC_SENTRY_DSN=<DSN> --build-arg SENTRY_RELEASE=<SHA> --build-arg SENTRY_ORG=<org> \
+#     --build-arg SENTRY_PROJECT=<project> --secret id=sentry_auth_token,env=SENTRY_AUTH_TOKEN -f apps/web/Dockerfile .
+#   설명: apps/web/README.md#오류-모니터링
 
 FROM node:24-slim AS build
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
@@ -24,7 +30,20 @@ COPY packages/design-tokens packages/design-tokens
 COPY apps/web apps/web
 # 디자인 토큰 생성물(packages/design-tokens/generated)은 커밋된 것을 씁니다. 원본과의 일치 검사는 CI(pnpm typecheck)가 맡습니다
 # (검사가 이미지에 넣지 않는 design/ 폴더까지 비교하기 때문).
-RUN pnpm --filter @crelink/shared build && \
+# Sentry 빌드 인자는 이 RUN의 환경변수로 next.config.ts(withSentryConfig)와 번들이 읽습니다. 토큰은 이 RUN에서만 보이고 이미지·캐시에 남지 않습니다.
+ARG NEXT_PUBLIC_SENTRY_DSN=""
+ARG SENTRY_RELEASE=""
+ARG SENTRY_ORG=""
+ARG SENTRY_PROJECT=""
+RUN --mount=type=secret,id=sentry_auth_token,env=SENTRY_AUTH_TOKEN \
+    if [ -n "$SENTRY_AUTH_TOKEN" ]; then \
+      : "${SENTRY_ORG:?SENTRY_AUTH_TOKEN이 있으면 SENTRY_ORG 빌드 인자가 필요합니다}" \
+        "${SENTRY_PROJECT:?SENTRY_AUTH_TOKEN이 있으면 SENTRY_PROJECT 빌드 인자가 필요합니다}" \
+        "${SENTRY_RELEASE:?SENTRY_AUTH_TOKEN이 있으면 SENTRY_RELEASE 빌드 인자가 필요합니다}"; \
+    else \
+      echo 'sentry_auth_token secret 없음: Sentry 소스맵을 만들지도 올리지도 않습니다.'; \
+    fi && \
+    pnpm --filter @crelink/shared build && \
     pnpm --filter @crelink/web build
 
 FROM node:24-slim AS runtime

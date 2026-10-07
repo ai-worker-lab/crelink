@@ -3,6 +3,7 @@ import { DatabaseError, Pool, PoolClient, PoolConfig, QueryResultRow } from 'pg'
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseDatabasePoolMax } from './config.service';
+import { loadLocalEnvironment } from './local-env';
 
 /** 트랜잭션 client와 pool 모두 받는 질의 대상. */
 export type Queryable = Pick<PoolClient, 'query'>;
@@ -10,15 +11,6 @@ export type Queryable = Pick<PoolClient, 'query'>;
 /** PostgreSQL UNIQUE 제약 위반(23505). 동시 요청이 같은 값을 만들 때 오류 코드로 바꾸는 데 씁니다. */
 export function isUniqueViolation(error: unknown): boolean {
   return error instanceof DatabaseError && error.code === '23505';
-}
-
-export function loadLocalEnvironment(): void {
-  const file = resolve(__dirname, '../.env');
-  if (!existsSync(file)) return;
-  for (const row of readFileSync(file, 'utf8').split(/\r?\n/)) {
-    const match = row.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
-    if (match && process.env[match[1]] === undefined) process.env[match[1]] = match[2].replace(/^(['"])(.*)\1$/, '$2');
-  }
 }
 
 /** pg가 연결 문자열에서 읽는 TLS 파라미터. `DATABASE_SSL`이 있으면 이 값들은 지우고 환경변수만 따릅니다. */

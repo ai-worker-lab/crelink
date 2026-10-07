@@ -1,8 +1,10 @@
 import { CRELINK_API_PATHS, type CreatorLandingState, type MeResponse } from '@crelink/shared';
+import * as Sentry from '@sentry/nextjs';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ErrorPanel } from '../../components/ErrorPanel';
 import { LogoutButton } from '../../components/LogoutButton';
+import { MonitoringUser } from '../../components/MonitoringUser';
 import { SiteHeader } from '../../components/SiteHeader';
 import { CreatorEditor } from '../../components/me/CreatorEditor';
 import { loadSignedIn } from '../../lib/api/server';
@@ -15,8 +17,11 @@ export default async function MePage() {
     loadSignedIn<CreatorLandingState>(CRELINK_API_PATHS.meLanding),
     loadSignedIn<MeResponse>(CRELINK_API_PATHS.me),
   ]);
+  // 로그인 사용자의 내부 ID만 이 요청(서버)과 브라우저의 Sentry 이벤트에 붙입니다. 이메일은 넣지 않습니다.
+  if (me.ok) Sentry.setUser({ id: me.data.id });
   return (
     <div className="app-page">
+      {me.ok ? <MonitoringUser id={me.data.id} /> : null}
       <SiteHeader>
         {landing.ok ? (
           <Link href={`/me/landings/${encodeURIComponent(landing.data.landing.publicId)}`}>링크 관리</Link>
