@@ -35,6 +35,8 @@ ARG NEXT_PUBLIC_SENTRY_DSN=""
 ARG SENTRY_RELEASE=""
 ARG SENTRY_ORG=""
 ARG SENTRY_PROJECT=""
+# secret은 캐시 키에 들어가지 않으므로, 토큰 유무를 이 인자로 키에 넣어 토큰 없이 만든 층(PR CI·토큰 등록 전 빌드)을 재사용하지 않게 합니다.
+ARG SENTRY_UPLOAD=""
 RUN --mount=type=secret,id=sentry_auth_token,env=SENTRY_AUTH_TOKEN \
     if [ -n "$SENTRY_AUTH_TOKEN" ]; then \
       : "${SENTRY_ORG:?SENTRY_AUTH_TOKEN이 있으면 SENTRY_ORG 빌드 인자가 필요합니다}" \

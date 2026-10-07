@@ -149,6 +149,7 @@ jobs:
       # Sentry(ADR 0012): release는 배포 커밋 SHA. 웹만 DSN을 빌드 시점에 넣습니다(API DSN은 서버 SOPS 암호문의 SENTRY_DSN).
       # 소스맵은 SENTRY_AUTH_TOKEN이 있을 때만 올립니다. vars·secret이 비어 있으면 빈 값이 넘어가 업로드를 건너뛰고(빈 secret은 action이
       # "is not a valid secret" 경고만 내고 넘기지 않음) 웹은 Sentry가 꺼진 이미지가 됩니다. 토큰이 있는데 업로드가 실패하면 이 job이 실패합니다.
+      # secret은 BuildKit 캐시 키에 들어가지 않아 같은 커밋을 토큰 없이 만든 층이 재사용될 수 있으므로 토큰 유무를 SENTRY_UPLOAD로 넘깁니다.
       - uses: docker/build-push-action@v7
         if: steps.want.outputs.build == 'true'
         with:
@@ -164,6 +165,7 @@ jobs:
             SENTRY_ORG=${{ vars.SENTRY_ORG }}
             SENTRY_PROJECT=${{ matrix.area == 'api' && vars.SENTRY_PROJECT_API || '' }}${{ matrix.area == 'web' && vars.SENTRY_PROJECT_WEB || '' }}
             NEXT_PUBLIC_SENTRY_DSN=${{ matrix.area == 'web' && vars.SENTRY_WEB_DSN || '' }}
+            SENTRY_UPLOAD=${{ secrets.SENTRY_AUTH_TOKEN != '' && 'yes' || 'no' }}
           secrets: |
             sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
 
