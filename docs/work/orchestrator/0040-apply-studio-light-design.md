@@ -38,5 +38,6 @@
 ## 진행 기록
 
 - 2026-10-07: 생성. 0020(designer)이 토큰·DESIGN.md를 바꾸며 소유 범위 밖 반영 작업을 넘김.
-- 2026-10-07: 착수. 브랜치 work/0040-apply-studio-light-design은 main에 0020 브랜치(PR #23)를 합친 위에서 시작. 웹 `styles.css` 계단 모서리 제거·둥근 모서리·1px 테두리·카드 그림자·초점 링·링크 글자색, 앱 `PixelFrame` 제거·`ActionButton`·`Card` 둥근 모서리·`StatusBar dark`, ADR 0012(ADR 0001 결정 6 대체), 토큰 사용법 문서. 내 크리링의 "링크 관리 화면 열기"는 화면 이동이라 `secondary`로 바꿈.
+- 2026-10-07: 착수. 브랜치 work/0040-apply-studio-light-design은 main에 0020 브랜치(PR #23)를 합친 위에서 시작. 웹 `styles.css` 계단 모서리 제거·둥근 모서리·1px 테두리·카드 그림자·초점 링·링크 글자색, 앱 `PixelFrame` 제거·`ActionButton`·`Card` 둥근 모서리·`StatusBar dark`, ADR 0013(ADR 0001 결정 6 대체), 토큰 사용법 문서. 내 크리링의 "링크 관리 화면 열기"는 화면 이동이라 `secondary`로 바꿈.
 - 2026-10-07: 검증(Node 24.20, 슬롯 1 로컬 인스턴스): `pnpm verify` 8단계 통과(lint·typecheck·build·test 포함), `pnpm smoke` 5개 통과(390·1280 가로 넘침 없음 포함), `pnpm e2e` 7개 통과. 임시 Playwright 스크린숏으로 홈(로그인 전·후)·공개 랜딩·내 크리링·링크 관리(편집, 숨긴 링크)·하단 시트·운영자 크리에이터 화면을 390·1280px에서 눈으로 확인(스크린숏 파일은 저장소에 넣지 않음). 앱은 타입 검사만 했고 시뮬레이터·실기기는 확인하지 않음. 남은 관찰: 내 크리링은 카드마다 저장 버튼이 강조색이라 한 화면에 강조색 버튼이 둘 이상 보일 수 있음(카드별 독립 폼, 디자인 규칙 "화면당 하나"와의 조정은 designer 판단 필요).
+- 2026-10-07: main에 0042(Sentry, ADR 0012)가 먼저 들어와 ADR 번호가 겹쳐 이 티켓의 ADR을 0013(`docs/adr/0013-rounded-corners.md`)으로 옮기고 참조를 고침. main·0020 브랜치를 다시 합침.

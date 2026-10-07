@@ -1,7 +1,7 @@
 # ADR 0001: 디자인 토큰 단일 원본과 공통 컴포넌트 규칙
 
 - 날짜: 2026-10-01
-- 상태: 승인 (결정 6은 [ADR 0012](0012-rounded-corners.md)가 대체)
+- 상태: 승인 (결정 6은 [ADR 0013](0013-rounded-corners.md)가 대체)
 - 범위: `packages/design-tokens`, `design/`, `apps/web`, `apps/app` (여러 영역)
 
 ## 배경
@@ -20,7 +20,7 @@
 3. **최신성 검사**: `pnpm tokens:check`는 생성물이 원본과 다르면 실패합니다. 루트 `pnpm typecheck`와 `pnpm build`의 첫 단계로 실행합니다.
 4. **이름 규칙**: `--ds-*` 체계를 쓰고 쓰임새로 이름을 짓습니다(`color.text.subtle`, `color.action.primary-pressed`, `color.status.danger-subtle`, `color.overlay.scrim`). 간격·글자 크기는 값 자체를 이름으로 쓰는 스케일(`space.16`, `font.size.14`)입니다. 웹·앱 코드가 생성물 식별자에 의존하므로 키 이름을 바꿀 때는 사용처를 같은 변경에서 옮깁니다.
 5. **색 리터럴 금지**: 웹(`apps/web/src`)·앱(`apps/app/app`, `apps/app/src`) 소스와 디자인 산출물(`design/` 안의 생성물 `tokens.css` 제외)에는 색 리터럴을 쓰지 않습니다. 예외는 `transparent`·`currentColor`·`inherit` 같은 키워드와 정적 에셋 파일(`apps/web/public/*.svg`, 글꼴)뿐입니다.
-6. **시작 모서리 스타일(픽셀 모서리)** — 대체됨, [ADR 0012](0012-rounded-corners.md): 뼈대의 시작 컴포넌트는 계단형 모서리를 쓰며, 서비스 디자인에서 바꿀 수 있습니다. 계단형 모서리 크기는 `corner.md`·`corner.sm` 토큰으로 정합니다.
+6. **시작 모서리 스타일(픽셀 모서리)** — 대체됨, [ADR 0013](0013-rounded-corners.md): 뼈대의 시작 컴포넌트는 계단형 모서리를 쓰며, 서비스 디자인에서 바꿀 수 있습니다. 계단형 모서리 크기는 `corner.md`·`corner.sm` 토큰으로 정합니다.
    - 웹은 `clip-path` 다각형을 씁니다. `clip-path`는 outline과 box-shadow도 잘라내므로 포커스 링은 요소 안쪽(음수 `outline-offset`)에 그립니다.
    - 앱(React Native)은 `PixelFrame`(`apps/app/src/components/ui/index.tsx`)으로 그립니다. 가운데 띠와 좌·우 기둥, 세 개의 절대 위치 `View`를 겹치지 않게 깔아 계단 모양을 만듭니다. 크기 측정(`onLayout`)이나 SVG가 필요 없어 첫 프레임이 깜빡이지 않고, 부모 배경색을 몰라도 되며, 새 의존성이 없습니다.
 7. **컴포넌트 규칙 기준**: 버튼·카드·입력·상태 표시 등의 시각 규칙과 웹 CSS 변수·앱 객체 경로 대응은 디자인 작업에서 `design/` 산출물로 정의합니다. 웹·앱은 이를 각자 소유한 코드로 구현하고 `design/` 파일을 런타임에서 불러오지 않습니다.
