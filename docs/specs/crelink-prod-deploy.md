@@ -119,6 +119,8 @@ Tunnel은 edge Caddy 하나로만 들어오고, edge Caddy는 활성 색의 `api
 
 **운영 결과(무중단)**: home-server는 2026-10-06T21:16Z에 cutover했고 그때 한 번 생긴 공백은 0.5초였습니다(대상마다 0.1초 간격 측정). 그 뒤 서버에서 부하(3개 경로 합계 초당 30건, 약 9초 걸리는 느린 요청, 운영자 회선의 공개 주소 루프)를 흘리며 배포 4회·롤백 6회·헬스 실패 배포 1회·`geoip.sh --restart` 1회를 했고 모든 요청이 성공했습니다(5xx·연결 오류 0건, 느린 요청 전부 완료, 성공 응답 최장 0.08초 이하). 헬스 실패 배포는 새 색만 내리고 활성 색·트래픽을 바꾸지 않았고(종료 1), 옛 색 api·web은 매번 drain 20초 뒤 `Exited (0)`(강제 종료 아님)로 멈췄으며, DB 연결은 겹치는 구간에도 전체 20·크리링 8 이하였습니다. 측정 방법은 [런북 6-1](../../infra/docs/prod-runbook.md#6-1-배포-공백-측정), 실행 기록(시각·릴리스·run)은 `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`입니다. 남는 공백은 edge 재생성(Caddy 이미지·포트·마운트 변경, 1~2초[추정])뿐이고 아래 "위험·후속"에 있습니다.
 
+Next.js 16(0039)부터 웹 standalone 서버는 SIGTERM에 진행 중 요청을 마친 뒤 종료 코드 143(신호로 정상 종료, SIGKILL 137 아님)으로 끝나므로, 이후 옛 색 web은 `Exited (143)`로 남는 것이 정상입니다([웹 README "종료 동작"](../../apps/web/README.md)).
+
 ## 워크플로
 
 | 워크플로·job | 내용 |
@@ -212,3 +214,4 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 - 2026-10-07: 0단계(에픽 0031 티켓 0034): compose api·web `stop_grace_period: 30s`·healthcheck `start_interval: 1s`(+ 이미지와 같은 `start_period`), 암호문 평문 키 `DATABASE_POOL_MAX=6`, 배포 공백 측정 도구(`infra/prod/measure-gap.sh`, 런북 6-1). 근거: `docs/work/infra/0034-prod-compose-graceful-stop.md`.
 - 2026-10-07: Blue/Green 무중단 배포(에픽 0031, 0035 구현·0036 운영 적용)에 맞춤: 구성도(Tunnel → edge Caddy `crelink-edge` → 활성 색 `api-<색>`·`web-<색>`), 공개 경로(업스트림 스니펫·같은 색 web→api `http://api-<색>:3000`·헬스 포트), 서버 배치(`state/active-color`·`edge/`·project·네트워크·외부 볼륨), 색 전환 흐름·실패 시 활성 색 불변·종료 코드, "무중단 아님"을 운영 실측(cutover 공백 0.5초, 배포 2회 실패 0건)으로, DB migration 규칙, 이식 규칙 3·7·8, 변경 범위 0031~0036, 위험·후속(502 해소, 남은 위험 4가지). 근거: `docs/work/infra/0035-prod-blue-green-edge.md`, `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`.
 - 2026-10-07: ADR 0011 승인(사용자). 운영 검증 결과(배포 4회·롤백 6회·헬스 실패 배포·GeoIP 재기동 모두 요청 실패 0건)를 위험·후속에 반영. 근거: `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`.
+- 2026-10-07: 의존성 LTS 기준 업그레이드(0039): 이미지 베이스 `node:24-slim`, geoip-writer `alpine:3.24`, 옛 색 web 종료 코드 143 설명. 근거: `docs/work/orchestrator/0039-lts-major-upgrades.md`.
