@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P2
 - 작성일: 2026-10-07
@@ -47,3 +47,4 @@
   - 릴리스 노트: 빈 상태 "아직 공개한 릴리스가 없어요." 확인. `RELEASES.md` 끝에 시험용 `## 0.1.0 (2026-10-07)` 항목을 잠시 붙이자 그 제목과 목록만 렌더링되고 첫머리 안내는 나오지 않음(확인 뒤 되돌림).
   - 이미지: `docker build -f apps/web/Dockerfile .` 성공(`COPY RELEASES.md ./`, 빌드 경로 표에 `/docs*` ○). 읽기 전용 루트로 띄워 `/docs`·`/docs/guide`·`/docs/releases`·`/docs/brand` 200, 실행 이미지에 `RELEASES.md` 없이 빈 상태 표시. 시험 이미지는 지움.
   - 발견: 웹 글꼴이 ExtraBold 한 면만 선언돼 400·700도 같은 글리프로 그려짐(`/docs/brand` 굵기 견본이 모두 같음) → 0044(web, 분류 대기).
+- 2026-10-07: 병합(main 고속 전진 `739d501`)·자동 배포 성공(CI run 37592308075, Deploy run 37592680226: 이미지 api·web, 배포 home-server, 배포 기록 태그 모두 success). 운영 확인: `https://links.shaul.kr`의 `/`·`/docs`·`/docs/guide`·`/docs/releases`·`/docs/brand`·`/privacy` 200, 홈에 `/docs` 링크, `/docs/releases` 빈 상태 표시. 상태 `완료`.
