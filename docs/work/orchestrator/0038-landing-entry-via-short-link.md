@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1 (AI 제안)
 - 작성일: 2026-10-07
@@ -19,7 +19,7 @@
 - [x] 웹: 통과 표시로 그린 화면은 주소창의 `?pass=`를 지워(`history.replaceState`) 복사·공유되는 주소가 `/p/{publicId}`이다. 무효·만료 표시는 단축 주소에서 새 표시를 받아 한 번 더 돌아오며 반복되지 않는다.
 - [x] 웹: `/me`의 크리링 링크 카드에 랜딩 주소 글자를 보여 주지 않고(미리보기 링크만), 관리 화면의 "공개 주소"는 단축 주소다.
 - [x] 시험: API e2e·단위 시험, Playwright E2E(외부 직접 접속 → 단축 주소 → 방문 1건 → 랜딩, 주소창에 pass 없음, `/me` 미리보기는 방문으로 안 셈)가 수정 전 실패하고 수정 뒤 통과. `pnpm verify` 통과.
-- [ ] 운영 배포 뒤 `links.shaul.kr/p/{publicId}` 직접 접속이 `go.shaul.kr/{slug}`를 거쳐 방문 1건으로 기록되는지 확인.
+- [x] 운영 배포 뒤 `links.shaul.kr/p/{publicId}` 직접 접속이 `go.shaul.kr/{slug}`를 거쳐 방문 1건으로 기록되는지 확인.
 
 ## 범위
 
@@ -45,3 +45,4 @@
 - 2026-10-07: 생성·착수. 사용자 결정(원문): "링크나 우리 서비스 안에서는 랜딩 주소(`links.shaul.kr/p/{publicId}`)를 쓸 수 있지만, 외부에서는 항상 `go.shaul.kr`(단축 주소)을 거치게 해야 방문 데이터가 누락 없이 수집된다." 설계: 단축 주소 302에 publicId에 묶인 60초 HMAC 통과 표시, 공개 랜딩 API가 검증 결과와 현재 단축 주소를 주고, 웹은 같은 출처이거나 표시가 유효할 때만 그리고 그 밖은 단축 주소로 보냄.
 - 2026-10-07: 구현. 웹 루트 `app/loading.tsx`가 모든 화면을 Suspense로 감싸 응답 머리를 먼저 보내므로, 공개 랜딩의 `redirect()`가 HTTP 307이 아니라 200 + `<meta http-equiv="refresh" content="1;url=…">`로 나가는 것을 로컬 curl로 확인(1초 지연이고, 메신저 미리보기 봇이 meta refresh를 따른다는 보장이 없음). 그래서 불러오는 중 화면을 로그인 화면(`app/me/loading.tsx`, `app/admin/loading.tsx`, 공통 `components/PageLoading.tsx`)으로 옮김. `/`·`/notice`·`/privacy`는 경계 없이 SSR이 끝난 뒤 응답한다.
 - 2026-10-07: 검증(로컬 인스턴스 crelink-0038). API 시험: 바꾼 `short-link.e2e-spec.ts`를 수정 전 API 코드에 돌려 4개 실패(Location에 pass 없음, 응답에 `passAccepted`·`shortUrl` 없음), 수정 뒤 통과. Playwright 새 시나리오는 수정 전 웹 화면에서 실패(직접 접속이 단축 주소를 거치지 않음), 수정 뒤 `pnpm e2e` 7개 모두 통과. `pnpm verify` 통과(api 시험 91개), `pnpm work:check`·`pnpm docs:check`·`pnpm work:scope 0038` 통과. 로컬 curl: 단축 주소 302 `/p/{id}?pass=…`, 그 주소 200, `Sec-Fetch-Site` 없음·`none`·`cross-site`·`same-site`는 307 단축 주소, `same-origin` 200, 변조·만료 pass 307 단축 주소, 없는 랜딩은 오류 화면(리디렉트 없음). 운영 확인은 배포 뒤.
+- 2026-10-07: 병합(PR #20, `0aec2a2`)·자동 배포 성공(활성 색 green). 운영 확인: `curl https://links.shaul.kr/p/9v931r7v2k` → 307 `https://go.shaul.kr/shaul1991`, `Sec-Fetch-Site: same-origin` → 200, `curl -L`(Referer `open.kakao.com`) → 리디렉트 2회 뒤 200 `/p/9v931r7v2k?pass=…`이고 방문 1건(IP `220.117.253.198`, slug `shaul1991`, referrer_host `open.kakao.com`). 배포 전 사용자가 카카오톡으로 단축 주소를 보낸 시험에서는 미리보기 봇(`kakaotalk-scrap`, device `bot`)과 휴대폰(IP `106.101.130.115`) 방문이 각 1건 기록됨. 완료.
