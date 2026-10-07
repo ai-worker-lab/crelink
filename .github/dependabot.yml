@@ -11,15 +11,22 @@ updates:
         update-types: [minor, patch]
     # Expo SDK가 버전을 고정하는 패키지는 따로 올리지 않습니다. Expo SDK 업그레이드(`npx expo install --fix`)로만 올립니다.
     # 웹(apps/web)의 react·react-dom·@types/react*도 앱과 같은 버전을 쓰므로 함께 묶어 둡니다.
+    # @types/node major는 Node LTS(.nvmrc)를 따르고, TypeScript major는 프레임워크가 요구할 때 사람이 올립니다(의존성 버전 정책).
     ignore:
       - dependency-name: react
       - dependency-name: react-dom
       - dependency-name: react-native
       - dependency-name: react-native-*
+      - dependency-name: '@react-native/*'
       - dependency-name: expo
       - dependency-name: expo-*
+      - dependency-name: '@expo/*'
       - dependency-name: '@types/react'
       - dependency-name: '@types/react-dom'
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:

@@ -63,5 +63,5 @@
 
 ## 의존성 버전
 
-- 의존성 major는 LTS(공급자가 지원 중인 안정 major)를 기준으로 사람이 올립니다. Node.js는 Active·Maintenance LTS인 짝수 major(Current·홀수·지원 종료 major는 기준 런타임으로 쓰지 않음, CI는 다음 LTS 후보를 미리 시험), Next.js는 Active LTS major, Expo와 Expo SDK가 고정하는 패키지(`react`·`react-dom`·`react-native*`·`expo*`·`@types/react*`)는 SDK 단위(`npx expo install --fix`)로 올립니다. 웹의 React 버전은 앱의 Expo SDK가 고정한 버전에 맞춥니다.
-- Node 기준 버전은 `.nvmrc`·운영 이미지(`apps/*/Dockerfile`)·CI 행렬(`.github/workflows/ci.yml`)이 원본이고, 바꿀 때 함께 고칠 곳은 [검증 루프](verification.md#ci)에 있습니다. Dependabot([`.github/dependabot.yml`](../../.github/dependabot.yml))은 Node 이미지 major와 Expo SDK 고정 패키지를 올리지 않고, 그 밖의 갱신 PR(minor·patch는 한 묶음)만 엽니다.
+- 의존성 major는 LTS(공급자가 지원 중인 안정 major)를 기준으로 사람이 올립니다. Node.js는 Active·Maintenance LTS인 짝수 major(Current·홀수·지원 종료 major는 기준 런타임으로 쓰지 않음, CI는 다음 LTS 후보를 미리 시험)이고 `@types/node` major는 그 Node major를 따릅니다. Next.js는 Active LTS major, Expo와 Expo SDK가 고정하는 패키지(`react`·`react-dom`·`react-native*`·`@react-native/*`·`expo*`·`@expo/*`·`@types/react*`)는 SDK 단위(`npx expo install --fix`)로 올립니다. 웹의 React 버전은 앱의 Expo SDK가 고정한 버전에 맞춥니다. TypeScript major는 쓰는 프레임워크가 요구할 때 올립니다.
+- Node 기준 버전은 `.nvmrc`·운영 이미지(`apps/*/Dockerfile`)·CI 행렬(`.github/workflows/ci.yml`)이 원본이고, 바꿀 때 함께 고칠 곳은 [검증 루프](verification.md#ci)에 있습니다. Dependabot([`.github/dependabot.yml`](../../.github/dependabot.yml))은 Node 이미지·`@types/node`·TypeScript major와 Expo SDK 고정 패키지를 올리지 않고, 그 밖의 갱신 PR(minor·patch는 한 묶음)만 엽니다.
