@@ -22,3 +22,5 @@
 - **Google Play:** Play Console 개발자 계정과 앱 레코드, 등록된 Android application ID, Android 배포 서명 키(또는 승인된 EAS 관리 자격 증명), 업로드 권한이 필요합니다. 현재 관련 계정, 앱, 서명 자격 증명은 설정되지 않았습니다.
 
 두 스토어 모두 프로덕션 API origin과 각 플랫폼 실기기 출시 후보 검증도 필요합니다. 두 스토어의 차단 조건은 별도입니다. 한 스토어의 승인·공개가 다른 스토어의 준비·공개를 뜻하지 않습니다.
+
+iOS 빌드 도구: Expo SDK 57은 Xcode 26.4 이상이 필요하고 최소 iOS는 16.4입니다. Xcode 27(iOS 27 SDK)로 빌드한 앱은 UIKit scene 기반 생명주기를 써야 iOS 27에서 제대로 시작되므로, SDK 57에서 Xcode 27로 스토어 빌드를 만들 때는 `expo-build-properties`의 `ios.enableSceneSupport`를 켭니다(`expo@57.0.23` 이상, [SDK 57 릴리스 노트](https://expo.dev/changelog/sdk-57#building-with-xcode-27-and-the-ios-27-sdk)). 아직 이 앱의 네이티브 빌드 설정에는 넣지 않았습니다.

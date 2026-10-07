@@ -40,7 +40,7 @@
     "@types/node": "^24.0.0",
     "@types/pg": "^8.23.1",
     "eslint": "^9.39.5",
-    "eslint-config-expo": "^10.0.0",
+    "eslint-config-expo": "~57.0.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
