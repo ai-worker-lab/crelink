@@ -118,9 +118,17 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 
 - 같은 프로세스가 `/api` 접두사 밖의 `GET /{slug}`와 `GET /c/{linkPublicId}`를 처리합니다(`src/short-link/`). `app.setup.ts`의 `setGlobalPrefix` exclude는 요청 URL이 아니라 라우트 정의 경로에 맞춰 보기 때문에, `:`를 이스케이프한 `\:slug`·`c/\:linkPublicId`로 두 정의만 제외합니다. 그냥 `:slug`를 쓰면 `/api/me`·`/api/health` 같은 한 단계 경로가 접두사를 잃습니다.
 - 그래서 접두사 없는 `/health`, `/me`, `/api` 같은 요청은 단축 주소로 해석되고, 예약어라 없는 주소 안내로 302 합니다. 예약어 목록은 `RESERVED_SLUGS`(공유 계약).
-- `GET /{slug}`: 대소문자를 무시하고 현재 주소 또는 `retired_at + 90일` 안의 옛 주소를 찾습니다. 찾으면 방문을 기록(응답을 기다리지 않음)하고 302 `{WEB_URL}/p/{publicId}`. 없으면 302 `…/notice?reason=link_not_found`, 정지 크리에이터면 `…reason=creator_suspended`.
+- `GET /{slug}`: 대소문자를 무시하고 현재 주소 또는 `retired_at + 90일` 안의 옛 주소를 찾습니다. 찾으면 방문을 기록(응답을 기다리지 않음)하고 302 `{WEB_URL}/p/{publicId}?pass={통과 표시}`. 없으면 302 `…/notice?reason=link_not_found`, 정지 크리에이터면 `…reason=creator_suspended`.
 - `GET /c/{linkPublicId}`: 클릭을 기록하고 DB에 저장된 URL(저장 시 http·https만 허용)로 302. 숨김·차단·삭제·정지면 302 `…/notice?reason=link_unavailable`. 열린 리디렉트를 막기 위해 요청 값으로 대상 URL을 만들지 않습니다.
 - 두 리디렉트 모두 `Cache-Control: no-store`이고, 방문자 쿠키 `cl_vid`(UUID, HttpOnly, SameSite=Lax, 1년)는 없거나 형식이 틀릴 때만 새로 발급합니다.
+
+### 랜딩 통과 표시
+
+방문은 `GET /{slug}`에서만 기록되므로, 웹 공개 랜딩은 외부에서 온 요청을 이 리디렉트로 온 경우에만 그대로 그리고 나머지는 단축 주소로 보냅니다(PRD R7, [기술 설계](../../../docs/specs/crelink-mvp.md#구성과-흐름)). 그 판단에 쓰는 값이 통과 표시입니다(`src/short-link/landing-pass.service.ts`).
+
+- 형식 `<만료 epoch 초>.<base64url HMAC-SHA256 앞 16바이트>`, 서명 대상 `publicId + '.' + 만료`, 유효 60초. 비교는 `timingSafeEqual`.
+- 키: API 프로세스가 시작할 때 `crypto.randomBytes(32)`로 만듭니다. 환경변수·비밀값이 없습니다. 위조·재사용돼도 결과는 "그 요청이 방문으로 안 세어짐"뿐이고, Blue/Green 전환 순간 다른 색 API가 검증해 실패해도 웹이 단축 주소로 한 번 더 보내 새 표시를 받으므로 스스로 복구됩니다. 한 색에서 API 프로세스를 여러 개(cluster·복제) 띄우면 발급과 검증이 다른 프로세스로 갈 수 있어 공유 키가 필요합니다.
+- 검증: `GET /api/public/landings/{publicId}?pass=`가 `passAccepted`(이 publicId에 대해 발급했고 만료 전이면 true)와 `shortUrl`(현재 단축 주소, `CreatorService.shortLink`)을 줍니다. 발급(`ShortLinkModule`)과 검증(`CreatorModule`)이 같은 키를 쓰도록 `LandingPassModule` 하나가 서비스를 제공합니다.
 
 ### 방문자 IP
 

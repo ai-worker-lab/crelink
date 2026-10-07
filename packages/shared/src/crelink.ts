@@ -292,8 +292,8 @@ export interface PublicBlockView {
   links: PublicLinkView[];
 }
 
-/** `GET /api/public/landings/{publicId}` 응답. 404 `landing_not_found`, 410 `creator_suspended`. */
-export interface PublicLandingResponse {
+/** 방문자가 보는 공개 랜딩 내용. 공개 랜딩(`/p/{publicId}`)과 관리 화면 보기 모드가 같은 모양으로 그립니다. */
+export interface PublicLandingView {
   publicId: string;
   displayName: string | null;
   bio: string | null;
@@ -301,6 +301,17 @@ export interface PublicLandingResponse {
   socials: SocialLinkView[];
   portfolio: Array<Omit<PortfolioItemView, 'image' | 'position'> & { imageUrl: string | null }>;
   blocks: PublicBlockView[];
+}
+
+/**
+ * `GET /api/public/landings/{publicId}?pass=` 응답. 404 `landing_not_found`, 410 `creator_suspended`.
+ * 외부에서 랜딩에 들어온 방문은 단축 주소를 거쳐야 기록되므로(PRD R7), 웹은 이 두 값으로 그대로 그릴지 단축 주소로 보낼지 정합니다.
+ */
+export interface PublicLandingResponse extends PublicLandingView {
+  /** `pass`가 단축 주소 리디렉트(`GET {SHORT}/{slug}`)가 이 랜딩에 붙여 준, 아직 만료되지 않은 통과 표시이면 true. */
+  passAccepted: boolean;
+  /** 이 랜딩의 현재 단축 주소 `{SHORT}/{slug}`(옛 주소 아님). */
+  shortUrl: string;
 }
 
 // ---------- 운영자 (R10, R13, R14) ----------
@@ -379,6 +390,9 @@ export interface AddBlockedDomainRequest {
   reason?: string | null;
 }
 
+/** 단축 주소 리디렉트가 랜딩 주소에 붙이는 통과 표시 쿼리 이름. 웹은 이 표시가 유효할 때만 외부에서 온 요청을 그대로 그립니다(PRD R7). */
+export const LANDING_PASS_PARAM = 'pass';
+
 export const CRELINK_API_PATHS = {
   authGoogleStart: '/api/auth/google/start',
   authGoogleCallback: '/api/auth/google/callback',
@@ -396,7 +410,9 @@ export const CRELINK_API_PATHS = {
   mePortfolioOrder: '/api/me/portfolio/order',
   meFiles: '/api/me/files',
   file: (id: string) => `/api/files/${encodeURIComponent(id)}`,
-  publicLanding: (publicId: string) => `/api/public/landings/${encodeURIComponent(publicId)}`,
+  /** `pass`: 단축 주소 리디렉트가 랜딩 주소에 붙인 통과 표시(`LANDING_PASS_PARAM`). 있으면 그대로 넘겨 검증을 받습니다. */
+  publicLanding: (publicId: string, pass?: string) =>
+    `/api/public/landings/${encodeURIComponent(publicId)}${pass ? `?${LANDING_PASS_PARAM}=${encodeURIComponent(pass)}` : ''}`,
   adminCreators: '/api/admin/creators',
   adminCreator: (userId: string) => `/api/admin/creators/${encodeURIComponent(userId)}`,
   adminCreatorStats: (userId: string) => `/api/admin/creators/${encodeURIComponent(userId)}/stats`,
@@ -409,7 +425,8 @@ export const CRELINK_API_PATHS = {
 
 /** 본 도메인(웹) 경로. API가 리디렉트 대상을 만들 때도 씁니다. */
 export const CRELINK_WEB_PATHS = {
-  landing: (publicId: string) => `/p/${encodeURIComponent(publicId)}`,
+  landing: (publicId: string, pass?: string) =>
+    `/p/${encodeURIComponent(publicId)}${pass ? `?${LANDING_PASS_PARAM}=${encodeURIComponent(pass)}` : ''}`,
   notice: (reason: NoticeReason) => `/notice?reason=${reason}`,
   googleCallback: '/auth/google/callback',
   privacy: '/privacy',

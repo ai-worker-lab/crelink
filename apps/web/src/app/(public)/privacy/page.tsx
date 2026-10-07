@@ -19,7 +19,10 @@ export default function PrivacyPage() {
 
         <section aria-labelledby="privacy-visitor">
           <h2 id="privacy-visitor">방문자에게서 수집하는 항목</h2>
-          <p>크리에이터의 크리링 링크(단축 주소)로 들어오거나 랜딩페이지의 외부 링크를 누르면 다음을 기록해요.</p>
+          <p>
+            크리에이터의 크리링 링크(단축 주소)로 들어오거나 랜딩페이지의 외부 링크를 누르면 다음을 기록해요. 다른
+            사이트나 메신저에서 랜딩페이지 주소로 바로 들어와도 크리링 링크를 거쳐 열리므로 같은 항목이 기록돼요.
+          </p>
           <ul>
             <li>접근 시각과 접근한 크리링 링크(단축 주소)</li>
             <li>유입 경로(referrer, 어느 페이지에서 왔는지)</li>

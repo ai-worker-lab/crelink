@@ -4,7 +4,7 @@
 - 역할: orchestrator
 - 상위: 0024
 - 선행: 0028
-- 상태: 진행
+- 상태: 완료
 - 종류: 운영
 - 우선순위: P1
 - 작성일: 2026-10-06
@@ -20,8 +20,8 @@
 - [x] 최초 배포가 `ssh-entry.sh` 경로로 성공하고 caddy·api·web이 healthy, 운영 주소 검사 6개가 기대대로, GeoIP가 로드된다.
 - [x] GitHub: 쓰지 않는 secrets(`OCI_*`) 삭제, `DEPLOY_SSH_KEY` 등록. 로컬 평문 비밀값 파일 삭제.
 - [x] Tailscale 관리 화면: `tagOwners` `tag:ci`, grant `tag:ci` → `home-server` tcp:22, workload identity federation 자격 증명(Subject `repo:ai-worker-lab@271170671/crelink@1406726921:ref:refs/heads/main`, GitHub 불변 subject 형식), GitHub variables `TS_OIDC_CLIENT_ID`·`TS_OIDC_AUDIENCE`(사용자 작업).
-- [ ] `https://links.shaul.kr`에서 구글 로그인, 링크 관리, 랜딩, 단축 URL 클릭 기록(IP가 방문자 IP)을 확인한다.
-- [ ] `deploy.yml` 자동 배포 1회(GHCR 이미지), 의도적 헬스 실패의 자동 복구 1회, `rollback.yml` 수동 롤백 1회를 실제로 실행해 결과를 기록한다. (자동 배포·워크플로 자동 롤백·수동 롤백 완료, 운영에서 의도적 헬스 실패 시험은 사용자 결정 대기 — 서버 자동 복구는 `tests/deploy-rollback.sh`에서 확인)
+- [x] `https://links.shaul.kr`에서 구글 로그인, 링크 관리, 랜딩, 단축 URL 클릭 기록(IP가 방문자 IP)을 확인한다.
+- [x] `deploy.yml` 자동 배포 1회(GHCR 이미지), 의도적 헬스 실패의 자동 복구 1회, `rollback.yml` 수동 롤백 1회를 실제로 실행해 결과를 기록한다. (의도적 헬스 실패는 Blue/Green 전환 뒤 0036에서 운영 실행: 새 색만 내리고 활성 색·트래픽 불변, 종료 1)
 
 ## 범위
 
@@ -52,3 +52,4 @@
 - 2026-10-07: 사용자가 Subject를 고친 뒤 Deploy 수동 실행(run 37497401435): Tailscale 접속·배포 성공(릴리스 `b25695e`, 이미지는 GHCR에서 pull), 러너의 운영 주소 검사 6개가 모두 403 → `rollback-on-failure`가 직전 릴리스 `d098c73`으로 되돌림(워크플로 자동 롤백이 실제로 동작함을 확인). 같은 커밋 push로 자동 실행된 Deploy(run 37497630745)도 같은 이유로 배포 → 롤백. 403은 Cloudflare가 GitHub 러너(데이터센터 IP)의 요청을 막은 것이고 같은 시각 운영자 PC·서버에서는 정상 응답. 운영 주소 검사를 서버의 `verify.sh`(`ssh deploy@<host> verify`)로 옮기고 배포 job 안에서 검사·자동 롤백을 하도록 `deploy.yml`·`rollback.yml`을 고침. `ssh-entry.sh`에 `verify`가 생겨 서버에서 `bootstrap.sh` 재실행. 참고: 배포마다 caddy·api·web을 다시 만들어 약 30~40초 운영 주소가 502(무중단 배포는 후속).
 - 2026-10-07: 첫 완전 자동 배포 성공. `021f81e` push → CI 성공 → Deploy(run 37499084332, `workflow_run`): 이미지 api·web(GHCR) → Tailscale → `deploy` → 서버 `verify` 6개 ok → 태그 `deploy/prod`·`deploy/prod-api`·`deploy/prod-web` = `021f81e`.
 - 2026-10-07: 수동 롤백(Rollback run 37499349862, `target=home-server`): 서버 `rollback`이 `021f81e` → `d098c73`으로 성공, 이어진 `verify` 단계는 `d098c73` 릴리스 폴더에 `verify.sh`가 없어 실패(그 커밋 뒤에 추가된 파일). 서버의 이전 릴리스 폴더 2개에 `verify.sh`를 복사해 채우고 `verify` 6개 ok 확인. 다음 Deploy(`force`, run 37499575245)로 `021f81e` 복구, 운영 정상. 롤백 뒤 같은 커밋으로 돌아가는 방법을 런북 7에 추가.
+- 2026-10-07: 실서비스 확인(사용자 휴대폰 iOS Chrome + 운영자 Mac, 릴리스 `4fbab57`). 구글 로그인(세션 생성, 역할 operator), 프로필 이미지 업로드(S3 SeaweedFS, `GET /api/backend/api/files/{id}` 200·크기 일치), 단축 주소 변경(`gk6rh10` → `shaul1991`, 옛 주소 90일 유지), 링크 추가(`https://naver.com/`). 클릭 기록: 휴대폰 이동통신 IP `106.101.130.115`·KR·mobile·iOS·Chrome·유입 `links.shaul.kr`(서버 IP 아님). 방문 기록: 운영자 Mac `curl https://go.shaul.kr/shaul1991` → IP `220.117.253.198`(Mac 공인 IP)·KR. API 오류 로그 0. 의도적 헬스 실패 자동 복구는 0036 운영 실행으로 확인. 발견: 휴대폰이 카카오톡에서 랜딩 주소 `links.shaul.kr/p/{id}`로 바로 들어와 방문이 기록되지 않음(설계상 단축 주소에서만 기록) → 0038에서 처리. 완료.

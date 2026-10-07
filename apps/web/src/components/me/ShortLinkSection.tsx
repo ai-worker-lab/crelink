@@ -50,11 +50,11 @@ export function ShortLinkSection({
         <code className="url-text">{shortLink.url}</code>
         <CopyButton text={shortLink.url} label="내 크리링 링크 복사" />
       </div>
+      {/* 공유용 주소는 단축 주소만 보여 줍니다(PRD R7). 미리보기는 같은 출처에서 열어 단축 주소를 거치지 않습니다. */}
       <dl className="meta-list">
         <div>
-          <dt>랜딩페이지 주소</dt>
+          <dt>랜딩페이지</dt>
           <dd>
-            <span className="url-text">{landing.url}</span>{' '}
             <a href={landing.url} target="_blank" rel="noopener">
               미리보기<span className="visually-hidden"> (새 창)</span>
             </a>

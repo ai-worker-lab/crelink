@@ -17,9 +17,9 @@ test('방문자: 단축 URL(새·옛 주소) → 랜딩, 외부 링크 클릭은
   const [first, second, hidden] = creator.links;
   const { context, page } = await data.session();
 
-  // 새 주소: 인스타그램에서 온 것처럼 Referer를 붙여 엽니다.
+  // 새 주소: 인스타그램에서 온 것처럼 Referer를 붙여 엽니다. 단축 주소가 붙인 통과 표시(?pass=)는 화면이 주소창에서 지웁니다.
   await page.goto(creator.shortUrl, { referer: 'https://www.instagram.com/' });
-  expect(page.url()).toBe(creator.landingUrl);
+  await expect(page).toHaveURL(creator.landingUrl);
   await expect(page.getByRole('heading', { name: 'E2E 방문 테스트', level: 1 })).toBeVisible();
   await expect(page.locator('.link-title')).toHaveText([first.title, second.title]);
   await expect(page.getByText(hidden.title)).toHaveCount(0);
@@ -27,7 +27,7 @@ test('방문자: 단축 URL(새·옛 주소) → 랜딩, 외부 링크 클릭은
 
   // 옛 주소(바꾼 지 90일 안)도 같은 랜딩
   await page.goto(`${SHORT_URL}/${creator.oldSlug}`);
-  expect(page.url()).toBe(creator.landingUrl);
+  await expect(page).toHaveURL(creator.landingUrl);
   await expect(page.getByRole('heading', { name: 'E2E 방문 테스트', level: 1 })).toBeVisible();
 
   // 외부 링크 클릭: {SHORT}/c/{id}가 저장된 URL로 302 → 브라우저가 그 URL을 요청.
@@ -106,4 +106,45 @@ test('방문자: 단축 URL(새·옛 주소) → 랜딩, 외부 링크 클릭은
 
   await page.goto(creator.landingUrl);
   await expectMobileFits(page, '/p/{publicId}');
+});
+
+test('외부에서 랜딩 주소로 바로 열면 단축 주소를 거쳐 방문 1건이 기록되고, 주소창에는 통과 표시 없는 랜딩 주소가 남는다. 관리 화면 미리보기는 기록 없이 열린다', async ({
+  data,
+}) => {
+  const name = `E2E 직접 접속 ${data.run}`;
+  const creator = await data.user({ displayName: name });
+
+  // 크리에이터가 /me의 미리보기(같은 출처, 새 창)로 열면 단축 주소를 거치지 않고 바로 열림
+  const own = await data.session(creator);
+  await own.page.goto('/me');
+  const [preview] = await Promise.all([
+    own.context.waitForEvent('page'),
+    own.page.getByRole('link', { name: '미리보기 (새 창)', exact: true }).click(),
+  ]);
+  await expect(preview.getByRole('heading', { name, level: 1 })).toBeVisible();
+  expect(preview.url()).toBe(creator.landingUrl);
+
+  // 메신저에 공유된 랜딩 주소를 연 방문자: /p/{id} → 단축 주소(방문 기록) → /p/{id}?pass=… → 주소창은 /p/{id}
+  const { page } = await data.session();
+  const response = await page.goto(creator.landingUrl, { referer: 'https://open.kakao.com/' });
+  const landed = response!.request();
+  expect(landed.url()).toMatch(new RegExp(`^${creator.landingUrl.replace(/\./g, '\\.')}\\?pass=\\d+\\.[\\w-]{22}$`));
+  expect(landed.redirectedFrom()?.url()).toBe(creator.shortUrl);
+  expect(landed.redirectedFrom()?.redirectedFrom()?.url()).toBe(creator.landingUrl);
+  await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(creator.landingUrl);
+
+  await waitForCount(data, 'visits', creator.shortLinkId, 1);
+  const { rows } = await data.db.query<{ slug: string; referrer_host: string | null }>(
+    'SELECT slug, referrer_host FROM visits WHERE short_link_id = $1',
+    [creator.shortLinkId],
+  );
+  expect(rows, '미리보기는 방문으로 세지 않고, 직접 접속은 단축 주소에서 1건').toEqual([
+    { slug: creator.slug, referrer_host: 'open.kakao.com' },
+  ]);
+
+  // 통과 표시가 지워진 주소를 새로 열면(다시 공유된 경우) 또 단축 주소를 거침
+  const again = await (await data.session()).page.goto(creator.landingUrl);
+  expect(again!.request().redirectedFrom()?.url()).toBe(creator.shortUrl);
+  await waitForCount(data, 'visits', creator.shortLinkId, 2);
 });

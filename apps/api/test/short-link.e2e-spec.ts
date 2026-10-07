@@ -1,4 +1,5 @@
 import { CreatorLandingState, LinkView, PublicLandingResponse } from '@crelink/shared';
+import { LandingPassService } from '../src/short-link/landing-pass.service';
 import { api, createTestApp, login, SHORT_URL, TestApp, waitForRows, WEB_URL } from './test-app';
 
 const IPHONE_UA =
@@ -22,6 +23,15 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
   const publicIdOf = async (linkId: string) =>
     (await t.pool.query<{ public_id: string }>('SELECT public_id FROM links WHERE id = $1', [linkId])).rows[0]
       .public_id;
+  /** 단축 주소 302의 랜딩 주소. 통과 표시 `?pass=<만료 초>.<서명 22자>`가 붙습니다. */
+  const landingLocation = (publicId: string) =>
+    new RegExp(`^${WEB_URL.replace(/\./g, '\\.')}/p/${publicId}\\?pass=\\d+\\.[A-Za-z0-9_-]{22}$`);
+  const publicLanding = (publicId: string, pass?: string) =>
+    api<PublicLandingResponse>(
+      t.baseUrl,
+      'GET',
+      `/api/public/landings/${publicId}${pass === undefined ? '' : `?pass=${encodeURIComponent(pass)}`}`,
+    );
 
   beforeAll(async () => {
     t = await createTestApp();
@@ -31,7 +41,7 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
     await t?.close();
   });
 
-  it('GET /{slug}는 302 랜딩, 처음 방문이면 cl_vid 쿠키를 주고 visits 행에 항목을 남긴다', async () => {
+  it('GET /{slug}는 302 랜딩(통과 표시 포함), 처음 방문이면 cl_vid 쿠키를 주고 visits 행에 항목을 남긴다', async () => {
     const creator = await newCreator();
     const response = await get(`/${creator.slug}`, {
       'user-agent': IPHONE_UA,
@@ -40,7 +50,7 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
       'x-forwarded-for': '203.0.113.9',
     });
     expect(response.status).toBe(302);
-    expect(response.headers.get('location')).toBe(`${WEB_URL}/p/${creator.publicId}`);
+    expect(response.headers.get('location')).toMatch(landingLocation(creator.publicId));
     expect(response.headers.get('cache-control')).toBe('no-store');
     const [cookie] = response.headers.getSetCookie();
     expect(cookie).toMatch(
@@ -88,12 +98,50 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
     const creator = await newCreator();
     await api(t.baseUrl, 'PUT', '/api/me/short-link/slug', { cookie: creator.cookie, body: { slug: 'renamed-one' } });
     const old = await get(`/${creator.slug}`);
-    expect(old.headers.get('location')).toBe(`${WEB_URL}/p/${creator.publicId}`);
-    expect((await get('/renamed-one')).headers.get('location')).toBe(`${WEB_URL}/p/${creator.publicId}`);
+    expect(old.headers.get('location')).toMatch(landingLocation(creator.publicId));
+    expect((await get('/renamed-one')).headers.get('location')).toMatch(landingLocation(creator.publicId));
     await t.pool.query("UPDATE short_slugs SET retired_at = now() - interval '91 days' WHERE slug = $1", [
       creator.slug,
     ]);
     expect((await get(`/${creator.slug}`)).headers.get('location')).toBe(`${WEB_URL}/notice?reason=link_not_found`);
+  });
+
+  it('통과 표시: 단축 주소가 준 pass는 그 랜딩에서 만료 전에만 passAccepted, shortUrl은 현재 주소', async () => {
+    const creator = await newCreator();
+    const other = await newCreator();
+    const location = (await get(`/${creator.slug}`)).headers.get('location')!;
+    const pass = new URL(location).searchParams.get('pass')!;
+
+    const accepted = await publicLanding(creator.publicId, pass);
+    expect(accepted.status).toBe(200);
+    expect(accepted.body).toMatchObject({ passAccepted: true, shortUrl: `${SHORT_URL}/${creator.slug}` });
+
+    // pass 없음, 다른 랜딩의 pass, 변조, 형식 오류
+    expect((await publicLanding(creator.publicId)).body.passAccepted).toBe(false);
+    expect((await publicLanding(other.publicId, pass)).body.passAccepted).toBe(false);
+    const [expires, signature] = pass.split('.');
+    const tampered = `${expires}.${signature[0] === 'A' ? 'B' : 'A'}${signature.slice(1)}`;
+    expect((await publicLanding(creator.publicId, tampered)).body.passAccepted).toBe(false);
+    expect((await publicLanding(creator.publicId, `${Number(expires) + 600}.${signature}`)).body.passAccepted).toBe(
+      false,
+    );
+    expect((await publicLanding(creator.publicId, 'not-a-pass')).body.passAccepted).toBe(false);
+
+    // 만료: 61초 전에 발급한 것과 같은 표시(같은 프로세스 키)는 거부, 59초 전 것은 아직 유효
+    const passes = t.app.get(LandingPassService);
+    const expired = passes.issue(creator.publicId, Date.now() - 61_000);
+    expect((await publicLanding(creator.publicId, expired)).body.passAccepted).toBe(false);
+    const fresh = passes.issue(creator.publicId, Date.now() - 59_000);
+    expect((await publicLanding(creator.publicId, fresh)).body.passAccepted).toBe(true);
+
+    // 주소를 바꾸면 shortUrl은 새 주소, 옛 주소 302의 pass도 같은 랜딩에서 유효
+    await api(t.baseUrl, 'PUT', '/api/me/short-link/slug', { cookie: creator.cookie, body: { slug: 'pass-renamed' } });
+    const oldLocation = (await get(`/${creator.slug}`)).headers.get('location')!;
+    const oldPass = new URL(oldLocation).searchParams.get('pass')!;
+    expect((await publicLanding(creator.publicId, oldPass)).body).toMatchObject({
+      passAccepted: true,
+      shortUrl: `${SHORT_URL}/pass-renamed`,
+    });
   });
 
   it('클릭 주소는 link_clicks를 남기고 저장된 URL로, 숨김·차단·삭제면 link_unavailable', async () => {
@@ -211,6 +259,8 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
           ],
         },
       ],
+      passAccepted: false,
+      shortUrl: `${SHORT_URL}/${creator.slug}`,
     });
   });
 

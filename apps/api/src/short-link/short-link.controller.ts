@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { AppConfig } from '../config.service';
 import { Database } from '../database';
 import { readCookie, serializeCookie, UUID_PATTERN } from '../common/http';
+import { LandingPassService } from './landing-pass.service';
 import { requestFacts, TrackingService } from './tracking.service';
 
 /**
@@ -27,6 +28,7 @@ export class ShortLinkController {
     private readonly database: Database,
     private readonly tracking: TrackingService,
     private readonly config: AppConfig,
+    private readonly landingPass: LandingPassService,
   ) {}
 
   /** 방문자 쿠키 `cl_vid`. 없거나 형식이 틀릴 때만 새로 발급합니다. */
@@ -84,7 +86,10 @@ export class ShortLinkController {
     this.redirect(response, link.url);
   }
 
-  /** `GET {SHORT}/{slug}` → 방문 기록 + 랜딩. 옛 주소는 바꾼 뒤 90일까지 같은 랜딩으로 보냅니다. */
+  /**
+   * `GET {SHORT}/{slug}` → 방문 기록 + 랜딩. 옛 주소는 바꾼 뒤 90일까지 같은 랜딩으로 보냅니다.
+   * 랜딩 주소에 통과 표시(`?pass=`)를 붙여, 웹이 이 리디렉트로 온 요청만 외부 진입으로 그대로 그리게 합니다(PRD R7).
+   */
   @Get(':slug')
   async visit(@Param('slug') rawSlug: string, @Req() request: Request, @Res() response: Response): Promise<void> {
     const slug = rawSlug.toLowerCase();
@@ -110,6 +115,9 @@ export class ShortLinkController {
         requestFacts(request, this.config.trustedProxyHops),
       ),
     );
-    this.redirect(response, `${this.config.webUrl}${CRELINK_WEB_PATHS.landing(target.public_id)}`);
+    this.redirect(
+      response,
+      `${this.config.webUrl}${CRELINK_WEB_PATHS.landing(target.public_id, this.landingPass.issue(target.public_id))}`,
+    );
   }
 }

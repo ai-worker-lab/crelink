@@ -8,9 +8,9 @@ Next.js App Router와 TypeScript 기반 크리링(CreLink) 웹 클라이언트�
 | --- | --- |
 | `/` | 소개, 로그인 전 `구글로 시작하기`, 로그인 후 `/me`·랜딩 관리 화면(운영자는 `/admin`) 링크 |
 | `/auth/google`, `/auth/google/callback` | 구글 로그인 route handler. API의 `cl_oauth_state`·`cl_session` `Set-Cookie`를 그대로 붙여 302 |
-| `/me` | 크리에이터 편집(단축 URL 복사·주소 변경, 프로필, SNS, 포트폴리오)과 외부 링크 요약·관리 화면 진입점. 401이면 `/` |
+| `/me` | 크리에이터 편집(단축 URL 복사·주소 변경, 프로필, SNS, 포트폴리오)과 외부 링크 요약·관리 화면 진입점. 공유용 주소는 단축 URL만 보여 주고 랜딩은 미리보기 링크(새 창)만 둠. 401이면 `/` |
 | `/me/landings/[publicId]` | 랜딩 관리 화면(PRD R18). 기본 편집 모드: 랜딩과 같은 배치에서 외부 링크 추가·수정·삭제(하단 시트), 끌어서 순서 변경(마우스·터치·키보드), 숨기기 스위치, 한도·차단 표시. `?mode=view` 보기 모드: 공개 랜딩과 같은 `Landing`으로 방문자 화면(숨긴·차단 링크 제외, 링크는 클릭 기록 없이 저장된 URL로). 내 랜딩이 아니면 찾을 수 없음 안내, 401이면 `/` |
-| `/p/[publicId]` | 공개 랜딩(SSR, `src/components/landing/Landing.tsx`). 404·410 안내 |
+| `/p/[publicId]` | 공개 랜딩(SSR, `src/components/landing/Landing.tsx`). 404·410 안내. 외부 진입은 단축 주소를 거침(PRD R7): `Sec-Fetch-Site: same-origin`(서비스 화면에서 연 경우)이거나 API가 단축 주소 302의 통과 표시 `?pass=`를 받아들이면(`passAccepted`) 그리고 주소창의 `pass`를 지우며(`PassCleanup`), 그 밖은 API가 준 `shortUrl`로 307. 이 리디렉트가 HTTP 307이 되도록 불러오는 중 화면(`loading.tsx`)은 루트가 아니라 `/me`·`/admin`에만 둠 |
 | `/notice?reason=` | 단축 주소·로그인 오류 안내 |
 | `/privacy` | 개인정보 수집·보관·쿠키 고지(법률 검토 전 문구) |
 | `/admin`, `/admin/creators/[userId]`, `/admin/blocked-domains` | 운영자 화면. 401이면 `/`, 403이면 권한 없음 안내 |

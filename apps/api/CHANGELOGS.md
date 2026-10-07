@@ -4,6 +4,7 @@
 
 ## 2026-10-07
 
+- 단축 주소 302(`GET /{slug}`, 옛 주소 포함)에 랜딩 통과 표시 `?pass=<만료 초>.<HMAC 앞 16바이트 base64url>`(publicId에 묶임, 60초, 프로세스 시작 때 만든 무작위 키, 새 비밀값 없음)를 붙임(`src/short-link/landing-pass.service.ts`, `LandingPassModule`). `GET /api/public/landings/{publicId}`가 `pass` 쿼리를 받아 `passAccepted`와 현재 단축 주소 `shortUrl`을 줌. 시험: `landing-pass.service.spec.ts`, `test/short-link.e2e-spec.ts`(302 Location의 pass, 다른 랜딩·변조·만료·형식 오류는 false, 주소 변경 뒤 새 `shortUrl`). 문서 `docs/README.md` "랜딩 통과 표시". 근거 `docs/work/orchestrator/0038-landing-entry-via-short-link.md`.
 - 결함 수정: JSON 본문 한도(100KB) 초과·지원하지 않는 문자셋 요청이 500 `internal_error`(오류 로그)였던 것을 413·415 `validation_failed`로 응답(`ApiExceptionFilter`가 4xx `expose` http-errors의 상태를 씀). 다른 예상하지 못한 오류는 그대로 500. 회귀 시험 `test/error-response.e2e-spec.ts`. 근거 `docs/work/api/0037-api-body-parser-error-status.md`.
 - 문서(코드 변경 없음): `docs/README.md`의 운영 접근 경로를 Blue/Green 구조로 고침(공용 네트워크 `crelink-edge`에서 edge Caddy와 같은 색 웹만 `api-<색>`을 부름, edge Caddy 본문 한도). 근거 `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`.
 - graceful shutdown(`src/shutdown.ts`, `main.ts`): SIGTERM·SIGINT를 받으면 새 연결을 받지 않고(idle keep-alive 연결은 바로 끊고 진행 중·종료 중 응답은 `Connection: close`), 진행 중 요청을 끝낸 뒤 `app.close()`로 `onModuleDestroy`(pg pool `end`, 보존 작업 timer 정리)를 부르고 종료 코드 0으로 끝냄. 이전에는 신호에 바로 죽어 진행 중 요청이 끊김(컨테이너 143). Nest 11의 `enableShutdownHooks()`는 HTTP 서버보다 pool을 먼저 닫아 진행 중 업로드가 500이 되므로 쓰지 않음. `Database.onModuleDestroy`는 pool 종료를 로그로 남기고 두 번 불려도 안전. 근거 `docs/work/api/0032-api-graceful-shutdown-pool-max.md`.

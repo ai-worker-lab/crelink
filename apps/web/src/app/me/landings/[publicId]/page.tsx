@@ -49,7 +49,7 @@ export default async function ManageLandingPage({ params, searchParams }: Props)
             </p>
             <h1 className="page-title">링크 관리</h1>
             <p className="page-subtitle">
-              공개 주소 <span className="url-text">{own.landing.url}</span>
+              공개 주소 <span className="url-text">{own.shortLink.url}</span>
             </p>
             <div className="manage-toolbar">
               <nav className="mode-switch" aria-label="화면 모드">

@@ -1,12 +1,16 @@
-import { Controller, Get, HttpStatus, Param } from '@nestjs/common';
-import { PublicLandingResponse, PublicLinkView } from '@crelink/shared';
+import { Controller, Get, HttpStatus, Param, Query } from '@nestjs/common';
+import { LANDING_PASS_PARAM, PublicLandingResponse, PublicLinkView } from '@crelink/shared';
 import { AppConfig } from '../config.service';
 import { Database } from '../database';
 import { apiError } from '../common/http';
 import { FilesService } from '../files/files.service';
+import { LandingPassService } from '../short-link/landing-pass.service';
 import { CreatorService } from './creator.service';
 
-/** 방문자가 보는 공개 랜딩(R3, R5, R12). 숨긴 링크와 차단된 링크는 빼고 내려 줍니다. */
+/**
+ * 방문자가 보는 공개 랜딩(R3, R5, R7, R12). 숨긴 링크와 차단된 링크는 빼고 내려 줍니다.
+ * 웹이 외부 진입을 단축 주소로 보낼지 정하도록 통과 표시 검증 결과(`passAccepted`)와 현재 단축 주소(`shortUrl`)를 함께 줍니다.
+ */
 @Controller('public/landings')
 export class PublicLandingController {
   constructor(
@@ -14,10 +18,14 @@ export class PublicLandingController {
     private readonly creator: CreatorService,
     private readonly files: FilesService,
     private readonly config: AppConfig,
+    private readonly landingPass: LandingPassService,
   ) {}
 
   @Get(':publicId')
-  async landing(@Param('publicId') publicId: string): Promise<PublicLandingResponse> {
+  async landing(
+    @Param('publicId') publicId: string,
+    @Query(LANDING_PASS_PARAM) pass: unknown,
+  ): Promise<PublicLandingResponse> {
     const result = /^[a-z0-9]{10}$/.test(publicId)
       ? await this.database.query<{
           id: string;
@@ -38,7 +46,7 @@ export class PublicLandingController {
       throw apiError(HttpStatus.GONE, 'creator_suspended', '운영 정책에 따라 지금은 볼 수 없는 페이지입니다.');
     }
     const db = this.database.pool;
-    const [blocks, links, socials, portfolio] = await Promise.all([
+    const [blocks, links, socials, portfolio, shortLink] = await Promise.all([
       db.query<{ id: string }>('SELECT id FROM landing_blocks WHERE landing_id = $1 ORDER BY position', [landing.id]),
       db.query<{
         block_id: string;
@@ -54,6 +62,7 @@ export class PublicLandingController {
       ),
       this.creator.socials(db, landing.id),
       this.creator.portfolio(db, landing.id),
+      this.creator.shortLink(db, landing.user_id),
     ]);
     return {
       publicId,
@@ -81,6 +90,8 @@ export class PublicLandingController {
             clickUrl: `${this.config.shortLinkBaseUrl}/c/${link.public_id}`,
           })),
       })),
+      passAccepted: this.landingPass.verify(publicId, pass),
+      shortUrl: shortLink.url,
     };
   }
 }

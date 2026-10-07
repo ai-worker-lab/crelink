@@ -1,4 +1,4 @@
-import type { PublicLandingResponse } from '@crelink/shared';
+import type { PublicLandingView } from '@crelink/shared';
 import type { ReactNode } from 'react';
 import { SOCIAL_PLATFORM_LABELS } from '../../lib/format';
 import { DefaultAvatar } from '../DefaultAvatar';
@@ -17,7 +17,7 @@ export function Landing({
   links,
   headingLevel = 1,
 }: {
-  landing: PublicLandingResponse;
+  landing: PublicLandingView;
   links?: ReactNode;
   headingLevel?: 1 | 2;
 }) {

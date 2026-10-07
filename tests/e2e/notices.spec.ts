@@ -6,7 +6,7 @@ test('빈 랜딩은 크리링 표시와 함께 열리고, 없는 단축 주소�
   const { page } = await data.session();
 
   await page.goto(creator.shortUrl);
-  expect(page.url()).toBe(creator.landingUrl);
+  await expect(page).toHaveURL(creator.landingUrl);
   await expect(page.getByText('아직 준비 중인 페이지예요.')).toBeVisible();
   // 프로필 사진이 없으면 기본 프로필(PRD R17)
   await expect(page.locator('.profile-head .default-avatar')).toBeVisible();
