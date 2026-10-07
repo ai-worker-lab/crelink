@@ -10,6 +10,7 @@ export function LogoutButton() {
 
   async function logout() {
     const ok = await run(() => browserApi<void>(CRELINK_API_PATHS.authLogout, { method: 'POST' }));
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- 로그아웃한 세션의 화면이 클라이언트 라우터 캐시에 남지 않도록 문서를 새로 불러옵니다.
     if (ok) window.location.assign('/');
   }
 

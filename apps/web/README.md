@@ -42,7 +42,7 @@ docker build -f apps/web/Dockerfile -t crelink-web:local .
 - [`Dockerfile`](Dockerfile): 빌드 단계(`node:22-slim`)에서 루트 `packageManager`의 pnpm으로 `pnpm install --frozen-lockfile --filter @crelink/web...` → `@crelink/shared` 빌드 → 웹 빌드. 디자인 토큰 생성물은 커밋된 것을 쓰고 원본과의 일치 검사는 CI(`pnpm typecheck`)가 맡습니다.
 - `next.config.ts`의 `output: 'standalone'`으로 `.next/standalone`(`server.js`와 추적된 의존성)만 런타임 단계(`node:22-slim`)에 옮기고 `.next/static`·`public`을 합칩니다. 실행은 `node` 사용자, `CMD node apps/web/server.js`, `PORT=3000`·`HOSTNAME=0.0.0.0`, `NODE_ENV=production`, `NEXT_TELEMETRY_DISABLED=1`.
 - `HEALTHCHECK`: 내장 `fetch`로 `/privacy`(API를 부르지 않는 정적 화면)를 확인합니다. Compose는 이 정의를 재사용하고 루트 파일 시스템을 읽기 전용(`/tmp`만 tmpfs)으로 둡니다.
-- 이미지는 amd64·arm64 모두 만들 수 있습니다(대상 플랫폼은 `infra/prod/targets.json`). 크기는 약 483MB(2026-10-06).
+- 이미지는 amd64·arm64 모두 만들 수 있습니다(대상 플랫폼은 `infra/prod/targets.json`). 크기는 약 432MB(2026-10-07, Next 16.4.0, `docker image inspect` 기준).
 
 환경변수(서버 전용, 실행 시점에 읽음. 이미지에 넣지 않음):
 
@@ -55,9 +55,9 @@ docker build -f apps/web/Dockerfile -t crelink-web:local .
 
 ### 종료 동작(SIGTERM)
 
-standalone `server.js`는 Next의 `startServer`(`next/dist/server/lib/start-server.js`)를 그대로 쓰고, 이 저장소는 신호 처리를 따로 넣지 않습니다(`NEXT_MANUAL_SIG_HANDLE` 미설정). Next 15.5.27(Node 22.23) 이미지에서 확인한 동작:
+standalone `server.js`는 Next의 `startServer`(`next/dist/server/lib/start-server.js`)를 그대로 쓰고, 이 저장소는 신호 처리를 따로 넣지 않습니다(`NEXT_MANUAL_SIG_HANDLE` 미설정). Next 16.4.0 이미지에서 확인한 동작:
 
-- SIGTERM·SIGINT를 받으면 `server.close()`로 listen 소켓과 쉬는 keep-alive 연결을 닫고(새 연결은 곧바로 `ECONNREFUSED`), 진행 중 요청(SSR·BFF·route handler)이 끝나면 `nextServer.close()` 뒤 종료 코드 0으로 끝납니다. Compose `init: true`의 `docker-init`이 PID 1로서 신호를 node에 넘깁니다.
+- SIGTERM·SIGINT를 받으면 `server.close()`로 listen 소켓과 쉬는 keep-alive 연결을 닫고(새 연결은 곧바로 `ECONNREFUSED`), 진행 중 요청(SSR·BFF·route handler)이 끝나면 `nextServer.close()` 뒤 신호에 맞춘 종료 코드(SIGTERM 143, SIGINT 130)로 스스로 끝납니다. Next 15는 같은 순서로 끝나되 종료 코드가 0이었습니다. 143은 SIGKILL(137)과 달리 Next가 신호를 받아 정상 정리를 마쳤다는 뜻입니다. Compose `init: true`의 `docker-init`이 PID 1로서 신호를 node에 넘깁니다.
 - Next 자체에는 종료 상한이 없습니다. 진행 중 요청이 Docker grace(`docker stop -t`, Compose `stop_grace_period`) 안에 끝나지 않으면 Docker가 SIGKILL로 끝내고(종료 코드 137) 그 요청은 끊깁니다. grace를 정하지 않으면 엔진 기본값을 쓰는데, 로컬 Docker Desktop 29.8.1은 약 3초였습니다(`docker stop`·`docker compose stop` 모두. Docker 문서상 Linux 엔진 기본은 10초). 그래서 grace는 Compose에 명시합니다([0034](../../docs/work/infra/0034-prod-compose-graceful-stop.md)).
 - 신호를 받을 때 요청을 처리 중이던 keep-alive 연결은 응답 뒤에도 닫지 않습니다(`Connection: keep-alive`). 같은 연결로 새 요청이 계속 오면 그것도 처리해 grace까지 살아 있을 수 있고, 새 요청이 없으면 keep-alive 제한 시간(Node 기본 5초) 뒤에 끝납니다. 앞단 프록시(Caddy)는 컨테이너를 멈추기 전에 이 컨테이너로 보내기를 멈춰야 합니다([ADR 0011](../../docs/adr/0011-zero-downtime-deploy.md)의 전환 순서).
-- 실측(2026-10-07, 로컬 arm64, 운영과 같은 `--init --read-only --tmpfs /tmp`, 5초 뒤 응답하는 모형 API): 진행 중 BFF(`/api/backend/api/health`) 3건과 SSR(`/p/[publicId]`) 1건이 모두 200, `docker stop -t 30`·`-t 10`은 마지막 응답 직후 종료 코드 0. 조건별 결과는 [0033 진행 기록](../../docs/work/web/0033-web-standalone-sigterm.md#진행-기록)에 있습니다.
+- 실측(2026-10-07, 로컬 arm64, 운영과 같은 `--init --read-only --tmpfs /tmp`, 실제 로컬 API로 5초 늦게 전달하는 모형): Next 16.4.0 이미지에서 진행 중 BFF(`/api/backend/api/health`) 3건과 SSR(`/p/[publicId]`, `Sec-Fetch-Site: same-origin`) 1건이 모두 200, `docker stop -t 30`·`-t 10`은 마지막 응답 직후 종료 코드 143(SIGKILL 없음). Next 15.5.27 때의 조건별 결과는 [0033 진행 기록](../../docs/work/web/0033-web-standalone-sigterm.md#진행-기록)에 있습니다.
