@@ -39,6 +39,7 @@
 - [NestJS API 구조와 구현 기준](architecture/nestjs-api.md) · [Next.js 웹 구조와 구현 기준](architecture/nextjs-web.md) · [Expo 모바일 구조와 구현 기준](architecture/expo-mobile.md) — 프레임워크별 구조와 현재 골격
 - [Redis와 Valkey 비교](references/redis-vs-valkey.md) — 프로젝트 역사, 라이선스, 호환성, 기능 비교 자료
 - [운영 배포 무중단화 방식 비교](references/zero-downtime-deploy.md) — 배포 중 502 원인, 로컬 실측, Caddy 재시도·docker-rollout·Blue/Green·Kamal·Swarm 비교
+- [쿠팡 파트너스 링크 카드 정보 채우기 방식 비교](references/coupang-partners-card-data.md) — 파트너스 API 경로·키 발급·약관(키 제3자 제공·데이터 저장 금지), HTML 복사 코드, 서버가 쿠팡 주소를 열 때의 위험, OG 수집 SSRF 항목, 선택지 비교
 - [CHANGELOGS](../CHANGELOGS.md) — 공개 여부와 무관한 내부 전체 변경 기록. 영역별 로그는 `infra/` 및 `apps/` 아래에 있음
 - [RELEASES](../RELEASES.md) — 사용자에게 공개한 릴리스 노트
 
