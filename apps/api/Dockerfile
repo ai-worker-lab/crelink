@@ -14,7 +14,9 @@ FROM --platform=$BUILDPLATFORM node:24-slim AS build
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
     PNPM_HOME=/pnpm \
     PATH=/pnpm:$PATH
-RUN corepack enable
+# ca-certificates: sentry-cli(소스맵 업로드)는 시스템 CA로 sentry.io TLS를 검증하는데 node:*-slim에는 CA 묶음이 없습니다. 빌드 단계에만 둡니다.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/* && \
+    corepack enable
 WORKDIR /repo
 # 의존성 설치를 소스 변경과 분리해 캐시합니다. pnpm 버전은 루트 package.json의 packageManager를 따릅니다.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
