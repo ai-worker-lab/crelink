@@ -4,7 +4,7 @@
 - 역할: infra
 - 상위: 0024
 - 선행: 0025
-- 상태: 검증
+- 상태: 완료
 - 종류: 운영
 - 우선순위: P1
 - 작성일: 2026-10-06
@@ -15,11 +15,11 @@
 
 ## 수용 기준
 
-- [ ] `infra/prod/compose.yaml`(project `crelink-prod`: caddy·api·web, 호스트 포트는 caddy `127.0.0.1:18080`만, 볼륨 uploads·geoip, `./certs`, `env_file` = 복호화한 `/run/crelink/app.env`), `Caddyfile`(단축·클릭만 api, 나머지 404, 웹 호스트 전부 web, `CF-Connecting-IP` 신뢰는 사설 대역만), `targets.json`, `secrets/home-server.sops.env`, `certs/supabase-ca.crt`, `images.env.example`. `config --quiet`가 통과한다.
-- [ ] Caddy 공개 정책을 로컬 컨테이너로 확인한다(`tests/caddy-routing.sh`): 단축·클릭 통과, `/api/*` 포함 그 밖 404, 웹 전달, 방문자 IP(`X-Forwarded-For` = `{client_ip}`, 위조 무시).
-- [ ] `lib.sh`·`deploy.sh`·`rollback.sh`·`ssh-entry.sh`·`geoip.sh`: 릴리스(SHA) 단위 배포, 복호화·문법 사전 확인, `up --wait` 헬스, 실패 시 직전 릴리스 복구, 기본 롤백 대상, forced command. `shellcheck`와 로컬 시뮬레이션(`tests/deploy-rollback.sh`)으로 정상·실패 경로를 확인한다.
-- [ ] `bootstrap.sh`(Ubuntu amd64·arm64: sops·age·Docker, `deploy`·forced command, `/opt/crelink`·`/run/crelink`·`/etc/crelink`, 선택 cloudflared)와 런북 `infra/docs/prod-runbook.md`(서버 준비, Tailscale·GitHub 접속 설정, Tunnel, 비밀값 편집·회전, 최초 배포, 운영 확인, 롤백, GeoIP, 업로드 백업, 대상 추가, 장애 대응, Supabase).
-- [ ] `infra/prod/README.md`·`infra/README.md`·`infra/AGENTS.md`·`infra/CHANGELOGS.md` 갱신, 평문 비밀값이 저장소에 없다.
+- [x] `infra/prod/compose.yaml`(project `crelink-prod`: caddy·api·web, 호스트 포트는 caddy `127.0.0.1:18080`만, 볼륨 uploads·geoip, `./certs`, `env_file` = 복호화한 `/run/crelink/app.env`), `Caddyfile`(단축·클릭만 api, 나머지 404, 웹 호스트 전부 web, `CF-Connecting-IP` 신뢰는 사설 대역만), `targets.json`, `secrets/home-server.sops.env`, `certs/supabase-ca.crt`, `images.env.example`. `config --quiet`가 통과한다.
+- [x] Caddy 공개 정책을 로컬 컨테이너로 확인한다(`tests/caddy-routing.sh`): 단축·클릭 통과, `/api/*` 포함 그 밖 404, 웹 전달, 방문자 IP(`X-Forwarded-For` = `{client_ip}`, 위조 무시).
+- [x] `lib.sh`·`deploy.sh`·`rollback.sh`·`ssh-entry.sh`·`geoip.sh`: 릴리스(SHA) 단위 배포, 복호화·문법 사전 확인, `up --wait` 헬스, 실패 시 직전 릴리스 복구, 기본 롤백 대상, forced command. `shellcheck`와 로컬 시뮬레이션(`tests/deploy-rollback.sh`)으로 정상·실패 경로를 확인한다.
+- [x] `bootstrap.sh`(Ubuntu amd64·arm64: sops·age·Docker, `deploy`·forced command, `/opt/crelink`·`/run/crelink`·`/etc/crelink`, 선택 cloudflared)와 런북 `infra/docs/prod-runbook.md`(서버 준비, Tailscale·GitHub 접속 설정, Tunnel, 비밀값 편집·회전, 최초 배포, 운영 확인, 롤백, GeoIP, 업로드 백업, 대상 추가, 장애 대응, Supabase).
+- [x] `infra/prod/README.md`·`infra/README.md`·`infra/AGENTS.md`·`infra/CHANGELOGS.md` 갱신, 평문 비밀값이 저장소에 없다.
 
 ## 범위
 
@@ -54,3 +54,4 @@
   - 로컬에서 못 한 것: 실제 서버 적용(edge 전환·`bootstrap.sh` 실행 — `bash -n`·shellcheck만), 실제 도메인 ACME 인증서 발급, GHCR 실제 로그인·pull, Supabase TLS(`verify-full`) 접속, OCI 보안 목록·iptables. 0029에서 실행.
 - 2026-10-06: 통합 확인(브랜치 `work/0024-prod-deploy`). 이미지 한도를 4MB로 맞춤(shared·API 메시지·테스트·문서). `pnpm verify` 8단계 통과(API 테스트 포함), `make api-restart` 뒤 `pnpm e2e` 6 passed, `pnpm smoke` 5 passed, `infra/prod/tests/caddy-routing.sh` 전 요청 일치. 상태 `완료`. 실서버 적용은 0029.
 - 2026-10-06: 범위 변경(에픽 0024 호스팅 전환). 서버 공용 edge Caddy(`infra/prod/edge/`)·`crelink.caddy`·`.env.example`·서버 `.env`·rsync 배포를 버리고, 스택 안 Caddy + Cloudflare Tunnel, SOPS/age 암호문, 릴리스 폴더(`releases/<SHA>`·`current`·`state/`)와 forced command(`ssh-entry.sh`), `targets.json`으로 바꿈. 목적·수용 기준을 새 설계로 고치고(이전 기준과 그 검증은 위 기록) 상태를 `검증`으로 되돌림. 스크립트·Compose는 통합 담당, 시험 스크립트는 시험 담당, 문서(`infra/prod/README.md`·`infra/README.md`·`infra/AGENTS.md`·런북)는 문서 담당이 바꿈. 새 기준의 검증 결과는 통합 확인에서 기록하고 `완료`로 바꿈.
+- 2026-10-07: 완료(에픽 0024 마감). 이 기준대로 운영 `home-server`에 최초 배포·자동 배포·롤백을 실행했고(0029), 시험 `tests/caddy-routing.sh`·`tests/deploy-rollback.sh`가 저장소에 있으며 암호문은 SOPS(`ENC[` 값)뿐. 이후 바뀐 부분: project `crelink-prod`·스택 안 caddy·실패 시 직전 릴리스 복구는 0035(edge Caddy `crelink-edge` + `crelink-blue`·`crelink-green`, 실패 시 활성 색 불변)가, 업로드 볼륨은 0030(S3)이 대체. 현재 기준은 `docs/specs/crelink-prod-deploy.md`.
