@@ -37,7 +37,7 @@
 
 기능 시나리오 E2E는 `pnpm smoke`와 분리해 [`tests/e2e/`](../../tests/e2e/README.md)에 둡니다. [`scripts/e2e.mjs`](../../scripts/e2e.mjs)가 실행 중인 인스턴스(`make up`)의 웹·API·DB에 Playwright로 크리링 MVP 시나리오([MVP 기술 설계 검증 계획](../specs/crelink-mvp.md#검증-계획))를 실행합니다. 로그인 상태는 DB fixture가 세션 행을 넣어 만들고, 테스트 데이터는 끝에 지웁니다.
 
-웹 개발 서버(`make up`의 `next dev`)는 `apps/web/.next-dev/`, 빌드(`pnpm verify`의 `next build`)는 `apps/web/.next/`에 출력하므로 개발 서버를 띄운 채 `pnpm verify` → `pnpm smoke`·`pnpm e2e` 순서로 실행해도 됩니다(`apps/web/next.config.ts`의 `distDir`). `apps/web/next-env.d.ts`는 Next.js가 출력 디렉터리에 맞춰 다시 쓰는 생성 파일이라 Git에서 제외하고, 웹 `typecheck`가 `next typegen`으로 만듭니다.
+웹 개발 서버(`make up`의 `next dev`)는 `apps/web/.next/dev/`, 빌드(`pnpm verify`의 `next build`)는 그 밖의 `apps/web/.next/`에 출력하므로 개발 서버를 띄운 채 `pnpm verify` → `pnpm smoke`·`pnpm e2e` 순서로 실행해도 됩니다(Next.js 16 기본 동작, `next build`가 `.next/dev`를 건드리지 않음). `apps/web/next-env.d.ts`는 Next.js가 출력 디렉터리에 맞춰 다시 쓰는 생성 파일이라 Git에서 제외하고, 웹 `typecheck`가 `next typegen`으로 만듭니다.
 
 ## CI
 
