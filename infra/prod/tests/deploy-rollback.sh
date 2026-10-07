@@ -8,7 +8,7 @@
 #   ssh-entry.sh를 SSH_ORIGINAL_COMMAND + stdin(첫 줄 "<사용자> <토큰>" + 묶음)으로 직접 실행합니다.
 # - 새 서버라 첫 deploy는 edge가 없어 거부되고(이미지는 받아 둠), cutover.sh로 edge + blue를 띄운 뒤 나머지를 확인합니다.
 #   drain은 CRELINK_DRAIN_SECONDS=1(무중단 자체는 tests/zero-downtime.sh가 부하로 확인).
-# - 끝나면(실패해도) 컨테이너·네트워크·볼륨·더미 이미지·임시 폴더를 지웁니다. registry:3·caddy·node:22-alpine(htpasswd가 없으면 httpd:2-alpine) 이미지는 남깁니다.
+# - 끝나면(실패해도) 컨테이너·네트워크·볼륨·더미 이미지·임시 폴더를 지웁니다. registry:3·caddy·node:24-alpine(htpasswd가 없으면 httpd:2-alpine) 이미지는 남깁니다.
 # 종료 코드: 0 모든 확인이 기대와 일치, 1 불일치 있음.
 set -euo pipefail
 # shellcheck source=SCRIPTDIR/lib/harness.sh

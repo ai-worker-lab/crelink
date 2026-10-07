@@ -50,7 +50,7 @@ echo "== 운영 중인 옛 구조 만들기(그 커밋의 deploy.sh, project $CR
 run env COMPOSE_PROJECT_NAME="$CRELINK_LEGACY_PROJECT" "$(rel "$L")/deploy.sh" "$L" "$i0" "$i0"
 result '옛 deploy.sh 종료·마지막 줄' '0 L api:i0 web:i0' "$CODE $(tail -n 1 "$LAST_OUT" | names)"
 result '옛 스택 응답(127.0.0.1:포트)' '302 api i0 r0 / web i0' "$(probe)"
-docker run --rm -v "$CRELINK_GEOIP_VOLUME:/d" alpine:3.22 sh -c 'echo keep >/d/marker'
+docker run --rm -v "$CRELINK_GEOIP_VOLUME:/d" alpine:3.24 sh -c 'echo keep >/d/marker'
 result '옛 스택 api가 geoip 볼륨을 읽음' keep "$(marker_in prod)"
 
 echo "== cutover 전: 새 릴리스 배포는 아무것도 바꾸지 않고 거부"

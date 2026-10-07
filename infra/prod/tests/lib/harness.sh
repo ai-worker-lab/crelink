@@ -5,7 +5,7 @@
 #   운영과 다른 값은 이것과 CRELINK_HTTP_PORT(빈 포트), CRELINK_SHORT_HOST=go.localhost·CRELINK_WEB_HOST=links.localhost뿐입니다.
 # - macOS에서는 GNU mv -T 대신 같은 뜻의 BSD mv -h를 쓰는 mv 심을 PATH 앞에 둡니다.
 # - 끝나면(실패해도) 이 run_id의 컨테이너·네트워크·볼륨·더미 이미지·임시 폴더를 지웁니다. 시험 스크립트가 test_cleanup 함수를 두면 먼저 부릅니다.
-# 더미 api·web 이미지(dummy_build): node:22-alpine HTTP 서버, SIGTERM에 server.close()(진행 중 요청을 마치고 종료, 0032·0033의 실제 앱과 같은 동작).
+# 더미 api·web 이미지(dummy_build): node:24-alpine HTTP 서버(운영 이미지와 같은 Node major), SIGTERM에 server.close()(진행 중 요청을 마치고 종료, 0032·0033의 실제 앱과 같은 동작).
 #   /healthz        HEALTHY=1이면 200, 아니면 503(이미지 HEALTHCHECK 1초 간격)
 #   모든 응답 헤더  x-dummy: "<역할> <버전> <app.env의 APP_LABEL>", x-host: 컨테이너 호스트 이름(= 컨테이너 ID 앞 12자, 색 판별용)
 #   ?ms=<밀리초>    그만큼 늦게 응답(긴 요청)
@@ -170,11 +170,11 @@ const server = http.createServer((q, s) => {
   });
 });
 server.listen(Number(process.env.PORT || 3000));
-// 0032·0033과 같은 종료: 새 연결을 받지 않고 진행 중 요청을 마친 뒤 끝냅니다(Node 22는 idle keep-alive 연결도 닫음).
+// 0032·0033과 같은 종료: 새 연결을 받지 않고 진행 중 요청을 마친 뒤 끝냅니다(Node 19 이상은 idle keep-alive 연결도 닫음).
 process.on('SIGTERM', () => server.close(() => process.exit(0)));
 EOF
 		cat >"$dir/Dockerfile" <<'EOF'
-FROM node:22-alpine
+FROM node:24-alpine
 ARG ROLE
 ARG VERSION
 ARG HEALTHY

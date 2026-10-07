@@ -1,6 +1,6 @@
 # 저장소 공통 정책
 
-언어, 기준 정보, 문서 배치, ADR, 진입점, 변경 기록에 관한 저장소 전체 정책의 원본입니다. 루트 [AGENTS.md](../../AGENTS.md)는 이 문서를 가리키는 지도이며, 영역별 `AGENTS.md`는 담당 영역의 추가 규칙만 정의하고 이 정책을 복사하거나 재정의하지 않습니다. 이 위치로 옮긴 결정은 [ADR 0006](../adr/0006-agents-md-as-map.md)입니다.
+언어, 기준 정보, 문서 배치, ADR, 진입점, 변경 기록, 의존성 버전에 관한 저장소 전체 정책의 원본입니다. 루트 [AGENTS.md](../../AGENTS.md)는 이 문서를 가리키는 지도이며, 영역별 `AGENTS.md`는 담당 영역의 추가 규칙만 정의하고 이 정책을 복사하거나 재정의하지 않습니다. 이 위치로 옮긴 결정은 [ADR 0006](../adr/0006-agents-md-as-map.md)입니다.
 
 ## 언어
 
@@ -60,3 +60,8 @@
 - 변경 기록 항목은 날짜별 제목(`## YYYY-MM-DD`, 최신순) 아래에 둡니다. 각 항목에 무엇이 바뀌었는지와 근거(커밋, work item, 관련 경로 중 해당하는 것)를 적고, 공개 릴리스에 포함된 경우 해당 `RELEASES.md` 버전을 표시합니다.
 - 루트 `RELEASES.md`는 공개용 릴리스 노트입니다. 사용자에게 실제로 공개한 릴리스만 기록하며, 버전·날짜·Git tag·대상(웹·앱·API 등)과 사용자 관점의 변경 내용을 적습니다. 내부 구현 세부·미공개 계획·비밀값은 넣지 않습니다. GitHub Releases를 사용할 경우 설명은 같은 tag의 `RELEASES.md` 항목을 원본으로 합니다.
 - 환경별 배포 시각·결과·복구 정보는 운영 work item이나 배포 플랫폼에 기록합니다. 코드, 설정, 설치 안내, 현재 아키텍처는 실행 가능한 원본이나 범위별 기준 문서에 두고, 변경 기록에는 무엇이 바뀌었는지만 적습니다.
+
+## 의존성 버전
+
+- 의존성 major는 LTS(공급자가 지원 중인 안정 major)를 기준으로 사람이 올립니다. Node.js는 Active·Maintenance LTS인 짝수 major(Current·홀수·지원 종료 major는 기준 런타임으로 쓰지 않음, CI는 다음 LTS 후보를 미리 시험)이고 `@types/node` major는 그 Node major를 따릅니다. Next.js는 Active LTS major, Expo와 Expo SDK가 고정하는 패키지(`react`·`react-dom`·`react-native*`·`@react-native/*`·`expo*`·`@expo/*`·`@types/react*`)는 SDK 단위(`npx expo install --fix`)로 올립니다. 웹의 React 버전은 앱의 Expo SDK가 고정한 버전에 맞춥니다. TypeScript major는 쓰는 프레임워크가 요구할 때 올립니다.
+- Node 기준 버전은 `.nvmrc`·운영 이미지(`apps/*/Dockerfile`)·CI 행렬(`.github/workflows/ci.yml`)이 원본이고, 바꿀 때 함께 고칠 곳은 [검증 루프](verification.md#ci)에 있습니다. Dependabot([`.github/dependabot.yml`](../../.github/dependabot.yml))은 Node 이미지·`@types/node`·TypeScript major와 Expo SDK 고정 패키지를 올리지 않고, 그 밖의 갱신 PR(minor·patch는 한 묶음)만 엽니다.

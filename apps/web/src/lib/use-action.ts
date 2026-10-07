@@ -22,6 +22,7 @@ export function useAction() {
       return true;
     } catch (caught) {
       if (caught instanceof BrowserApiError && caught.status === 401) {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- 끝난 세션의 화면이 클라이언트 라우터 캐시에 남지 않도록 문서를 새로 불러옵니다.
         window.location.assign('/');
         return false;
       }
