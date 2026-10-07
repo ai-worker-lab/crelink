@@ -35,6 +35,10 @@
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | `s3`면 필수(비밀) | 버킷 범위 읽기·쓰기 자격 증명. 운영 값은 SeaweedFS `s3.json`의 identity `crelink`이고 대상별 SOPS 암호문에만 둡니다. |
 | `GEOIP_MMDB_PATH` | 아니오 | mmdb(DB-IP Lite City 등, CC BY 4.0이라 웹 `/privacy`에 출처 표시) 경로. 비면 국가·도시를 null로 두고 기동 시 경고를 한 번 남김. 파일을 열지 못해도 같은 동작에 오류 로그. 컨테이너는 볼륨 `/data/geoip`. |
 | `TRUSTED_PROXY_HOPS` | 아니오 | 앞단의 신뢰할 리버스 프록시 수(기본 0). 0이면 소켓 주소, N이면 `X-Forwarded-For`의 오른쪽에서 N번째 값을 방문·클릭 IP로 씁니다([방문자 IP](#방문자-ip)). 운영(Caddy 1단)은 `1`. 0 이상의 정수가 아니면 기동 거부. |
+| `SENTRY_DSN` | 아니오(운영 선택) | Sentry DSN. 비면 Sentry를 초기화하지 않습니다(로컬·시험·PR CI). 운영 값은 대상별 SOPS 암호문의 평문 키(이벤트 전송만 허용하는 공개 값). [오류 모니터링](#오류-모니터링). |
+| `SENTRY_ENVIRONMENT` | 아니오 | 이벤트 환경 이름. 비면 `NODE_ENV=production`이면 `production`, 아니면 `development`. |
+| `SENTRY_RELEASE` | 아니오 | release. 운영 이미지는 빌드 인자로 배포 커밋 SHA가 이미지 ENV에 들어가 소스맵 업로드 release와 같습니다. 비면 release 없이 보냅니다. |
+| `SENTRY_TRACES_SAMPLE_RATE` | 아니오 | 성능 추적 비율(기본 0.1). 0~1 사이 수가 아니면 기동 거부. |
 
 ### 운영 필수 설정
 
@@ -82,7 +86,8 @@
 
 1. HTTP 서버를 닫아 새 연결을 받지 않습니다. idle keep-alive 연결은 바로 끊고, 진행 중 요청과 종료 중 기존 연결로 들어온 요청은 `Connection: close`로 응답한 뒤 연결을 끊습니다(이미 헤더를 보낸 응답은 끝나면 idle 연결로 끊음). 그래서 Caddy 같은 keep-alive 클라이언트가 종료를 `keepAliveTimeout`(5초)만큼 늦추거나 계속 붙잡지 못합니다.
 2. 진행 중 요청이 모두 끝나면 `app.close()`로 `onModuleDestroy`를 부릅니다: `Database`가 빌려 간 연결이 돌아오길 기다려 pool을 닫고(`PostgreSQL pool을 닫았습니다.` 로그), `RetentionService`가 24시간 timer를 정리합니다.
-3. 종료 코드 0으로 끝냅니다. 종료 중 오류면 1입니다. 종료 중 다시 온 신호는 무시합니다.
+3. Sentry 공식 안내(`close`는 종료 직전에)대로 `Sentry.close(2000)`으로 남은 이벤트를 최대 2초 보냅니다(Sentry가 꺼져 있으면 바로 끝남).
+4. 종료 코드 0으로 끝냅니다. 종료 중 오류면 1입니다. 종료 중 다시 온 신호는 무시합니다.
 
 - `app.enableShutdownHooks()`를 쓰지 않는 이유: Nest 11.2와 12.1 모두 신호를 받으면 `onModuleDestroy`를 HTTP 서버를 닫기 **전에** 부르고(`NestApplicationContext.runShutdownSequence`: destroy hook → beforeShutdown hook → HTTP 서버 close), 끝에 같은 신호로 자신을 다시 죽입니다(`useProcessExit` 옵션이면 `process.exit(0)`). 이 순서면 진행 중 업로드가 닫힌 pool을 써서 500이 되고(실측), 컨테이너 종료 코드가 143입니다. Nest 12 Express 어댑터의 종료 옵션(종료 중 새 요청에 503을 주는 `return503OnClosing`, 열린 연결을 `socket.destroy`로 끊는 `forceCloseConnections`)은 기본으로 꺼져 있고 이 순서 문제를 풀지 못하므로 쓰지 않습니다. 근거: `node_modules/@nestjs/core/nest-application-context.js`, `node_modules/@nestjs/platform-express/adapters/express-adapter.js`.
 - 요청이 compose `stop_grace_period`(기본 10초)보다 오래 걸리면 Docker가 SIGKILL로 끝냅니다(종료 코드 137). 운영 grace는 `infra/prod/compose.yaml`에서 정합니다.
@@ -101,8 +106,10 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 - 런타임 단계(대상 플랫폼 `node:24-slim`): `/app/apps/api/{package.json,dist,migrations,node_modules}`만 복사. 코드는 root 소유(읽기 전용), 실행은 `node` 사용자(uid 1000), `NODE_ENV=production`, `CMD node apps/api/dist/main.js`, `EXPOSE 3000`. `PORT`는 이미지에 넣지 않으므로 실행 환경에서 `PORT=3000`을 줍니다. `/data/uploads`·`/data/geoip`를 `node` 소유로 만들어 두어 빈 named volume이 처음 붙을 때 그 소유권을 이어받습니다.
 - `HEALTHCHECK`: curl 없이 `node -e` 내장 `fetch`로 `http://127.0.0.1:${PORT:-3000}/api/health/ready`(DB 포함)를 4초 제한으로 확인합니다(간격 10초, 제한 5초, 시작 유예 30초, 재시도 3회). Compose는 이 정의를 재사용합니다.
 - `@crelink/shared`와 NestJS 12 패키지는 ESM이고 API 빌드는 CommonJS라 Node의 `require(esm)`로 읽습니다. 이미지 기동과 단축 주소 302(`CRELINK_WEB_PATHS` 사용)로 해석을 확인했습니다.
-- 운영 의존성은 순수 JS입니다(2026-10-06 이미지 안 `node_modules` 127개에 `*.node`·`binding.gyp`·install 스크립트 없음. 2026-10-07 `@aws-sdk/client-s3`(`@aws-sdk/*`·`@smithy/*`) 추가 뒤 amd64 교차 빌드 이미지에서 다시 확인해도 없음). native 애드온 의존성을 추가하면 빌더 플랫폼의 바이너리가 다른 대상 플랫폼으로 옮겨져 깨지므로 이 구성을 다시 정해야 합니다(이식 규칙: 멀티 아키텍처 유지).
-- 크기(2026-10-06, arm64 측정): 이미지 약 388MB(`docker image ls`), 압축 약 80MB. 대부분 Node 베이스 이미지이고 앱 레이어는 `node_modules` 37MB·`dist` 0.8MB·`migrations` 33KB. 2026-10-07 S3 SDK 추가 뒤(amd64): 이미지 약 392MB, `node_modules` 57MB. 같은 날 베이스를 `node:24-slim`(Node 24.21)으로 바꾼 뒤(arm64): 이미지 약 414MB.
+- 운영 의존성은 순수 JS였습니다(2026-10-06 이미지 안 `node_modules` 127개에 `*.node`·`binding.gyp`·install 스크립트 없음. 2026-10-07 `@aws-sdk/client-s3`(`@aws-sdk/*`·`@smithy/*`) 추가 뒤 amd64 교차 빌드 이미지에서 다시 확인해도 없음). native 애드온 의존성을 추가하면 빌더 플랫폼의 바이너리가 다른 대상 플랫폼으로 옮겨져 깨지므로 이 구성을 다시 정해야 합니다(이식 규칙: 멀티 아키텍처 유지).
+  - 예외(2026-10-07, `@sentry/nestjs` 11.4): `@sentry/node`가 의존하는 `@sentry/bundler-plugins`(번들러용 플러그인)가 `oxc-parser`의 플랫폼별 native 바인딩(`@oxc-parser/binding-<os>-<cpu>-<libc>`, 빌더 플랫폼 것만 설치됨)을 가져옵니다. API 런타임(`node dist/main.js`)은 이 패키지를 불러오지 않습니다: 이미지에서 `@oxc-parser`·`oxc-parser`를 지우고 Sentry를 켠 채 기동·오류 전송·SIGTERM 종료 코드 0을 확인했습니다. 그래서 빌더와 대상 플랫폼이 달라도 동작은 깨지지 않고, 쓰지 않는 바이너리가 이미지에 남을 뿐입니다. 이 패키지를 런타임에 쓰는 의존성이 생기면 다시 정합니다.
+- 크기(2026-10-06, arm64 측정): 이미지 약 388MB(`docker image ls`), 압축 약 80MB. 대부분 Node 베이스 이미지이고 앱 레이어는 `node_modules` 37MB·`dist` 0.8MB·`migrations` 33KB. 2026-10-07 S3 SDK 추가 뒤(amd64): 이미지 약 392MB, `node_modules` 57MB. 같은 날 베이스를 `node:24-slim`(Node 24.21)으로 바꾼 뒤(arm64): 이미지 약 414MB. 같은 날 Sentry SDK 추가 뒤(arm64): 이미지 약 539MB, `node_modules` 159MB(`@sentry/*` 54MB와 `@sentry/bundler-plugins`가 가져오는 `@babel/*`·`oxc-parser` 등).
+- Sentry 빌드 인자·secret과 소스맵 업로드는 [오류 모니터링](#오류-모니터링)의 소스맵 절에 있습니다.
 - 로컬 확인 예(일회용 DB, 호스트 PostgreSQL은 `host.docker.internal`): `docker run -d --name crelink-api-check -p 3920:3000 -e PORT=3000 -e DATABASE_URL=postgresql://…@host.docker.internal:<포트>/<일회용 DB> -e WEB_URL=https://… -e SHORT_LINK_BASE_URL=https://… -e GOOGLE_CLIENT_ID=… -e GOOGLE_CLIENT_SECRET=… -e OPERATOR_EMAILS=… -e UPLOAD_DIR=/data/uploads crelink-api:local` 후 `docker inspect -f '{{.State.Health.Status}}' crelink-api-check`가 `healthy`, `curl -i http://127.0.0.1:3920/api/health/ready`가 200.
 
 ## 인증과 권한
@@ -112,7 +119,7 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 - 역할: 구글이 검증한 이메일이 `OPERATOR_EMAILS`에 있으면 로그인할 때마다 `operator`, 아니면 `creator`로 갱신합니다.
 - 세션: 쿠키 `cl_session`(원문 무작위 토큰, 30일), DB `sessions.token_hash`는 SHA-256 hex. API는 웹 BFF·웹 서버가 전달한 `Cookie` 헤더에서 읽습니다.
 - `/api/me/*`는 로그인 필수(401 `unauthenticated`), 남의 리소스는 404. `/api/admin/*`는 로그인(401) 후 `role='operator'`(아니면 403 `forbidden`). 정지하면 그 사용자의 세션을 모두 지우고, 세션 조회도 정지 사용자를 제외하며, 다시 로그인하면 403 `account_suspended`.
-- 오류 응답은 모두 `{ code, message }`입니다(`src/common/http.ts`의 `ApiExceptionFilter`). 없는 `/api` 경로는 404 `not_found`, 예상하지 못한 오류는 500 `internal_error`와 로그.
+- 오류 응답은 모두 `{ code, message }`입니다(`src/common/http.ts`의 `ApiExceptionFilter`). 없는 `/api` 경로는 404 `not_found`, 예상하지 못한 오류는 500 `internal_error`와 로그, Sentry 전송([오류 모니터링](#오류-모니터링)).
 - 본문 파서(express body-parser, JSON 한도 기본 100KB)가 컨트롤러 전에 내는 클라이언트 오류는 `HttpException`이 아니라 http-errors(`status`, `expose`)라서 필터가 따로 읽습니다. 4xx이고 `expose`인 것만 그 상태로 응답하고 로그를 남기지 않습니다: 잘못된 JSON 400 `validation_failed`, 본문 한도 초과 413 `validation_failed`("요청 본문이 너무 큽니다."), 지원하지 않는 문자셋 415 `validation_failed`. 시험: `test/error-response.e2e-spec.ts`.
 
 ## 단축 도메인
@@ -144,6 +151,25 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 ### 방문·클릭 기록 항목
 
 `src/short-link/tracking.service.ts`. IP, `cl_vid`, `Referer`(방문은 원문 2048자까지와 호스트, 클릭은 호스트만), User-Agent(512자까지), `bowser`로 기기 종류(`mobile`·`tablet`·`desktop` 등)·브라우저·OS, `maxmind`로 국가(ISO 코드)·도시(영문). 저장 실패는 리디렉트에 영향 없이 로그만 남깁니다.
+
+## 오류 모니터링
+
+Sentry(SaaS, 미국 리전)로 예상하지 못한 오류와 요청 10%의 성능 추적을 보냅니다. 결정과 대안·위험은 [ADR 0012](../../../docs/adr/0012-error-monitoring-sentry.md), 운영 설정 절차는 [런북](../../../infra/docs/prod-runbook.md), 개인정보 고지는 웹 `/privacy`입니다. SDK는 `@sentry/nestjs` 11.4입니다.
+
+- 초기화: `src/instrument.ts`가 `main.ts`의 첫 import라 Nest·Express·pg보다 먼저 실행되고(자동 계측 조건), `apps/api/.env`를 읽은 뒤(`src/local-env.ts`) `sentryOptions`(`src/monitoring/sentry.ts`)로 `Sentry.init`합니다. `SENTRY_DSN`이 비면 초기화하지 않아 나머지 코드(`SentryModule.forRoot()`, 필터 데코레이터, `setUser`, `Sentry.close`)는 아무것도 보내지 않습니다. Jest 시험은 `main.ts`를 거치지 않으므로 Sentry가 꺼진 채 돕니다.
+- 보내는 오류: `ApiExceptionFilter`가 500 `internal_error`로 응답하는 오류만 `@SentryExceptionCaptured()`(500 처리 메서드에 붙임)로 보냅니다. Nest `HttpException`(4xx, 의도한 503 포함)과 본문 파서의 http-errors 4xx(400·413·415)는 보내지 않습니다. 이 데코레이터는 `HttpException`만 예상한 오류로 보므로 `catch`에 붙이면 http-errors 4xx도 보냅니다(실측: 데코레이터를 `catch`로 옮기면 아래 시험의 4xx 0건 검사가 실패).
+- 사용자: 요청마다 `src/monitoring/request-user.ts`(`configureApp`이 가장 먼저 붙이는 Express 미들웨어)가 요청 격리 스코프의 `user.ip_address`를 [방문자 IP](#방문자-ip)와 같은 `clientIp`(`TRUSTED_PROXY_HOPS`)로 넣고, `SessionGuard`가 세션을 확인하면 `user.id`(내부 UUID)를 더합니다. 이메일·이름은 넣지 않습니다. SDK의 헤더 기반 IP 추론(`X-Forwarded-For` 첫 값 등, 클라이언트가 위조 가능)은 `dataCollection.userInfo: false`로 끕니다. 웹 BFF·서버 컴포넌트를 거친 요청은 웹 컨테이너가 직접 부르므로 IP가 웹 서버 주소이고, 방문자 IP는 같은 trace의 웹 브라우저 이벤트에 있습니다.
+- 보내지 않는 것: 쿠키(`cl_session` 원문 포함)·`Authorization`·`Proxy-Authorization`·`X-Crelink-Internal`·`Set-Cookie` 헤더, 요청 본문, DB 쿼리 파라미터(`databaseQueryData: false`, 쿼리 문은 매개변수화된 형태만). URL 쿼리의 `code`·`state`(구글 로그인)·`pass`(통과 표시)는 `[Filtered]`. `dataCollection`(SDK 11은 `sendDefaultPii` 대신 이것으로 정함)으로 막고, `beforeSend`·`beforeSendSpan`(`scrubEvent`·`scrubSpan`)이 이벤트와 span 속성에서 한 번 더 지웁니다. SDK 11은 성능 데이터를 span 단위로 보내므로(`traceLifecycle: 'stream'` 기본) `beforeSendTransaction` 대신 `beforeSendSpan`을 씁니다.
+- 그 밖에 SDK 기본으로 보내는 것: 프로세스 단위 세션(Release Health, 오류가 나면 `crashed`, `did`는 내부 사용자 ID), 버린 이벤트 수(client report).
+- 종료: [종료](#종료) 3단계의 `Sentry.close(2000)`.
+- 시험: `src/monitoring/sentry.spec.ts`(DSN 없음 → 설정 없음·`Sentry.isEnabled()` false, 기본값, 비율 검증, 헤더·쿠키 정리), `test/sentry.e2e-spec.ts`(가짜 transport: 예상 못 한 오류 1건·user가 `{ id, ip_address }`뿐이고 IP는 `X-Forwarded-For` 오른쪽 신뢰 값·쿠키 원문 없음, 동시 요청의 user가 섞이지 않음, 401·404·413·400은 0건, span에 user가 붙고 쿠키 헤더 없음). 이 시험은 모듈을 불러온 뒤 초기화하므로 Express·pg 자동 계측 span은 확인하지 못합니다(실제 기동에서는 `SessionGuard`·`SELECT …` 같은 span이 붙는 것을 가짜 수신 서버로 확인, [0042 진행 기록](../../../docs/work/orchestrator/0042-sentry-monitoring.md#진행-기록)).
+- 로컬에서 전송 확인: 가짜 수신 서버를 띄우고 `apps/api/.env`에 `SENTRY_DSN=http://public@127.0.0.1:<포트>/1`을 넣어 `make api-restart`. 수신 서버는 `POST /api/1/envelope/`로 envelope(줄마다 JSON, 큰 본문은 gzip)를 받습니다.
+
+### 소스맵
+
+- `tsconfig.build.json`이 `sourceMap`·`inlineSources`·`sourceRoot: "/"`(Sentry TypeScript 안내)로 `dist/*.js.map`에 원본을 넣습니다.
+- `Dockerfile` 빌드 단계는 BuildKit secret `sentry_auth_token`이 있을 때만 `@sentry/cli`(개발 의존성)로 `sourcemaps inject dist`(debug ID 삽입) 뒤 `sourcemaps upload --org $SENTRY_ORG --project $SENTRY_PROJECT --release $SENTRY_RELEASE dist`를 실행하고 그다음 운영 의존성을 모읍니다. secret이 없으면 건너뛰고 빌드는 성공합니다(로컬·PR CI). 토큰이 있는데 `SENTRY_ORG`·`SENTRY_PROJECT`·`SENTRY_RELEASE`가 비거나 업로드가 실패하면 빌드가 실패합니다(배포가 읽을 수 없는 스택으로 나가지 않게. Sentry 장애로 배포가 막히면 secret을 비우고 다시 실행). 토큰은 그 `RUN`에만 보이고 이미지·빌드 캐시에 남지 않습니다.
+- 런타임 단계는 빌드 인자 `SENTRY_RELEASE`를 `ENV`로 둬 이벤트 release가 업로드 release와 같습니다. 배포 워크플로가 넘기는 값은 [운영 배포 설계](../../../docs/specs/crelink-prod-deploy.md)에 있습니다.
 
 ## 크리에이터 규칙
 

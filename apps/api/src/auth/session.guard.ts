@@ -2,11 +2,12 @@ import { CanActivate, createParamDecorator, ExecutionContext, HttpStatus, Inject
 import { COOKIE_NAMES, SessionUser } from '@crelink/shared';
 import type { Request } from 'express';
 import { apiError, readCookie } from '../common/http';
+import { setUserId } from '../monitoring/sentry';
 import { AuthService } from './auth.service';
 
 type SessionRequest = Request & { sessionUser?: SessionUser };
 
-/** `cl_session` 쿠키의 세션이 유효해야 통과합니다. 없거나 만료·정지면 401 `unauthenticated`. */
+/** `cl_session` 쿠키의 세션이 유효해야 통과합니다. 없거나 만료·정지면 401 `unauthenticated`. 통과하면 Sentry 요청 user에 내부 ID를 넣습니다. */
 @Injectable()
 export class SessionGuard implements CanActivate {
   constructor(private readonly auth: AuthService) {}
@@ -17,6 +18,7 @@ export class SessionGuard implements CanActivate {
     const user = token ? await this.auth.sessionUser(token) : null;
     if (!user) throw apiError(HttpStatus.UNAUTHORIZED, 'unauthenticated', '로그인이 필요합니다.');
     request.sessionUser = user;
+    setUserId(user.id);
     return true;
   }
 }

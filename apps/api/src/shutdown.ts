@@ -1,7 +1,11 @@
 import { INestApplication, Logger } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 
 export const SHUTDOWN_SIGNALS = ['SIGTERM', 'SIGINT'] as const;
+
+/** 종료 직전 Sentry가 남은 이벤트를 보내도록 기다리는 최대 시간(ms). compose `stop_grace_period` 안에 끝나야 합니다. */
+export const SENTRY_DRAIN_TIMEOUT_MS = 2000;
 
 /**
  * 종료 신호(SIGTERM·SIGINT)를 받으면 진행 중 요청을 끝낸 뒤 앱을 닫고 종료 코드 0으로 끝냅니다. `app.listen` 전에 부릅니다.
@@ -10,6 +14,7 @@ export const SHUTDOWN_SIGNALS = ['SIGTERM', 'SIGINT'] as const;
  *    기존 연결로 들어온 요청은 `Connection: close`로 응답한 뒤 연결을 끊습니다. 응답 헤더를 이미 보낸 요청은 응답을 마치면 idle 연결로 끊습니다.
  *    이 처리가 없으면 keep-alive 연결(Caddy 등)이 `keepAliveTimeout`(5초)마다 종료를 늦추거나, 요청이 계속 오면 끝나지 않습니다.
  * 2. 모든 연결이 끝나면 `app.close()`로 `onModuleDestroy`(pg pool `end`, 보존 작업 timer 정리)를 부릅니다.
+ * 3. Sentry 공식 안내대로 종료 직전에 `Sentry.close`로 남은 이벤트를 최대 2초 보냅니다(Sentry가 꺼져 있으면 바로 끝남).
  *
  * `app.enableShutdownHooks()`는 쓰지 않습니다. Nest 11·12 모두 `onModuleDestroy`를 HTTP 서버를 닫기 **전에** 부르므로
  * (`NestApplicationContext.close`: destroy hook → beforeShutdown hook → HTTP 서버 close) 진행 중 요청이 닫힌 pool을 써서 실패하고,
@@ -42,16 +47,18 @@ export function enableGracefulShutdown(
     closing = true;
     logger.log(`${signal} 수신: 새 연결을 받지 않고 진행 중 요청 ${pending.size}건을 마친 뒤 종료합니다.`);
     for (const response of pending) if (!response.headersSent) response.setHeader('connection', 'close');
+    let code = 0;
     try {
       await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
       logger.log('HTTP 서버를 닫았습니다(진행 중 요청 완료).');
       await app.close();
       logger.log('종료합니다.');
-      exit(0);
     } catch (error) {
       logger.error(`종료 중 오류: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
-      exit(1);
+      code = 1;
     }
+    await Sentry.close(SENTRY_DRAIN_TIMEOUT_MS);
+    exit(code);
   };
   for (const signal of SHUTDOWN_SIGNALS) process.on(signal, shutdown);
   return () => {
