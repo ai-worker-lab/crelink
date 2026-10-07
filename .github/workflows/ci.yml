@@ -22,8 +22,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 지원하는 Node.js LTS 메이저 버전. 로컬 개발 기본값은 .nvmrc입니다.
-        node: [22, 24, 26]
+        # 기준 런타임은 Node 24 LTS(.nvmrc·운영 이미지 node:24-slim)이고, 26은 다음 LTS 후보(짝수 major)라 다음 기준
+        # 전환 준비로 함께 시험합니다. 22(Maintenance LTS)는 뺍니다: NestJS 12가 ESM 전용이라 CommonJS API와 API Jest가
+        # Node 24.9 이상에서만 돕니다(NestJS 마이그레이션 가이드). 지원 범위는 README 요구사항과 같이 고칩니다.
+        node: [24, 26]
     services:
       postgres:
         image: postgres:17-alpine

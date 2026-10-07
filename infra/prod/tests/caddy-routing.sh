@@ -10,7 +10,7 @@
 #   203.0.113.0/24(TEST-NET-3) 네트워크의 클라이언트 컨테이너로 흉내 냅니다.
 # - 관리 API: 컨테이너 안 localhost:2019에서만 열리고(같은 네트워크·호스트에서 닿지 않음) upstreams.caddy를 green으로 바꾼 뒤
 #   `caddy reload`(lib.sh와 같은 명령)로 전환되는지 확인합니다.
-# - 끝나면(실패해도) 컨테이너·네트워크·임시 폴더를 지웁니다. 이미지(caddy, node:22-alpine)는 남깁니다.
+# - 끝나면(실패해도) 컨테이너·네트워크·임시 폴더를 지웁니다. 이미지(caddy, node:24-alpine)는 남깁니다.
 # 종료 코드: 0 모든 기대 일치, 1 불일치 있음.
 set -euo pipefail
 
@@ -18,7 +18,7 @@ prod="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 run_id="crelink-caddytest-$$"
 work="$(mktemp -d)"
 caddy_image=caddy:2.11.7-alpine
-node_image=node:22-alpine
+node_image=node:24-alpine
 short=go.localhost
 web=links.localhost
 net="$run_id-net"

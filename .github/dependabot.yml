@@ -9,15 +9,29 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    # Expo SDK가 버전을 고정하는 패키지는 따로 올리지 않습니다. Expo SDK 업그레이드(`npx expo install --fix`)로만 올립니다.
+    # 웹(apps/web)의 react·react-dom·@types/react*도 앱과 같은 버전을 쓰므로 함께 묶어 둡니다.
+    ignore:
+      - dependency-name: react
+      - dependency-name: react-dom
+      - dependency-name: react-native
+      - dependency-name: react-native-*
+      - dependency-name: expo
+      - dependency-name: expo-*
+      - dependency-name: '@types/react'
+      - dependency-name: '@types/react-dom'
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-  # 운영 이미지 베이스(apps/api·apps/web Dockerfile)
+  # 운영 이미지 베이스(apps/api·apps/web Dockerfile). Node major는 LTS 기준으로 사람이 올립니다(.nvmrc·CI 행렬과 함께).
   - package-ecosystem: docker
     directories: [/apps/api, /apps/web]
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: node
+        update-types: ['version-update:semver-major']
   # 운영 compose의 이미지: 앱 색 스택의 alpine(infra/prod/compose.yaml), edge 스택의 caddy(infra/prod/edge/compose.yaml).
   # edge compose 변경은 배포로 반영되지 않으므로 병합 뒤 런북 "6-3. edge 설정 갱신·Caddy 이미지 업그레이드"로 서버 edge를 다시 만듭니다.
   - package-ecosystem: docker-compose

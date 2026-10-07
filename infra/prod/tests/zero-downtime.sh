@@ -7,7 +7,7 @@
 #   · 6초 걸리는 긴 요청(web BFF → api)이 전환 중에도 모두 200으로 완료
 #   · web → api 호출이 늘 같은 색 안에서만 일어남(두 색이 함께 떠 있는 drain 구간 포함, 응답의 컨테이너 호스트 이름으로 판별)
 #   · 전환 뒤 옛 색은 stopped(컨테이너 유지), 활성 색만 실행, releases.log 형식·순서
-# - 부하(load.js, node:22-alpine 컨테이너, crelink-edge 네트워크에서 edge Caddy:80으로 직접): keep-alive 연결을 계속 다시 쓰는 클라이언트
+# - 부하(load.js, node:24-alpine 컨테이너, crelink-edge 네트워크에서 edge Caddy:80으로 직접): keep-alive 연결을 계속 다시 쓰는 클라이언트
 #   (cloudflared처럼)로 초당 약 22.5건. GET links /(웹) 80ms마다, GET go /abcd(api 302) 200ms마다, POST links /api/backend/echo(web→api)
 #   200ms마다, POST links /api/backend/slow?ms=6000(web→api 6초) 2초마다. 응답 하나마다 한 줄을 남깁니다.
 # - 더미 이미지(graceful 종료)는 tests/lib/harness.sh. drain은 CRELINK_DRAIN_SECONDS=8(긴 요청 6초보다 길게, 운영 기본 20초).
@@ -94,7 +94,7 @@ process.on('SIGTERM', () => {
 EOF
 load_start() {
 	docker run -d --name "$load_name" --label "crelink-test=$run_id" --network "$CRELINK_EDGE_NETWORK" -e "TARGET=http://$edge_host:80" \
-		-v "$work/load.js:/load.js:ro" node:22-alpine node /load.js >/dev/null
+		-v "$work/load.js:/load.js:ro" node:24-alpine node /load.js >/dev/null
 }
 load_stop() { # load_stop <결과 파일>
 	docker stop -t 40 "$load_name" >/dev/null

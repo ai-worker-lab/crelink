@@ -76,7 +76,7 @@ services:
 
   # GeoIP 파일을 geoip 볼륨에 쓰는 일회성 도구(geoip.sh가 docker compose run으로만 실행, up 대상 아님).
   geoip-writer:
-    image: alpine:3.22
+    image: alpine:3.24
     profiles: [tools]
     network_mode: none
     volumes:
