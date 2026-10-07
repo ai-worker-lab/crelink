@@ -6,6 +6,7 @@
 
 ## 2026-10-07
 
+- 블록 안 스와이프 카드의 쿠팡 파트너스 카드 정보 채우기 조사(문서만, 동작·PRD 변경 없음): 조사 `docs/references/coupang-partners-card-data.md`(상품 ID·URL 조회 API 없음, 키 제3자 제공·API 데이터 저장 금지, 상품 링크 코드 형식, 서버 요청 위험, OG 수집 SSRF 항목, 선택지 비교와 추천), 문서 색인. 사용자 결정 4개와 남은 질문 5개. 근거 `docs/work/orchestrator/0045-block-swipe-cards.md`.
 - 웹 공개 문서 `/docs`(사용자 결정: 변경 기록은 `RELEASES.md`만 공개하고 `CHANGELOGS.md`는 내부 유지, 디자인은 토큰 자동 견본, 사용 안내·개인정보 처리방침 링크 포함): 공유 계약 `packages/shared/src/crelink.ts`에 예약어 `docs`와 `CRELINK_WEB_PATHS.docs*`, `RELEASES.md` 첫머리에 웹 공개 규칙(첫 `## `부터 공개, 항목 형식), `.dockerignore` `!RELEASES.md`, `deploy.yml`의 웹·릴리스 변경 감지에 `RELEASES.md`, 저장소 정책 변경 기록 절, MVP 설계 예약어. 발견한 기존 결함(웹 글꼴이 ExtraBold 한 굵기로만 그려짐)을 0044(분류 대기)로 등록. 세부는 [웹](apps/web/CHANGELOGS.md) 로그. 근거 `docs/work/orchestrator/0043-public-docs-page.md`.
 - 웹·앱 화면에 스튜디오 라이트 디자인 적용(0040): ADR 0013(계단형 모서리 대신 둥근 모서리, ADR 0001 결정 6 대체), `docs/README.md` ADR 색인, 토큰 사용법 `packages/design-tokens/docs/usage.md`의 현재 팔레트 서술·`corner.md` 예시 값. 세부는 [웹](apps/web/CHANGELOGS.md)·[앱](apps/app/CHANGELOGS.md) 로그. 근거 `docs/work/orchestrator/0040-apply-studio-light-design.md`.
 - 링크 인 바이오 유사 서비스 벤치마킹(인포크링크·인링크·리틀리) `docs/product/research/link-in-bio-benchmark.md` 추가, PRD `유사 서비스에서 얻은 것` 절에서 연결. 사용자 결정으로 QR 다운로드·방문자 공유 버튼·링크 강조·크리에이터 테마를 PRD MVP 제외(이후 버전)에 추가, R10 유지. 근거 `docs/work/product/0041-link-in-bio-benchmark.md`.
