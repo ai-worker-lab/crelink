@@ -11,7 +11,7 @@ export const SHUTDOWN_SIGNALS = ['SIGTERM', 'SIGINT'] as const;
  *    이 처리가 없으면 keep-alive 연결(Caddy 등)이 `keepAliveTimeout`(5초)마다 종료를 늦추거나, 요청이 계속 오면 끝나지 않습니다.
  * 2. 모든 연결이 끝나면 `app.close()`로 `onModuleDestroy`(pg pool `end`, 보존 작업 timer 정리)를 부릅니다.
  *
- * `app.enableShutdownHooks()`는 쓰지 않습니다. Nest 11은 `onModuleDestroy`를 HTTP 서버를 닫기 **전에** 부르므로
+ * `app.enableShutdownHooks()`는 쓰지 않습니다. Nest 11·12 모두 `onModuleDestroy`를 HTTP 서버를 닫기 **전에** 부르므로
  * (`NestApplicationContext.close`: destroy hook → beforeShutdown hook → HTTP 서버 close) 진행 중 요청이 닫힌 pool을 써서 실패하고,
  * 끝에 같은 신호로 자신을 다시 죽여 종료 코드가 0이 아닙니다(컨테이너 143). 근거: docs/work/api/0032-api-graceful-shutdown-pool-max.md
  *
