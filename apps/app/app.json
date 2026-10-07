@@ -5,7 +5,7 @@
     "scheme": "crelink",
     "version": "0.1.0",
     "orientation": "portrait",
-    "plugins": ["expo-router"],
+    "plugins": ["expo-router", "expo-status-bar"],
     "ios": {
       "supportsTablet": true
     },

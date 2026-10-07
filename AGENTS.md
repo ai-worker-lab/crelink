@@ -39,7 +39,7 @@ pnpm 모노레포 스켈레톤입니다: NestJS API(`apps/api`), Next.js 웹(`ap
 ## 문서 지도
 
 - [문서 색인](docs/README.md) — 모든 문서의 목록
-- [저장소 공통 정책](docs/development/repository-policy.md) — 언어·기준 정보·문서 배치·ADR·변경 기록
+- [저장소 공통 정책](docs/development/repository-policy.md) — 언어·기준 정보·문서 배치·ADR·변경 기록·의존성 버전(LTS 기준)
 - [로컬 개발 환경](docs/development/local-environment.md) · [검증 루프](docs/development/verification.md)
 - [작업 관리](docs/work/README.md) · [ALM 운영 기준](docs/alm/workflow.md) · [실행기 정책 WORKFLOW.md](WORKFLOW.md)
 - [영역별 병렬 개발](docs/development/parallel-work.md) — 역할·소유 경계·계약·통합 순서

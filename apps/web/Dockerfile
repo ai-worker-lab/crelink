@@ -4,7 +4,7 @@
 # 서버 전용 환경변수(API_INTERNAL_URL·API_INTERNAL_TOKEN)는 실행 시점에만 읽으므로 이미지에 넣지 않습니다.
 # 정적으로 미리 렌더링되는 화면(/privacy, 404)은 API를 부르지 않습니다(next build 경로 표 ○).
 
-FROM node:22-slim AS build
+FROM node:24-slim AS build
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
     PNPM_HOME=/pnpm \
     PATH=/pnpm:$PATH \
@@ -27,7 +27,7 @@ COPY apps/web apps/web
 RUN pnpm --filter @crelink/shared build && \
     pnpm --filter @crelink/web build
 
-FROM node:22-slim AS runtime
+FROM node:24-slim AS runtime
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     HOSTNAME=0.0.0.0 \

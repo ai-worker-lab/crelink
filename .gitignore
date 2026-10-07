@@ -4,8 +4,6 @@ dist/
 coverage/
 .expo/
 .next/
-# 웹 개발 서버(next dev) 출력. 빌드(.next/)와 나눠 pnpm verify가 실행 중인 개발 서버를 깨뜨리지 않게 합니다(apps/web/next.config.ts).
-.next-dev/
 # Next.js가 관리하는 생성 파일(개발·빌드가 각자 출력 디렉터리 경로로 다시 씀). typecheck는 next typegen으로 만듭니다.
 apps/web/next-env.d.ts
 *.tsbuildinfo

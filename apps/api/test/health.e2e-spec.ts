@@ -1,11 +1,15 @@
 import 'reflect-metadata';
 import { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { Express } from 'express';
 import { Client } from 'pg';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/app.setup';
 import { createTestDatabase, TestDatabase } from './test-database';
 import { setTestEnvironment, WEB_URL } from './test-app';
+
+/** Express 5 라우터 스택의 라우트 항목(시험에 필요한 필드만). */
+type RouterLayer = { route?: { path: string; methods: Record<string, boolean> } };
 
 describe('API 기동과 health', () => {
   let database: TestDatabase;
@@ -42,6 +46,20 @@ describe('API 기동과 health', () => {
     const response = await fetch(`${baseUrl}/api/nope`);
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ code: 'not_found', message: '요청한 경로를 찾을 수 없습니다.' });
+  });
+
+  it('등록된 라우트는 단축 도메인 두 정의만 /api 밖이고 나머지는 모두 /api 아래다', () => {
+    // setGlobalPrefix exclude(`\:slug`·`c/\:linkPublicId`)의 매칭 규칙이 프레임워크 업그레이드로 바뀌면 여기서 드러납니다.
+    const express = app.getHttpAdapter().getInstance() as Express;
+    const routes = (express.router.stack as RouterLayer[])
+      .filter((layer) => layer.route)
+      .flatMap(({ route }) => Object.keys(route!.methods).map((method) => `${method.toUpperCase()} ${route!.path}`));
+    expect(routes.filter((route) => !route.split(' ')[1].startsWith('/api/')).sort()).toEqual([
+      'GET /:slug',
+      'GET /c/:linkPublicId',
+    ]);
+    expect(routes).toEqual(expect.arrayContaining(['GET /api/health', 'GET /api/me', 'POST /api/me/files']));
+    expect(routes.length).toBeGreaterThan(20);
   });
 
   it('기동 시 빈 데이터베이스에 migration을 적용해 크리링 테이블을 만든다', async () => {

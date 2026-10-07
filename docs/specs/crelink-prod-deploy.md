@@ -82,7 +82,7 @@ Tunnel은 edge Caddy 하나로만 들어오고, edge Caddy는 활성 색의 `api
 - Compose project: edge `crelink-edge`(`crelink-edge-caddy-1`), 앱은 같은 `compose.yaml`을 색마다 `crelink-blue`·`crelink-green`(`crelink-<색>-api-1`·`-web-1`, `CRELINK_COLOR`)으로 띄웁니다. 앱 compose에는 `name:`이 없어 항상 `lib.sh`(또는 런북 명령)가 `-p`로 실행합니다. blue/green 이전의 단일 project `crelink-prod`는 cutover 때 컨테이너·네트워크를 지웠습니다(볼륨 유지).
 - Docker 네트워크 `crelink-edge`(외부 네트워크): edge와 두 색이 붙고 색 별칭 `api-<색>`·`web-<색>`만 씁니다. `bootstrap.sh`·`cutover.sh`가 만듭니다.
 - 볼륨: GeoIP는 `crelink-prod_geoip`(`external: true`, blue/green 이전 이름을 이어 씀)를 두 색이 같이 씁니다. 업로드 볼륨 `crelink-prod_uploads`는 S3 전환과 함께 compose에서 뺐습니다(서버의 남은 볼륨 삭제는 [런북 9-5](../../infra/docs/prod-runbook.md#9-5-전환-뒤-볼륨-정리)).
-- 서비스: edge `caddy`(`caddy:2.11.7-alpine`, 읽기 전용 루트, `cap_drop: all` + `NET_BIND_SERVICE`, 헬스 `:2020/healthz`). 색 스택 `api`(이미지 HEALTHCHECK `/api/health/ready`(DB만, 업로드 저장소 제외), `FILE_STORAGE=s3` 고정, 볼륨 geoip(ro)·`./certs`(ro)), `web`(이미지 HEALTHCHECK `/privacy`, 읽기 전용 루트, api가 healthy일 때 기동), 도구 프로필 `geoip-writer`(`alpine:3.22`, `geoip.sh`만 사용). api·web 모두 `init: true`, `stop_grace_period: 30s`, healthcheck `start_interval: 1s`.
+- 서비스: edge `caddy`(`caddy:2.11.7-alpine`, 읽기 전용 루트, `cap_drop: all` + `NET_BIND_SERVICE`, 헬스 `:2020/healthz`). 색 스택 `api`(이미지 HEALTHCHECK `/api/health/ready`(DB만, 업로드 저장소 제외), `FILE_STORAGE=s3` 고정, 볼륨 geoip(ro)·`./certs`(ro)), `web`(이미지 HEALTHCHECK `/privacy`, 읽기 전용 루트, api가 healthy일 때 기동), 도구 프로필 `geoip-writer`(`alpine:3.24`, `geoip.sh`만 사용). api·web 모두 `init: true`, `stop_grace_period: 30s`, healthcheck `start_interval: 1s`.
 
 ## 비밀값과 환경변수
 
@@ -118,6 +118,8 @@ Tunnel은 edge Caddy 하나로만 들어오고, edge Caddy는 활성 색의 `api
 8. cutover(서버마다 한 번): blue/green 이전 단일 스택 `crelink-prod`(스택 안 caddy가 18080을 쥠)에서 edge + `crelink-blue`로 옮기는 일은 운영자가 서버에서 직접 실행하는 `cutover.sh`(사전 점검·`--dry-run`·멱등·자동 원복, `--revert`로 되돌리기)입니다. 워크플로·`ssh-entry.sh`로는 실행되지 않습니다. 절차: [런북 14](../../infra/docs/prod-runbook.md#14-bluegreen-cutover).
 
 **운영 결과(무중단)**: home-server는 2026-10-06T21:16Z에 cutover했고 그때 한 번 생긴 공백은 0.5초였습니다(대상마다 0.1초 간격 측정). 그 뒤 서버에서 부하(3개 경로 합계 초당 30건, 약 9초 걸리는 느린 요청, 운영자 회선의 공개 주소 루프)를 흘리며 배포 4회·롤백 6회·헬스 실패 배포 1회·`geoip.sh --restart` 1회를 했고 모든 요청이 성공했습니다(5xx·연결 오류 0건, 느린 요청 전부 완료, 성공 응답 최장 0.08초 이하). 헬스 실패 배포는 새 색만 내리고 활성 색·트래픽을 바꾸지 않았고(종료 1), 옛 색 api·web은 매번 drain 20초 뒤 `Exited (0)`(강제 종료 아님)로 멈췄으며, DB 연결은 겹치는 구간에도 전체 20·크리링 8 이하였습니다. 측정 방법은 [런북 6-1](../../infra/docs/prod-runbook.md#6-1-배포-공백-측정), 실행 기록(시각·릴리스·run)은 `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`입니다. 남는 공백은 edge 재생성(Caddy 이미지·포트·마운트 변경, 1~2초[추정])뿐이고 아래 "위험·후속"에 있습니다.
+
+Next.js 16(0039)부터 웹 standalone 서버는 SIGTERM에 진행 중 요청을 마친 뒤 종료 코드 143(신호로 정상 종료, SIGKILL 137 아님)으로 끝나므로, 이후 옛 색 web은 `Exited (143)`로 남는 것이 정상입니다([웹 README "종료 동작"](../../apps/web/README.md)).
 
 ## 워크플로
 
@@ -212,3 +214,4 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 - 2026-10-07: 0단계(에픽 0031 티켓 0034): compose api·web `stop_grace_period: 30s`·healthcheck `start_interval: 1s`(+ 이미지와 같은 `start_period`), 암호문 평문 키 `DATABASE_POOL_MAX=6`, 배포 공백 측정 도구(`infra/prod/measure-gap.sh`, 런북 6-1). 근거: `docs/work/infra/0034-prod-compose-graceful-stop.md`.
 - 2026-10-07: Blue/Green 무중단 배포(에픽 0031, 0035 구현·0036 운영 적용)에 맞춤: 구성도(Tunnel → edge Caddy `crelink-edge` → 활성 색 `api-<색>`·`web-<색>`), 공개 경로(업스트림 스니펫·같은 색 web→api `http://api-<색>:3000`·헬스 포트), 서버 배치(`state/active-color`·`edge/`·project·네트워크·외부 볼륨), 색 전환 흐름·실패 시 활성 색 불변·종료 코드, "무중단 아님"을 운영 실측(cutover 공백 0.5초, 배포 2회 실패 0건)으로, DB migration 규칙, 이식 규칙 3·7·8, 변경 범위 0031~0036, 위험·후속(502 해소, 남은 위험 4가지). 근거: `docs/work/infra/0035-prod-blue-green-edge.md`, `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`.
 - 2026-10-07: ADR 0011 승인(사용자). 운영 검증 결과(배포 4회·롤백 6회·헬스 실패 배포·GeoIP 재기동 모두 요청 실패 0건)를 위험·후속에 반영. 근거: `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`.
+- 2026-10-07: 의존성 LTS 기준 업그레이드(0039): 이미지 베이스 `node:24-slim`, geoip-writer `alpine:3.24`, 옛 색 web 종료 코드 143 설명. 근거: `docs/work/orchestrator/0039-lts-major-upgrades.md`.

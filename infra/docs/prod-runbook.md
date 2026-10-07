@@ -382,7 +382,7 @@ AWS_ACCESS_KEY_ID=$(key accessKey) AWS_SECRET_ACCESS_KEY=$(key secretKey); expor
 s3() { sudo --preserve-env=AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY docker run --rm -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
   -e AWS_DEFAULT_REGION=us-east-1 -v "crelink-prod_uploads:/data:${MODE:-ro}" -v /etc/hostname:/probe:ro \
   amazon/aws-cli --endpoint-url https://s3.shaul.kr "$@"; }
-sudo docker run --rm -v crelink-prod_uploads:/data:ro alpine:3.22 sh -c 'find /data -type f | wc -l'   # 볼륨 파일 수
+sudo docker run --rm -v crelink-prod_uploads:/data:ro alpine:3.24 sh -c 'find /data -type f | wc -l'   # 볼륨 파일 수
 s3 s3 sync /data s3://crelink-uploads --no-progress                                                  # 1차 복사
 ```
 
@@ -399,7 +399,7 @@ s3 s3 sync /data s3://crelink-uploads --no-progress                             
 ### 9-4. 되돌리기(S3 → 디스크)
 
 1. `uploads` 볼륨이 있고 `FILE_STORAGE=s3`가 아닌 compose·암호문으로 되돌리는 커밋을 병합해 배포합니다(지금 compose는 `s3`를 고정하므로 암호문만 `disk`로 바꾸는 것으로는 되돌아가지 않습니다). 그런 옛 릴리스는 모두 blue/green 이전 형식이라 cutover 뒤에는 Rollback이 거부합니다. 새 compose에 볼륨을 다시 넣을 때는 두 색이 같이 쓰도록 `geoip`처럼 `external: true`, `name: crelink-prod_uploads`로 둡니다.
-2. 전환 뒤 버킷에만 올라온 파일을 볼륨으로 복사합니다: 9-3의 `key`·`s3` 함수를 준비하고 `MODE=rw s3 s3 sync s3://crelink-uploads /data --no-progress` 후 `sudo docker run --rm -v crelink-prod_uploads:/data alpine:3.22 chown -R 1000:1000 /data`(볼륨을 지웠다면 이 명령이 빈 볼륨을 새로 만듭니다).
+2. 전환 뒤 버킷에만 올라온 파일을 볼륨으로 복사합니다: 9-3의 `key`·`s3` 함수를 준비하고 `MODE=rw s3 s3 sync s3://crelink-uploads /data --no-progress` 후 `sudo docker run --rm -v crelink-prod_uploads:/data alpine:3.24 chown -R 1000:1000 /data`(볼륨을 지웠다면 이 명령이 빈 볼륨을 새로 만듭니다).
 3. 확인은 9-3의 5번(이미지 200·새 업로드가 볼륨에 생김)과 같습니다.
 
 ### 9-5. 전환 뒤 볼륨 정리
@@ -411,11 +411,11 @@ compose에서는 `uploads` 볼륨을 뺐고 `FILE_STORAGE=s3`를 고정했습니
 ```bash
 ssh home-server
 sudo install -d -m 700 /var/backups/crelink
-sudo docker run --rm -v crelink-prod_uploads:/data:ro -v /var/backups/crelink:/backup alpine:3.22 \
+sudo docker run --rm -v crelink-prod_uploads:/data:ro -v /var/backups/crelink:/backup alpine:3.24 \
   tar czf "/backup/uploads-$(date -u +%Y%m%d).tgz" -C /data .
 # 로컬로 가져오기: scp home-server:/var/backups/crelink/uploads-<날짜>.tgz ./   (root 소유라 필요하면 sudo로 권한 조정)
 # 복구(같은 이름 볼륨에):
-sudo docker run --rm -v crelink-prod_uploads:/data -v /var/backups/crelink:/backup:ro alpine:3.22 \
+sudo docker run --rm -v crelink-prod_uploads:/data -v /var/backups/crelink:/backup:ro alpine:3.24 \
   sh -c 'tar xzf /backup/uploads-YYYYMMDD.tgz -C /data && chown -R 1000:1000 /data'
 ```
 

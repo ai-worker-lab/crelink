@@ -6,6 +6,8 @@
 
 API·Expo Metro 포트는 checkout 인스턴스마다 다릅니다(주 checkout은 슬롯 0, git worktree는 슬롯마다 다름). 아래 절차의 `<API 포트>`·`<Expo 포트>`는 그 checkout에서 `pnpm instance`가 출력하는 값(값 하나만: `pnpm -s instance --get API_PORT`, `pnpm -s instance --get EXPO_PORT`)입니다. `apps/app`의 `start`·`android`·`ios` 스크립트는 `EXPO_PORT`가 없으면 이 인스턴스의 Expo 포트로 `expo start --port`를 실행합니다.
 
+앱은 **Expo SDK 57**(React Native 0.86, Expo Router 57)을 씁니다. Expo Go는 SDK 버전이 같아야 열리므로 SDK 54용 Expo Go가 설치된 에뮬레이터·시뮬레이터에서는 SDK 57용으로 다시 설치합니다(Expo CLI가 `expo start --android`·`--ios`에서 맞는 버전을 설치합니다). SDK 57용 Expo Go는 아직 App Store·Google Play에 없어(2026-10 기준, [SDK 57 릴리스 노트](https://expo.dev/changelog/sdk-57#will-there-be-a-new-expo-go-version-on-the-app-store-and-play-store)), 실기기는 Android는 Expo CLI로 설치하고 iOS는 `eas go`로 만든 TestFlight 빌드나 개발 빌드를 씁니다.
+
 ## Android 에뮬레이터 절차
 
 1. 로컬 서비스를 실행합니다: `make up`.
@@ -37,7 +39,7 @@ Orca 1.4.217의 `orca emulator`는 serve-sim 0.1.40을 포함해, Xcode 27이 `S
    ```
 
 3. 제어 도구를 띄웁니다. serve-sim helper의 기본 시작 포트는 `3100`입니다. API 포트와 겹치면 다른 시작 포트를 지정합니다: `npx serve-sim@0.1.47 --detach --quiet --port 3300 <udid>`. 출력의 `url`을 씁니다. 이 포트 지정은 아직 이 Mac에서 실행해 보지 않았습니다.
-4. 앱을 엽니다: `xcrun simctl openurl <udid> exp://127.0.0.1:<Expo 포트>`. 설치 여부는 `xcrun simctl get_app_container <udid> host.exp.Exponent`로 확인합니다. Xcode 27에서는 `npx expo start --ios`가 Simulator 앱을 찾지 못해 실패하므로, Expo Go 시뮬레이터 빌드(`.app`)를 `xcrun simctl install <udid> <Exponent.app>`로 설치합니다. 이 설치 경로는 아직 이 Mac에서 실행해 보지 않았습니다.
+4. 앱을 엽니다: `xcrun simctl openurl <udid> exp://127.0.0.1:<Expo 포트>`. 설치 여부는 `xcrun simctl get_app_container <udid> host.exp.Exponent`로 확인합니다. Xcode 27에서는 `npx expo start --ios`가 Simulator 앱을 찾지 못해 실패하므로, SDK 57용 Expo Go 시뮬레이터 빌드(`.app`)를 `xcrun simctl install <udid> <Exponent.app>`로 설치합니다. 이 설치 경로는 아직 이 Mac에서 실행해 보지 않았습니다.
 5. `GET <url>/helper/<udid>/ax`로 화면 요소 트리(JSON, 포인트 좌표)를 읽고, 요소 중심을 화면 크기로 나눈 0..1 좌표로 `npx serve-sim@0.1.47 tap <x> <y> -d <udid>`를 보냅니다. 입력은 `type <text>`, 스크롤은 `gesture`(`begin`→`move`→`end`), 화면 확인은 `xcrun simctl io <udid> screenshot <file>`을 씁니다.
 6. 끝나면 `npx serve-sim@0.1.47 --kill`로 제어 도구를 멈춥니다.
 

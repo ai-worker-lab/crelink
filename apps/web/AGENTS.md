@@ -3,6 +3,7 @@
 적용 범위: `apps/web/`와 그 하위 파일. [루트 공통 규칙](../../AGENTS.md)을 함께 따르며 여기서는 웹에 필요한 규칙만 정의합니다.
 
 - Next.js App Router와 TypeScript 구조를 유지합니다. route와 layout은 기본적으로 Server Component로 두고 상호작용이 필요한 작은 경계만 Client Component로 분리합니다.
+- Next.js 16은 이전 버전과 API·규칙·파일 구조가 다릅니다. 코드를 쓰기 전에 설치된 버전의 문서(`node_modules/next/dist/docs/`, 저장소가 `node-linker=hoisted`라 루트 `node_modules`에 있음)에서 해당 가이드를 읽고 폐기 예정 안내를 따릅니다. `next dev`가 이 파일에 영어 안내 블록을 넣지 않도록 `next.config.ts`에 `agentRules: false`를 둡니다.
 - `design/`은 화면 구조와 시각 표현의 기준 정보원입니다. 화면·토큰·에셋은 승인된 디자인을 따라 앱 소유 코드로 구현하고, 디자인 도구 내부 파일을 런타임에서 직접 불러오지 않습니다.
 - 의미 있는 HTML, 키보드 조작, 초점 표시, 폼 레이블을 유지하고 데스크톱·모바일 폭에서 실제 화면과 가로 넘침을 확인합니다.
 - API 연결을 도입하거나 변경하면 실제 로딩·성공·오류 상태와 백엔드 계약을 확인합니다. 준비 중인 화면을 동작하는 제품 기능으로 표시하지 않습니다.

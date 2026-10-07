@@ -10,18 +10,23 @@ type HealthState = { status: 'loading' } | { status: 'ok' } | { status: 'error';
 /** 초기 시작 화면. 제품 기능이 아니라 앱 실행과 API·DB 준비 상태만 확인한다. */
 export default function IndexRoute() {
   const [health, setHealth] = useState<HealthState>({ status: 'loading' });
-  const check = useCallback(async () => {
+  // 상태는 응답 콜백에서만 바꾼다(effect 본문에서 동기로 setState하지 않음). 첫 확인은 초기 상태가 이미 loading이고, 다시 시도만 loading으로 되돌린다.
+  const check = useCallback(
+    () =>
+      apiRequest<ReadinessResponse>(API_PATHS.ready).then(
+        () => setHealth({ status: 'ok' }),
+        (caught: unknown) =>
+          setHealth({
+            status: 'error',
+            message: caught instanceof Error ? caught.message : 'API·DB 상태를 확인하지 못했습니다.',
+          }),
+      ),
+    [],
+  );
+  const retry = () => {
     setHealth({ status: 'loading' });
-    try {
-      await apiRequest<ReadinessResponse>(API_PATHS.ready);
-      setHealth({ status: 'ok' });
-    } catch (caught) {
-      setHealth({
-        status: 'error',
-        message: caught instanceof Error ? caught.message : 'API·DB 상태를 확인하지 못했습니다.',
-      });
-    }
-  }, []);
+    void check();
+  };
   useEffect(() => {
     void check();
   }, [check]);
@@ -46,7 +51,7 @@ export default function IndexRoute() {
             <Text accessibilityRole="alert" style={styles.error}>
               {health.message}
             </Text>
-            <ActionButton title="다시 시도" variant="outline" onPress={() => void check()} />
+            <ActionButton title="다시 시도" variant="outline" onPress={retry} />
           </>
         ) : null}
       </Card>
