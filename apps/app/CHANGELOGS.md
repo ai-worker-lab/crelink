@@ -4,6 +4,7 @@
 
 ## 2026-10-07
 
+- 스튜디오 라이트 디자인 적용(0040): `src/components/ui/index.tsx`의 계단 모서리 `PixelFrame`을 없애고 `ActionButton`(알약형, `corner.full`)·`Card`(`corner.lg`, 1px 테두리)를 한 `View`의 배경·테두리·`borderRadius`로 그림. 화면 바탕 `background.stage`, `StatusBar` `light` → `dark`(밝은 바탕). 타입 검사만 했고 시뮬레이터·실기기 화면은 확인하지 않음.
 - Expo SDK 54 → 57 업그레이드(`expo` ~57.0.27, React Native 0.86.3, React·React DOM 19.2.3, `expo-router` ~57.0.25, `expo-status-bar` ~57.0.1, `react-native-safe-area-context` ~5.7.0, `react-native-screens` ~4.26.2, `@types/react` ~19.2.0). `npx expo install expo@^57.0.0 --fix`와 SDK 55·56·57 릴리스 노트의 breaking changes를 따름. 근거: work item 0039(의존성 LTS 메이저 업그레이드), `apps/app/package.json`.
   - `expo-router` 57이 의존하는 `react-native-drawer-layout`의 필수 peer(`react-native-reanimated`·`react-native-gesture-handler`)와 `react-native-worklets`의 peer(`@react-native/metro-config`)를 pnpm이 SDK와 맞지 않는 최신 버전(reanimated 4.7·worklets 0.13·metro-config 0.87)으로 자동 설치해, SDK 57 값(`react-native-reanimated` 4.5.1, `react-native-worklets` 0.10.1, `react-native-gesture-handler` ~2.32.0, `@react-native/metro-config` 0.86.3)으로 명시함. `expo-router`의 필수 peer `expo-linking`·`expo-constants`·`@expo/metro-runtime`도 SDK 57 값(~57.0.12·~57.0.21·~57.0.16)으로 명시(명시하지 않으면 기존 락파일의 SDK 54용 `expo-linking` 8.0.12·`@expo/metro-runtime` 6.1.2가 남음).
   - TypeScript는 `~5.9.3` 유지: SDK 56부터 `expo install --fix`가 TypeScript 6.0.3을 넣지만 SDK가 요구하지 않으므로 `package.json`의 `expo.install.exclude`에 `typescript`를 둠.

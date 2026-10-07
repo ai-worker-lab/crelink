@@ -5,6 +5,8 @@
 !pnpm-lock.yaml
 !pnpm-workspace.yaml
 !.npmrc
+# 웹 /docs/releases가 빌드 때 읽는 공개 릴리스 노트입니다.
+!RELEASES.md
 !apps/api
 !apps/web
 !packages/shared

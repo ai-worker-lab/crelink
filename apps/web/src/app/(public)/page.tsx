@@ -81,6 +81,7 @@ export default async function HomePage() {
         )}
       </section>
       <footer className="site-footer">
+        <Link href={CRELINK_WEB_PATHS.docs}>문서</Link>
         <Link href={CRELINK_WEB_PATHS.privacy}>개인정보 처리방침</Link>
       </footer>
     </main>
