@@ -13,6 +13,7 @@ Next.js App Router와 TypeScript 기반 크리링(CreLink) 웹 클라이언트�
 | `/p/[publicId]` | 공개 랜딩(SSR, `src/components/landing/Landing.tsx`). 404·410 안내. 외부 진입은 단축 주소를 거침(PRD R7): `Sec-Fetch-Site: same-origin`(서비스 화면에서 연 경우)이거나 API가 단축 주소 302의 통과 표시 `?pass=`를 받아들이면(`passAccepted`) 그리고 주소창의 `pass`를 지우며(`PassCleanup`), 그 밖은 API가 준 `shortUrl`로 307. 이 리디렉트가 HTTP 307이 되도록 불러오는 중 화면(`loading.tsx`)은 루트가 아니라 `/me`·`/admin`에만 둠 |
 | `/notice?reason=` | 단축 주소·로그인 오류 안내 |
 | `/privacy` | 개인정보 수집·보관·쿠키 고지(법률 검토 전 문구) |
+| `/docs`, `/docs/guide`, `/docs/releases`, `/docs/brand` | 공개 문서(목록 `src/lib/docs.ts`): 크리에이터 사용 안내, 릴리스 노트(빌드 때 루트 `RELEASES.md`의 첫 `## `부터 끝까지, 없으면 빈 상태), 브랜드와 디자인(`@crelink/design-tokens` 값으로 만든 색·글꼴·간격·모서리 견본), `/privacy` 링크. 모두 정적 화면 |
 | `/admin`, `/admin/creators/[userId]`, `/admin/blocked-domains` | 운영자 화면. 401이면 `/`, 403이면 권한 없음 안내 |
 
 SNS 채널 아이콘 자산의 출처·상표 사용 규칙은 [SNS 채널 아이콘](docs/sns-icons.md)에 있습니다.

@@ -825,6 +825,9 @@ textarea.input {
   padding-top: var(--ds-space-24);
   border-top: 1px solid var(--ds-color-border-default);
   font-size: var(--ds-font-size-14);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-16);
 }
 .narrow-page {
   max-width: 760px;
@@ -847,6 +850,133 @@ textarea.input {
 }
 .prose li + li {
   margin-top: var(--ds-space-8);
+}
+
+/* 공개 문서(/docs) */
+.docs-nav {
+  margin-bottom: var(--ds-space-32);
+}
+.docs-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.docs-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--ds-space-16);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-full);
+  background: var(--ds-color-surface-default);
+  font-size: var(--ds-font-size-14);
+  font-weight: var(--ds-font-weight-bold);
+  text-decoration: none;
+}
+.docs-nav a:hover {
+  border-color: var(--ds-color-text-primary);
+}
+.docs-nav a[aria-current='page'] {
+  border-color: var(--ds-color-text-primary);
+  background: var(--ds-color-text-primary);
+  color: var(--ds-color-text-on-action);
+}
+.prose .docs-list {
+  display: grid;
+  gap: var(--ds-space-12);
+  margin: var(--ds-space-24) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.prose .docs-list li {
+  margin: 0;
+  padding: var(--ds-space-16) var(--ds-space-20);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-lg);
+  background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
+}
+.docs-list a {
+  font-size: var(--ds-font-size-18);
+  font-weight: var(--ds-font-weight-extrabold);
+}
+.docs-list p {
+  margin: var(--ds-space-4) 0 0;
+}
+.prose h3 {
+  font-size: var(--ds-font-size-18);
+}
+.prose ol {
+  padding-left: var(--ds-space-20);
+}
+.release-notes h2 {
+  margin-top: var(--ds-space-32);
+}
+.token-group {
+  margin-top: var(--ds-space-24);
+}
+.prose :is(.swatch-list, .sample-list, .corner-list) {
+  display: grid;
+  gap: var(--ds-space-12);
+  padding: 0;
+  list-style: none;
+}
+.prose .swatch-list {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.prose :is(.swatch-list, .sample-list, .corner-list) li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+  min-width: 0;
+  margin: 0;
+  color: var(--ds-color-text-primary);
+}
+.swatch {
+  height: 56px;
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-md);
+}
+.token-name {
+  font-size: var(--ds-font-size-13);
+  font-weight: var(--ds-font-weight-bold);
+  overflow-wrap: anywhere;
+}
+.token-value {
+  font-size: var(--ds-font-size-12);
+  color: var(--ds-color-text-subtle);
+}
+.token-pairs dt {
+  margin-top: var(--ds-space-16);
+  font-weight: var(--ds-font-weight-bold);
+}
+.token-pairs dd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+  margin: var(--ds-space-4) 0 0;
+  font-size: var(--ds-font-size-18);
+}
+.font-sample {
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.space-bar {
+  height: 16px;
+  border-radius: var(--ds-corner-sm);
+  background: var(--ds-color-decoration-subtle);
+}
+.prose .corner-list {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+.corner-sample {
+  width: 96px;
+  height: 64px;
+  border: 2px solid var(--ds-color-text-primary);
+  background: var(--ds-color-surface-default);
 }
 
 /* 크리에이터 랜딩페이지(/p/{publicId}) */

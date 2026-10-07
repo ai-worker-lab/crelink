@@ -2,7 +2,7 @@
 # 크리링 웹 운영 이미지(Next.js standalone). 빌드 컨텍스트는 저장소 루트입니다(허용 목록: 루트 .dockerignore).
 #   docker build -f apps/web/Dockerfile -t crelink-web:local .
 # 서버 전용 환경변수(API_INTERNAL_URL·API_INTERNAL_TOKEN)는 실행 시점에만 읽으므로 이미지에 넣지 않습니다.
-# 정적으로 미리 렌더링되는 화면(/privacy, 404)은 API를 부르지 않습니다(next build 경로 표 ○).
+# 정적으로 미리 렌더링되는 화면(/privacy, /docs/*, 404)은 API를 부르지 않습니다(next build 경로 표 ○).
 # Sentry: NEXT_PUBLIC_SENTRY_DSN(서버·브라우저 공용, 공개 값)과 SENTRY_RELEASE(배포 커밋 SHA)는 빌드 시점에 번들에 들어가므로
 # 이미지가 배포 대상(Sentry 프로젝트)별이 됩니다. DSN이 비면 Sentry를 켜지 않습니다. BuildKit secret sentry_auth_token이 있을 때만
 # 소스맵을 올리고 지웁니다(SENTRY_ORG·SENTRY_PROJECT 필요, 업로드 실패면 빌드 실패). 없으면 소스맵을 만들지 않습니다(로컬·PR CI).
@@ -29,6 +29,8 @@ RUN --mount=type=cache,id=crelink-pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter @crelink/web...
 COPY packages/shared packages/shared
 COPY packages/design-tokens packages/design-tokens
+# /docs/releases는 빌드 때 루트 RELEASES.md를 읽어 정적 화면으로 만듭니다(실행 이미지에는 넣지 않음).
+COPY RELEASES.md ./
 COPY apps/web apps/web
 # 디자인 토큰 생성물(packages/design-tokens/generated)은 커밋된 것을 씁니다. 원본과의 일치 검사는 CI(pnpm typecheck)가 맡습니다
 # (검사가 이미지에 넣지 않는 design/ 폴더까지 비교하기 때문).

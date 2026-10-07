@@ -52,6 +52,7 @@ export const RESERVED_SLUGS: readonly string[] = [
   'me',
   'notice',
   'privacy',
+  'docs',
   'static',
   'files',
   'www',
@@ -430,4 +431,8 @@ export const CRELINK_WEB_PATHS = {
   notice: (reason: NoticeReason) => `/notice?reason=${reason}`,
   googleCallback: '/auth/google/callback',
   privacy: '/privacy',
+  docs: '/docs',
+  docsGuide: '/docs/guide',
+  docsReleases: '/docs/releases',
+  docsBrand: '/docs/brand',
 } as const;

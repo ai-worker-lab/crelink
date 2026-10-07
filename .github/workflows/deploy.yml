@@ -90,9 +90,10 @@ jobs:
             fi
           }
           decide api deploy/prod-api '^(apps/api/|packages/shared/|pnpm-lock\.yaml$|\.dockerignore$)'
-          decide web deploy/prod-web '^(apps/web/|packages/shared/|packages/design-tokens/|pnpm-lock\.yaml$|\.dockerignore$)'
+          # 웹 /docs/releases가 빌드 때 RELEASES.md를 읽어 정적 화면을 만들므로 RELEASES.md만 바뀌어도 웹 이미지를 다시 만듭니다.
+          decide web deploy/prod-web '^(apps/web/|packages/shared/|packages/design-tokens/|RELEASES\.md$|pnpm-lock\.yaml$|\.dockerignore$)'
           # 릴리스(설정·비밀값 포함)는 이미지가 바뀌었거나 infra/prod가 바뀌면 배포합니다.
-          decide release deploy/prod '^(apps/api/|apps/web/|packages/shared/|packages/design-tokens/|pnpm-lock\.yaml$|\.dockerignore$|infra/prod/)'
+          decide release deploy/prod '^(apps/api/|apps/web/|packages/shared/|packages/design-tokens/|RELEASES\.md$|pnpm-lock\.yaml$|\.dockerignore$|infra/prod/)'
       - name: 배포 대상
         id: targets
         run: |

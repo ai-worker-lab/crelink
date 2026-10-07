@@ -86,7 +86,7 @@ migration은 `apps/api/migrations/`의 SQL 파일(기존 실행기). 모든 시�
 | `blocked_domains` | `domain PK`, `reason`, `created_by`, `created_at` | R14. 도메인과 그 하위 도메인을 막음. |
 
 - **가입 시 생성**(한 트랜잭션): `users` → `user_identities` → `landings` → `landing_blocks(list)` → `short_links` → `short_slugs(is_auto, 7자 [a-z0-9])`.
-- **예약어**: 단축 주소로 쓸 수 없는 값 `api`, `c`, `health`, `admin`, `auth`, `p`, `me`, `notice`, `privacy`, `static`, `files`, `www`, `crelink` `[임시값]`.
+- **예약어**: 단축 주소로 쓸 수 없는 값 `api`, `c`, `health`, `admin`, `auth`, `p`, `me`, `notice`, `privacy`, `docs`, `static`, `files`, `www`, `crelink` `[임시값]`.
 - **보존 작업**(R11): API 기동 시와 24시간마다 실행. 365일보다 오래된 날짜의 원본을 날짜·단축 URL 단위로 집계 테이블에 넣고 같은 트랜잭션에서 원본을 지웁니다. 여러 인스턴스가 동시에 돌지 않게 advisory lock.
 - **되돌리기**: 새 테이블만 추가하므로 migration 이전으로 돌아가려면 테이블을 지웁니다. 운영 데이터가 생긴 뒤에는 되돌리지 않고 다음 migration으로 고칩니다.
 
