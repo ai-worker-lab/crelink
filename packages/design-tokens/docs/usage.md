@@ -2,7 +2,7 @@
 
 `@crelink/design-tokens`는 색·간격·모서리·글자 크기·글자 굵기·글꼴 스택의 단일 원본입니다. 디자인(`design/`), 웹(`apps/web`), 앱(`apps/app`)은 모두 이 패키지의 생성물을 사용합니다. 결정 배경은 [ADR 0001 디자인 토큰 단일 원본](../../../docs/adr/0001-design-tokens.md)을 봅니다.
 
-현재 `src/tokens.json`의 값은 서비스 고유 색이 없는 중립 시작 팔레트(어두운 회색 배경, 파란 강조색)입니다. 서비스의 시각 디자인이 정해지면 디자인 작업에서 값과 의미를 다시 정의합니다. 토큰 이름과 생성물의 식별자는 웹·앱이 의존하므로 바꿀 때 사용처를 함께 옮깁니다.
+현재 `src/tokens.json`의 값은 크리링 디자인 방향 스튜디오 라이트(밝은 회색 바탕, 흰 카드, 산호빛 빨강 강조색, 둥근 모서리)입니다. 쓰임새와 규칙은 [디자인 시스템](../../../design/system/DESIGN.md)에 있습니다. 토큰 이름과 생성물의 식별자는 웹·앱이 의존하므로 바꿀 때 사용처를 함께 옮깁니다.
 
 ## 구성
 
@@ -45,7 +45,7 @@
 | `color.action.primary-pressed` | `--ds-color-action-primary-pressed` | `color.action.primaryPressed` |
 | `color.status.danger-subtle` | `--ds-color-status-danger-subtle` | `color.status.dangerSubtle` |
 | `space.16` | `--ds-space-16` (`16px`) | `space[16]` (`16`) |
-| `corner.md` | `--ds-corner-md` (`6px`) | `corner.md` (`6`) |
+| `corner.md` | `--ds-corner-md` (`12px`) | `corner.md` (`12`) |
 | `font.size.14` | `--ds-font-size-14` (`14px`) | `font.size[14]` (`14`) |
 | `font.weight.bold` | `--ds-font-weight-bold` (`700`) | `font.weight.bold` (`700`) |
 | `font.sans` | `--ds-font-sans` | `font.sans` |

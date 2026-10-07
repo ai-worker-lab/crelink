@@ -13,21 +13,9 @@
 
 /* ---------- 기본 ---------- */
 :root {
-  /* 계단 모서리(corner md) 다각형 */
-  --notch-md: polygon(
-    0 var(--ds-corner-md),
-    var(--ds-corner-md) var(--ds-corner-md),
-    var(--ds-corner-md) 0,
-    calc(100% - var(--ds-corner-md)) 0,
-    calc(100% - var(--ds-corner-md)) var(--ds-corner-md),
-    100% var(--ds-corner-md),
-    100% calc(100% - var(--ds-corner-md)),
-    calc(100% - var(--ds-corner-md)) calc(100% - var(--ds-corner-md)),
-    calc(100% - var(--ds-corner-md)) 100%,
-    var(--ds-corner-md) 100%,
-    var(--ds-corner-md) calc(100% - var(--ds-corner-md)),
-    0 calc(100% - var(--ds-corner-md))
-  );
+  /* 카드가 바탕에서 살짝 뜨는 옅은 그림자(design/system/DESIGN.md 컴포넌트 절). */
+  --card-shadow: 0 1px 2px var(--ds-color-overlay-shadow), 0 4px 16px var(--ds-color-overlay-shadow);
+  color-scheme: light;
   font-family: var(--ds-font-sans);
   font-weight: var(--ds-font-weight-regular);
   font-optical-sizing: auto;
@@ -71,12 +59,15 @@ h3 {
 p {
   color: var(--ds-color-text-secondary);
 }
+/* 강조색은 주요 행동에만 쓰므로 글 속 링크는 본문 글자색과 밑줄로 구분한다. */
 a {
-  color: var(--ds-color-action-primary);
-  text-decoration: none;
+  color: var(--ds-color-text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--ds-color-border-strong);
+  text-underline-offset: 3px;
 }
 a:hover {
-  text-decoration: underline;
+  text-decoration-color: currentColor;
 }
 button {
   font: inherit;
@@ -87,9 +78,10 @@ button:disabled {
   cursor: not-allowed;
   opacity: 0.48;
 }
+/* 초점 링: 요소 바깥 3px, 간격 2px, 본문 글자색(강조색 버튼 위에서도 보이도록). */
 :is(button, a, input, select, textarea, summary):focus-visible {
-  outline: 3px solid var(--ds-color-action-primary);
-  outline-offset: 3px;
+  outline: 3px solid var(--ds-color-text-primary);
+  outline-offset: 2px;
 }
 code {
   font-family: var(--ds-font-mono);
@@ -104,33 +96,29 @@ code {
   justify-content: center;
   gap: var(--ds-space-8);
   min-height: 44px;
-  padding: var(--ds-space-12) var(--ds-space-16);
+  padding: var(--ds-space-12) var(--ds-space-20);
   border: 0;
-  border-radius: 0;
+  border-radius: var(--ds-corner-full);
   background: var(--ds-color-action-primary);
   color: var(--ds-color-text-on-action);
   font-weight: var(--ds-font-weight-extrabold);
   text-decoration: none;
-  clip-path: var(--notch-md);
+  transition: background-color 150ms cubic-bezier(0.23, 1, 0.32, 1);
 }
-.primary:hover:not(:disabled) {
-  filter: brightness(1.07);
+.primary:hover:not(:disabled),
+.primary:active:not(:disabled) {
+  background: var(--ds-color-action-primary-pressed);
   text-decoration: none;
-}
-/* 계단 모서리(clip-path)가 바깥 포커스 링을 자르므로 링을 요소 안쪽에 그린다. */
-.primary:focus-visible {
-  outline-color: currentColor;
-  outline-offset: calc(-3px - var(--ds-corner-md));
 }
 
 /* 빈 상태·경로 오류 */
 .empty-state {
   padding: var(--ds-space-20);
-  border: 2px solid var(--ds-color-border-default);
-  border-radius: 0;
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-lg);
   background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
   color: var(--ds-color-text-secondary);
-  clip-path: var(--notch-md);
 }
 .empty-state > .primary {
   margin-top: var(--ds-space-16);
@@ -144,7 +132,8 @@ code {
   height: 40px;
   margin-bottom: var(--ds-space-12);
   border: 2px solid var(--ds-color-status-danger);
-  background: var(--ds-color-surface-default);
+  border-radius: var(--ds-corner-full);
+  background: var(--ds-color-status-danger-subtle);
   font-family: var(--ds-font-mono);
   font-size: var(--ds-font-size-22);
   font-weight: var(--ds-font-weight-extrabold);
@@ -154,7 +143,8 @@ code {
 /* 오류 알림 */
 .error {
   padding: var(--ds-space-12);
-  border: 2px solid var(--ds-color-border-danger);
+  border: 1px solid var(--ds-color-border-danger);
+  border-radius: var(--ds-corner-md);
   background: var(--ds-color-status-danger-subtle);
   color: var(--ds-color-status-danger);
 }
@@ -169,11 +159,11 @@ code {
   align-items: center;
   justify-content: center;
   gap: var(--ds-space-6);
-  min-height: 40px;
-  padding: var(--ds-space-8) var(--ds-space-12);
-  border: 2px solid var(--ds-color-border-strong);
-  border-radius: 0;
-  background: var(--ds-color-surface-raised);
+  min-height: 44px;
+  padding: var(--ds-space-8) var(--ds-space-16);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-full);
+  background: var(--ds-color-surface-default);
   color: var(--ds-color-text-primary);
   font-size: var(--ds-font-size-14);
   font-weight: var(--ds-font-weight-bold);
@@ -181,7 +171,7 @@ code {
   white-space: nowrap;
 }
 .secondary:hover:not(:disabled) {
-  border-color: var(--ds-color-action-primary);
+  border-color: var(--ds-color-text-primary);
   text-decoration: none;
 }
 .secondary.danger {
@@ -204,22 +194,19 @@ code {
   width: 100%;
   min-width: 0;
   min-height: 44px;
-  /* 날짜 선택 아이콘 등 브라우저 기본 컨트롤을 어두운 배경에 맞춥니다. */
-  color-scheme: dark;
   padding: var(--ds-space-10) var(--ds-space-12);
-  border: 2px solid var(--ds-color-border-default);
-  border-radius: 0;
+  border: 1px solid var(--ds-color-border-strong);
+  border-radius: var(--ds-corner-md);
   background: var(--ds-color-background-screen);
   color: var(--ds-color-text-primary);
   font: inherit;
   font-size: var(--ds-font-size-16);
 }
 .input:hover:not(:disabled) {
-  border-color: var(--ds-color-border-strong);
+  border-color: var(--ds-color-text-subtle);
 }
 .input:focus-visible {
-  outline-offset: 0;
-  border-color: var(--ds-color-action-primary);
+  border-color: var(--ds-color-text-primary);
 }
 .input[aria-invalid='true'] {
   border-color: var(--ds-color-status-danger);
@@ -291,13 +278,18 @@ textarea.input {
   padding: var(--ds-space-8) var(--ds-space-12);
   font-size: var(--ds-font-size-14);
 }
+.form-error,
+.form-success,
+.notice-box {
+  border-radius: var(--ds-corner-md);
+}
 .form-error {
-  border: 2px solid var(--ds-color-border-danger);
+  border: 1px solid var(--ds-color-border-danger);
   background: var(--ds-color-status-danger-subtle);
   color: var(--ds-color-status-danger);
 }
 .form-success {
-  border: 2px solid var(--ds-color-status-positive-subtle);
+  border: 1px solid var(--ds-color-status-positive-subtle);
   background: var(--ds-color-status-positive-subtle);
   color: var(--ds-color-status-positive);
 }
@@ -311,7 +303,7 @@ textarea.input {
 .notice-box {
   margin: 0;
   padding: var(--ds-space-12);
-  border: 2px solid var(--ds-color-status-warning-subtle);
+  border: 1px solid var(--ds-color-status-warning-subtle);
   background: var(--ds-color-status-warning-subtle);
   color: var(--ds-color-status-warning);
   font-size: var(--ds-font-size-14);
@@ -334,12 +326,14 @@ textarea.input {
   display: inline-block;
   padding: var(--ds-space-2) var(--ds-space-8);
   border: 1px solid var(--ds-color-border-strong);
+  border-radius: var(--ds-corner-sm);
   font-size: var(--ds-font-size-12);
   font-weight: var(--ds-font-weight-bold);
   color: var(--ds-color-text-secondary);
 }
 .badge-danger {
   border-color: var(--ds-color-status-danger);
+  background: var(--ds-color-status-danger-subtle);
   color: var(--ds-color-status-danger);
 }
 .url-text {
@@ -381,7 +375,8 @@ textarea.input {
   width: 72px;
   height: 72px;
   object-fit: cover;
-  border: 2px solid var(--ds-color-border-default);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-md);
   background: var(--ds-color-background-screen);
 }
 .image-empty {
@@ -423,13 +418,20 @@ textarea.input {
   justify-content: space-between;
   gap: var(--ds-space-12);
   padding: var(--ds-space-12) var(--ds-space-24);
-  border-bottom: 2px solid var(--ds-color-border-frame);
+  border-bottom: 1px solid var(--ds-color-border-default);
   background: var(--ds-color-surface-bar);
 }
 .brand {
   font-weight: var(--ds-font-weight-extrabold);
   font-size: var(--ds-font-size-18);
   color: var(--ds-color-text-primary);
+  text-decoration: none;
+}
+.site-nav a:not(.secondary) {
+  text-decoration: none;
+}
+.site-nav a:not(.secondary):hover {
+  text-decoration: underline;
 }
 .site-nav {
   display: flex;
@@ -475,8 +477,10 @@ textarea.input {
   min-width: 0;
   margin-bottom: var(--ds-space-24);
   padding: var(--ds-space-20);
-  border: 2px solid var(--ds-color-border-default);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-lg);
   background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
 }
 .editor > .card {
   margin-bottom: 0;
@@ -503,7 +507,8 @@ textarea.input {
 .limit-badge {
   margin: 0;
   padding: var(--ds-space-4) var(--ds-space-10);
-  border: 2px solid var(--ds-color-border-strong);
+  border: 1px solid var(--ds-color-border-strong);
+  border-radius: var(--ds-corner-full);
   font-family: var(--ds-font-mono);
   font-size: var(--ds-font-size-14);
   color: var(--ds-color-text-primary);
@@ -518,8 +523,9 @@ textarea.input {
   align-items: center;
   gap: var(--ds-space-12);
   padding: var(--ds-space-12);
-  border: 2px solid var(--ds-color-border-strong);
-  background: var(--ds-color-background-screen);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-md);
+  background: var(--ds-color-background-stage);
 }
 .copy-row > .url-text {
   flex: 1 1 200px;
@@ -588,7 +594,8 @@ textarea.input {
 }
 .item-card {
   padding: var(--ds-space-16);
-  border: 2px solid var(--ds-color-border-default);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-md);
   background: var(--ds-color-background-screen);
 }
 .item-card.item-blocked {
@@ -623,7 +630,8 @@ textarea.input {
   width: 64px;
   height: 64px;
   object-fit: cover;
-  border: 2px solid var(--ds-color-border-default);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-sm);
 }
 .item-actions {
   display: flex;
@@ -650,7 +658,9 @@ textarea.input {
 .table-scroll {
   max-width: 100%;
   overflow-x: auto;
-  border: 2px solid var(--ds-color-border-default);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-md);
+  background: var(--ds-color-surface-default);
 }
 .data-table {
   width: 100%;
@@ -724,7 +734,8 @@ textarea.input {
 }
 .stat-tiles > div {
   padding: var(--ds-space-12) var(--ds-space-16);
-  border: 2px solid var(--ds-color-border-default);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-md);
   background: var(--ds-color-background-screen);
 }
 .stat-tiles dt {
@@ -798,6 +809,7 @@ textarea.input {
 }
 .brand-mark a {
   color: inherit;
+  text-decoration: none;
 }
 .home-actions {
   display: flex;
@@ -847,7 +859,7 @@ textarea.input {
 .profile-main {
   flex: 1;
   width: 100%;
-  max-width: 560px;
+  max-width: 480px;
   margin: 0 auto;
   padding: var(--ds-space-40) var(--ds-space-20) var(--ds-space-32);
 }
@@ -867,12 +879,12 @@ textarea.input {
   width: 96px;
   height: 96px;
   object-fit: cover;
-  border: 2px solid var(--ds-color-border-strong);
-  clip-path: var(--notch-md);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: 50%;
 }
 .profile-name {
   margin: 0;
-  font-size: var(--ds-font-size-27);
+  font-size: var(--ds-font-size-22);
   line-height: 1.3;
 }
 .profile-bio {
@@ -895,6 +907,7 @@ textarea.input {
   height: 56px;
   color: var(--ds-color-text-primary);
 }
+.social-link,
 .social-link:hover {
   text-decoration: none;
 }
@@ -964,18 +977,23 @@ textarea.input {
   gap: var(--ds-space-12);
   min-height: 56px;
   padding: var(--ds-space-12) var(--ds-space-16);
-  border: 2px solid var(--ds-color-border-default);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-lg);
   background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
   color: var(--ds-color-text-primary);
+  text-decoration: none;
+  transition: border-color 150ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 .link-card:hover {
-  border-color: var(--ds-color-action-primary);
+  border-color: var(--ds-color-text-primary);
   text-decoration: none;
 }
 .link-thumb {
   flex: none;
   width: 56px;
   height: 56px;
+  border-radius: var(--ds-corner-md);
   object-fit: cover;
 }
 .link-text {
@@ -1015,18 +1033,22 @@ textarea.input {
   gap: var(--ds-space-6);
   height: 100%;
   padding: var(--ds-space-12);
-  border: 2px solid var(--ds-color-border-default);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-lg);
   background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
   color: var(--ds-color-text-primary);
+  text-decoration: none;
 }
 a.portfolio-card:hover {
-  border-color: var(--ds-color-action-primary);
+  border-color: var(--ds-color-text-primary);
   text-decoration: none;
 }
 .portfolio-image {
   width: 100%;
   height: auto;
   aspect-ratio: 16 / 10;
+  border-radius: var(--ds-corner-md);
   object-fit: cover;
 }
 .portfolio-title {
@@ -1063,16 +1085,25 @@ a.portfolio-card:hover {
   gap: var(--ds-space-12);
   margin-bottom: var(--ds-space-16);
 }
+/* 편집·보기 전환: 알약형 묶음. 고른 쪽은 본문 글자색 면에 흰 글자(강조색을 쓰지 않음). */
 .mode-switch {
   display: inline-flex;
+  gap: var(--ds-space-4);
+  padding: var(--ds-space-4);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-full);
+  background: var(--ds-color-surface-default);
 }
-.mode-switch > a + a {
-  margin-left: -2px;
+.mode-switch > .secondary {
+  border-color: transparent;
+  background: transparent;
+}
+.mode-switch > .secondary:hover:not([aria-current='page']) {
+  background: var(--ds-color-surface-raised);
 }
 .mode-switch > a[aria-current='page'] {
-  position: relative;
-  border-color: var(--ds-color-action-primary);
-  background: var(--ds-color-action-primary-subtle);
+  background: var(--ds-color-text-primary);
+  color: var(--ds-color-surface-default);
 }
 .landing-preview {
   max-width: 560px;
@@ -1119,14 +1150,15 @@ a.portfolio-card:hover {
   width: 40px;
   min-height: 44px;
   padding: 0;
-  border: 2px solid var(--ds-color-border-default);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-md);
   background: var(--ds-color-surface-default);
   color: var(--ds-color-text-subtle);
   cursor: grab;
   touch-action: none;
 }
 .drag-handle:hover {
-  border-color: var(--ds-color-action-primary);
+  border-color: var(--ds-color-text-primary);
   color: var(--ds-color-text-primary);
 }
 .link-edit-item.is-dragging .drag-handle {
@@ -1138,14 +1170,14 @@ a.portfolio-card:hover {
   text-align: left;
 }
 .link-edit-item.is-dragging .link-edit-card {
-  border-color: var(--ds-color-action-primary);
+  border-color: var(--ds-color-text-primary);
 }
 .link-edit-item.is-blocked .link-edit-card {
   border-color: var(--ds-color-border-danger);
 }
 /* 숨긴 링크는 방문자에게 보이지 않으므로 흐리게 보여 준다(숨김 배지와 함께). */
 .link-edit-item.is-hidden .link-edit-card {
-  opacity: 0.5;
+  opacity: 0.45;
 }
 .hide-switch {
   display: flex;
@@ -1156,14 +1188,15 @@ a.portfolio-card:hover {
   gap: var(--ds-space-4);
   min-width: 56px;
   padding: var(--ds-space-6) var(--ds-space-8);
-  border: 2px solid var(--ds-color-border-default);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-md);
   background: var(--ds-color-surface-default);
   color: var(--ds-color-text-secondary);
   font-size: var(--ds-font-size-12);
   font-weight: var(--ds-font-weight-bold);
 }
 .hide-switch:hover:not([aria-disabled='true']) {
-  border-color: var(--ds-color-action-primary);
+  border-color: var(--ds-color-text-primary);
 }
 .hide-switch[aria-disabled='true'] {
   cursor: not-allowed;
@@ -1174,27 +1207,26 @@ a.portfolio-card:hover {
   display: block;
   width: 36px;
   height: 20px;
-  border: 2px solid var(--ds-color-border-strong);
-  background: var(--ds-color-background-screen);
+  border-radius: var(--ds-corner-full);
+  background: var(--ds-color-border-strong);
 }
 .hide-switch-thumb {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 12px;
-  height: 12px;
-  background: var(--ds-color-text-subtle);
-  transition: transform 0.15s;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--ds-color-surface-default);
+  transition: transform 150ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 .hide-switch[aria-checked='true'] {
   color: var(--ds-color-text-primary);
 }
 .hide-switch[aria-checked='true'] .hide-switch-track {
-  border-color: var(--ds-color-action-primary);
-  background: var(--ds-color-action-primary-subtle);
+  background: var(--ds-color-text-primary);
 }
 .hide-switch[aria-checked='true'] .hide-switch-thumb {
-  background: var(--ds-color-action-primary);
   transform: translateX(16px);
 }
 /* 상태 배지·차단 사유는 손잡이(40px)와 간격을 뺀 카드 아래에 맞춘다. */
@@ -1211,9 +1243,11 @@ a.portfolio-card:hover {
   max-height: 90dvh;
   margin: auto auto 0;
   padding: 0;
-  border: 2px solid var(--ds-color-border-strong);
+  border: 1px solid var(--ds-color-border-default);
   border-bottom: 0;
+  border-radius: var(--ds-corner-lg) var(--ds-corner-lg) 0 0;
   background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
   color: var(--ds-color-text-primary);
   overflow-y: auto;
   overscroll-behavior: contain;
