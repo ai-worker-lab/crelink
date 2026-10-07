@@ -1,4 +1,5 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { SentryExceptionCaptured } from '@sentry/nestjs';
 import { ApiError, CrelinkErrorCode } from '@crelink/shared';
 import type { Request, Response } from 'express';
 import { randomInt } from 'node:crypto';
@@ -29,7 +30,11 @@ function clientErrorStatus(exception: unknown): number | null {
   return typeof status === 'number' && status >= 400 && status < 500 && expose === true ? status : null;
 }
 
-/** 모든 오류 응답을 `ApiError`로 맞춥니다. 프레임워크가 만든 오류(잘못된 JSON, 본문 한도 초과, 없는 경로 등)도 포함합니다. */
+/**
+ * 모든 오류 응답을 `ApiError`로 맞춥니다. 프레임워크가 만든 오류(잘못된 JSON, 본문 한도 초과, 없는 경로 등)도 포함합니다.
+ * 예상하지 못한 오류(500 `internal_error`)만 Sentry로 보냅니다. `@SentryExceptionCaptured()`는 Nest `HttpException`만 예상한 오류로 보고
+ * 본문 파서의 http-errors 4xx(413 등)는 보내므로, `catch` 대신 500 처리 메서드에 붙입니다. Sentry가 꺼져 있으면 보내지 않습니다.
+ */
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger('ApiExceptionFilter');
@@ -51,12 +56,19 @@ export class ApiExceptionFilter implements ExceptionFilter {
       response.status(clientStatus).json(fallbackBody(clientStatus));
       return;
     }
+    this.internalError(exception, host);
+  }
+
+  @SentryExceptionCaptured()
+  private internalError(exception: unknown, host: ArgumentsHost) {
     const request = host.switchToHttp().getRequest<Request>();
     this.logger.error(
       `${request.method} ${request.path} 처리 중 오류`,
       exception instanceof Error ? exception.stack : String(exception),
     );
-    response
+    host
+      .switchToHttp()
+      .getResponse<Response>()
       .status(HttpStatus.INTERNAL_SERVER_ERROR)
       .json({ code: 'internal_error', message: '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' });
   }

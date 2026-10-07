@@ -89,18 +89,21 @@ Tunnel은 edge Caddy 하나로만 들어오고, edge Caddy는 활성 색의 `api
 | 위치 | 키 | 비고 |
 | --- | --- | --- |
 | `infra/prod/secrets/<대상>.sops.env`(암호화) | `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPERATOR_EMAILS`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | API가 읽음(compose `env_file` = `/run/crelink/app.env`). S3 키 원본은 서버 `/opt/seaweedfs/config/s3.json`의 identity `crelink` |
-| 같은 파일(평문, `.sops.yaml`의 `unencrypted_regex`) | `PORT=3000`, `WEB_URL`, `SHORT_LINK_BASE_URL`, `DATABASE_SSL=verify-full`, `DATABASE_SSL_CA_PATH=/etc/crelink/certs/supabase-ca.crt`, `DATABASE_POOL_MAX=6`(API pg Pool 상한, 산정은 [런북 12](../../infra/docs/prod-runbook.md#12-supabase-주의사항)), `FILE_STORAGE=s3`, `S3_ENDPOINT=https://s3.shaul.kr`, `S3_REGION=us-east-1`, `S3_BUCKET=crelink-uploads`, `UPLOAD_DIR=/data/uploads`(볼륨이 있던 릴리스로 롤백할 때용), `GEOIP_MMDB_PATH=/data/geoip/dbip-city-lite.mmdb`, `TRUSTED_PROXY_HOPS=1` | diff로 검토할 수 있게 평문. 정규식을 바꾸면 그 파일을 한 번 다시 암호화합니다([런북 9-2](../../infra/docs/prod-runbook.md#9-2-암호문에-키-넣기)) |
+| 같은 파일(평문, `.sops.yaml`의 `unencrypted_regex`) | `PORT=3000`, `WEB_URL`, `SHORT_LINK_BASE_URL`, `DATABASE_SSL=verify-full`, `DATABASE_SSL_CA_PATH=/etc/crelink/certs/supabase-ca.crt`, `DATABASE_POOL_MAX=6`(API pg Pool 상한, 산정은 [런북 12](../../infra/docs/prod-runbook.md#12-supabase-주의사항)), `FILE_STORAGE=s3`, `S3_ENDPOINT=https://s3.shaul.kr`, `S3_REGION=us-east-1`, `S3_BUCKET=crelink-uploads`, `UPLOAD_DIR=/data/uploads`(볼륨이 있던 릴리스로 롤백할 때용), `GEOIP_MMDB_PATH=/data/geoip/dbip-city-lite.mmdb`, `TRUSTED_PROXY_HOPS=1`, `SENTRY_DSN`(API Sentry 프로젝트 DSN, 비면 Sentry 꺼짐. 공개돼도 이벤트 전송만 되는 값), `SENTRY_ENVIRONMENT=production` | diff로 검토할 수 있게 평문. 정규식을 바꾸면 그 파일을 한 번 다시 암호화합니다([런북 9-2](../../infra/docs/prod-runbook.md#9-2-암호문에-키-넣기)) |
 | `infra/prod/certs/supabase-ca.crt` | Supabase 루트 CA(공개 인증서) | api 컨테이너 `/etc/crelink/certs`에 읽기 전용 마운트 |
 | `compose.yaml` `api.environment` | `FILE_STORAGE=s3` | `env_file`보다 우선. uploads 볼륨이 없는 compose에서 `disk`로 기동해 이미지가 컨테이너 안에만 저장되는 일을 막음 |
 | `compose.yaml` `web.environment` | `API_INTERNAL_URL=http://api-${CRELINK_COLOR}:3000` | 같은 색 api. `API_INTERNAL_TOKEN`은 두지 않음 |
+| API 이미지(`apps/api/Dockerfile`) | 빌드 인자 `SENTRY_RELEASE`(배포 커밋 SHA → 이미지 ENV), `SENTRY_ORG`·`SENTRY_PROJECT`(소스맵 업로드용). 런타임 `SENTRY_TRACES_SAMPLE_RATE`는 운영에 두지 않음(기본 0.1) | Sentry 결정은 [ADR 0012](../adr/0012-error-monitoring-sentry.md). 키 설명은 [API 문서](../../apps/api/docs/README.md#환경변수) |
+| 웹 이미지(`apps/web/Dockerfile`) | 빌드 인자 `NEXT_PUBLIC_SENTRY_DSN`(웹 Sentry 프로젝트 DSN, 서버·브라우저 공용, 번들에 들어감), `SENTRY_RELEASE`, `SENTRY_ORG`·`SENTRY_PROJECT` | 빌드 시점 값이라 웹 이미지가 그 Sentry 프로젝트에 묶임(대상마다 다른 프로젝트면 따로 빌드). 비면 웹 Sentry 꺼짐 |
+| 이미지 빌드 BuildKit secret | `sentry_auth_token`(= GitHub secret `SENTRY_AUTH_TOKEN`) | 있을 때만 두 Dockerfile 빌드 단계가 소스맵을 Sentry에 올림. 업로드가 실패하면 빌드 실패. 웹은 업로드 뒤 소스맵 파일을 지워 이미지에 없음 |
 | `edge/compose.yaml` 변수 기본값 | `CRELINK_HTTP_PORT`(18080), `CRELINK_SHORT_HOST`(`go.shaul.kr`), `CRELINK_WEB_HOST`(`links.shaul.kr`) | 지금은 기본값만 씀. 대상별로 달라지면 전달 경로를 추가(후속) |
 | 서버 `state/images.env` | `API_IMAGE`, `WEB_IMAGE` | `deploy.sh`·`rollback.sh`만 씀. 형식 `infra/prod/images.env.example` |
 | `.sops.yaml` | 수신자 `operator`(운영자 키: macOS 키체인 `crelink-sops-age` + 운영자 비밀번호 관리자 백업), `home-server`(서버 `/etc/crelink/age.key`) | 대상 추가 시 그 서버 공개키를 수신자에 넣고 `sops updatekeys` |
-| GitHub Actions variables | `TS_OIDC_CLIENT_ID`, `TS_OIDC_AUDIENCE` | Tailscale workload identity federation. 비밀 아님 |
-| GitHub Actions secret | `DEPLOY_SSH_KEY` | `deploy` 사용자 배포 키(forced command) |
+| GitHub Actions variables | `TS_OIDC_CLIENT_ID`, `TS_OIDC_AUDIENCE`, `SENTRY_ORG`, `SENTRY_PROJECT_API`, `SENTRY_PROJECT_WEB`, `SENTRY_WEB_DSN` | Tailscale workload identity federation, Sentry 조직·프로젝트 slug와 웹 DSN(이미지 빌드 인자). 비밀 아님. Sentry 값이 없으면 빈 값으로 빌드해 업로드를 건너뛰고 웹 Sentry가 꺼짐 |
+| GitHub Actions secret | `DEPLOY_SSH_KEY`, `SENTRY_AUTH_TOKEN` | `deploy` 사용자 배포 키(forced command), Sentry 조직 토큰(권한 `org:ci` 고정, 소스맵 업로드 전용. 앱 비밀값 아님) |
 | job `GITHUB_TOKEN` | GHCR push(`packages: write`), 서버 pull(`packages: read`) | 서버 pull은 SSH stdin 첫 줄로 넘겨 일회 로그인 후 로그아웃. 서버·secrets에 레지스트리 장기 토큰 없음 |
 
-- CI에는 앱 비밀값이 없습니다. 평문 비밀값은 서버의 `/run/crelink/app.env`에 compose 실행 동안만 있고 끝나면 지웁니다(실행 중 컨테이너 환경에는 남음).
+- CI에는 앱 비밀값이 없습니다(`SENTRY_AUTH_TOKEN`은 빌드 때 소스맵을 올리는 토큰이라 앱 실행에 쓰이지 않음). 평문 비밀값은 서버의 `/run/crelink/app.env`에 compose 실행 동안만 있고 끝나면 지웁니다(실행 중 컨테이너 환경에는 남음).
 - API는 `NODE_ENV=production`(이미지)에서 필수 키 누락·https 아님을 기동 단계에서 거부합니다([API 문서](../../apps/api/docs/README.md#환경변수)).
 
 ## 릴리스·배포·롤백
@@ -128,7 +131,7 @@ Next.js 16(0039)부터 웹 standalone 서버는 SIGTERM에 진행 중 요청을 
 | `ci.yml` `이미지 빌드 api`·`web` | PR·main push마다 두 이미지를 `linux/amd64`로 빌드만 합니다(푸시 없음, gha 캐시) |
 | `deploy.yml` 트리거 | `workflow_run`(`CI` 성공, main push) 또는 main에서 `workflow_dispatch`(`force`: 변경과 무관하게 두 이미지 새로 빌드). 동시 실행 그룹 `deploy-prod`(취소 안 함, `rollback.yml`과 공유) |
 | `plan` | 배포 커밋, 변경 영역(태그 기준: `api` ← `deploy/prod-api` 이후 `apps/api/`·`packages/shared/`·`pnpm-lock.yaml`·`.dockerignore`, `web` ← `deploy/prod-web` 이후 `apps/web/`·`packages/shared/`·`packages/design-tokens/`·같은 두 파일, `release` ← `deploy/prod` 이후 위 경로나 `infra/prod/`. 태그가 없으면 그 영역 예), `targets.json`의 `enabled` 대상 matrix와 플랫폼 합집합, 접속 설정 준비 여부(`vars.TS_OIDC_*`·`DEPLOY_SSH_KEY`가 없으면 배포를 건너뛰고 경고) |
-| `image` | matrix `api`·`web` 중 바뀐 영역만 GHCR `:<SHA>`로 push. 플랫폼에 arm64가 있을 때만 QEMU |
+| `image` | matrix `api`·`web` 중 바뀐 영역만 GHCR `:<SHA>`로 push. 플랫폼에 arm64가 있을 때만 QEMU. 빌드 인자 `SENTRY_RELEASE=<배포 커밋 SHA>`·`SENTRY_ORG=vars.SENTRY_ORG`·`SENTRY_PROJECT`(api `vars.SENTRY_PROJECT_API`, web `vars.SENTRY_PROJECT_WEB`), 웹만 `NEXT_PUBLIC_SENTRY_DSN=vars.SENTRY_WEB_DSN`, BuildKit secret `sentry_auth_token=secrets.SENTRY_AUTH_TOKEN`. 토큰이 있으면 소스맵 업로드(실패하면 빌드 실패), 없으면 건너뜀 |
 | `deploy` | 대상 matrix(`max-parallel: 1`, `fail-fast`). `release`가 예이고 접속 설정이 있을 때. Tailscale(OIDC, `tag:ci`, 대상 `ping`) → `ssh deploy@<host> "deploy <SHA> <api 이미지 SHA> <web 이미지 SHA>"`(이미지 SHA는 plan의 `api_image`·`web_image`), stdin = GHCR 사용자·토큰 + `infra/prod` tar.gz(`tests`·`README.md`·`*.example`·`.env` 제외). 호스트 신원은 Tailscale이 보증하므로 `StrictHostKeyChecking accept-new`. 이어서 같은 job에서 `ssh deploy@<host> verify`(운영 주소 검사), 실패하면 `rollback`(직전 릴리스) 뒤 다시 `verify`하고 job 실패 |
 | 운영 주소 검사(`infra/prod/verify.sh`) | 배포 대상 서버가 Cloudflare를 거쳐 공개 주소 6개를 부름: 웹 `/` 200, `/privacy` 200, BFF `/api/backend/api/health` 200, `go.shaul.kr/zzz-e2e-none` 302 → `https://links.shaul.kr/notice?reason=link_not_found`, `go.shaul.kr/api/health` 404. 주소는 릴리스 암호문의 평문 키 `WEB_URL`·`SHORT_LINK_BASE_URL`. 러너에서 부르지 않는 이유: Cloudflare가 GitHub 러너(데이터센터 IP) 요청을 403으로 막음(2026-10-07 확인) |
 | `record` | 성공 시 태그 `deploy/prod`와 바뀐 영역의 `deploy/prod-api`·`deploy/prod-web`를 배포 커밋으로 옮김(다음 변경 비교 기준) |
@@ -144,6 +147,7 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 - **main 병합 = 서버 실행 권한**: main의 `infra/prod/compose.yaml`이 서버에서 복호화된 비밀값과 함께 실행됩니다. main에 병합할 수 있는 사람(에이전트 포함)은 비밀값을 읽는 컨테이너를 넣을 수 있습니다. 운영자가 `infra/prod/` 변경을 리뷰하는 것이 통제 수단입니다(별도 운영 저장소 대안은 ADR 0010).
 - **docker 그룹 = root**: `deploy`는 docker 그룹이라 서버 root와 같습니다. 배포 키는 forced command(`restrict`, 셸·포워딩 없음)로 줄이고, 운영자 관리 접속은 Tailscale로 별도입니다.
 - **Tailscale Personal 무료 플랜은 비상업 조건**입니다. 상업 운영 전 Standard 등으로 바꿉니다. ephemeral 노드 사용량 한도도 이 플랜 기준입니다.
+- **Sentry 토큰**: `SENTRY_AUTH_TOKEN`도 위와 같은 이유로 push 권한자가 읽을 수 있습니다. 조직 토큰이라 권한이 `org:ci`(릴리스·소스맵 업로드)로 고정되고 이벤트 읽기·조직 설정 변경은 없지만[추정: 공식 문서의 `org:ci` 설명 기준], 새면 Sentry에서 폐기·재발급합니다([런북 15](../../infra/docs/prod-runbook.md#15-sentry-오류성능-모니터링)).
 - **방문자 IP 신뢰**: edge Caddy는 사설 대역에서 온 `CF-Connecting-IP`를 믿습니다. 호스트 포트를 127.0.0.1에만 열어 외부 위조를 막고, 이 포트를 공인 주소에 열지 않습니다. 공용 네트워크 `crelink-edge`의 다른 컨테이너(두 색의 api·web)도 사설 대역이지만 edge Caddy를 부르지 않습니다(web은 같은 색 api를 바로 부름).
 - **단일 서버·가정 회선**: 서버·회선 장애가 곧 서비스 장애입니다. 업로드 저장소(SeaweedFS)도 같은 home-server·회선에 있어 S3로 옮겨도 데이터 위치와 가용성은 그 서버에 묶입니다(아래 위험).
 - 평문 비밀값은 실행 중 컨테이너 환경(`docker inspect`)에서는 보입니다. 서버 root·docker 그룹 접근을 줄이는 것으로 막습니다.
@@ -177,6 +181,7 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 | 0034 | infra | compose api·web `stop_grace_period: 30s`·healthcheck `start_interval: 1s`, 암호문 평문 키 `DATABASE_POOL_MAX=6`, 배포 공백 측정 `measure-gap.sh`(런북 6-1) |
 | 0035 | infra | edge 스택 `edge/compose.yaml`(project `crelink-edge`), Caddyfile(`admin localhost:2019`·`grace_period 30s`·`import upstreams.caddy`·`lb_try_duration`·keep-alive 4초), 색 스택 `compose.yaml`(`crelink-blue`·`crelink-green`, 별칭 `api-<색>`·`web-<색>`, GeoIP 외부 볼륨), `lib.sh` `switch_color`, `deploy.sh`·`rollback.sh`·`geoip.sh`·`bootstrap.sh`·`ssh-entry.sh status`, `cutover.sh`(`--revert`), 시험 `zero-downtime.sh`·`cutover-rehearsal.sh`·`deploy-rollback.sh`, 런북 6-2·6-3·14 |
 | 0036 | orchestrator | home-server cutover(공백 0.5초)와 부하 중 배포 검증, 이 문서·`deploy.yml`·`rollback.yml` 주석·`dependabot.yml`(edge compose)·관련 문서를 현재 동작으로 |
+| 0042 | orchestrator | Sentry 오류·성능 모니터링([ADR 0012](../adr/0012-error-monitoring-sentry.md)): API `@sentry/nestjs`·웹 `@sentry/nextjs`, DSN 없으면 꺼짐, 두 Dockerfile 소스맵 업로드(BuildKit secret), `deploy.yml` 빌드 인자·secret, `.sops.yaml` 평문 키 `SENTRY_DSN`·`SENTRY_ENVIRONMENT`, `/privacy` 국외 이전 고지, 런북 15 |
 
 ## 위험·후속 `[임시값]`
 
@@ -193,6 +198,7 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 - 단축 도메인(`go.shaul.kr`)은 임시. 정식 도메인이 정해지면 `SHORT_LINK_BASE_URL`·Caddy 호스트·Tunnel 공개 호스트를 함께 바꿉니다. 이미 인스타그램에 걸린 링크는 옛 도메인이 유지되어야 합니다.
 - 속도 제한(rate limit)·WAF는 Cloudflare 무료 기능으로 시작하고 부족하면 Caddy 쪽을 추가합니다(후속).
 - 이미지 한도 4MB는 MVP 임시값입니다. edge Caddy의 `request_body` 6MB가 웹 호스트 본문 상한입니다.
+- Sentry([ADR 0012](../adr/0012-error-monitoring-sentry.md)): 무료(Developer) 요금제는 사용자 1명, 월 오류 5천 건·span 500만 개, 보관 30일이라 오류가 폭주하면 그 달 나머지 이벤트를 받지 못합니다. 브라우저 이벤트는 광고 차단기에 일부 막힙니다(`tunnelRoute` 미사용). Sentry 장애 때 토큰이 있으면 소스맵 업로드 실패로 이미지 빌드·배포가 막히므로, 급하면 secret `SENTRY_AUTH_TOKEN`을 지우고 다시 실행합니다(소스맵 없이 배포). 웹 DSN이 빌드 시점 값이라 웹 이미지가 Sentry 프로젝트에 묶입니다. 설정·끄기는 [런북 15](../../infra/docs/prod-runbook.md#15-sentry-오류성능-모니터링).
 
 ## 검증 계획
 
@@ -215,3 +221,4 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 - 2026-10-07: Blue/Green 무중단 배포(에픽 0031, 0035 구현·0036 운영 적용)에 맞춤: 구성도(Tunnel → edge Caddy `crelink-edge` → 활성 색 `api-<색>`·`web-<색>`), 공개 경로(업스트림 스니펫·같은 색 web→api `http://api-<색>:3000`·헬스 포트), 서버 배치(`state/active-color`·`edge/`·project·네트워크·외부 볼륨), 색 전환 흐름·실패 시 활성 색 불변·종료 코드, "무중단 아님"을 운영 실측(cutover 공백 0.5초, 배포 2회 실패 0건)으로, DB migration 규칙, 이식 규칙 3·7·8, 변경 범위 0031~0036, 위험·후속(502 해소, 남은 위험 4가지). 근거: `docs/work/infra/0035-prod-blue-green-edge.md`, `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`.
 - 2026-10-07: ADR 0011 승인(사용자). 운영 검증 결과(배포 4회·롤백 6회·헬스 실패 배포·GeoIP 재기동 모두 요청 실패 0건)를 위험·후속에 반영. 근거: `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`.
 - 2026-10-07: 의존성 LTS 기준 업그레이드(0039): 이미지 베이스 `node:24-slim`, geoip-writer `alpine:3.24`, 옛 색 web 종료 코드 143 설명. 근거: `docs/work/orchestrator/0039-lts-major-upgrades.md`.
+- 2026-10-07: Sentry 오류·성능 모니터링(ADR 0012): 암호문 평문 키 `SENTRY_DSN`·`SENTRY_ENVIRONMENT`, 이미지 빌드 인자·BuildKit secret, GitHub variables `SENTRY_ORG`·`SENTRY_PROJECT_API`·`SENTRY_PROJECT_WEB`·`SENTRY_WEB_DSN`과 secret `SENTRY_AUTH_TOKEN`, 워크플로 `image`, 보안 경계·위험, 변경 범위 0042. 근거: `docs/work/orchestrator/0042-sentry-monitoring.md`.

@@ -38,6 +38,7 @@ crelink이 의존하는 외부 SaaS와 개발 도구를 한곳에서 찾기 위�
 | SeaweedFS(home-server 자체 운영, `https://s3.shaul.kr`) | 서버(S3 호환 API) | 사용 중(`FILE_STORAGE=s3`로 전환한 뒤) | 업로드 이미지 저장(버킷 `crelink-uploads`, identity `crelink`). 같은 home-server·가정 회선·Cloudflare Tunnel에 의존하고 단일 노드라 그 서버 장애·디스크 손상이 곧 이미지 장애·손실입니다. API는 AWS SDK v3(`@aws-sdk/client-s3`)로 path-style 접근 | [API 문서](../../apps/api/docs/README.md#이미지-저장소), [prod 런북](../../infra/docs/prod-runbook.md#9-업로드-저장소), [home-seaweedfs](https://github.com/shaul1991/home-seaweedfs) |
 | SOPS · age | 도구 | 사용 중 | 운영 비밀값 암호문(`infra/prod/secrets/`)과 서버 복호화 | `.sops.yaml`, `infra/prod/bootstrap.sh` |
 | Caddy(공식 Docker 이미지) | 도구 | 사용 중 | 운영 edge 스택의 공개 경로 정책(http, TLS는 Cloudflare, 활성 색으로 reload 전환) | `infra/prod/Caddyfile`, `infra/prod/edge/compose.yaml` |
+| Sentry(sentry.io, 미국 데이터 저장 위치) | SaaS | 사용 중(DSN을 넣은 뒤. 없으면 꺼짐) | API·웹 오류 전부와 성능 추적 10%, 이미지 빌드 때 소스맵 업로드. 방문자·크리에이터 IP와 내부 사용자 ID를 미국으로 보내므로 웹 `/privacy`에 국외 이전 고지. 무료(Developer) 요금제는 사용자 1명·월 오류 5천 건·보관 30일 | [ADR 0012](../adr/0012-error-monitoring-sentry.md), [운영 배포 설계](../specs/crelink-prod-deploy.md#비밀값과-환경변수), [prod 런북](../../infra/docs/prod-runbook.md#15-sentry-오류성능-모니터링) |
 
 운영 비밀값은 대상별 SOPS 암호문으로만 저장소에 있고 평문·계정 자격 증명은 없습니다. 로컬 Valkey는 표준 구성으로 유지하지만 API는 아직 사용하지 않으며, 운영 캐시 제품과 위치는 미정입니다([ADR 0005](../adr/0005-keep-valkey-local-infra.md)).
 
