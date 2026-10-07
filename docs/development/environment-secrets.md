@@ -19,8 +19,8 @@
 | 영역 | 로컬 설정 위치·주입 방식 | 현재 소비 범위 |
 | --- | --- | --- |
 | 인프라 | `infra/local/.env` / 추적하는 예시는 `infra/local/.env.example` | Compose의 PostgreSQL 계정·DB명과 호스트 포트. Makefile의 `--env-file`로 명시적으로 전달하며, 호스트 포트는 `.local/instance.env`의 값이 셸 환경으로 넘어가 `--env-file` 값보다 우선함. 추적 예시의 `API_PORT`·`WEB_PORT`·`EXPO_PORT`·`POSTGRES_PORT`·`VALKEY_PORT`는 슬롯 0 포트의 유일한 원본([로컬 개발 환경](local-environment.md#인스턴스와-포트)) |
-| API | `apps/api/.env` / 추적되는 안전한 예시 `apps/api/.env.example`; 운영은 `infra/prod/secrets/<대상>.sops.env`를 서버가 복호화해 Compose `env_file`로 주입 | `loadLocalEnvironment()`가 Nest 생성 전에 로컬 `.env`를 읽고 이미 주입된 값을 덮어쓰지 않음. `DATABASE_URL`·`PORT`·`WEB_URL`·`SHORT_LINK_BASE_URL` 필수(기본값 없음, 로컬은 `pnpm instance`가 채우고 `make`는 PM2로 넘김). 비밀값 `GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET`과 `OPERATOR_EMAILS`는 사용자가 채우며 비면 로그인 API가 503. 선택 `FILE_STORAGE`(기본 `disk`, 로컬은 비워 둠)·`UPLOAD_DIR`(기본 `.local/uploads`), 운영 `s3` 전환 때 `S3_ENDPOINT`·`S3_REGION`·`S3_BUCKET`과 비밀값 `S3_ACCESS_KEY_ID`·`S3_SECRET_ACCESS_KEY`, `GEOIP_MMDB_PATH`(`pnpm geoip:download` 파일이 있으면 PM2가 넘김). 키 설명은 [API 문서](../../apps/api/docs/README.md#환경변수) |
-| 웹 | `apps/web/.env.local`; 웹 영역 소유의 추적 예시 `apps/web/.env.example`; 운영은 `infra/prod/compose.yaml`의 `web.environment` | 서버 전용 `API_INTERNAL_URL`로 Nest API에 연결(운영은 같은 색 api의 내부 주소 `http://api-<색>:3000`). 현재 `NEXT_PUBLIC_*` 공개 변수는 없음 |
+| API | `apps/api/.env` / 추적되는 안전한 예시 `apps/api/.env.example`; 운영은 `infra/prod/secrets/<대상>.sops.env`를 서버가 복호화해 Compose `env_file`로 주입 | `loadLocalEnvironment()`가 Nest 생성 전에 로컬 `.env`를 읽고 이미 주입된 값을 덮어쓰지 않음. `DATABASE_URL`·`PORT`·`WEB_URL`·`SHORT_LINK_BASE_URL` 필수(기본값 없음, 로컬은 `pnpm instance`가 채우고 `make`는 PM2로 넘김). 비밀값 `GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET`과 `OPERATOR_EMAILS`는 사용자가 채우며 비면 로그인 API가 503. 선택 `FILE_STORAGE`(기본 `disk`, 로컬은 비워 둠)·`UPLOAD_DIR`(기본 `.local/uploads`), 운영 `s3` 전환 때 `S3_ENDPOINT`·`S3_REGION`·`S3_BUCKET`과 비밀값 `S3_ACCESS_KEY_ID`·`S3_SECRET_ACCESS_KEY`, `GEOIP_MMDB_PATH`(`pnpm geoip:download` 파일이 있으면 PM2가 넘김), Sentry `SENTRY_DSN`(비면 꺼짐, 로컬은 비워 둠)·`SENTRY_ENVIRONMENT`·`SENTRY_TRACES_SAMPLE_RATE`(`SENTRY_RELEASE`는 이미지가 넣음). 키 설명은 [API 문서](../../apps/api/docs/README.md#환경변수) |
+| 웹 | `apps/web/.env.local`; 웹 영역 소유의 추적 예시 `apps/web/.env.example`; 운영은 `infra/prod/compose.yaml`의 `web.environment` | 서버 전용 `API_INTERNAL_URL`로 Nest API에 연결(운영은 같은 색 api의 내부 주소 `http://api-<색>:3000`). 공개 변수 `NEXT_PUBLIC_SENTRY_DSN`(Sentry DSN, 공개돼도 되는 값)과 `SENTRY_RELEASE`는 운영 이미지 빌드 인자로만 넣고(빌드 시점에 번들에 들어감), 비면 웹 Sentry가 꺼짐 |
 | 모바일 앱 | `apps/app/.env`; 앱 영역 소유의 추적 예시 `apps/app/.env.example` | Expo client의 `EXPO_PUBLIC_API_BASE_URL`. 서명 자격 증명은 앱 번들에 넣지 않음 |
 
 환경 파일은 소비 코드가 실제로 읽는 서비스에만 둡니다. API bootstrap은 `apps/api/.env`를 Nest provider 검증 전에 로드하고, 이미 전달된 프로세스 환경값은 유지합니다. Next.js와 Expo 공개 변수는 각 도구의 개발·빌드 환경에서 주입되며 공개 prefix 값만 클라이언트 번들에 포함할 수 있습니다. 새 설정은 소비 코드, 안전한 예시, 관련 서비스 문서를 같은 변경에서 갱신합니다.
@@ -37,7 +37,7 @@
 ## 원격 비밀값 주입
 
 - 운영 앱 설정·비밀값의 원본은 저장소의 대상별 SOPS(age) 암호문 `infra/prod/secrets/<대상>.sops.env`입니다. 수신자는 운영자 키와 그 대상 서버 키뿐이고(`.sops.yaml`), 배포 때 서버가 자기 키(`/etc/crelink/age.key`)로 복호화해 tmpfs `/run/crelink/app.env`에 Compose 실행 동안만 둡니다. 키 목록과 위치 표는 [운영 배포 설계](../specs/crelink-prod-deploy.md#비밀값과-환경변수), 편집·키 보관·회전 절차는 [prod 런북](../../infra/docs/prod-runbook.md#4-비밀값-sopsage)입니다.
-- CI(GitHub Actions)에는 앱 비밀값을 두지 않습니다. GitHub Free 비공개 저장소는 environment secrets·브랜치 보호가 없어 push 권한이 있으면 모든 secret을 읽을 수 있기 때문입니다. CI가 가진 것은 Tailscale 접속 설정값(variables)과 배포 명령만 실행하는 SSH 키(`DEPLOY_SSH_KEY`)뿐입니다.
+- CI(GitHub Actions)에는 앱 비밀값을 두지 않습니다. GitHub Free 비공개 저장소는 environment secrets·브랜치 보호가 없어 push 권한이 있으면 모든 secret을 읽을 수 있기 때문입니다. CI가 가진 것은 Tailscale 접속 설정값·Sentry 조직·프로젝트·웹 DSN(variables), 배포 명령만 실행하는 SSH 키(`DEPLOY_SSH_KEY`), 이미지 빌드 때 소스맵만 올리는 Sentry 조직 토큰(`SENTRY_AUTH_TOKEN`)뿐입니다([ADR 0012](../adr/0012-error-monitoring-sentry.md)).
 - 운영자 age 개인키는 평문 파일로 두지 않고 키체인에서 `SOPS_AGE_KEY_CMD`로 꺼냅니다. 복호화 결과를 파일·로그·채팅에 남기지 않습니다.
 - Supabase: dev·prod 프로젝트와 자격 증명을 분리하고 서버 전용 키는 클라이언트에 전달하지 않습니다.
 

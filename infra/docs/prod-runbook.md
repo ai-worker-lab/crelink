@@ -24,7 +24,8 @@
 | 업로드 저장소 | `s3`(compose `api.environment`의 `FILE_STORAGE=s3` 고정): SeaweedFS `https://s3.shaul.kr` 버킷 `crelink-uploads`, 접근 키는 암호문 `S3_*`. 볼륨 `crelink-prod_uploads`는 쓰지 않음. [9](#9-업로드-저장소) |
 | 정지·헬스(api·web) | compose `stop_grace_period: 30s`(SIGTERM 뒤 진행 중 요청을 마칠 시간, 넘으면 SIGKILL. 기본 10초, Cloudflare 원본 응답 한도 100초(524)보다 짧게), `healthcheck.start_interval: 1s`(기동 중 1초마다 검사해 준비되자마자 healthy)와 Compose가 함께 요구하는 `start_period`(api 30초·web 20초, 이미지와 같은 값). test·interval(10초)·timeout·retries는 이미지 `HEALTHCHECK`(확인: [6](#6-운영-확인)). Docker Engine 25 이상 |
 | DB pool 상한 | 암호문 평문 `DATABASE_POOL_MAX=6`(API pg Pool `max`, 비면 15). 산정·확인은 [12](#12-supabase-주의사항) |
-| GitHub | variables `TS_OIDC_CLIENT_ID`·`TS_OIDC_AUDIENCE`, secret `DEPLOY_SSH_KEY`. 그 밖의 배포 secret 없음 |
+| GitHub | variables `TS_OIDC_CLIENT_ID`·`TS_OIDC_AUDIENCE`, Sentry `SENTRY_ORG`·`SENTRY_PROJECT_API`·`SENTRY_PROJECT_WEB`·`SENTRY_WEB_DSN`, secret `DEPLOY_SSH_KEY`·`SENTRY_AUTH_TOKEN`(소스맵 업로드 전용, [15](#15-sentry-오류성능-모니터링)). 그 밖의 배포 secret 없음 |
+| Sentry | 조직 `crelink`(제안, 미국 데이터 저장 위치), 프로젝트 `crelink-api`·`crelink-web`. API DSN은 암호문 평문 키 `SENTRY_DSN`·`SENTRY_ENVIRONMENT`, 웹 DSN은 이미지 빌드 인자. 비어 있으면 꺼짐. [15](#15-sentry-오류성능-모니터링) |
 
 ## 1. 서버 준비 (bootstrap)
 
@@ -175,6 +176,8 @@ SOPS_AGE_KEY_CMD='security find-generic-password -s crelink-sops-age -a operator
 | `DEPLOY_SSH_KEY` | 1-1로 새 키 → 1-2로 bootstrap을 `DEPLOY_SSH_PUBKEY=<새 공개키>`로 다시 실행(줄 추가) → 2-4로 secret 교체 → `ssh -i <새 키> deploy@<host> status` 확인 → 서버 `/home/deploy/.ssh/authorized_keys`에서 옛 줄 삭제 |
 | Tailscale WIF 자격 증명 | Trust credentials에서 새로 만들고 2-3으로 variables 교체 → 옛 자격 증명 삭제 |
 | GHCR | 장기 토큰 없음(job마다 `GITHUB_TOKEN`). 교체할 것 없음 |
+| `SENTRY_AUTH_TOKEN`(Sentry 조직 토큰) | [15-5](#15-5-끄기장애회전) |
+| Sentry DSN | [15-5](#15-5-끄기장애회전) |
 
 ## 5. 최초 배포
 
@@ -587,6 +590,69 @@ cp .images.env /opt/crelink/state/images.env
 
 복구 뒤 [11](#11-장애-대응) 12처럼 기록합니다.
 
+## 15. Sentry 오류·성능 모니터링
+
+결정·수집 범위·개인정보는 [ADR 0012](../../docs/adr/0012-error-monitoring-sentry.md), 키 위치 표는 [설계 "비밀값과 환경변수"](../../docs/specs/crelink-prod-deploy.md#비밀값과-환경변수)입니다. API·웹은 DSN이 비어 있으면 Sentry를 켜지 않으므로 이 절을 하기 전에는 아무것도 보내지 않고, `SENTRY_AUTH_TOKEN`이 없으면 이미지 빌드가 소스맵 업로드를 건너뜁니다. DSN·조직·프로젝트 이름은 비밀이 아니지만 토큰은 이 문서·채팅에 붙여 넣지 않습니다.
+
+### 15-1. 조직·프로젝트 만들기(한 번)
+
+1. [sentry.io](https://sentry.io/signup/)에서 가입하고 조직을 만듭니다. 이름(slug) `crelink`(이미 쓰이면 다른 slug), **Data Storage Location = United States of America (US)**. 저장 위치는 나중에 바꿀 수 없고 바꾸려면 조직을 새로 만들어야 합니다. 조직 Settings에서 slug와 저장 위치를 확인합니다.
+2. 프로젝트 두 개: `crelink-api`(플랫폼 Node.js의 **NestJS**), `crelink-web`(**Next.js**). 설치 안내(wizard)의 코드 변경은 하지 않습니다(저장소에 이미 있음).
+3. 각 프로젝트 Settings > **Client Keys (DSN)**에서 DSN을 복사합니다(`https://<공개 키>@o<숫자>.ingest.<지역>.sentry.io/<프로젝트 ID>` 꼴).
+4. 요금제: 무료 Developer는 사용자 1명, 월 오류 5천 건·span 500만 개, 보관 30일입니다. 새 조직은 체험 기간 동안 Team 요금제 보관(오류 90일)이 적용됩니다. 보관 기간이 달라지는 요금제로 바꾸면 웹 `/privacy`의 "보유·이용 기간" 문구를 같은 변경에서 맞춥니다.
+
+### 15-2. API DSN 넣기(암호문)
+
+저장소 루트에서 운영자 키로 합니다. `SENTRY_DSN`·`SENTRY_ENVIRONMENT`는 `.sops.yaml`의 `unencrypted_regex`에 있어 평문입니다. 정규식에 두 키를 넣은 뒤 처음 한 번은 [9-2](#9-2-암호문에-키-넣기)처럼 먼저 다시 암호화합니다.
+
+```bash
+export SOPS_AGE_KEY_CMD='security find-generic-password -s crelink-sops-age -a operator -w'
+f=infra/prod/secrets/home-server.sops.env
+# 정규식을 바꾼 뒤 처음 한 번: 같은 수신자로 다시 암호화(평문은 파이프에만 있음). 모든 암호 값이 새로 바뀝니다.
+grep -q '^sops_unencrypted_regex=.*SENTRY_ENVIRONMENT' "$f" || {
+  sops decrypt "$f" | sops encrypt --input-type dotenv --output-type dotenv --filename-override "$f" /dev/stdin > "$f.new" && mv "$f.new" "$f"; }
+sops set "$f" '["SENTRY_DSN"]' '"<crelink-api DSN>"'
+sops set "$f" '["SENTRY_ENVIRONMENT"]' '"production"'
+grep -E '^SENTRY_' "$f" | cut -c1-40   # 두 키 모두 평문(ENC[...]가 아님)
+```
+
+커밋 → main 병합 → Deploy가 `infra/prod/` 변경으로 릴리스를 배포합니다. API 이미지는 그대로이고 새 색이 암호문 값을 읽어 켜집니다. 다른 대상이 생기면 그 대상 암호문에도 같은 두 키를 넣습니다.
+
+### 15-3. GitHub variables·secret과 이미지 다시 빌드
+
+```bash
+gh variable set SENTRY_ORG --body 'crelink'                    # 조직 slug
+gh variable set SENTRY_PROJECT_API --body 'crelink-api'
+gh variable set SENTRY_PROJECT_WEB --body 'crelink-web'
+gh variable set SENTRY_WEB_DSN --body '<crelink-web DSN>'      # 공개 값(브라우저 번들에 들어감)
+```
+
+토큰은 Sentry 조직 Settings > Developer Settings > **Organization Tokens**에서 만듭니다. 조직 토큰은 권한을 고를 수 없고 CI용(`org:ci`: 소스맵 업로드·릴리스 생성)으로 고정되며, 만든 직후 한 번만 보입니다. 개인 토큰(Personal Token)은 만든 사람이 조직에서 빠지면 멈추므로 쓰지 않습니다.
+
+```bash
+gh secret set SENTRY_AUTH_TOKEN     # 프롬프트에 붙여 넣음(셸 기록에 남지 않음)
+gh secret list && gh variable list
+```
+
+웹 DSN과 소스맵 업로드는 이미지 빌드 때 쓰이고, Deploy는 바뀐 영역의 이미지만 새로 만듭니다. 설정한 뒤 두 이미지를 다시 만들어 배포합니다: `gh workflow run deploy.yml --ref main -f force=true`(Actions 화면에서 `force`를 켜고 실행해도 같음). 토큰이 있는데 업로드가 실패하면 그 이미지 job이 실패하고 배포하지 않습니다(15-5).
+
+### 15-4. 확인
+
+- Deploy run의 `이미지 api`·`이미지 web` 로그에 소스맵 업로드 출력이 있고 job이 성공합니다. Sentry 프로젝트의 Releases에 배포 커밋 SHA 릴리스가 생깁니다.
+- 서버에서 활성 색 api의 설정: `c=$(cat /opt/crelink/state/active-color); sudo docker exec crelink-$c-api-1 sh -c 'echo "release=$SENTRY_RELEASE env=$SENTRY_ENVIRONMENT dsn=${SENTRY_DSN:+set}"'`(release가 이미지 SHA, `dsn=set`).
+- 트레이스: `https://links.shaul.kr`을 몇 번 열고 Sentry의 Traces(성능) 화면에서 `crelink-web`·`crelink-api` 트랜잭션을 봅니다. 표본 10%라 여러 번 요청해야 보입니다. 브라우저 개발자 도구 Network에 `*.ingest.*sentry.io`로 가는 요청이 있는지도 봅니다(광고 차단기를 끈 상태).
+- 오류: 웹은 `https://links.shaul.kr`에서 개발자 도구 콘솔에 `setTimeout(() => { throw new Error('sentry-check') })`를 실행하면 `crelink-web` Issues에 `sentry-check`가 생깁니다(브라우저 전송 확인용, 콘솔 코드라 소스맵과 무관). API는 4xx를 보내지 않고 일부러 500을 내는 경로가 없으므로 실제 오류가 생길 때 Issues에서 봅니다. 확인용 이슈는 Resolve·Delete합니다.
+- 소스맵: 실제 오류 이벤트의 스택에 원래 경로(웹 `src/app/...`, API `src/...`)와 줄이 보이면 적용된 것입니다. 압축 파일(`.next/...chunks`·`dist/...js`)만 보이면 이벤트의 release가 업로드한 릴리스와 같은지, 그 릴리스에 소스맵 artifact가 있는지 봅니다.
+- 개인정보: 이벤트의 User에 `id`(UUID)와 `ip_address`만 있고, Request의 쿠키·`Authorization`·`X-Crelink-Internal` 헤더와 본문이 없고, 쿼리 `code`·`state`·`pass`는 `[Filtered]`인지 봅니다.
+
+### 15-5. 끄기·장애·회전
+
+- **끄기**: API는 `sops set "$f" '["SENTRY_DSN"]' '""'` → 병합·배포. 웹은 `gh variable delete SENTRY_WEB_DSN` → 15-3의 `force` 실행(웹 이미지를 다시 빌드해야 꺼짐). 롤백하면 그 릴리스의 암호문·이미지 값으로 돌아가므로 끈 뒤 옛 릴리스로 롤백하면 다시 켜질 수 있습니다.
+- **소스맵 업로드 실패로 배포가 막힘**(Sentry 장애 등): Sentry가 돌아온 뒤 실패한 job을 다시 실행합니다. 급하면 `gh secret delete SENTRY_AUTH_TOKEN` 뒤 다시 실행해 소스맵 없이 배포하고, 복구되면 15-3으로 토큰을 다시 넣습니다(그 배포의 스택은 압축 코드 위치로 보임).
+- **토큰 회전·유출**: Organization Tokens에서 새 토큰을 만들어 `gh secret set SENTRY_AUTH_TOKEN` → 옛 토큰 Revoke(조직 owner·manager만 가능). 새 토큰이 만들어지면 owner에게 보안 메일이 갑니다.
+- **DSN 회전**(남용된 이벤트가 들어올 때): 프로젝트 Client Keys에서 새 키를 만들고 API는 15-2, 웹은 15-3(`SENTRY_WEB_DSN` 교체 + `force`)으로 바꾼 뒤 옛 키를 비활성화합니다.
+- **한도 초과**: Sentry Stats·Subscription 화면에서 사용량을 봅니다. 무료 요금제는 한도를 넘으면 그 달 나머지 이벤트를 받지 않습니다. 반복 오류는 원인을 고치거나 Inbound Filters로 거릅니다.
+
 ## 로컬 시험
 
 원격 없이 Docker로 이 구성을 확인하는 방법은 [infra/prod/README.md](../prod/README.md#로컬-시험)에 있습니다.
@@ -624,5 +690,12 @@ cp .images.env /opt/crelink/state/images.env
 | Supabase Pool Size·클라이언트/백엔드 연결·`pg_stat_activity` 확인, compute별 `max_connections`(Nano 60)·Pool Size 비율 권장(2026-10-07) | <https://supabase.com/docs/guides/database/connecting-to-postgres/pooling-and-limits>, <https://supabase.com/docs/guides/platform/compute-and-disk>, <https://supabase.com/docs/guides/database/connection-management> |
 | Caddy `caddy reload`(admin `/load`, 실패하면 옛 설정 유지)·`admin`·`grace_period`·`import`·reverse_proxy `lb_try_duration`(2026-10-07, 동작은 0035 로컬 시험으로 확인) | <https://caddyserver.com/docs/command-line#caddy-reload>, <https://caddyserver.com/docs/api#post-load>, <https://caddyserver.com/docs/caddyfile/options>, <https://caddyserver.com/docs/caddyfile/directives/import>, <https://caddyserver.com/docs/caddyfile/directives/reverse_proxy> |
 | 파일 하나 bind는 교체(rename) 뒤 옛 inode를 봄(그래서 edge 설정은 폴더 bind)(2026-10-07) | <https://github.com/moby/moby/issues/15793> |
+| Sentry 데이터 저장 위치(US = 미국 아이오와, 조직 생성 때 선택, 변경 불가)(2026-10-07) | <https://docs.sentry.io/organization/data-storage-location/> |
+| Sentry DSN은 공개돼도 됨(이벤트 제출만, 읽기 불가)·Client Keys에서 회전, 빈 DSN이면 SDK가 전송하지 않음(2026-10-07) | <https://docs.sentry.io/concepts/key-terms/dsn-explainer/> |
+| Sentry 보관 기간(Developer 30일, Team·Business 오류 90일·span 30일, 체험은 Team 보관), 백업은 만든 뒤 90일에 삭제·HTTPS(TLS) 전송(2026-10-07) | <https://docs.sentry.io/security-legal-pii/security/data-retention-periods/>, <https://sentry.io/security/> |
+| Sentry 요금제(Developer: 사용자 1명, 오류 5천·span 500만/월)(2026-10-07) | <https://sentry.io/pricing/> |
+| Sentry 조직 토큰(권한 고정, 한 번만 보임, owner 보안 메일·owner·manager만 폐기)과 `org:ci` 범위(2026-10-07) | <https://docs.sentry.io/account/auth-tokens/>, <https://docs.sentry.io/api/permissions/> |
+| Sentry 운영 회사·연락처(Functional Software, Inc. d/b/a Sentry, 45 Fremont Street 8th Floor San Francisco CA 94105, compliance@sentry.io)(2026-10-07) | <https://sentry.io/privacy/> |
+| Next.js SDK 기본 통합(BrowserSession 자동)·광고 차단기와 `tunnel`, 서버 쿠키 수집 기본값(2026-10-07) | <https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/integrations/>, <https://docs.sentry.io/platforms/javascript/guides/nextjs/troubleshooting/>, <https://docs.sentry.io/platforms/javascript/guides/nextjs/data-management/data-collected/> |
 
-`[확인 못 함]`: Tailscale WIF Custom claims의 와일드카드, `pg_dump`의 Supabase 버전·풀러 제약, `pg_stat_activity`에 보이는 Supavisor 연결의 구분.
+`[확인 못 함]`: Tailscale WIF Custom claims의 와일드카드, `pg_dump`의 Supabase 버전·풀러 제약, `pg_stat_activity`에 보이는 Supavisor 연결의 구분, Sentry 화면 메뉴 이름(Traces·Releases 등)과 소스맵 업로드 로그 형식(첫 설정 때 확인), 유출된 `org:ci` 토큰으로 이벤트를 읽을 수 없는지.

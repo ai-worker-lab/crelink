@@ -1,6 +1,17 @@
 'use client';
 
-export default function GlobalError({ error, reset }: { error: Error; reset: () => void }) {
+import * as Sentry from '@sentry/nextjs';
+import { useEffect } from 'react';
+
+/**
+ * 화면 오류 경계(루트 레이아웃 안). 루트 레이아웃 자체의 오류는 `global-error.tsx`가 맡습니다.
+ * 브라우저에서 난 오류만 Sentry로 보냅니다. `digest`가 있는 오류는 서버 오류라 서버의 `onRequestError`가 이미 보냈습니다.
+ */
+export default function RouteError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    if (!error.digest) Sentry.captureException(error);
+  }, [error]);
+
   return (
     <main className="public-page">
       <div className="empty-state" role="alert">

@@ -4,12 +4,12 @@
 # 수신자(공개키)
 #   operator    운영자 키. 개인키는 운영자 macOS 키체인(crelink-sops-age)과 운영자 비밀번호 관리자에만 있습니다.
 #   home-server 서버 키. 개인키는 서버 /etc/crelink/age.key(root:deploy 640)에만 있습니다. 배포 때 서버가 복호화합니다.
-# 값이 비밀이 아닌 키(호스트·경로·모드)는 unencrypted_regex로 평문으로 남겨 diff로 검토할 수 있게 합니다.
+# 값이 비밀이 아닌 키(호스트·경로·모드, 공개돼도 이벤트 전송만 되는 Sentry DSN)는 unencrypted_regex로 평문으로 남겨 diff로 검토할 수 있게 합니다.
 # 이 정규식은 암호화할 때 파일 메타데이터(sops_unencrypted_regex)에 기록되고 sops edit·set은 그 기록을 따르므로,
 # 바꾼 뒤에는 한 번 다시 암호화합니다(런북 "9-2. 암호문에 키 넣기").
 creation_rules:
   - path_regex: ^infra/prod/secrets/home-server\.sops\.env$
-    unencrypted_regex: ^(PORT|WEB_URL|SHORT_LINK_BASE_URL|DATABASE_SSL|DATABASE_SSL_CA_PATH|DATABASE_POOL_MAX|FILE_STORAGE|UPLOAD_DIR|S3_ENDPOINT|S3_REGION|S3_BUCKET|GEOIP_MMDB_PATH|TRUSTED_PROXY_HOPS)$
+    unencrypted_regex: ^(PORT|WEB_URL|SHORT_LINK_BASE_URL|DATABASE_SSL|DATABASE_SSL_CA_PATH|DATABASE_POOL_MAX|FILE_STORAGE|UPLOAD_DIR|S3_ENDPOINT|S3_REGION|S3_BUCKET|GEOIP_MMDB_PATH|TRUSTED_PROXY_HOPS|SENTRY_DSN|SENTRY_ENVIRONMENT)$
     age: >-
       age1jkv08aj00hqzappkuf8z60cxv0ucsxtzvnnt2saj3u7gguxl9eaq70h69e,
       age1g952gu6mk2h447pksl29c8xwpdpkk6qh4jmzr2x50fe9hynk7cjqd6xla0

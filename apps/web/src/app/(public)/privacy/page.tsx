@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 export const metadata: Metadata = { title: '개인정보 처리방침' };
 
-/** 개인정보 수집·보관 고지(R9·R11). 근거: docs/specs/crelink-mvp.md `권한·보안·개인정보`. 법률 검토 전 문구입니다. */
+/** 개인정보 수집·보관·국외 이전 고지(R9·R11, Sentry). 근거: docs/specs/crelink-mvp.md `권한·보안·개인정보`, docs/adr/0012-error-monitoring-sentry.md. 법률 검토 전 문구입니다. */
 export default function PrivacyPage() {
   return (
     <main className="public-page narrow-page">
@@ -41,12 +41,29 @@ export default function PrivacyPage() {
           </ul>
         </section>
 
+        <section aria-labelledby="privacy-diagnostics">
+          <h2 id="privacy-diagnostics">오류·성능 진단을 위해 수집하는 항목</h2>
+          <p>
+            서비스에서 오류가 나거나 성능을 측정할 때(요청의 일부만 골라 측정해요) 방문자와 크리에이터 모두에게서 다음을
+            기록해요. 이 정보는 오류 모니터링 서비스 Sentry에 보관돼요(아래 &lsquo;개인정보 국외 이전&rsquo;).
+          </p>
+          <ul>
+            <li>IP 주소</li>
+            <li>로그인한 경우 크리링 내부 사용자 ID(이메일 주소·이름은 보내지 않아요)</li>
+            <li>기기·브라우저·운영체제 정보</li>
+            <li>오류 내용과 오류가 난 화면·요청 주소</li>
+            <li>성능 측정 정보(요청·화면을 처리하는 데 걸린 시간)</li>
+          </ul>
+          <p>로그인 쿠키 같은 인증 정보는 보내지 않아요.</p>
+        </section>
+
         <section aria-labelledby="privacy-purpose">
           <h2 id="privacy-purpose">이용 목적</h2>
           <ul>
             <li>크리에이터 랜딩페이지 제공과 크리링 링크 연결</li>
             <li>크리에이터별·기간별 접근 통계 작성(크리링 운영자만 조회)</li>
             <li>위험한 링크 차단 등 서비스 운영과 부정 이용 방지</li>
+            <li>서비스 오류 파악과 성능 개선(오류·성능 진단 정보)</li>
           </ul>
         </section>
 
@@ -62,6 +79,10 @@ export default function PrivacyPage() {
               주소를 넣지 않아요.
             </li>
             <li>크리에이터 계정 정보와 입력한 내용은 계정을 이용하는 동안 보관해요.</li>
+            <li>
+              오류·성능 진단 정보는 Sentry의 보관 기간이 지나면 지워져요(아래 &lsquo;개인정보 국외 이전&rsquo;의
+              보유·이용 기간).
+            </li>
           </ul>
         </section>
 
@@ -83,6 +104,35 @@ export default function PrivacyPage() {
         <section aria-labelledby="privacy-access">
           <h2 id="privacy-access">열람 권한</h2>
           <p>접근 기록은 크리링 운영자 화면에서만 볼 수 있어요. 크리에이터와 방문자 화면에는 보이지 않아요.</p>
+        </section>
+
+        <section aria-labelledby="privacy-transfer">
+          <h2 id="privacy-transfer">개인정보 국외 이전</h2>
+          <p>크리링은 서비스 오류를 파악하고 성능을 개선하려고 다음과 같이 개인정보를 국외로 보내 보관해요.</p>
+          <ul>
+            <li>
+              이전받는 자: Functional Software, Inc. d/b/a Sentry(연락처: compliance@sentry.io, 45 Fremont Street, 8th
+              Floor, San Francisco, CA 94105, USA)
+            </li>
+            <li>이전되는 국가: 미국(Sentry의 미국 데이터 저장 위치)</li>
+            <li>
+              이전 일시와 방법: 서비스를 이용하는 중 오류가 나거나 성능을 측정할 때마다 암호화된 네트워크 연결(HTTPS)로
+              보내요. 브라우저에서 난 오류와 성능 정보는 이용자의 브라우저가 Sentry로 직접 보내고, 서버에서 난 것은
+              크리링 서버가 보내요.
+            </li>
+            <li>이전되는 항목: 위 &lsquo;오류·성능 진단을 위해 수집하는 항목&rsquo;</li>
+            <li>이전받는 자의 이용 목적: 크리링의 서비스 오류 파악과 성능 개선을 위한 보관·조회</li>
+            <li>
+              보유·이용 기간: Sentry 요금제의 보관 기간이 지나면 지워져요. 무료(Developer) 요금제는 수집 후 30일, 유료
+              요금제(체험 기간 포함)는 오류 정보 90일·성능 측정 정보 30일이에요. Sentry가 만드는 백업은 만든 날부터 90일
+              뒤에 지워져요.
+            </li>
+            <li>
+              거부 방법과 거부할 때의 영향: 브라우저의 광고·추적 차단 기능(확장 프로그램 등)으로 브라우저에서 Sentry로
+              보내는 전송을 막을 수 있고, 막아도 서비스는 그대로 쓸 수 있어요. 서버에서 생기는 오류·성능 정보는 서비스를
+              안정적으로 운영하는 데 꼭 필요해 따로 거부할 수 없어요. 이 이전을 원하지 않으면 서비스 이용을 멈춰야 해요.
+            </li>
+          </ul>
         </section>
 
         <section aria-labelledby="privacy-attribution">
