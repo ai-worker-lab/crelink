@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 진행
+- 상태: 검증
 - 종류: 기능
 - 우선순위: P1 (AI 제안)
 - 작성일: 2026-10-07
@@ -78,3 +78,4 @@
 - 2026-10-07: 운영 값 넣기(통합 담당). 사용자가 Sentry(US) 프로젝트 `crelink-api`·`crelink-web`을 만들고 DSN을 줌(조직 ID `o877167`). 암호문 `infra/prod/secrets/home-server.sops.env`: 정규식 변경 뒤 한 번 다시 암호화하고 평문 키 `SENTRY_DSN`(crelink-api DSN)·`SENTRY_ENVIRONMENT=production` 추가(다른 값은 복호화 해시 비교로 불변 확인). GitHub variables `SENTRY_WEB_DSN`·`SENTRY_PROJECT_API=crelink-api`·`SENTRY_PROJECT_WEB=crelink-web` 등록. 남은 것: 조직 slug(`SENTRY_ORG`)·`SENTRY_AUTH_TOKEN`(사용자) 뒤 강제 배포.
 - 2026-10-07: `SENTRY_ORG=shaul1991` 등록, 사용자가 `SENTRY_AUTH_TOKEN`(조직 토큰) 등록. API 컨테이너에서 시험 메시지 1건 전송 성공(이벤트 `a88a20d0…`). 강제 배포 2회(run 37580367678: 토큰 전 → 웹 DSN 반영, run 37580697263: 토큰 후) 성공했으나 두 번째에서 업로드 RUN이 `CACHED` — BuildKit secret은 캐시 키에 들어가지 않아 같은 커밋을 토큰 없이 만든 층을 재사용함(결함). 고침: 두 Dockerfile에 `ARG SENTRY_UPLOAD`, Deploy가 토큰 유무를 `yes`/`no`로 넘겨 캐시 키에 넣음.
 - 2026-10-07: 장애. `f00ae15` 병합 뒤 실제로 업로드가 돌면서 API 이미지 빌드가 `sentry-cli` TLS 오류(`unable to get local issuer certificate`)로 실패해, `f00ae15`·`d766e57`·`8c4c71a`·`35ee77a`(다른 작업 포함) Deploy가 이미지 단계에서 멈춤(운영은 직전 릴리스 그대로, 서비스 영향 없음). 원인: `node:24-slim`에 CA 묶음이 없고 `sentry-cli`는 시스템 CA를 씀(로컬 재현: CA 없음 → SSL 오류, `ca-certificates` 설치 → TLS 통과 후 가짜 토큰 404). 고침: 두 Dockerfile 빌드 단계에 `ca-certificates` 설치(런타임 단계는 그대로).
+- 2026-10-07: 운영 확인. 수정(PR #36, `5c0648c`) 배포 성공, 이미지 빌드 로그에서 API `Bundled 86 files for upload`·`Uploaded files to Sentry`, 웹 `Successfully uploaded source maps to Sentry`. PR #29(`41f89f5`) 배포도 성공. 사용자 확인(Sentry 화면): `crelink-api` Issues에 시험 메시지 "crelink-api 운영 연결 확인(0042)" 도착, Releases에 `41f89f5`·`5c0648c`가 `crelink-api`·`crelink-web` 두 프로젝트로 보이고 세션 adoption·crash free 100%(두 SDK 모두 운영에서 동작). 남은 것: 실제 웹 오류 이벤트와 소스맵이 적용된 스택은 첫 실제 오류(또는 운영 시험 오류)에서 확인. `8c4c71a`·`35ee77a`는 실패한 배포에서 웹 빌드가 먼저 만든 Sentry 릴리스라 운영에 쓰이지 않음.
