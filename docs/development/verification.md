@@ -45,12 +45,12 @@
 
 | job | 내용 |
 | --- | --- |
-| `check` | 지원 Node.js LTS(`matrix.node`: 22·24·26)마다 `pnpm install --frozen-lockfile` 후 `pnpm verify --keep-going`. PostgreSQL 17 서비스 컨테이너에 `TEST_DATABASE_URL`로 연결합니다. 한 버전이 실패해도 나머지 버전 결과를 끝까지 봅니다. |
+| `check` | 지원 Node.js(`matrix.node`: 기준 LTS 24와 다음 LTS 후보 26)마다 `pnpm install --frozen-lockfile` 후 `pnpm verify --keep-going`. PostgreSQL 17 서비스 컨테이너에 `TEST_DATABASE_URL`로 연결합니다. 한 버전이 실패해도 나머지 버전 결과를 끝까지 봅니다. |
 | `smoke` | `.nvmrc` Node로 `node scripts/instance.mjs --print-env`의 슬롯 0 포트·주소(`API_PORT`·`WEB_PORT`·`API_URL`·`WEB_URL`, 원본 `infra/local/.env.example`)를 job 환경에 넣고, 공용 패키지·API·웹을 빌드해 PostgreSQL 서비스에 연결한 API(`node apps/api/dist/main.js`, `PORT=$API_PORT`)와 웹(`next start --port $WEB_PORT`)을 백그라운드로 띄운 뒤 준비를 기다려 `pnpm smoke`를 실행합니다. 실패하면 API·웹 로그를 출력합니다. |
 | `이미지 빌드 api`·`이미지 빌드 web` | 운영 이미지(`apps/api/Dockerfile`, `apps/web/Dockerfile`)가 `linux/amd64`로 빌드되는지 확인합니다(buildx, gha 캐시). 푸시하지 않습니다. 배포 대상 플랫폼 빌드는 `deploy.yml`이 합니다. |
 | `work scope` | `work/NNNN-*` 브랜치의 PR에서만 전체 이력을 받아 `pnpm work:scope --base origin/<기준 브랜치>`로 변경 파일이 티켓 역할의 소유 경로 안에 있는지 검사합니다. |
 
-지원 Node.js 버전을 바꾸면 workflow의 `matrix.node`와 README 요구사항을 함께 고칩니다.
+지원 Node.js 버전을 바꾸면 workflow의 `matrix.node`, `.nvmrc`, 운영 이미지 베이스(`apps/*/Dockerfile`), `apps/web/package.json`의 `engines`, README 요구사항을 함께 고칩니다. 버전 선택 기준은 [저장소 공통 정책](repository-policy.md#의존성-버전)입니다.
 
 ## CD(운영 배포)
 

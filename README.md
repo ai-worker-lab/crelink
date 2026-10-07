@@ -24,7 +24,7 @@
 
 ## 요구사항
 
-- Node.js: 22·24·26 LTS를 지원하며 CI가 세 버전을 모두 검사합니다. 로컬 개발 기본 버전은 [`.nvmrc`](.nvmrc)입니다(`nvm use` 또는 `fnm use`).
+- Node.js: 24 LTS 이상(24.9+, NestJS 12 요구)을 지원하며 CI가 24·26을 검사합니다. 기준 런타임과 로컬 개발 기본 버전은 [`.nvmrc`](.nvmrc)(24)입니다(`nvm use` 또는 `fnm use`).
 - pnpm: 루트 `package.json`의 `packageManager` 값(`corepack enable` 후 자동 사용)
 - Docker Engine/Desktop과 Compose v2 (로컬 PostgreSQL·Valkey용)
 - make, PM2(`pnpm install` 시 함께 설치)

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": "22.x"
+    "node": ">=24.9"
   },
   "scripts": {
     "start": "WEB_PORT=${WEB_PORT:-$(node ../../scripts/instance.mjs --get WEB_PORT)} && NEXT_DIST_DIR=.next-dev next dev --port $WEB_PORT",

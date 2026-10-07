@@ -39,8 +39,8 @@ SNS 채널 아이콘 자산의 출처·상표 사용 규칙은 [SNS 채널 아�
 docker build -f apps/web/Dockerfile -t crelink-web:local .
 ```
 
-- [`Dockerfile`](Dockerfile): 빌드 단계(`node:22-slim`)에서 루트 `packageManager`의 pnpm으로 `pnpm install --frozen-lockfile --filter @crelink/web...` → `@crelink/shared` 빌드 → 웹 빌드. 디자인 토큰 생성물은 커밋된 것을 쓰고 원본과의 일치 검사는 CI(`pnpm typecheck`)가 맡습니다.
-- `next.config.ts`의 `output: 'standalone'`으로 `.next/standalone`(`server.js`와 추적된 의존성)만 런타임 단계(`node:22-slim`)에 옮기고 `.next/static`·`public`을 합칩니다. 실행은 `node` 사용자, `CMD node apps/web/server.js`, `PORT=3000`·`HOSTNAME=0.0.0.0`, `NODE_ENV=production`, `NEXT_TELEMETRY_DISABLED=1`.
+- [`Dockerfile`](Dockerfile): 빌드 단계(`node:24-slim`)에서 루트 `packageManager`의 pnpm으로 `pnpm install --frozen-lockfile --filter @crelink/web...` → `@crelink/shared` 빌드 → 웹 빌드. 디자인 토큰 생성물은 커밋된 것을 쓰고 원본과의 일치 검사는 CI(`pnpm typecheck`)가 맡습니다.
+- `next.config.ts`의 `output: 'standalone'`으로 `.next/standalone`(`server.js`와 추적된 의존성)만 런타임 단계(`node:24-slim`)에 옮기고 `.next/static`·`public`을 합칩니다. 실행은 `node` 사용자, `CMD node apps/web/server.js`, `PORT=3000`·`HOSTNAME=0.0.0.0`, `NODE_ENV=production`, `NEXT_TELEMETRY_DISABLED=1`.
 - `HEALTHCHECK`: 내장 `fetch`로 `/privacy`(API를 부르지 않는 정적 화면)를 확인합니다. Compose는 이 정의를 재사용하고 루트 파일 시스템을 읽기 전용(`/tmp`만 tmpfs)으로 둡니다.
 - 이미지는 amd64·arm64 모두 만들 수 있습니다(대상 플랫폼은 `infra/prod/targets.json`). 크기는 약 483MB(2026-10-06).
 

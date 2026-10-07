@@ -82,7 +82,7 @@ Tunnel은 edge Caddy 하나로만 들어오고, edge Caddy는 활성 색의 `api
 - Compose project: edge `crelink-edge`(`crelink-edge-caddy-1`), 앱은 같은 `compose.yaml`을 색마다 `crelink-blue`·`crelink-green`(`crelink-<색>-api-1`·`-web-1`, `CRELINK_COLOR`)으로 띄웁니다. 앱 compose에는 `name:`이 없어 항상 `lib.sh`(또는 런북 명령)가 `-p`로 실행합니다. blue/green 이전의 단일 project `crelink-prod`는 cutover 때 컨테이너·네트워크를 지웠습니다(볼륨 유지).
 - Docker 네트워크 `crelink-edge`(외부 네트워크): edge와 두 색이 붙고 색 별칭 `api-<색>`·`web-<색>`만 씁니다. `bootstrap.sh`·`cutover.sh`가 만듭니다.
 - 볼륨: GeoIP는 `crelink-prod_geoip`(`external: true`, blue/green 이전 이름을 이어 씀)를 두 색이 같이 씁니다. 업로드 볼륨 `crelink-prod_uploads`는 S3 전환과 함께 compose에서 뺐습니다(서버의 남은 볼륨 삭제는 [런북 9-5](../../infra/docs/prod-runbook.md#9-5-전환-뒤-볼륨-정리)).
-- 서비스: edge `caddy`(`caddy:2.11.7-alpine`, 읽기 전용 루트, `cap_drop: all` + `NET_BIND_SERVICE`, 헬스 `:2020/healthz`). 색 스택 `api`(이미지 HEALTHCHECK `/api/health/ready`(DB만, 업로드 저장소 제외), `FILE_STORAGE=s3` 고정, 볼륨 geoip(ro)·`./certs`(ro)), `web`(이미지 HEALTHCHECK `/privacy`, 읽기 전용 루트, api가 healthy일 때 기동), 도구 프로필 `geoip-writer`(`alpine:3.22`, `geoip.sh`만 사용). api·web 모두 `init: true`, `stop_grace_period: 30s`, healthcheck `start_interval: 1s`.
+- 서비스: edge `caddy`(`caddy:2.11.7-alpine`, 읽기 전용 루트, `cap_drop: all` + `NET_BIND_SERVICE`, 헬스 `:2020/healthz`). 색 스택 `api`(이미지 HEALTHCHECK `/api/health/ready`(DB만, 업로드 저장소 제외), `FILE_STORAGE=s3` 고정, 볼륨 geoip(ro)·`./certs`(ro)), `web`(이미지 HEALTHCHECK `/privacy`, 읽기 전용 루트, api가 healthy일 때 기동), 도구 프로필 `geoip-writer`(`alpine:3.24`, `geoip.sh`만 사용). api·web 모두 `init: true`, `stop_grace_period: 30s`, healthcheck `start_interval: 1s`.
 
 ## 비밀값과 환경변수
 

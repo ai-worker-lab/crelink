@@ -9,12 +9,12 @@ crelink이 의존하는 외부 SaaS와 개발 도구를 한곳에서 찾기 위�
 | 대상 | 종류 | 상태 | 용도 | 기준 위치 |
 | --- | --- | --- | --- | --- |
 | GitHub (`ai-worker-lab/crelink`) | SaaS | 사용 중 | 원격 Git 저장소, Pull Request. Issues는 끔. Release는 선택 | [ADR 0002](../adr/0002-work-items-in-repository.md), `.github/pull_request_template.md` |
-| GitHub Actions | SaaS | 사용 중 | PR·`main` push 검사(Node 22·24·26 matrix, PostgreSQL 서비스 컨테이너, API·웹 이미지 빌드), `main` CI 성공 시 운영 배포·수동 롤백 | `.github/workflows/ci.yml`, `deploy.yml`, `rollback.yml` |
+| GitHub Actions | SaaS | 사용 중 | PR·`main` push 검사(Node 24·26 matrix, PostgreSQL 서비스 컨테이너, API·웹 이미지 빌드), `main` CI 성공 시 운영 배포·수동 롤백 | `.github/workflows/ci.yml`, `deploy.yml`, `rollback.yml` |
 | GitHub Container Registry(GHCR) | SaaS | 사용 중(패키지는 Deploy 첫 실행 때 생성) | 운영 이미지 `ghcr.io/ai-worker-lab/crelink-api:<SHA>`·`crelink-web:<SHA>` | `.github/workflows/deploy.yml`, [prod 런북](../../infra/docs/prod-runbook.md) |
-| Dependabot | SaaS | 사용 중 | npm·Actions·Docker(`apps/api`·`apps/web` Dockerfile)·Docker Compose(`infra/prod`) 의존성 갱신 PR(주 1회) | `.github/dependabot.yml` |
+| Dependabot | SaaS | 사용 중 | npm·Actions·Docker(`apps/api`·`apps/web` Dockerfile)·Docker Compose(`infra/prod`) 의존성 갱신 PR(주 1회). Node 이미지 major와 Expo SDK가 고정하는 패키지(`react*`·`expo*`·`@types/react*`)는 올리지 않음 | `.github/dependabot.yml` |
 | npm registry | SaaS | 사용 중 | `pnpm install`의 패키지 다운로드 | `pnpm-lock.yaml`, 각 `package.json` |
 | Node.js · pnpm(corepack) | 도구 | 사용 중 | 런타임과 workspace 관리. 지원 버전은 CI matrix, 로컬 기본값은 `.nvmrc` | `.github/workflows/ci.yml`, `.nvmrc`, 루트 `package.json`의 `packageManager` |
-| Docker Engine/Compose · Docker Hub 이미지 | 도구·SaaS | 사용 중 | 로컬 PostgreSQL(`postgres:17-alpine`)·Valkey(`valkey/valkey:8-alpine`), API 저장소 계약 시험의 일회용 SeaweedFS(`chrislusf/seaweedfs:4.47`, 테스트가 `docker run`), 운영 이미지 베이스(`node:22-slim`)와 운영 스택(`caddy`, `alpine`), 업로드 이전 도구(`amazon/aws-cli`, 런북 9) | `infra/local/compose.yaml`, `apps/api/test/test-s3.ts`, `apps/*/Dockerfile`, `infra/prod/compose.yaml` |
+| Docker Engine/Compose · Docker Hub 이미지 | 도구·SaaS | 사용 중 | 로컬 PostgreSQL(`postgres:17-alpine`)·Valkey(`valkey/valkey:8-alpine`), API 저장소 계약 시험의 일회용 SeaweedFS(`chrislusf/seaweedfs:4.47`, 테스트가 `docker run`), 운영 이미지 베이스(`node:24-slim`)와 운영 스택(`caddy`, `alpine`), 업로드 이전 도구(`amazon/aws-cli`, 런북 9) | `infra/local/compose.yaml`, `apps/api/test/test-s3.ts`, `apps/*/Dockerfile`, `infra/prod/compose.yaml` |
 | PM2 | 도구 | 사용 중 | 로컬 API·웹·Expo 개발 서버 실행 | `ecosystem.config.cjs`, `Makefile` |
 | Next.js 텔레메트리 | SaaS | 사용 중(기본값, 운영 이미지 빌드는 끔) | 로컬·CI `next build`가 익명 사용 통계를 Next.js 운영사(Vercel)에 전송. 빌드 출력에서 확인. 웹 이미지는 `NEXT_TELEMETRY_DISABLED=1` | `apps/web`, `apps/web/Dockerfile` |
 
