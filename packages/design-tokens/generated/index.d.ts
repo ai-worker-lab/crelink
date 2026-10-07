@@ -1,47 +1,47 @@
 // @crelink/design-tokens에서 생성한 파일. 직접 고치지 않는다. 원본: packages/design-tokens/src/tokens.json, 생성: pnpm tokens:generate
 export declare const color: {
   readonly background: {
-    readonly stage: "#0e0f11";
-    readonly screen: "#131517";
-    readonly device: "#08090a";
+    readonly stage: "#f5f7f9";
+    readonly screen: "#ffffff";
+    readonly device: "#171b20";
   };
   readonly surface: {
-    readonly default: "#1c1f23";
-    readonly raised: "#252a30";
-    readonly bar: "#16181b";
+    readonly default: "#ffffff";
+    readonly raised: "#f0f3f7";
+    readonly bar: "#ffffff";
   };
   readonly border: {
-    readonly default: "#30353c";
-    readonly strong: "#434a53";
-    readonly frame: "#2a2e34";
-    readonly danger: "#4a2b31";
+    readonly default: "#dfe1e5";
+    readonly strong: "#8f9298";
+    readonly frame: "#e9ebef";
+    readonly danger: "#f6c2bf";
   };
   readonly text: {
-    readonly primary: "#eef0f3";
-    readonly secondary: "#a9b0ba";
-    readonly subtle: "#8a929d";
-    readonly onAction: "#0b1a33";
-    readonly onPositive: "#16300a";
+    readonly primary: "#171b20";
+    readonly secondary: "#44484e";
+    readonly subtle: "#5f636a";
+    readonly onAction: "#ffffff";
+    readonly onPositive: "#ffffff";
   };
   readonly decoration: {
-    readonly subtle: "#7a828c";
+    readonly subtle: "#a7abb1";
   };
   readonly action: {
-    readonly primary: "#5b9bff";
-    readonly primaryPressed: "#3a7ae6";
-    readonly primarySubtle: "rgba(91, 155, 255, 0.16)";
+    readonly primary: "#d02d27";
+    readonly primaryPressed: "#b31415";
+    readonly primarySubtle: "rgba(208, 45, 39, 0.1)";
   };
   readonly status: {
-    readonly positive: "#8fd95c";
-    readonly positiveSubtle: "rgba(143, 217, 92, 0.14)";
-    readonly danger: "#f79ab0";
-    readonly dangerSubtle: "rgba(247, 154, 176, 0.14)";
-    readonly warning: "#f2c46d";
-    readonly warningSubtle: "rgba(242, 196, 109, 0.14)";
+    readonly positive: "#137738";
+    readonly positiveSubtle: "rgba(19, 119, 56, 0.1)";
+    readonly danger: "#b6143f";
+    readonly dangerSubtle: "rgba(182, 20, 63, 0.08)";
+    readonly warning: "#9d6300";
+    readonly warningSubtle: "rgba(157, 99, 0, 0.1)";
   };
   readonly overlay: {
-    readonly scrim: "rgba(8, 9, 11, 0.62)";
-    readonly shadow: "rgba(0, 0, 0, 0.55)";
+    readonly scrim: "rgba(23, 27, 32, 0.48)";
+    readonly shadow: "rgba(23, 27, 32, 0.08)";
   };
 };
 
@@ -61,8 +61,10 @@ export declare const space: {
 };
 
 export declare const corner: {
-  readonly sm: 3;
-  readonly md: 6;
+  readonly sm: 8;
+  readonly md: 12;
+  readonly lg: 16;
+  readonly full: 999;
 };
 
 export declare const font: {

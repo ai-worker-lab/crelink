@@ -1,47 +1,47 @@
 // @crelink/design-tokens에서 생성한 파일. 직접 고치지 않는다. 원본: packages/design-tokens/src/tokens.json, 생성: pnpm tokens:generate
 export const color = {
   background: {
-    stage: "#0e0f11",
-    screen: "#131517",
-    device: "#08090a",
+    stage: "#f5f7f9",
+    screen: "#ffffff",
+    device: "#171b20",
   },
   surface: {
-    default: "#1c1f23",
-    raised: "#252a30",
-    bar: "#16181b",
+    default: "#ffffff",
+    raised: "#f0f3f7",
+    bar: "#ffffff",
   },
   border: {
-    default: "#30353c",
-    strong: "#434a53",
-    frame: "#2a2e34",
-    danger: "#4a2b31",
+    default: "#dfe1e5",
+    strong: "#8f9298",
+    frame: "#e9ebef",
+    danger: "#f6c2bf",
   },
   text: {
-    primary: "#eef0f3",
-    secondary: "#a9b0ba",
-    subtle: "#8a929d",
-    onAction: "#0b1a33",
-    onPositive: "#16300a",
+    primary: "#171b20",
+    secondary: "#44484e",
+    subtle: "#5f636a",
+    onAction: "#ffffff",
+    onPositive: "#ffffff",
   },
   decoration: {
-    subtle: "#7a828c",
+    subtle: "#a7abb1",
   },
   action: {
-    primary: "#5b9bff",
-    primaryPressed: "#3a7ae6",
-    primarySubtle: "rgba(91, 155, 255, 0.16)",
+    primary: "#d02d27",
+    primaryPressed: "#b31415",
+    primarySubtle: "rgba(208, 45, 39, 0.1)",
   },
   status: {
-    positive: "#8fd95c",
-    positiveSubtle: "rgba(143, 217, 92, 0.14)",
-    danger: "#f79ab0",
-    dangerSubtle: "rgba(247, 154, 176, 0.14)",
-    warning: "#f2c46d",
-    warningSubtle: "rgba(242, 196, 109, 0.14)",
+    positive: "#137738",
+    positiveSubtle: "rgba(19, 119, 56, 0.1)",
+    danger: "#b6143f",
+    dangerSubtle: "rgba(182, 20, 63, 0.08)",
+    warning: "#9d6300",
+    warningSubtle: "rgba(157, 99, 0, 0.1)",
   },
   overlay: {
-    scrim: "rgba(8, 9, 11, 0.62)",
-    shadow: "rgba(0, 0, 0, 0.55)",
+    scrim: "rgba(23, 27, 32, 0.48)",
+    shadow: "rgba(23, 27, 32, 0.08)",
   },
 };
 
@@ -61,8 +61,10 @@ export const space = {
 };
 
 export const corner = {
-  sm: 3,
-  md: 6,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  full: 999,
 };
 
 export const font = {

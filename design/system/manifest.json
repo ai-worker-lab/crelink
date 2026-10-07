@@ -3,7 +3,7 @@
   "id": "crelink",
   "name": "crelink",
   "category": "Product",
-  "description": "crelink 서비스의 디자인 시스템. 값은 packages/design-tokens/src/tokens.json에서 생성합니다.",
+  "description": "crelink 서비스의 디자인 시스템(스튜디오 라이트). 값은 packages/design-tokens/src/tokens.json에서 생성합니다.",
   "source": {
     "type": "local",
     "origin": "packages/design-tokens/src/tokens.json + src/opendesign.json (pnpm tokens:generate)"
