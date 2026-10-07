@@ -17,7 +17,7 @@ export function LinksSummary({ publicId, links, limits }: { publicId: string; li
         외부 링크는 랜딩페이지 모양 그대로 보면서 추가·수정·순서 변경·숨기기 할 수 있어요. 숨긴 링크 {hidden}개 · 차단된
         링크 {blocked}개 · 전체 {limits.totalUsed}/{limits.totalMax}개.
       </p>
-      <Link className="primary" href={`/me/landings/${encodeURIComponent(publicId)}`}>
+      <Link className="secondary" href={`/me/landings/${encodeURIComponent(publicId)}`}>
         링크 관리 화면 열기
       </Link>
     </section>
