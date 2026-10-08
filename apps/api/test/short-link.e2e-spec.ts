@@ -127,11 +127,12 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
     );
     expect((await publicLanding(creator.publicId, 'not-a-pass')).body.passAccepted).toBe(false);
 
-    // 만료: 61초 전에 발급한 것과 같은 표시(같은 프로세스 키)는 거부, 59초 전 것은 아직 유효
+    // 만료: 61초 전에 발급한 것과 같은 표시(같은 프로세스 키)는 거부, 50초 전 것은 아직 유효.
+    // 만료 시각은 초 단위로 내림하므로 59초 전 발급이면 남은 시간이 1~1000ms뿐이라 느린 CI에서 요청 중에 만료됩니다.
     const passes = t.app.get(LandingPassService);
     const expired = passes.issue(creator.publicId, Date.now() - 61_000);
     expect((await publicLanding(creator.publicId, expired)).body.passAccepted).toBe(false);
-    const fresh = passes.issue(creator.publicId, Date.now() - 59_000);
+    const fresh = passes.issue(creator.publicId, Date.now() - 50_000);
     expect((await publicLanding(creator.publicId, fresh)).body.passAccepted).toBe(true);
 
     // 주소를 바꾸면 shortUrl은 새 주소, 옛 주소 302의 pass도 같은 랜딩에서 유효

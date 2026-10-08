@@ -4,6 +4,7 @@
 
 ## 2026-10-08
 
+- 시험 `test/short-link.e2e-spec.ts` 통과 표시 만료 검사의 경계 흔들림 수정: 만료 시각을 초 단위로 내림하므로 59초 전 발급 표시는 남은 시간이 1~1000ms뿐이라 CI(Node 24)에서 요청 중에 만료돼 실패함(0061 PR #58 첫 실행) → "아직 유효" 쪽을 50초 전 발급으로. 서비스 코드 변경 없음. 근거 `docs/work/orchestrator/0061-main-branch-protection.md`.
 - Sentry 무료 기능(ADR 0014): Nest 로그·업무 지표·보존 작업 Cron 체크인을 보냄. `SENTRY_DSN`이 비면 아무것도 보내지 않고 동작 변화 없음. 근거 `docs/work/orchestrator/0052-sentry-free-features.md`.
   - Logs: `main.ts`가 `NestFactory.create`에 `SentryConsoleLogger`(`src/monitoring/sentry-logger.ts`, `ConsoleLogger` 하위 클래스)를 넘김. 콘솔 출력은 그대로, `log`·`warn`·`error`·`fatal`을 Sentry Logs(`info`·`warn`·`error`·`fatal`, 속성 `nest.context`·`nest.stack`)로도 보냄(`debug`·`verbose` 제외). `beforeSendLog: scrubLog`가 이름에 `cookie`·`authorization`·`token`·`secret`·`password`·`email`이 든 속성과 `user.email`·`user.name`을 지우고 본문·문자열 속성의 이메일(`[email]`)·JWT(`[token]`)를 가림(`user.id`는 남김). 기존 로그 점검: `AuthService` 구글 검증 실패 경고는 라이브러리 오류 문구가 ID 토큰 원문·payload(이메일·이름·사진·sub)를 붙이므로 `googleVerifyFailureReason`(`src/auth/google-oauth.ts`)으로 그 꼬리를 버리고 오류 이름과 이유만 남김(콘솔 출력도 같은 문구로 바뀜). 다른 로그는 해당 없음.
   - Metrics: `src/monitoring/metrics.ts`의 `countBusinessMetric`으로 counter 3종 `crelink.auth.login`(`POST /api/auth/google/callback`, `result`: `success`·`failure`)·`crelink.short_link.visit`(`GET /{slug}` 랜딩 302)·`crelink.link.click`(`GET /c/{linkPublicId}` 외부 URL 302). 속성에 단축 주소·링크·사용자·IP 없음. `beforeSendMetric: scrubMetric`이 `user.*`와 이메일·IP 속성을 지움.
