@@ -10,6 +10,7 @@ pnpm 모노레포 스켈레톤입니다: NestJS API(`apps/api`), Next.js 웹(`ap
 - 작업 영역의 `AGENTS.md`를 함께 읽습니다: [api](apps/api/AGENTS.md), [web](apps/web/AGENTS.md), [app](apps/app/AGENTS.md), [infra](infra/AGENTS.md).
 - 티켓의 `역할` 소유 경로(`.omp/agents/*.md`의 `owns`) 밖을 바꾸지 않습니다. `pnpm work:scope`로 확인합니다.
 - 실행하지 않은 검증을 통과했다고 보고하지 않습니다. 배포·데이터 파괴·외부 공개는 명시적 요청 없이 하지 않습니다.
+- main 머지는 곧 운영 배포입니다(CD). 머지 전에 알리고, 머지 뒤에는 Deploy job 결과(운영 주소 검사 포함)로 확인합니다. 운영(prod)에서 직접 확인·시험은 운영에서만 드러나는 위험이라는 명분이 있을 때만, 이유·범위를 사용자에게 먼저 알리고 진행합니다([검증 루프](docs/development/verification.md#운영-확인)).
 - 제품 방향·우선순위·요구 확정은 사용자가 결정합니다.
 
 전체 정책 원문: [저장소 공통 정책](docs/development/repository-policy.md).
