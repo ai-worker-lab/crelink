@@ -460,6 +460,34 @@ textarea.input {
   gap: var(--ds-space-8);
 }
 /*
+ * 로그인 화면 오른쪽 아래에 떠 있는 `의견 보내기`(`FeedbackButton`). 1023px 이하는 아이콘 버튼(아래 가운데 `미리보기` 버튼과 겹치지 않게).
+ * 대화상자·하단 시트는 최상위 층이라 이 버튼을 덮는다. 맨 아래 내용을 가리지 않게 본문 아래 여백을 버튼 높이만큼 더 둔다.
+ */
+.feedback-fab {
+  position: fixed;
+  right: calc(var(--ds-space-24) + env(safe-area-inset-right));
+  bottom: calc(var(--ds-space-24) + env(safe-area-inset-bottom));
+  z-index: 9;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-space-8);
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0 var(--ds-space-20);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-full);
+  background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
+  font-weight: var(--ds-font-weight-bold);
+}
+.feedback-fab:hover {
+  border-color: var(--ds-color-text-primary);
+}
+.app-page:has(> .feedback-fab) .app-main {
+  padding-bottom: calc(var(--ds-space-48) + 64px);
+}
+/*
  * Sentry 의견 보내기 창(`FeedbackButton`). 창은 `body`에 붙는 `#sentry-feedback`의 shadow DOM 안에 그려지고,
  * 바깥 문서 규칙이 SDK의 `:host` 기본값보다 우선하므로 여기서 디자인 토큰으로 색·글꼴·모서리를 정합니다.
  */
@@ -1563,9 +1591,10 @@ a.portfolio-card:hover {
   border-radius: calc(var(--ds-corner-lg) * 2);
   background: var(--ds-color-background-device);
 }
+/* 160px = 미리보기 제목·설명·프레임 여백, 72px = 오른쪽 아래 `의견 보내기` 버튼(48)과 간격(24). 버튼이 프레임을 덮지 않는다. */
 .preview-screen {
-  height: min(760px, calc(100vh - var(--manager-head) - 160px));
-  height: min(760px, calc(100dvh - var(--manager-head) - 160px));
+  height: min(760px, calc(100vh - var(--manager-head) - 232px));
+  height: min(760px, calc(100dvh - var(--manager-head) - 232px));
   min-height: 420px;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1978,8 +2007,8 @@ body:has(.sheet[open]) {
     top: calc(var(--manager-head) + 49px + var(--ds-space-24));
   }
   .preview-screen {
-    height: min(760px, calc(100vh - var(--manager-head) - 49px - 160px));
-    height: min(760px, calc(100dvh - var(--manager-head) - 49px - 160px));
+    height: min(760px, calc(100vh - var(--manager-head) - 49px - 232px));
+    height: min(760px, calc(100dvh - var(--manager-head) - 49px - 232px));
   }
 }
 /* 관리 화면 1023px 이하: 한 열 패널, 미리보기는 떠 있는 버튼(대화상자). 서버가 그린 미리보기 열도 숨긴다. */
@@ -1997,6 +2026,19 @@ body:has(.sheet[open]) {
   }
   .manager .manager-preview {
     display: none;
+  }
+  .feedback-fab {
+    right: calc(var(--ds-space-16) + env(safe-area-inset-right));
+    bottom: calc(var(--ds-space-16) + env(safe-area-inset-bottom));
+    padding: 0;
+  }
+  .feedback-fab-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 @media (max-width: 600px) {
