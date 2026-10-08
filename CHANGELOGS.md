@@ -7,6 +7,7 @@
 ## 2026-10-09
 
 - 광고 블록과 크리에이터 배너 슬롯 요구(사용자 결정: 무료는 지울 수 없는 크리링 광고 블록, 유료는 같은 자리의 크리에이터 배너 슬롯, 링크 사이 어디든 끌어서 위치 변경, 스와이프 배너, 리틀리 광고 블록처럼 수익 배분, 운영자 등록 광고로 시작, 배너 슬롯은 운영자 수동 부여). PRD `docs/product/crelink.md`: R20~R22(수용 기준은 `[AI 제안]`), 대상 사용자(운영자)·범위·참고 사실·미정 질문 6개·위험 5개. 벤치마킹 `docs/product/research/link-in-bio-benchmark.md`: `광고 블록과 광고 제거` 절(리틀리AD 수익 구조·정산·세금·이용 조건, 인포크 Pro `광고 없음`, Google 게시자 정책). 코드·디자인 변경은 없음. `design/system/DESIGN.md`의 공개 랜딩 장식 금지 규칙과 부딪치는 점은 디자인 work item에서 다룸. 근거 `docs/work/product/0062-ad-banner-block-prd.md`.
+- 광고 블록 요구 두 번째 결정과 추가 조사. 사용자 결정은 광고 블록 최소 1개(지금은 1개 고정), 위법이 아니면 광고를 실을지는 크리에이터가 정함, 배너 슬롯 계정 단위 부여, 배분 방식과 수익 보기는 추가 조사입니다. PRD R20·R21 요구 문장과 수용 기준, R22 참고 사실, 미정 질문을 고쳤습니다. 새 조사 문서는 `docs/product/research/ad-revenue-share.md`와 `docs/product/research/creator-ad-revenue-reporting.md`입니다. 앞 문서는 배분 기준·비율, 정산 주기·최소 지급액, 개인 지급 세무와 주민등록번호 근거, 지급 대행을 다룹니다. 뒤 문서는 예상·확정 보고 관행, 무효 트래픽 처리, R10·개인정보 영향을 다룹니다. 근거 `docs/work/product/0062-ad-banner-block-prd.md`.
 
 ## 2026-10-08
 
