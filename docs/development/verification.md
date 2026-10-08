@@ -68,6 +68,8 @@
 
 수동 롤백은 [`.github/workflows/rollback.yml`](../../.github/workflows/rollback.yml)(입력 `target`·`release`)입니다. 의존성 갱신 PR은 [`.github/dependabot.yml`](../../.github/dependabot.yml)이 주 1회 엽니다. 워크플로 문법은 `actionlint`로 검사합니다(로컬 설치 시 `actionlint .github/workflows/*.yml`).
 
+GitHub Actions가 돌지 않을 때(사용량 한도 초과·장애)는 CI 대신 로컬 `pnpm verify`·`pnpm smoke`·`pnpm e2e`를 실행해 PR에 결과를 적고 머지한 뒤, 운영자 컴퓨터에서 [`infra/prod/deploy-local.sh`](../../infra/prod/deploy-local.sh)로 같은 순서(변경 판별 → 대상 서버에서 이미지 빌드 → `deploy` → `운영 주소 검사`·실패 시 롤백 → 배포 기록 태그)의 배포를 실행합니다. 이때 머지 뒤 확인은 이 스크립트 출력(`완료` 줄)입니다. 절차와 한계(소스맵 업로드 없음, 이미지는 서버에만)는 [런북 16](../../infra/docs/prod-runbook.md#16-github-actions-없이-배포)입니다.
+
 ### 운영 확인
 
 `배포 <대상>` job의 `운영 주소 검사`가 배포마다 운영 주소를 확인하므로, 머지 뒤 확인은 Deploy 실행 결과(어느 커밋의 실행이 `이미지`·`배포` job을 돌렸는지 포함)로 충분합니다. 그 밖에 운영에서 직접 요청을 보내거나 화면을 열어 확인·시험하는 일은 시간·CI·외부 서비스 사용량과 운영 데이터·모니터링 기록을 남기므로, 로컬·CI 검증으로 볼 수 없는 위험이 있을 때만 합니다.
