@@ -4,6 +4,10 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-10-09
+
+- 광고 블록과 크리에이터 배너 슬롯 요구(사용자 결정: 무료는 지울 수 없는 크리링 광고 블록, 유료는 같은 자리의 크리에이터 배너 슬롯, 링크 사이 어디든 끌어서 위치 변경, 스와이프 배너, 리틀리 광고 블록처럼 수익 배분, 운영자 등록 광고로 시작, 배너 슬롯은 운영자 수동 부여). PRD `docs/product/crelink.md`: R20~R22(수용 기준은 `[AI 제안]`), 대상 사용자(운영자)·범위·참고 사실·미정 질문 6개·위험 5개. 벤치마킹 `docs/product/research/link-in-bio-benchmark.md`: `광고 블록과 광고 제거` 절(리틀리AD 수익 구조·정산·세금·이용 조건, 인포크 Pro `광고 없음`, Google 게시자 정책). 코드·디자인 변경은 없음. `design/system/DESIGN.md`의 공개 랜딩 장식 금지 규칙과 부딪치는 점은 디자인 work item에서 다룸. 근거 `docs/work/product/0062-ad-banner-block-prd.md`.
+
 ## 2026-10-08
 
 - main 브랜치 보호(저장소 공개 전환 뒤, 여러 사람이 씀): `.github/workflows/ci.yml`에 모든 job 결과를 모으는 필수 검사 job `CI 통과`(실패·취소면 실패, 건너뜀은 통과), GitHub ruleset `main 보호`(직접·force push·삭제 금지, 선형 이력, PR 필수·squash만·승인 0, 필수 검사 `CI 통과`·최신 main 기준, admin은 PR 머지만 우회), 저장소 설정(squash만, 브랜치 갱신 제안, 머지 뒤 브랜치 삭제, 외부 기여자 fork PR 워크플로 승인, secret scanning·push protection). 검증 루프 CI 절에 머지 규칙과 Actions가 돌지 않을 때의 admin 우회 머지. 근거 `docs/work/orchestrator/0061-main-branch-protection.md`.
