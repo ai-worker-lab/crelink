@@ -4,6 +4,7 @@
 
 ## 2026-10-08
 
+- Sentry 조직 옮기기(`shaul1991` → `ai-worker-lab`, 새 프로젝트 방식): 암호문 `prod/secrets/home-server.sops.env`의 평문 키 `SENTRY_DSN`을 새 `crelink-api` DSN으로(다른 값은 복호화 해시 비교로 불변), 런북 15-1 현재 조직, 15-3 `SENTRY_ORG` 예시와 여러 GitHub 계정 안내, 15-5 "다른 조직으로 옮기기" 순서(토큰 → variables → 암호문 → `force` 배포 → 옛 모니터 끄기), 15-6 재적용 표시. GitHub variables `SENTRY_ORG=ai-worker-lab`·`SENTRY_WEB_DSN`(새 `crelink-web` DSN)과 secret `SENTRY_AUTH_TOKEN`(새 조직 토큰, 사용자가 넣음) 변경. 근거 `docs/work/orchestrator/0054-sentry-org-migration.md`.
 - Sentry 무료 요금제 기능(ADR 0014): 런북 15에 ADR 0014 연결, 요금제 한도(Logs·Metrics·리플레이·Cron·Uptime·첨부), 15-4 확인 항목(로그·지표·Cron·Uptime·리플레이·Release Health·의견), 15-5 끄기에 Uptime·Cron 모니터 정리와 리플레이 한도, 새 15-6 화면 설정(Uptime `https://links.shaul.kr/api/backend/api/health` 1분·`crelink-web`·`production`, 두 프로젝트 Inbound Filters, Cron은 코드 upsert), 출처 4줄. 2026-10-08에 Uptime 모니터와 `crelink-api` 필터(브라우저 확장·크롤러·오래된 브라우저)를 Sentry 화면에 적용. 실행 설정 변경 없음. 근거 `docs/work/orchestrator/0052-sentry-free-features.md`.
 
 ## 2026-10-07
