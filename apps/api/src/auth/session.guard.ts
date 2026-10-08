@@ -35,9 +35,35 @@ export class OperatorGuard extends SessionGuard {
   }
 }
 
+/**
+ * 로그인 선택. `cl_session`이 유효하면 그 사용자를 보는 사람으로 두고, 없거나 만료·정지면 비회원으로 통과합니다(401 아님).
+ * 보는 사람은 `ViewerUser`로 읽습니다.
+ */
+@Injectable()
+export class OptionalSessionGuard implements CanActivate {
+  constructor(private readonly auth: AuthService) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<SessionRequest>();
+    const token = readCookie(request, COOKIE_NAMES.session);
+    const user = token ? await this.auth.sessionUser(token) : null;
+    if (user) {
+      request.sessionUser = user;
+      setUserId(user.id);
+    }
+    return true;
+  }
+}
+
 /** 가드가 확인한 로그인 사용자. SessionGuard·OperatorGuard 뒤에서만 씁니다. */
 export const CurrentUser = createParamDecorator((_data: unknown, context: ExecutionContext): SessionUser => {
   const user = context.switchToHttp().getRequest<SessionRequest>().sessionUser;
   if (!user) throw new Error('CurrentUser는 SessionGuard 뒤에서만 쓸 수 있습니다.');
   return user;
 });
+
+/** `OptionalSessionGuard` 뒤의 보는 사람. 비회원이면 null입니다. */
+export const ViewerUser = createParamDecorator(
+  (_data: unknown, context: ExecutionContext): SessionUser | null =>
+    context.switchToHttp().getRequest<SessionRequest>().sessionUser ?? null,
+);

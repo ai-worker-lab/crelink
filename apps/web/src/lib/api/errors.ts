@@ -34,6 +34,8 @@ const API_ERROR_MESSAGES: Record<CrelinkErrorCode, string> = {
   domain_invalid: '올바른 도메인을 입력해 주세요. 예: example.com',
   domain_exists: '이미 차단 목록에 있는 도메인이에요.',
   domain_not_found: '차단 목록에 없는 도메인이에요.',
+  guestbook_disabled: '방명록을 닫은 페이지예요.',
+  guestbook_entry_not_found: '방명록 글을 찾을 수 없어요. 새로고침한 뒤 다시 시도해 주세요.',
 };
 
 /** 웹(BFF·클라이언트)에서만 생기는 오류 코드. */

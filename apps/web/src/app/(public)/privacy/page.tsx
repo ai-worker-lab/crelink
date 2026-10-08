@@ -5,8 +5,9 @@ import Link from 'next/link';
 export const metadata: Metadata = { title: '개인정보 처리방침' };
 
 /**
- * 개인정보 수집·보관·국외 이전 고지(R9·R11, Sentry). 근거: docs/specs/crelink-mvp.md `권한·보안·개인정보`,
- * docs/adr/0012-error-monitoring-sentry.md, docs/adr/0014-sentry-free-plan-features.md. 법률 검토 전 문구입니다.
+ * 개인정보 수집·보관·국외 이전 고지(R9·R11·R19, Sentry). 근거: docs/specs/crelink-mvp.md `권한·보안·개인정보`,
+ * docs/specs/crelink-guestbook.md `권한·보안·개인정보`, docs/adr/0012-error-monitoring-sentry.md,
+ * docs/adr/0014-sentry-free-plan-features.md. 법률 검토 전 문구입니다.
  */
 export default function PrivacyPage() {
   return (
@@ -41,6 +42,25 @@ export default function PrivacyPage() {
           <ul>
             <li>구글 로그인으로 받은 이메일 주소와 구글 계정 식별자</li>
             <li>크리에이터가 직접 입력한 프로필(사진·이름·소개), SNS 계정 주소, 포트폴리오, 외부 링크와 올린 이미지</li>
+          </ul>
+        </section>
+
+        <section aria-labelledby="privacy-guestbook">
+          <h2 id="privacy-guestbook">방명록</h2>
+          <p>
+            로그인한 회원이 크리에이터 랜딩페이지의 방명록에 글을 남기면 다음을 저장해요. 글에는 작성한 회원의
+            랜딩페이지 표시 이름과 프로필 사진(지금 설정된 값)이 함께 보여요.
+          </p>
+          <ul>
+            <li>작성 내용(최대 {CRELINK_LIMITS.guestbookBodyMax}자)과 비밀글 여부</li>
+            <li>작성 시각</li>
+            <li>작성한 회원(크리링 계정)</li>
+          </ul>
+          <p>글을 볼 수 있는 사람은 다음과 같아요.</p>
+          <ul>
+            <li>공개글: 랜딩페이지를 보는 누구나</li>
+            <li>비밀글: 작성자와 그 랜딩페이지의 크리에이터</li>
+            <li>크리에이터가 숨긴 글: 작성자와 그 랜딩페이지의 크리에이터</li>
           </ul>
         </section>
 
@@ -84,6 +104,7 @@ export default function PrivacyPage() {
             <li>크리에이터별·기간별 접근 통계 작성(크리링 운영자만 조회)</li>
             <li>위험한 링크 차단 등 서비스 운영과 부정 이용 방지</li>
             <li>서비스 오류 파악과 성능 개선, 이용자 의견 확인(오류·성능 진단 정보)</li>
+            <li>크리에이터 랜딩페이지 방명록 제공</li>
           </ul>
         </section>
 
@@ -99,6 +120,10 @@ export default function PrivacyPage() {
               주소를 넣지 않아요.
             </li>
             <li>크리에이터 계정 정보와 입력한 내용은 계정을 이용하는 동안 보관해요.</li>
+            <li>
+              방명록 글은 작성자가 지울 때까지 보관해요. 크리에이터가 방명록을 꺼도 글은 지우지 않고 보관하며, 다시 켜면
+              그대로 보여요.
+            </li>
             <li>
               오류·성능 진단 정보는 Sentry의 보관 기간이 지나면 지워져요(아래 &lsquo;개인정보 국외 이전&rsquo;의
               보유·이용 기간).
@@ -117,6 +142,10 @@ export default function PrivacyPage() {
             <li>
               <code>{COOKIE_NAMES.session}</code>: 크리에이터 로그인을 유지하는 쿠키예요. {CRELINK_LIMITS.sessionDays}일
               동안 유지되고 로그아웃하면 지워져요.
+            </li>
+            <li>
+              <code>{COOKIE_NAMES.returnTo}</code>: 방명록에서 로그인할 때 로그인을 마치고 돌아갈 랜딩페이지 주소를 담는
+              쿠키예요. 10분 동안만 유지되고 로그인을 마치면 지워져요.
             </li>
           </ul>
         </section>

@@ -50,6 +50,16 @@ export interface CreatorContext {
   shortLinkId: string;
 }
 
+/** 공개 랜딩 행. `publicLanding`이 없음(404)·정지(410)를 걸러 낸 뒤 돌려줍니다. */
+export interface PublicLandingRow {
+  id: string;
+  user_id: string;
+  display_name: string | null;
+  bio: string | null;
+  avatar_file_id: string | null;
+  guestbook_enabled: boolean;
+}
+
 /** 편집 화면·운영자 화면이 함께 쓰는 조회와 응답 모양. */
 @Injectable()
 export class CreatorService {
@@ -58,6 +68,24 @@ export class CreatorService {
     private readonly files: FilesService,
     private readonly config: AppConfig,
   ) {}
+
+  /** 방문자가 여는 랜딩. 형식이 틀리거나 없으면 404 `landing_not_found`, 크리에이터가 정지되었으면 410 `creator_suspended`. */
+  async publicLanding(db: Queryable, publicId: string): Promise<PublicLandingRow> {
+    const result = /^[a-z0-9]{10}$/.test(publicId)
+      ? await db.query<PublicLandingRow & { suspended: boolean }>(
+          `SELECT l.id, l.user_id, l.display_name, l.bio, l.avatar_file_id, l.guestbook_enabled,
+                  u.suspended_at IS NOT NULL AS suspended
+           FROM landings l JOIN users u ON u.id = l.user_id WHERE l.public_id = $1`,
+          [publicId],
+        )
+      : null;
+    const landing = result?.rows[0];
+    if (!landing) throw apiError(HttpStatus.NOT_FOUND, 'landing_not_found', '랜딩페이지를 찾을 수 없습니다.');
+    if (landing.suspended) {
+      throw apiError(HttpStatus.GONE, 'creator_suspended', '운영 정책에 따라 지금은 볼 수 없는 페이지입니다.');
+    }
+    return landing;
+  }
 
   async context(db: Queryable, userId: string): Promise<CreatorContext> {
     const result = await db.query<CreatorContext>(
@@ -185,7 +213,10 @@ export class CreatorService {
       display_name: string | null;
       bio: string | null;
       avatar_file_id: string | null;
-    }>('SELECT id, public_id, display_name, bio, avatar_file_id FROM landings WHERE user_id = $1', [userId]);
+      guestbook_enabled: boolean;
+    }>('SELECT id, public_id, display_name, bio, avatar_file_id, guestbook_enabled FROM landings WHERE user_id = $1', [
+      userId,
+    ]);
     const row = landing.rows[0];
     const [shortLink, links, socials, portfolio, limits] = await Promise.all([
       this.shortLink(db, userId),
@@ -202,6 +233,7 @@ export class CreatorService {
         displayName: row.display_name,
         bio: row.bio,
         avatar: this.files.imageRef(row.avatar_file_id),
+        guestbookEnabled: row.guestbook_enabled,
       },
       shortLink,
       links,

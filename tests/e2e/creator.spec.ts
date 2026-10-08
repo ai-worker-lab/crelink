@@ -15,8 +15,12 @@ async function addLink(page: Page, links: Locator, title: string, url: string) {
   await expect(links.getByRole('button', { name: `${title} 수정`, exact: true })).toBeVisible();
 }
 
-/** 손잡이를 마우스로 눌러 대상 카드 위치까지 끌어 놓습니다(dnd-kit PointerSensor는 4px 넘게 움직여야 시작). */
+/**
+ * 손잡이를 마우스로 눌러 대상 카드 위치까지 끌어 놓습니다(dnd-kit PointerSensor는 4px 넘게 움직여야 시작).
+ * 마우스 좌표는 화면 기준이라 손잡이가 화면 밖이면 끌기가 시작되지 않으므로 먼저 손잡이를 화면 안으로 스크롤합니다.
+ */
 async function dragWithMouse(page: Page, handle: Locator, target: Locator) {
+  await handle.scrollIntoViewIfNeeded();
   const from = await handle.boundingBox();
   const to = await target.boundingBox();
   if (!from || !to) throw new Error('끌기 대상 위치를 찾지 못했어요.');

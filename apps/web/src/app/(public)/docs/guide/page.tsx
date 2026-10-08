@@ -123,6 +123,32 @@ export default function GuidePage() {
         </ul>
       </section>
 
+      <section aria-labelledby="guide-guestbook">
+        <h2 id="guide-guestbook">5. 방명록</h2>
+        <p>
+          랜딩페이지에는 <strong>링크</strong>·<strong>방명록</strong> 탭이 있어요. 방문자는 로그인하지 않아도 공개글을
+          읽을 수 있고, 글은 로그인한 회원만 {CRELINK_LIMITS.guestbookBodyMax}자까지 남길 수 있어요.
+        </p>
+        <ul>
+          <li>
+            <strong>비밀글</strong>로 남긴 글은 쓴 사람과 크리에이터만 봐요. 쓴 사람은 자기 글을 지울 수 있어요.
+          </li>
+          <li>
+            링크 관리 화면 보기 모드의 방명록 탭에서 글마다 <strong>숨기기</strong>를 누르면 쓴 사람과 크리에이터 말고는
+            그 글을 볼 수 없어요. 쓴 사람에게는 숨긴 사실이 보이지 않아요. <strong>숨김 해제</strong>로 되돌릴 수
+            있어요.
+          </li>
+          <li>
+            링크 관리 화면 편집 모드의 <strong>방명록</strong> 스위치를 끄면 방명록 탭이 사라지고 새 글을 받지 않아요.
+            남은 글은 지우지 않고, 다시 켜면 그대로 보여요.
+          </li>
+          <li>
+            글쓴이 이름과 사진은 그 회원의 크리링 프로필 이름·사진이에요. 비어 있으면 <strong>크리링 회원</strong>으로
+            보여요.
+          </li>
+        </ul>
+      </section>
+
       <section aria-labelledby="guide-notes">
         <h2 id="guide-notes">알아 두면 좋은 것</h2>
         <ul>

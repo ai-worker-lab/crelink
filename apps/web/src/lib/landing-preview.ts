@@ -34,5 +34,6 @@ export function toLandingPreview(state: CreatorLandingState): PublicLandingView 
           })),
       },
     ],
+    guestbookEnabled: state.landing.guestbookEnabled,
   };
 }

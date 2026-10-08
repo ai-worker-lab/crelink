@@ -5,6 +5,7 @@ import { DatabaseModule } from './database.module';
 import { AuthModule } from './auth/auth.module';
 import { FilesModule } from './files/files.module';
 import { CreatorModule } from './creator/creator.module';
+import { GuestbookModule } from './guestbook/guestbook.module';
 import { AdminModule } from './admin/admin.module';
 import { RetentionModule } from './retention/retention.module';
 import { ShortLinkModule } from './short-link/short-link.module';
@@ -19,6 +20,7 @@ import { ShortLinkModule } from './short-link/short-link.module';
     AuthModule,
     FilesModule,
     CreatorModule,
+    GuestbookModule,
     AdminModule,
     RetentionModule,
     ShortLinkModule,
