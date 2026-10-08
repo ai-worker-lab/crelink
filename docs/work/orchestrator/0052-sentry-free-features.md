@@ -3,7 +3,7 @@
 - 단계: 티켓
 - 역할: orchestrator
 - 선행: 0042
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P2 (AI 제안)
 - 작성일: 2026-10-08
@@ -37,10 +37,10 @@ Sentry 결제 화면(`shaul1991` 조직, Developer plan, 2026-09-24 ~ 10-23 기�
 
 - [x] API: Nest `Logger` 출력(log·warn·error·fatal)이 Sentry Logs로 가고, 로그 속성에 쿠키·인증 헤더·토큰·이메일이 없다. 업무 지표 3종이 Sentry Metrics로 가고 속성에 IP·사용자 ID·이메일이 없다. 보관 정리 작업이 Cron 체크인(`in_progress`→`ok`/`error`)을 보낸다. DSN이 없으면 아무것도 보내지 않는다.
 - [x] 웹: Replay(오류 세션만, 가림 기본값), 브라우저 세션, 콘솔 warn·error 로그(브라우저·서버), 관리 화면 `의견 보내기`(이름·이메일 입력 없음, 스크린숏 선택)가 켜지고, `/api/backend/api/health`가 BFF를 통과한다. DSN이 없으면 아무것도 보내지 않는다.
-- [ ] Sentry 화면: Uptime 모니터 1개, Inbound filters, (첫 체크인 뒤) Cron 모니터가 보인다. (Uptime·필터 완료, Cron은 운영 배포 뒤 첫 체크인 때 생김)
+- [x] Sentry 화면: Uptime 모니터 1개, Inbound filters, (첫 체크인 뒤) Cron 모니터가 보인다.
 - [x] `/privacy` 고지(리플레이·로그·의견·세션), ADR 0014(ADR 0012 수집 범위 대체), 운영 설계·런북 15, 변경 기록 갱신.
 - [x] `pnpm verify` 통과, 가짜 DSN 수신 서버로 로그·지표·체크인·리플레이·의견 envelope 확인.
-- [ ] 운영 배포 뒤 Sentry 화면에서 Logs·Metrics·Cron·Uptime·Replays(오류 발생 시)·Release Health를 확인한다.
+- [x] 운영 배포 뒤 Sentry 화면에서 Logs·Metrics·Cron·Uptime·Replays(오류 발생 시)·Release Health를 확인한다.
 
 ## 범위
 
@@ -74,4 +74,9 @@ Sentry 결제 화면(`shaul1991` 조직, Developer plan, 2026-09-24 ~ 10-23 기�
   - 가짜 DSN 웹(DSN을 넣은 `next build` → standalone `server.js`, 시드 운영자 세션 쿠키, Playwright): `/p/{id}` 의견 버튼 0개, `/me`·`/admin` 1개. 의견 창 입력칸은 `message`뿐, 화면 캡처 첨부·보내기 → feedback(이름·이메일 빈 값, user.id, replay_id)과 `screenshot.png` 첨부 envelope. `console.warn('… owner@example.com')`·오류 → log `[email]`, 오류 이벤트(user.id), 리플레이 `replay_type: buffer` 3 segment(글자 `***`, 이미지 자리표시, 이메일·시드 이름 없음), 브라우저 세션(`ok`·`unhandled`). 처음 실행에서 콘솔 breadcrumb가 리플레이·오류 이벤트에 이메일 원문으로 들어가는 것을 발견해 `scrubBreadcrumb`(`beforeBreadcrumb`)를 더하고 다시 확인(원문 0건, `[email]` 7건).
   - DSN 없음: 웹(DSN 없이 빌드) `/me`·`/admin` 의견 버튼 0개·외부 요청 0건·수신 0건, API 단축 주소·클릭 302 뒤 수신 0건.
   - Sentry 화면(사용자 로그인 브라우저): `crelink-api` Inbound Filters에 브라우저 확장·웹 크롤러·오래된 브라우저(전 종류) 켬(localhost·헬스 체크 트랜잭션은 이미 켜짐, `crelink-web`은 다섯 개 모두 이미 켜짐). Uptime 모니터 `Uptime check for links.shaul.kr/api/backend/api/health`(`crelink-web`·`production`, 1분, 5초, 실패 3·복구 1, Allow Sampling 끔) 생성, 첫 확인 성공(Uptime 100%, 787ms), 프로젝트 알림 "Send a notification for high priority issues(Email)"이 연결됨.
-  - 남은 것: main 병합·운영 배포(사용자 결정) 뒤 런북 15-4로 Logs·Metrics·Cron(`crelink-api-retention` 생성)·Replays(오류 발생 시)·Release Health·의견 확인.
+  - 남은 것(당시): main 병합·운영 배포 뒤 런북 15-4 확인 → 아래 운영 확인에서 끝냄.
+- 2026-10-08: 배포·운영 확인(사용자 지시: 푸시·main 병합·Sentry 확인).
+  - PR #41 CI 6개(check Node 24·26, smoke, work scope, 이미지 빌드 api·web) 통과 → rebase 병합 `d32bf13` → CI·Deploy run 37727411026 성공(plan·이미지 api·web·배포 home-server·배포 기록 태그).
+  - Sentry(조직 API를 로그인 브라우저 세션으로 조회): `crelink-api` Logs에 기동 로그(`Nest application successfully started`·보존 작업 완료 등), Cron 모니터 `crelink-api-retention` 생성(04:28:44Z, interval 1 day·margin 60·max 30·Asia/Seoul)과 체크인 `ok`(production). Uptime 모니터는 배포 중에도 100%(773ms). 운영 `/privacy`에서 Playwright로 `console.warn`·오류를 내자 `crelink-web` 로그 `sentry-check-0052 warn`, 이슈 `Error: sentry-check-0052`(release `d32bf13…`, `replayId` 태그), 리플레이 1건(오류 1), 새 릴리스 브라우저 세션(healthy 14·errored 1·unhandled 1).
+  - 사용자가 Playwright 창에서 구글 로그인한 뒤: `/me` 의견 버튼 1개, 입력칸 `message`뿐, 의견 1건 → `crelink-web` User Feedback(이름·이메일 없음). 본인 단축 주소 `go.shaul.kr/shaul1991` 방문 1회·링크 클릭 1회(본인 통계에 각 1 더해짐)와 로그인으로 지표 `crelink.short_link.visit` 1·`crelink.link.click` 1·`crelink.auth.login` success 1·failure 1(콜백 시험), 속성 `user.id`·`user.email`·`client.address` 모두 비어 있음.
+  - 확인용 이슈 2건(오류·의견)은 Resolve함.
