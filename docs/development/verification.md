@@ -42,7 +42,7 @@
 
 ## CI
 
-[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)이 `main` 대상 PR에서만 실행합니다. main push(PR 머지)에서는 같은 내용을 PR에서 이미 검사했으므로 다시 돌리지 않습니다(Actions 무료 몫 절약, 0060). main에 브랜치 보호가 없어 머지 뒤 다시 검사하지 않으므로, PR은 최신 `main` 위에서 CI(Actions가 막혔을 때는 로컬 `pnpm verify`·`pnpm smoke`)가 통과한 뒤 머지합니다. 먼저 `changes` job이 바뀐 파일(병합 커밋의 첫 부모와 비교)이 문서뿐인지 판정합니다. 문서는 `docs/`·`design/` 아래 파일과 `*.md`이고, `RELEASES.md`는 웹 `/docs/releases`가 빌드 때 읽으므로 코드로 봅니다. 문서뿐이면 `docs` job만, 아니면(비교할 수 없을 때 포함) `check`·`smoke`·이미지 빌드를 실행합니다.
+[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)이 `main` 대상 PR에서만 실행합니다. main push(PR 머지)에서는 다시 돌리지 않습니다(0060). 대신 GitHub ruleset `main 보호`(0061)가 머지를 막습니다: main 직접 push·force push·삭제 금지, PR 필수(squash만, 승인 0), 필수 검사 `CI 통과`, PR 브랜치가 최신 `main`을 포함해야 함(뒤처지면 PR의 `Update branch`). 그래서 PR이 검사한 내용과 머지 결과가 같습니다. 우회는 저장소 admin의 PR 머지만 가능하고 Actions가 돌지 않을 때만 씁니다(아래 CD 절). 설정 값은 `gh api repos/ai-worker-lab/crelink/rulesets`로 봅니다. 먼저 `changes` job이 바뀐 파일(병합 커밋의 첫 부모와 비교)이 문서뿐인지 판정합니다. 문서는 `docs/`·`design/` 아래 파일과 `*.md`이고, `RELEASES.md`는 웹 `/docs/releases`가 빌드 때 읽으므로 코드로 봅니다. 문서뿐이면 `docs` job만, 아니면(비교할 수 없을 때 포함) `check`·`smoke`·이미지 빌드를 실행합니다.
 
 | job | 내용 |
 | --- | --- |
@@ -52,6 +52,7 @@
 | `smoke` | `.nvmrc` Node로 `node scripts/instance.mjs --print-env`의 슬롯 0 포트·주소(`API_PORT`·`WEB_PORT`·`API_URL`·`WEB_URL`, 원본 `infra/local/.env.example`)를 job 환경에 넣고, 공용 패키지·API·웹을 빌드해 PostgreSQL 서비스에 연결한 API(`node apps/api/dist/main.js`, `PORT=$API_PORT`)와 웹(`next start --port $WEB_PORT`)을 백그라운드로 띄운 뒤 준비를 기다려 `pnpm smoke`를 실행합니다. 실패하면 API·웹 로그를 출력합니다. |
 | `이미지 빌드 api`·`이미지 빌드 web` | 운영 이미지(`apps/api/Dockerfile`, `apps/web/Dockerfile`)가 `linux/amd64`로 빌드되는지 확인합니다(buildx, gha 캐시). 푸시하지 않습니다. 배포 대상 플랫폼 빌드는 `deploy.yml`이 합니다. |
 | `work scope` | `work/NNNN-*` 브랜치의 PR에서만 전체 이력을 받아 `pnpm work:scope --base origin/<기준 브랜치>`로 변경 파일이 티켓 역할의 소유 경로 안에 있는지 검사합니다. |
+| `CI 통과` | 위 job이 모두 끝난 뒤 항상 돌아, 하나라도 실패·취소면 실패합니다(건너뜀은 통과). ruleset의 필수 검사는 이 job 하나입니다. 개별 job을 필수로 걸면 문서만 바뀐 PR에서 건너뛴 matrix job이 치환되지 않은 이름(`check (Node ${{ matrix.node }})`)으로 보고되어 필수 이름이 오지 않기 때문입니다. job을 추가하면 이 job의 `needs`에도 넣습니다. |
 
 지원 Node.js 버전을 바꾸면 workflow의 `matrix.node`, `.nvmrc`, 운영 이미지 베이스(`apps/*/Dockerfile`), `apps/web/package.json`의 `engines`, README 요구사항을 함께 고칩니다. 버전 선택 기준은 [저장소 공통 정책](repository-policy.md#의존성-버전)입니다.
 
@@ -68,7 +69,7 @@
 
 수동 롤백은 [`.github/workflows/rollback.yml`](../../.github/workflows/rollback.yml)(입력 `target`·`release`)입니다. 의존성 갱신 PR은 [`.github/dependabot.yml`](../../.github/dependabot.yml)이 주 1회 엽니다. 워크플로 문법은 `actionlint`로 검사합니다(로컬 설치 시 `actionlint .github/workflows/*.yml`).
 
-GitHub Actions가 돌지 않을 때(사용량 한도 초과·장애)는 CI 대신 로컬 `pnpm verify`·`pnpm smoke`·`pnpm e2e`를 실행해 PR에 결과를 적고 머지한 뒤, 운영자 컴퓨터에서 [`infra/prod/deploy-local.sh`](../../infra/prod/deploy-local.sh)로 같은 순서(변경 판별 → 대상 서버에서 이미지 빌드 → `deploy` → `운영 주소 검사`·실패 시 롤백 → 배포 기록 태그)의 배포를 실행합니다. 이때 머지 뒤 확인은 이 스크립트 출력(`완료` 줄)입니다. 절차와 한계(소스맵 업로드 없음, 이미지는 서버에만)는 [런북 16](../../infra/docs/prod-runbook.md#16-github-actions-없이-배포)입니다.
+GitHub Actions가 돌지 않을 때(장애, 비공개 시절의 사용량 한도 초과)는 CI 대신 로컬 `pnpm verify`·`pnpm smoke`·`pnpm e2e`를 실행해 PR에 결과를 적고, `CI 통과`가 오지 않으므로 저장소 admin이 ruleset 우회로 머지한 뒤, 운영자 컴퓨터에서 [`infra/prod/deploy-local.sh`](../../infra/prod/deploy-local.sh)로 같은 순서(변경 판별 → 대상 서버에서 이미지 빌드 → `deploy` → `운영 주소 검사`·실패 시 롤백 → 배포 기록 태그)의 배포를 실행합니다. 이때 머지 뒤 확인은 이 스크립트 출력(`완료` 줄)입니다. 절차와 한계(소스맵 업로드 없음, 이미지는 서버에만)는 [런북 16](../../infra/docs/prod-runbook.md#16-github-actions-없이-배포)입니다.
 
 ### 운영 확인
 

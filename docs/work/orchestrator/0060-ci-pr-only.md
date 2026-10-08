@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 검증
+- 상태: 완료
 - 종류: 운영
 - 우선순위: P1
 - 작성일: 2026-10-08
@@ -36,3 +36,4 @@ main은 브랜치 보호가 없어 CI가 실패했거나 오래된 기준 위의
 
 - 2026-10-08: 생성, 브랜치 `work/0060-ci-pr-only`. 계기: 사용자 지시(위 목적).
 - 2026-10-08: 구현. `ci.yml`: `push` 트리거, `changes`의 push 비교(`github.event.before`) 분기, `work scope`의 이벤트 조건 제거. `deploy.yml`: `workflow_run` → `push: branches: [main]`, `plan` 조건 `github.ref == 'refs/heads/main'`, 배포 커밋 `GITHUB_SHA`(태그 push는 브랜치 필터에 걸리지 않아 `record`가 다시 배포를 부르지 않음). Tailscale OIDC subject(`ref:refs/heads/main`)는 push에서도 같아 바꿀 것 없음. 문서: 검증 루프 CI·CD, 배포 설계 워크플로 표, 런북 2-2·5, 변경 기록(루트·인프라). 확인: `actionlint .github/workflows/*.yml` 통과, `pnpm verify --fast` 통과. 실제 트리거 동작은 Actions 무료 몫이 2026-11-01에 돌아온 뒤 첫 PR·머지에서 확인(지금은 job이 시작되지 않음).
+- 2026-10-08: PR #57 squash 머지(`de51721`). 트리거 확인: 머지 push로 Deploy만 실행(`plan` 성공, api·web·release 모두 아니오라 이미지·배포·태그 건너뜀, 18:13Z), 같은 커밋의 CI push 실행은 없음. 이후 저장소가 공개로 바뀌어(사용자) Actions 사용 시간 제한은 사라졌고, 0061의 ruleset(최신 main 기준 필수 검사)이 머지 전 검사를 강제하므로 main 재검사 없이 둡니다.
