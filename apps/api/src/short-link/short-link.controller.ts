@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { AppConfig } from '../config.service';
 import { Database } from '../database';
 import { readCookie, serializeCookie, UUID_PATTERN } from '../common/http';
+import { countBusinessMetric } from '../monitoring/metrics';
 import { LandingPassService } from './landing-pass.service';
 import { requestFacts, TrackingService } from './tracking.service';
 
@@ -82,6 +83,7 @@ export class ShortLinkController {
         requestFacts(request, this.config.trustedProxyHops),
       ),
     );
+    countBusinessMetric('crelink.link.click');
     // 열린 리디렉트 방지: DB에 저장된(저장 시 http·https만 허용한) URL로만 보냅니다.
     this.redirect(response, link.url);
   }
@@ -115,6 +117,7 @@ export class ShortLinkController {
         requestFacts(request, this.config.trustedProxyHops),
       ),
     );
+    countBusinessMetric('crelink.short_link.visit');
     this.redirect(
       response,
       `${this.config.webUrl}${CRELINK_WEB_PATHS.landing(target.public_id, this.landingPass.issue(target.public_id))}`,

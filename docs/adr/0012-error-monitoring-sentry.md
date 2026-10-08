@@ -1,7 +1,7 @@
 # ADR 0012: 오류·성능 모니터링에 Sentry SaaS(미국 리전) 사용
 
 - 날짜: 2026-10-07
-- 상태: 승인 (2026-10-07 사용자 선택: 호스팅·수집 범위·개인정보·소스맵 업로드·대상 앱)
+- 상태: 승인 (2026-10-07 사용자 선택: 호스팅·수집 범위·개인정보·소스맵 업로드·대상 앱). 결정 2의 리플레이·브라우저 세션 제외와 대안 "세션 리플레이"는 [ADR 0014](0014-sentry-free-plan-features.md)가 대체(2026-10-08)
 - 범위: API(`apps/api`, `@sentry/nestjs`)·웹(`apps/web`, `@sentry/nextjs`)의 오류·성능 이벤트 전송, 두 Dockerfile의 소스맵 업로드, Deploy 워크플로의 빌드 인자·secret, 운영 암호문의 `SENTRY_*` 평문 키, 웹 `/privacy`의 국외 이전 고지. Expo 앱(`apps/app`)은 범위 밖
 - 관계: [ADR 0010](0010-prod-deployment-topology.md)의 비밀값 원칙(앱 비밀값은 서버 복호화, CI에는 두지 않음)과 릴리스 단위(커밋 SHA)를 그대로 따릅니다. 운영 배포 설계 [`crelink-prod-deploy.md`](../specs/crelink-prod-deploy.md)의 "모니터링·알림 고도화(후속)" 중 오류·성능 모니터링을 이 결정이 정합니다.
 
@@ -15,7 +15,7 @@
 ## 결정
 
 1. **호스팅**: Sentry SaaS(sentry.io), 데이터 저장 위치 **미국(US)**. 조직 하나에 프로젝트 둘(API·웹, 프로젝트마다 DSN 하나).
-2. **수집 범위**: 오류 전부 + 성능 추적 표본 10%(`tracesSampleRate` 0.1, API는 `SENTRY_TRACES_SAMPLE_RATE`로 조정). 세션 리플레이·프로파일링은 쓰지 않습니다. 브라우저 Release Health 세션(`browserSessionIntegration`, 기본으로 켜짐)도 꺼서 페이지를 열 때마다 보내지 않게 합니다.
+2. **수집 범위**: 오류 전부 + 성능 추적 표본 10%(`tracesSampleRate` 0.1, API는 `SENTRY_TRACES_SAMPLE_RATE`로 조정). 세션 리플레이·프로파일링은 쓰지 않습니다. 브라우저 Release Health 세션(`browserSessionIntegration`, 기본으로 켜짐)도 꺼서 페이지를 열 때마다 보내지 않게 합니다. (리플레이·브라우저 세션·로그·지표·의견·Cron·Uptime은 [ADR 0014](0014-sentry-free-plan-features.md)로 켬. 프로파일링 제외는 유지)
 3. **개인정보**: 사용자 결정 `sendDefaultPii: true`(IP와 사용자 정보 포함)를 SDK 11.x에서는 `dataCollection` 옵션으로 구현합니다(11.x에는 `sendDefaultPii` 옵션이 없음).
    - 사용자 정보는 크리링 내부 사용자 ID(UUID)만 `Sentry.setUser({ id })`로 넣고, 이메일·이름은 넣지 않습니다. API는 세션 가드가 확인한 모든 요청에, 웹은 서버가 `GET /api/me`로 ID를 아는 `/me` 화면(서버 요청과 브라우저)에만 붙입니다.
    - API는 SDK의 자동 IP 추론(`X-Forwarded-For` 첫 값이라 위조 가능)을 끄고(`dataCollection.userInfo: false`), 요청 스코프의 user에 방문 기록과 같은 `clientIp`(`TRUSTED_PROXY_HOPS`) 값을 `ip_address`로 직접 넣습니다. 웹 브라우저는 기본값(`userInfo` 켜짐)이라 Sentry가 브라우저 접속 IP를 기록합니다. 웹 서버는 신뢰할 프록시 판정 기준이 없어 헤더 기반 추론을 끄고 IP를 넣지 않습니다(방문자 IP는 같은 trace의 브라우저·API 이벤트에 있음).

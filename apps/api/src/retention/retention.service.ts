@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import { CRELINK_LIMITS } from '@crelink/shared';
 import { Database } from '../database';
 
@@ -8,9 +9,24 @@ export const STATS_TIME_ZONE = 'Asia/Seoul';
 const RETENTION_LOCK_KEY = 931475211;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** Sentry Cron 모니터 slug. 첫 체크인이 모니터를 만듭니다(`RETENTION_MONITOR_CONFIG` upsert). */
+const RETENTION_MONITOR_SLUG = 'crelink-api-retention';
+
+/**
+ * 하루 간격(기동 때 실행 + `setInterval` 24시간이라 crontab이 아니라 interval). 배포·재시작은 다음 실행을 앞당길 뿐이라 늦지 않고,
+ * `setInterval` 지연을 넉넉히 덮도록 체크인 여유 60분, 작업은 보통 수 초지만 다른 인스턴스의 advisory lock 대기를 덮도록 최대 실행 30분.
+ */
+const RETENTION_MONITOR_CONFIG: Parameters<typeof Sentry.withMonitor>[2] = {
+  schedule: { type: 'interval', value: 1, unit: 'day' },
+  timezone: STATS_TIME_ZONE,
+  checkinMargin: 60,
+  maxRuntime: 30,
+};
+
 /**
  * 접근 로그 보존 작업(R11). 기동 시와 24시간마다 365일보다 오래된 날짜의 visits·link_clicks를 집계 테이블로 옮기고
  * 같은 트랜잭션에서 원본을 지웁니다. 여러 API 인스턴스가 동시에 돌지 않게 트랜잭션 advisory lock을 잡습니다.
+ * 실행마다 Sentry Cron 체크인(`in_progress` → `ok`·`error`)을 보냅니다. `SENTRY_DSN`이 비면 보내지 않고 작업만 실행합니다.
  */
 @Injectable()
 export class RetentionService implements OnApplicationBootstrap, OnModuleDestroy {
@@ -21,8 +37,9 @@ export class RetentionService implements OnApplicationBootstrap, OnModuleDestroy
 
   onApplicationBootstrap() {
     const runLogged = () =>
-      this.runOnce().catch((error: unknown) =>
-        this.logger.error(`보존 작업 실패: ${error instanceof Error ? error.message : String(error)}`),
+      Sentry.withMonitor(RETENTION_MONITOR_SLUG, () => this.runOnce(), RETENTION_MONITOR_CONFIG).catch(
+        (error: unknown) =>
+          this.logger.error(`보존 작업 실패: ${error instanceof Error ? error.message : String(error)}`),
       );
     void runLogged();
     this.timer = setInterval(runLogged, DAY_MS);

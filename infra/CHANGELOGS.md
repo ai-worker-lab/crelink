@@ -2,6 +2,10 @@
 
 내부 참고용으로 인프라의 모든 변경을 적용 여부와 관계없이 기록합니다. 환경별 적용 시각·결과·복구 정보는 운영 work item이나 배포 플랫폼에 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-10-08
+
+- Sentry 무료 요금제 기능(ADR 0014): 런북 15에 ADR 0014 연결, 요금제 한도(Logs·Metrics·리플레이·Cron·Uptime·첨부), 15-4 확인 항목(로그·지표·Cron·Uptime·리플레이·Release Health·의견), 15-5 끄기에 Uptime·Cron 모니터 정리와 리플레이 한도, 새 15-6 화면 설정(Uptime `https://links.shaul.kr/api/backend/api/health` 1분·`crelink-web`·`production`, 두 프로젝트 Inbound Filters, Cron은 코드 upsert), 출처 4줄. 2026-10-08에 Uptime 모니터와 `crelink-api` 필터(브라우저 확장·크롤러·오래된 브라우저)를 Sentry 화면에 적용. 실행 설정 변경 없음. 근거 `docs/work/orchestrator/0052-sentry-free-features.md`.
+
 ## 2026-10-07
 
 - Sentry 설정(ADR 0012): 루트 `.sops.yaml` `unencrypted_regex`에 `SENTRY_DSN`·`SENTRY_ENVIRONMENT` 추가(DSN은 공개돼도 이벤트 전송만 되는 값. 정규식은 파일 메타데이터에 기록되므로 키를 넣기 전에 한 번 다시 암호화, 암호문은 아직 그대로). 런북 15 "Sentry 오류·성능 모니터링"(조직·프로젝트 만들기(US), API DSN 암호문 넣기, GitHub variables·secret과 `force` 재빌드, 확인, 끄기·업로드 장애·토큰·DSN 회전·한도), 값 표·회전 표·출처. 근거 `docs/work/orchestrator/0042-sentry-monitoring.md`.

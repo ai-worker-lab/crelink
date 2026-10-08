@@ -446,6 +446,27 @@ textarea.input {
   align-items: center;
   gap: var(--ds-space-8);
 }
+/*
+ * Sentry 의견 보내기 창(`FeedbackButton`). 창은 `body`에 붙는 `#sentry-feedback`의 shadow DOM 안에 그려지고,
+ * 바깥 문서 규칙이 SDK의 `:host` 기본값보다 우선하므로 여기서 디자인 토큰으로 색·글꼴·모서리를 정합니다.
+ */
+#sentry-feedback {
+  --font-family: var(--ds-font-sans);
+  --font-size: var(--ds-font-size-14);
+  --page-margin: var(--ds-space-16);
+  --foreground: var(--ds-color-text-primary);
+  --background: var(--ds-color-surface-default);
+  --accent-foreground: var(--ds-color-text-on-action);
+  --accent-background: var(--ds-color-action-primary);
+  --success-color: var(--ds-color-status-positive);
+  --error-color: var(--ds-color-status-danger);
+  --border: 1px solid var(--ds-color-border-default);
+  --box-shadow: var(--card-shadow);
+  --outline: 3px solid var(--ds-color-text-primary);
+  --dialog-border-radius: var(--ds-corner-lg);
+  --input-border-radius: var(--ds-corner-md);
+  --button-border-radius: var(--ds-corner-full);
+}
 .app-main {
   max-width: 760px;
   margin: 0 auto;

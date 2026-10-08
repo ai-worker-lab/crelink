@@ -182,6 +182,7 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 | 0035 | infra | edge 스택 `edge/compose.yaml`(project `crelink-edge`), Caddyfile(`admin localhost:2019`·`grace_period 30s`·`import upstreams.caddy`·`lb_try_duration`·keep-alive 4초), 색 스택 `compose.yaml`(`crelink-blue`·`crelink-green`, 별칭 `api-<색>`·`web-<색>`, GeoIP 외부 볼륨), `lib.sh` `switch_color`, `deploy.sh`·`rollback.sh`·`geoip.sh`·`bootstrap.sh`·`ssh-entry.sh status`, `cutover.sh`(`--revert`), 시험 `zero-downtime.sh`·`cutover-rehearsal.sh`·`deploy-rollback.sh`, 런북 6-2·6-3·14 |
 | 0036 | orchestrator | home-server cutover(공백 0.5초)와 부하 중 배포 검증, 이 문서·`deploy.yml`·`rollback.yml` 주석·`dependabot.yml`(edge compose)·관련 문서를 현재 동작으로 |
 | 0042 | orchestrator | Sentry 오류·성능 모니터링([ADR 0012](../adr/0012-error-monitoring-sentry.md)): API `@sentry/nestjs`·웹 `@sentry/nextjs`, DSN 없으면 꺼짐, 두 Dockerfile 소스맵 업로드(BuildKit secret), `deploy.yml` 빌드 인자·secret, `.sops.yaml` 평문 키 `SENTRY_DSN`·`SENTRY_ENVIRONMENT`, `/privacy` 국외 이전 고지, 런북 15 |
+| 0052 | orchestrator | Sentry 무료 요금제 기능([ADR 0014](../adr/0014-sentry-free-plan-features.md)): API Logs·업무 지표·Cron 체크인(`crelink-api-retention`), 웹 오류 세션 리플레이·브라우저 세션·콘솔 로그·관리 화면 의견 보내기, Sentry 화면의 Uptime(`/api/backend/api/health`)·Inbound filters, `/privacy`, 런북 15. 배포 설정·키 변경 없음 |
 
 ## 위험·후속 `[임시값]`
 
@@ -198,7 +199,7 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 - 단축 도메인(`go.shaul.kr`)은 임시. 정식 도메인이 정해지면 `SHORT_LINK_BASE_URL`·Caddy 호스트·Tunnel 공개 호스트를 함께 바꿉니다. 이미 인스타그램에 걸린 링크는 옛 도메인이 유지되어야 합니다.
 - 속도 제한(rate limit)·WAF는 Cloudflare 무료 기능으로 시작하고 부족하면 Caddy 쪽을 추가합니다(후속).
 - 이미지 한도 4MB는 MVP 임시값입니다. edge Caddy의 `request_body` 6MB가 웹 호스트 본문 상한입니다.
-- Sentry([ADR 0012](../adr/0012-error-monitoring-sentry.md)): 무료(Developer) 요금제는 사용자 1명, 월 오류 5천 건·span 500만 개, 보관 30일이라 오류가 폭주하면 그 달 나머지 이벤트를 받지 못합니다. 브라우저 이벤트는 광고 차단기에 일부 막힙니다(`tunnelRoute` 미사용). Sentry 장애 때 토큰이 있으면 소스맵 업로드 실패로 이미지 빌드·배포가 막히므로, 급하면 secret `SENTRY_AUTH_TOKEN`을 지우고 다시 실행합니다(소스맵 없이 배포). 웹 DSN이 빌드 시점 값이라 웹 이미지가 Sentry 프로젝트에 묶입니다. 설정·끄기는 [런북 15](../../infra/docs/prod-runbook.md#15-sentry-오류성능-모니터링).
+- Sentry([ADR 0012](../adr/0012-error-monitoring-sentry.md), [ADR 0014](../adr/0014-sentry-free-plan-features.md)): 무료(Developer) 요금제는 사용자 1명, 월 오류 5천 건·span 500만 개·리플레이 50건, 보관 30일이라 오류가 폭주하면 그 달 나머지 이벤트·리플레이를 받지 못합니다. 브라우저 이벤트는 광고 차단기에 일부 막힙니다(`tunnelRoute` 미사용). Sentry 장애 때 토큰이 있으면 소스맵 업로드 실패로 이미지 빌드·배포가 막히므로, 급하면 secret `SENTRY_AUTH_TOKEN`을 지우고 다시 실행합니다(소스맵 없이 배포). 웹 DSN이 빌드 시점 값이라 웹 이미지가 Sentry 프로젝트에 묶입니다. Uptime·Cron 모니터와 Inbound filters는 저장소가 아니라 Sentry 화면 설정입니다(Cron은 코드가 upsert). 설정·끄기는 [런북 15](../../infra/docs/prod-runbook.md#15-sentry-오류성능-모니터링).
 
 ## 검증 계획
 
@@ -222,3 +223,4 @@ API 기동 시 migration이 돌고(세션 advisory lock, 그래서 트랜잭션 
 - 2026-10-07: ADR 0011 승인(사용자). 운영 검증 결과(배포 4회·롤백 6회·헬스 실패 배포·GeoIP 재기동 모두 요청 실패 0건)를 위험·후속에 반영. 근거: `docs/work/orchestrator/0036-zero-downtime-cutover-verify.md`.
 - 2026-10-07: 의존성 LTS 기준 업그레이드(0039): 이미지 베이스 `node:24-slim`, geoip-writer `alpine:3.24`, 옛 색 web 종료 코드 143 설명. 근거: `docs/work/orchestrator/0039-lts-major-upgrades.md`.
 - 2026-10-07: Sentry 오류·성능 모니터링(ADR 0012): 암호문 평문 키 `SENTRY_DSN`·`SENTRY_ENVIRONMENT`, 이미지 빌드 인자·BuildKit secret, GitHub variables `SENTRY_ORG`·`SENTRY_PROJECT_API`·`SENTRY_PROJECT_WEB`·`SENTRY_WEB_DSN`과 secret `SENTRY_AUTH_TOKEN`, 워크플로 `image`, 보안 경계·위험, 변경 범위 0042. 근거: `docs/work/orchestrator/0042-sentry-monitoring.md`.
+- 2026-10-08: Sentry 무료 요금제 기능(ADR 0014): 변경 범위 0052, 위험(리플레이 한도, Sentry 화면 설정). 배포 설정·키는 바뀌지 않음. 근거: `docs/work/orchestrator/0052-sentry-free-features.md`.

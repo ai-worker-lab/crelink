@@ -2,6 +2,14 @@
 
 내부 참고용으로 백엔드 API의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-10-08
+
+- Sentry 무료 기능(ADR 0014): Nest 로그·업무 지표·보존 작업 Cron 체크인을 보냄. `SENTRY_DSN`이 비면 아무것도 보내지 않고 동작 변화 없음. 근거 `docs/work/orchestrator/0052-sentry-free-features.md`.
+  - Logs: `main.ts`가 `NestFactory.create`에 `SentryConsoleLogger`(`src/monitoring/sentry-logger.ts`, `ConsoleLogger` 하위 클래스)를 넘김. 콘솔 출력은 그대로, `log`·`warn`·`error`·`fatal`을 Sentry Logs(`info`·`warn`·`error`·`fatal`, 속성 `nest.context`·`nest.stack`)로도 보냄(`debug`·`verbose` 제외). `beforeSendLog: scrubLog`가 이름에 `cookie`·`authorization`·`token`·`secret`·`password`·`email`이 든 속성과 `user.email`·`user.name`을 지우고 본문·문자열 속성의 이메일(`[email]`)·JWT(`[token]`)를 가림(`user.id`는 남김). 기존 로그 점검: `AuthService` 구글 검증 실패 경고는 라이브러리 오류 문구가 ID 토큰 원문·payload(이메일·이름·사진·sub)를 붙이므로 `googleVerifyFailureReason`(`src/auth/google-oauth.ts`)으로 그 꼬리를 버리고 오류 이름과 이유만 남김(콘솔 출력도 같은 문구로 바뀜). 다른 로그는 해당 없음.
+  - Metrics: `src/monitoring/metrics.ts`의 `countBusinessMetric`으로 counter 3종 `crelink.auth.login`(`POST /api/auth/google/callback`, `result`: `success`·`failure`)·`crelink.short_link.visit`(`GET /{slug}` 랜딩 302)·`crelink.link.click`(`GET /c/{linkPublicId}` 외부 URL 302). 속성에 단축 주소·링크·사용자·IP 없음. `beforeSendMetric: scrubMetric`이 `user.*`와 이메일·IP 속성을 지움.
+  - Cron: `RetentionService` 실행을 `Sentry.withMonitor('crelink-api-retention', …)`로 감쌈(`in_progress` → `ok`·`error`, 모니터 upsert: interval 1일·`Asia/Seoul`·체크인 여유 60분·최대 실행 30분). 실패 오류 로그는 그대로.
+  - 시험: `src/monitoring/sentry.spec.ts`에 로그 정리(속성 삭제·이메일·JWT 가림·`user.id` 유지)·지표 정리(사용자 ID·이메일·이름·IP 삭제) 2건, `src/auth/google-oauth.spec.ts`에 검증 실패 문구(payload·토큰 꼬리 제거, 이유 유지) 1건. 문서 `docs/README.md#로그지표cron`.
+
 ## 2026-10-07
 
 - Sentry 오류·성능 모니터링(ADR 0012): `@sentry/nestjs` 11.4, `src/instrument.ts`를 `main.ts` 맨 처음에 불러오고 `SentryModule.forRoot()`. 환경변수 `SENTRY_DSN`(비면 꺼짐, 운영 필수 아님)·`SENTRY_ENVIRONMENT`(기본 `NODE_ENV=production`이면 `production`, 아니면 `development`)·`SENTRY_RELEASE`(이미지 빌드 인자, 배포 커밋 SHA)·`SENTRY_TRACES_SAMPLE_RATE`(기본 0.1). 전역 `ApiExceptionFilter`가 예상하지 못한 오류(500 `internal_error`)만 보내고 4xx는 보내지 않음. 세션 가드가 확인한 사용자는 내부 ID만 user `id`로, IP는 SDK 자동 추론(`dataCollection.userInfo: false`)이 아니라 방문 기록과 같은 `clientIp`(`TRUSTED_PROXY_HOPS`)를 `ip_address`로. 쿠키·`Authorization`·`Cookie`·`X-Crelink-Internal` 헤더, 요청 본문, DB 쿼리 파라미터는 보내지 않고 쿼리 `code`·`state`·`pass`는 `[Filtered]`. 종료 때 남은 이벤트를 비움. 운영 이미지 빌드에서 BuildKit secret `sentry_auth_token`이 있으면 `@sentry/cli`로 소스맵 업로드(실패하면 빌드 실패). 운영 값은 암호문 평문 키 `SENTRY_DSN`·`SENTRY_ENVIRONMENT`. 근거 `docs/work/orchestrator/0042-sentry-monitoring.md`.

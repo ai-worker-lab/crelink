@@ -69,7 +69,7 @@ make infra-up   # 테스트는 실제 PostgreSQL이 필요합니다
 pnpm test       # 공용 패키지 빌드 후 test 스크립트가 있는 모든 workspace의 테스트 실행
 ```
 
-현재 테스트는 API 통합 테스트(`apps/api/test/*.e2e-spec.ts`, Jest + ts-jest)뿐입니다. NestJS 12가 ESM 전용이라 Jest가 `--experimental-vm-modules`로 ESM을 불러오므로 Node 24.9 이상이 필요합니다(`apps/api`의 `test` 스크립트가 플래그를 붙임, [API 문서](../../apps/api/docs/README.md)). 테스트마다 일회용 데이터베이스(`crelink_test_*`)를 만들고 끝나면 지우므로 개발 DB의 데이터는 바뀌지 않습니다. 관리 연결은 `TEST_DATABASE_URL`, 없으면 `apps/api/.env`의 `DATABASE_URL`을 쓰며, 그 사용자에게 데이터베이스 생성 권한이 필요합니다(로컬 Compose 사용자는 권한이 있습니다). `pnpm verify`는 `.local/instance.env`의 `TEST_DATABASE_URL`을 넘기므로 worktree에서도 그 인스턴스 DB로 테스트합니다. `pnpm test`를 직접 실행할 때는 worktree 인스턴스 값을 `TEST_DATABASE_URL`로 넘깁니다. 한 영역만 실행하려면 `pnpm --filter @crelink/api test`를 씁니다.
+테스트는 API 테스트(`apps/api`의 `test/*.e2e-spec.ts` 통합 테스트와 `src/**/*.spec.ts` 단위 테스트, Jest + ts-jest)와 웹 단위 테스트(`apps/web/src/**/*.spec.ts`, Node 내장 `node:test`가 타입을 지우고 바로 실행)입니다. NestJS 12가 ESM 전용이라 Jest가 `--experimental-vm-modules`로 ESM을 불러오므로 Node 24.9 이상이 필요합니다(`apps/api`의 `test` 스크립트가 플래그를 붙임, [API 문서](../../apps/api/docs/README.md)). 테스트마다 일회용 데이터베이스(`crelink_test_*`)를 만들고 끝나면 지우므로 개발 DB의 데이터는 바뀌지 않습니다. 관리 연결은 `TEST_DATABASE_URL`, 없으면 `apps/api/.env`의 `DATABASE_URL`을 쓰며, 그 사용자에게 데이터베이스 생성 권한이 필요합니다(로컬 Compose 사용자는 권한이 있습니다). `pnpm verify`는 `.local/instance.env`의 `TEST_DATABASE_URL`을 넘기므로 worktree에서도 그 인스턴스 DB로 테스트합니다. `pnpm test`를 직접 실행할 때는 worktree 인스턴스 값을 `TEST_DATABASE_URL`로 넘깁니다. 한 영역만 실행하려면 `pnpm --filter @crelink/api test`·`pnpm --filter @crelink/web test`를 씁니다.
 
 ## 코드 검사
 

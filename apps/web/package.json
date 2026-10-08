@@ -9,7 +9,8 @@
   "scripts": {
     "start": "WEB_PORT=${WEB_PORT:-$(node ../../scripts/instance.mjs --get WEB_PORT)} && next dev --port $WEB_PORT",
     "build": "next build",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "node --test 'src/**/*.spec.ts'"
   },
   "dependencies": {
     "@crelink/design-tokens": "workspace:*",

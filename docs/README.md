@@ -32,7 +32,8 @@
 - [ADR 0009 work item을 역할별 폴더에 둠](adr/0009-work-item-role-folders.md) — 에픽은 `docs/work/epics/`, 티켓은 `docs/work/<역할>/`에 두고 계층은 계속 필드로 표현하는 결정
 - [ADR 0010 운영(prod) 배포 구성과 CD](adr/0010-prod-deployment-topology.md) — 배포 대상 서버 1대의 웹·API Compose 스택, Cloudflare Tunnel 공개, Tailscale OIDC 배포 접속, SOPS/age 비밀값, main 병합 자동 배포와 롤백(제안)
 - [ADR 0011 운영 배포 무중단 방식](adr/0011-zero-downtime-deploy.md) — 고정 edge Caddy + Blue/Green 앱 스택, Caddy reload 전환, 선행 0단계(graceful shutdown·`start_interval`·DB pool 상한)(승인, home-server 운영 적용. ADR 0010의 Kamal 후보 문구와 단일 스택·헬스 실패 복구 방식 대체)
-- [ADR 0012 오류·성능 모니터링에 Sentry](adr/0012-error-monitoring-sentry.md) — Sentry SaaS(미국 리전), 오류 전부 + 성능 추적 10%, IP·내부 사용자 ID만, CI 이미지 빌드에서 소스맵 업로드, DSN 없으면 꺼짐, `/privacy` 국외 이전 고지(승인)
+- [ADR 0012 오류·성능 모니터링에 Sentry](adr/0012-error-monitoring-sentry.md) — Sentry SaaS(미국 리전), 오류 전부 + 성능 추적 10%, IP·내부 사용자 ID만, CI 이미지 빌드에서 소스맵 업로드, DSN 없으면 꺼짐, `/privacy` 국외 이전 고지(승인. 리플레이·브라우저 세션 제외는 ADR 0014가 대체)
+- [ADR 0014 Sentry 무료 요금제 기능 모두 사용](adr/0014-sentry-free-plan-features.md) — API Logs·업무 지표·Cron 체크인, 웹 오류 세션 리플레이(가림)·브라우저 세션·콘솔 로그·관리 화면 의견 보내기, Uptime 1개·Inbound filters, 유료 기능 제외(승인)
 - [외부 서비스·도구 의존](architecture/external-dependencies.md) — 현재 사용 중이거나 계획된 외부 SaaS·도구와 기준 위치
 - [자주 묻는 질문](faq.md) — 저장소 구조, 개발 도구, 로컬 실행, 배포 목표, 언어 정책
 - [배포 대상 아키텍처](architecture/deployment-target.md) — 운영 배치(배포 대상 서버·Supabase·Cloudflare Tunnel)와 운영상 경계

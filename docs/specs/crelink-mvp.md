@@ -147,7 +147,7 @@ migration은 `apps/api/migrations/`의 SQL 파일(기존 실행기). 모든 시�
 - **권한**: `/api/me/*`는 로그인 사용자 본인 데이터만. `/api/admin/*`는 `role='operator'`만. 정지된 사용자는 로그인·편집 불가, 랜딩·단축 URL은 안내로 바뀝니다.
 - **방문자 쿠키**: `cl_vid`(UUID, httpOnly, SameSite=Lax, 1년)는 단축 도메인. 동의 창 없이 `/privacy`에 고지(R9 사용자 결정).
 - **개인정보**: IP 원문·기기·위치·유입 경로를 1년 보관(R11). 운영자 화면만 조회. 집계 테이블에는 IP를 넣지 않습니다. 법률 검토는 PRD 위험에 남아 있습니다.
-- **오류·성능 진단**: 운영 API·웹은 오류와 성능 추적 표본(10%)을 Sentry(미국)로 보냅니다. IP와 크리링 내부 사용자 ID만 넣고 이메일·이름·쿠키·인증 헤더·요청 본문은 보내지 않으며, `/privacy`에 국외 이전으로 고지합니다. 결정과 위험은 [ADR 0012](../adr/0012-error-monitoring-sentry.md)입니다.
+- **오류·성능 진단**: 운영 API·웹은 오류와 성능 추적 표본(10%)을 Sentry(미국)로 보냅니다. IP와 크리링 내부 사용자 ID만 넣고 이메일·이름·쿠키·인증 헤더·요청 본문은 보내지 않으며, `/privacy`에 국외 이전으로 고지합니다. 결정과 위험은 [ADR 0012](../adr/0012-error-monitoring-sentry.md)입니다. 무료 요금제의 로그·업무 지표·Cron·Uptime, 웹 오류 세션 리플레이(화면 가림)·브라우저 세션·관리 화면 의견 보내기는 [ADR 0014](../adr/0014-sentry-free-plan-features.md)입니다.
 - **비밀값**(`apps/api/.env`, 사용자가 채움): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPERATOR_EMAILS`. 비어 있으면 로그인 API가 503 `auth_not_configured`. 구글 콘솔에 등록할 리디렉션 URI는 `{WEB_URL}/auth/google/callback`(로컬 `http://127.0.0.1:5193/auth/google/callback`).
 - **열린 리디렉트 방지**: `/c/{id}`는 DB에 저장된 URL로만 보냅니다. 랜딩 302 대상은 `WEB_URL`로 고정합니다.
 

@@ -23,6 +23,15 @@ export abstract class GoogleOAuth {
   abstract verifyCode(config: GoogleClientConfig, code: string): Promise<GoogleProfile>;
 }
 
+/**
+ * `verifyCode` 실패의 로그 문구(오류 이름과 이유). `google-auth-library`는 이유 뒤에 ID 토큰 원문(`: eyJ…`)이나 payload JSON
+ * (`: {…}`, 이메일·이름·사진·sub)을 붙이므로 그 꼬리를 버립니다. 콘솔과 Sentry Logs에 같은 문구가 남습니다.
+ */
+export function googleVerifyFailureReason(error: unknown): string {
+  const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  return message.replace(/: (?:\{|eyJ)[\s\S]*$/, '');
+}
+
 @Injectable()
 export class GoogleAuthLibraryOAuth extends GoogleOAuth {
   authorizationUrl(config: GoogleClientConfig, state: string): string {

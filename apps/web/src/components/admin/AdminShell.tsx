@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { ServerApiError } from '../../lib/api/server';
 import { ErrorPanel } from '../ErrorPanel';
+import { FeedbackButton } from '../FeedbackButton';
 import { LogoutButton } from '../LogoutButton';
 import { SiteHeader } from '../SiteHeader';
 
@@ -13,6 +14,7 @@ export function AdminShell({ error, children }: { error?: ServerApiError | null;
         <Link href="/admin">크리에이터</Link>
         <Link href="/admin/blocked-domains">차단 도메인</Link>
         <Link href="/me">내 크리링</Link>
+        <FeedbackButton />
         <LogoutButton />
       </SiteHeader>
       <main className="app-main wide">
