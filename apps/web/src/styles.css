@@ -4,6 +4,19 @@
  * 1px·2px 선 두께, 레이아웃 폭·높이, line-height, letter-spacing, 아이콘·이모지 크기는 토큰 대상이 아니다.
  */
 
+/* Pretendard 1.3.9 정적 woff2. 토큰 굵기(--ds-font-weight-*) 400·700·800마다 면 하나. 브라우저는 화면에 쓰인 굵기 파일만 받는다. */
+@font-face {
+  font-family: Pretendard;
+  src: url('/Pretendard-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: Pretendard;
+  src: url('/Pretendard-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
 @font-face {
   font-family: Pretendard;
   src: url('/Pretendard-ExtraBold.woff2') format('woff2');
