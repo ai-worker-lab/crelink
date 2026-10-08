@@ -5,7 +5,7 @@
 ## 실행
 
 - 로컬: 저장소 루트에서 `make infra-up` 후 `make up`(또는 `make api-up`). PM2가 `pnpm --filter @crelink/api start:dev`를 실행하고 `.local/instance.env`의 `PORT`·`DATABASE_URL`·`WEB_URL`·`SHORT_LINK_BASE_URL`을 넘깁니다. 나머지 키는 `apps/api/.env`에서 읽습니다.
-- 기동하면 `apps/api/migrations/*.sql`을 이름 순으로 한 번씩 적용합니다(`src/database.ts`의 `runMigrations`). 스키마 원본은 [`migrations/0001_crelink_mvp.sql`](../migrations/0001_crelink_mvp.sql)입니다.
+- 기동하면 `apps/api/migrations/*.sql`을 이름 순으로 한 번씩 적용합니다(`src/database.ts`의 `runMigrations`). 스키마 원본은 [`migrations/0001_crelink_mvp.sql`](../migrations/0001_crelink_mvp.sql)과 방명록을 더한 [`migrations/0002_guestbook.sql`](../migrations/0002_guestbook.sql)입니다.
 - 확인: `curl -i {API}/api/health/ready`(DB 포함 200), `curl -i {API}/없는주소`(302 `{WEB_URL}/notice?reason=link_not_found`).
 - 테스트: `pnpm --filter @crelink/api test`(Node 24.9 이상). 테스트마다 일회용 DB를 만들어 지웁니다(`test/test-database.ts`). 구글 code 교환은 `GoogleOAuth` provider를, 위치 조회는 `GeoIpService`를 테스트용으로 바꿉니다(`test/test-app.ts`). 이미지 저장소 계약 시험(`test/file-storage.e2e-spec.ts`)은 Docker로 일회용 SeaweedFS(`chrislusf/seaweedfs:4.47`, `test/test-s3.ts`)를 띄우므로 Docker가 실행 중이어야 합니다.
 - ESM 의존성과 Jest: NestJS 12 패키지(`@nestjs/*`)와 `@crelink/shared`는 ESM 전용이고 API는 CommonJS입니다. Jest는 CommonJS 코드가 ESM을 `require`하는 것(require(esm))을 Node 24.9 이상에서 VM 모듈(`--experimental-vm-modules`)이 켜져 있을 때만 지원하므로, `test` 스크립트가 `NODE_OPTIONS`에 이 플래그를 붙입니다(워커마다 `ExperimentalWarning: VM Modules` 경고 한 줄). Node 22에서는 모든 스위트가 `Must use import to load ES Module`로 실패하고, Node 24.20에서도 플래그가 없으면 같은 오류였습니다(2026-10-07 실측). 근거: [Nest 마이그레이션 가이드 "Testing stack"](https://docs.nestjs.com/migration-guide#testing-stack), [Jest "require() of ESM"](https://jestjs.io/docs/ecmascript-modules#require-of-esm). `@crelink/shared`는 빌드 없이 시험하도록 Jest 설정의 `moduleNameMapper`가 TypeScript 원본을 직접 컴파일해 씁니다. 실행 중인 API(`node dist/main.js`)는 Node 자체의 require(esm)(플래그 없음, Node 22.12 이상)으로 두 패키지를 읽습니다.
@@ -194,6 +194,18 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 - 링크 한도(R13): 보이는(숨기지 않고 차단되지 않은) 링크 ≤ 5 + `extra_link_slots`(409 `link_limit_reached`), 숨긴 링크 포함 ≤ 50(409 `link_total_limit_reached`). 추가와 숨김 해제에서 확인하며, 같은 사용자의 링크 변경은 사용자 행 잠금으로 줄 세웁니다. 운영자 추가 슬롯은 0~45.
 - 차단 도메인(R14): 링크 호스트가 차단 도메인이거나 그 하위 도메인이면 추가·URL 수정이 422 `link_domain_blocked`. 운영자가 도메인을 추가하면 같은 트랜잭션에서 기존 링크의 `blocked_at`을 채웁니다. 목록에서 빼도 이미 차단된 링크는 운영자가 링크별로 풉니다.
 - 이미지(`src/files/`): multipart 필드 `file`, `CRELINK_LIMITS.imageMaxBytes`(4MB, MVP 임시값. 운영 edge Caddy의 웹 호스트 본문 한도는 6MB) 이하. 형식은 클라이언트 Content-Type이 아니라 파일 앞부분(매직 바이트)으로 JPEG·PNG·WebP·GIF만 받습니다. 저장은 `FileStorage` 경계 뒤의 로컬 디스크 또는 S3 호환 저장소([이미지 저장소](#이미지-저장소))이고, `GET /api/files/{id}`는 누구나 받을 수 있으며 1년 캐시합니다(id는 UUID, 내용 불변).
+
+## 방명록
+
+`src/guestbook/`(R19). 계약은 `packages/shared/src/crelink.ts`의 방명록 절, 설계는 [랜딩 방명록 탭 기술 설계](../../../docs/specs/crelink-guestbook.md)입니다.
+
+- 목록 `GET /api/landings/{publicId}/guestbook`은 `OptionalSessionGuard`(`src/auth/session.guard.ts`)를 씁니다. `cl_session`이 유효하면 그 사용자를 보는 사람으로, 없거나 만료·정지 세션이면 비회원으로 보고 401을 내지 않습니다. 작성·삭제·숨김은 `SessionGuard`입니다.
+- 랜딩 판정은 공개 랜딩과 같은 `CreatorService.publicLanding`(없음 404 `landing_not_found`, 정지 410 `creator_suspended`) 뒤에 `guestbook_enabled`가 false면 목록·작성이 404 `guestbook_disabled`입니다. 끄기는 `PATCH /api/me/landing { guestbookEnabled }`이고 글은 지우지 않습니다. 삭제·숨김은 방명록을 꺼도 됩니다.
+- 가시성은 SQL 한 곳에서 정합니다: 작성자가 정지된 글은 모두에게 빼고, 그 밖에는 보는 사람이 작성자이거나 랜딩 크리에이터이거나 공개·숨기지 않은 글이면 보입니다. `hidden`은 보는 사람이 랜딩 크리에이터일 때만 실제 값이고, `mine`은 보는 사람이 작성자일 때 true입니다. 안 보이는 글은 쪽 크기·커서에도 영향이 없습니다.
+- 페이지는 최신순 `(created_at, id)` keyset 20개(`CRELINK_LIMITS.guestbookPageSize`)입니다. 커서는 마지막 글의 `created_at` epoch 마이크로초와 id를 `{마이크로초}.{id}`로 묶은 base64url이며(JS `Date`는 밀리초까지라 DB 값을 그대로 씀), 해석할 수 없거나 여러 번 준 커서는 400 `validation_failed`입니다.
+- 작성자 이름·사진은 작성자 랜딩의 현재 `display_name`·`avatar_file_id`를 매번 조인합니다. 본문은 앞뒤 공백을 자른 뒤 1~500자(JS 문자열 길이 기준. DB `CHECK`는 `char_length` 1~500이라 API 검사가 더 엄격함)입니다.
+- 권한 없는 삭제(작성자 아님)·숨김(랜딩 크리에이터 아님)과 없는 글·UUID가 아닌 id는 모두 404 `guestbook_entry_not_found`로 같게 답해 글의 존재를 드러내지 않습니다. 숨김은 `hidden_at = now()`, 해제는 NULL입니다.
+- 네 경로의 성공 응답은 `Cache-Control: no-store`입니다(보는 사람마다 다름).
 
 ## 이미지 저장소
 

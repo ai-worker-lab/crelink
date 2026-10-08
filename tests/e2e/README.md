@@ -1,6 +1,6 @@
 # 크리링 MVP E2E
 
-실행 중인 웹·API·PostgreSQL에 [크리링 MVP 기술 설계의 검증 계획](../../docs/specs/crelink-mvp.md#검증-계획) E2E 1~4를 Playwright로 실행합니다. 화면과 무관한 불변 조건(헬스 체크, 첫 화면 렌더링)은 `pnpm smoke`(`tests/smoke/`)가 맡고, 이 폴더는 화면 시나리오와 웹→API→DB 연결을 확인합니다.
+실행 중인 웹·API·PostgreSQL에 [크리링 MVP 기술 설계의 검증 계획](../../docs/specs/crelink-mvp.md#검증-계획) E2E 1~4와 [방명록 기술 설계의 검증 계획](../../docs/specs/crelink-guestbook.md#검증-계획)을 Playwright로 실행합니다. 화면과 무관한 불변 조건(헬스 체크, 첫 화면 렌더링)은 `pnpm smoke`(`tests/smoke/`)가 맡고, 이 폴더는 화면 시나리오와 웹→API→DB 연결을 확인합니다.
 
 ## 실행
 
@@ -39,5 +39,6 @@ pnpm e2e operator                         # 파일 이름 일부로 골라 실�
 | `visitor.spec.ts` | 2 방문자 | 새 단축 주소(Referer 인스타그램)·옛 주소 모두 `WEB_URL/p/{publicId}` 같은 랜딩(통과 표시 `?pass=`는 주소창에서 지워짐), 숨긴 링크 없음 → 링크 클릭이 `{SHORT}/c/{id}`에서 저장된 URL로 302, 숨긴 링크 클릭 주소는 `link_unavailable` 안내 → `visits`(유입 호스트·기기·브라우저·OS·IP·visitor_id)·`link_clicks` 행, 같은 브라우저 재방문은 같은 `visitor_id`(= `cl_vid` 쿠키), 다른 브라우저는 다른 값. 별도 시나리오로 외부 진입(PRD R7): `/me` 미리보기(같은 출처)는 단축 주소 없이 열리고 방문으로 안 셈 → 랜딩 주소를 바로 열면(Referer 카카오) `/p/{id}` → 단축 주소 → `/p/{id}?pass=…` 리디렉트 사슬, 주소창은 `/p/{id}`, 방문 1건(유입 호스트 유지) → 같은 주소를 다시 열면 또 단축 주소를 거침 |
 | `operator.spec.ts` | 3 운영자 | 방문 3·순 방문자 2·클릭 1을 만든 뒤 `/admin` 검색 → 목록의 최근 30일 방문 → 상세 통계 합계가 DB와 일치, 분포 표(유입 경로·기기·브라우저·운영체제)·링크별 클릭, 390px 확인 → 슬롯 1개 부여 후 크리에이터가 관리 화면 시트로 6번째 링크 추가 → 도메인 차단 후 랜딩에서 링크 사라짐·클릭 주소 안내·관리 화면에 차단 표시와 사유 → 하위 도메인 링크 저장 거부 안내(시트 안) → 크리에이터의 `/admin`·상세 접근은 권한 없음 |
 | `notices.spec.ts` | 4 안내 화면 | 빈 랜딩은 준비 중 문구와 크리링 표시로 열림(390px) → 없는 단축 주소는 `/notice?reason=link_not_found` → 운영자가 정지하면 단축 URL은 `/notice?reason=creator_suspended`, `/p/{id}`도 정지 안내, 링크 클릭 주소는 `link_unavailable`, 크리에이터 세션은 끊겨 `/me`가 홈으로 |
+| `guestbook.spec.ts` | 방명록 1~8 | 크리에이터·작성자·다른 회원·비회원 컨텍스트로 `/p/{id}#guestbook`(단축 주소를 거쳐도 해시와 방명록 탭 유지) → 비회원 빈 상태·`로그인하고 남기기`(`returnTo`) → 작성자의 공개글·비밀글 → 비회원·다른 회원은 공개글만(BFF 응답 원문에도 비밀글 없음, 버튼 없음) → 크리에이터 숨김 시 비회원·다른 회원에게서 사라지고 작성자에게는 숨김 표시 없이 그대로, 숨김 해제 → 작성자 삭제 → 관리 화면 스위치로 끄면 탭 없음·API 404 `guestbook_disabled`, 켜면 남은 글 → 이름 없는 작성자 '크리링 회원', 긴 글 390px |
 
 실제 구글 로그인(키 발급 후)과 인스타그램 인앱 브라우저 확인은 이 테스트 범위 밖이며 설계의 [위험과 스파이크](../../docs/specs/crelink-mvp.md#위험과-스파이크)대로 수동으로 확인합니다.

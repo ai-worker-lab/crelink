@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Pool } from 'pg';
@@ -62,5 +62,38 @@ describe('runMigrations', () => {
     expect(await versions()).toEqual(['001_create']);
     const partial = await pool.query("SELECT to_regclass('public.partial') AS table_name");
     expect(partial.rows[0].table_name).toBeNull();
+  });
+
+  it('0002_guestbook은 기존 랜딩에 방명록 켜짐(기본 true)을 더하고 글 본문 길이·삭제 연쇄를 지킨다', async () => {
+    const source = join(__dirname, '../migrations');
+    copyFileSync(join(source, '0001_crelink_mvp.sql'), join(directory, '0001_crelink_mvp.sql'));
+    await runMigrations(pool, directory);
+    const user = await pool.query<{ id: string }>("INSERT INTO users (email) VALUES ('a@example.com') RETURNING id");
+    const userId = user.rows[0].id;
+    const landing = await pool.query<{ id: string }>(
+      "INSERT INTO landings (user_id, public_id) VALUES ($1, 'abcdefghij') RETURNING id",
+      [userId],
+    );
+    const landingId = landing.rows[0].id;
+
+    copyFileSync(join(source, '0002_guestbook.sql'), join(directory, '0002_guestbook.sql'));
+    await runMigrations(pool, directory);
+
+    expect(await versions()).toEqual(['0001_crelink_mvp', '0002_guestbook']);
+    const enabled = await pool.query('SELECT guestbook_enabled FROM landings WHERE id = $1', [landingId]);
+    expect(enabled.rows[0].guestbook_enabled).toBe(true);
+    const insert = (body: string) =>
+      pool.query('INSERT INTO guestbook_entries (landing_id, author_user_id, body) VALUES ($1, $2, $3) RETURNING *', [
+        landingId,
+        userId,
+        body,
+      ]);
+    const entry = await insert('가'.repeat(500));
+    expect(entry.rows[0]).toMatchObject({ is_secret: false, hidden_at: null, created_at: expect.any(Date) });
+    await expect(insert('')).rejects.toThrow(/guestbook_entries_body_check/);
+    await expect(insert('가'.repeat(501))).rejects.toThrow(/guestbook_entries_body_check/);
+
+    await pool.query('DELETE FROM landings WHERE id = $1', [landingId]);
+    expect((await pool.query('SELECT 1 FROM guestbook_entries')).rowCount).toBe(0);
   });
 });

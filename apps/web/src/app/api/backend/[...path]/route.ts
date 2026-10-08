@@ -34,6 +34,9 @@ const rules: ReadonlyArray<{ methods: readonly string[]; pattern: RegExp; upload
   { methods: ['PUT'], pattern: new RegExp(`^api/admin/links/${ID}/block$`) },
   { methods: ['GET', 'POST'], pattern: /^api\/admin\/blocked-domains$/ },
   { methods: ['DELETE'], pattern: new RegExp(`^api/admin/blocked-domains/${ID}$`) },
+  { methods: ['GET', 'POST'], pattern: new RegExp(`^api/landings/${ID}/guestbook$`) },
+  { methods: ['DELETE'], pattern: new RegExp(`^api/guestbook/${ID}$`) },
+  { methods: ['PUT'], pattern: new RegExp(`^api/guestbook/${ID}/hidden$`) },
 ];
 
 /** 그대로 돌려줄 API 응답 헤더. `Set-Cookie`는 여러 줄이라 따로 옮깁니다. */

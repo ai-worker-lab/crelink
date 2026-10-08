@@ -5,6 +5,7 @@ import {
   type CreatorLandingState,
   type LinkView,
   type ReorderRequest,
+  type UpdateLandingRequest,
   type UpdateLinkRequest,
 } from '@crelink/shared';
 import {
@@ -48,14 +49,17 @@ type SheetState = { link: LinkView | null; opener: HTMLElement | null };
 /**
  * 관리 화면 편집 모드. 공개 랜딩과 같은 배치(`Landing`)에서 리스트형 링크 구역만 편집할 수 있습니다.
  * 링크 추가·수정·삭제는 하단 시트, 순서는 끌어 놓기(`PUT /api/me/links/order`), 숨기기는 스위치(`PATCH hidden`).
+ * 방명록 켜기·끄기는 스위치를 누르면 바로 저장합니다(`PATCH /api/me/landing { guestbookEnabled }`, PRD R19).
  * 저장 뒤에는 편집 상태(`GET /api/me/landing`)를 다시 읽어 한도·순서를 서버 값과 맞춥니다.
  */
 export function LandingEditor({ initial }: { initial: CreatorLandingState }) {
   const [state, setState] = useState(initial);
   const [sheet, setSheet] = useState<SheetState | null>(null);
   const { pending, error, notice, run, setError, setNotice } = useAction();
+  const guestbookAction = useAction();
   const dndId = useId();
   const headingId = useId();
+  const guestbookHeadingId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
   /** 이번 끌기에서 한 번이라도 다른 자리로 옮겼는지(스크린리더 안내용). */
   const movedSinceStart = useRef(false);
@@ -116,6 +120,28 @@ export function LandingEditor({ initial }: { initial: CreatorLandingState }) {
         links: current.links.map((item) => (item.id === link.id ? { ...item, hidden: link.hidden } : item)),
       }));
     }
+  }
+
+  async function toggleGuestbook(guestbookEnabled: boolean) {
+    const payload: UpdateLandingRequest = { guestbookEnabled };
+    const setEnabled = (value: boolean) =>
+      setState((current) => ({ ...current, landing: { ...current.landing, guestbookEnabled: value } }));
+    // 링크 숨기기 스위치와 같이 바로 바꾸고, 실패하면 원래대로 돌립니다.
+    setEnabled(guestbookEnabled);
+    const saved = await guestbookAction.run(
+      async () => {
+        setState(
+          await browserApi<CreatorLandingState>(CRELINK_API_PATHS.meLanding, {
+            method: 'PATCH',
+            body: JSON.stringify(payload),
+          }),
+        );
+      },
+      guestbookEnabled
+        ? '방명록을 켰어요. 방문자에게 방명록 탭이 보여요.'
+        : '방명록을 껐어요. 남은 글은 지우지 않고 보관해요.',
+    );
+    if (!saved) setEnabled(!guestbookEnabled);
   }
 
   async function onDragEnd({ active, over }: DragEndEvent) {
@@ -225,6 +251,37 @@ export function LandingEditor({ initial }: { initial: CreatorLandingState }) {
       <div className="landing-preview">
         <Landing landing={toLandingPreview(state)} headingLevel={2} links={linkZone} />
       </div>
+      <section className="guestbook-setting" aria-labelledby={guestbookHeadingId}>
+        <div className="guestbook-setting-row">
+          <div className="guestbook-setting-text">
+            <h2 id={guestbookHeadingId}>방명록</h2>
+            <p>
+              켜면 랜딩페이지에 링크·방명록 탭이 생기고 로그인한 회원이 글을 남길 수 있어요. 꺼도 남은 글은 지우지
+              않아요. 글 숨기기는 보기 모드의 방명록 탭에서 할 수 있어요.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            className="hide-switch"
+            aria-checked={state.landing.guestbookEnabled}
+            aria-label="방명록 켜기"
+            aria-disabled={guestbookAction.pending || undefined}
+            onClick={() => {
+              // 링크 숨기기 스위치와 같이 aria-disabled로 알리고 누르기만 무시합니다(포커스 유지).
+              if (!guestbookAction.pending) void toggleGuestbook(!state.landing.guestbookEnabled);
+            }}
+          >
+            <span className="hide-switch-track" aria-hidden="true">
+              <span className="hide-switch-thumb" />
+            </span>
+            <span className="hide-switch-text" aria-hidden="true">
+              {state.landing.guestbookEnabled ? '켜짐' : '꺼짐'}
+            </span>
+          </button>
+        </div>
+        <ActionStatus error={guestbookAction.error} notice={guestbookAction.notice} />
+      </section>
       {sheet ? <LinkSheet link={sheet.link} onChanged={reload} onClose={closeSheet} /> : null}
     </>
   );

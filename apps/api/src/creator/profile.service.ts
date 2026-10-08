@@ -3,7 +3,7 @@ import { CRELINK_LIMITS, PortfolioItemView, SOCIAL_PLATFORMS, SocialLinkView } f
 import type { PoolClient } from 'pg';
 import { Database } from '../database';
 import { apiError, UUID_PATTERN } from '../common/http';
-import { bodyObject, optionalText, orderedIds, parseHttpUrl, requiredText } from '../common/input';
+import { bodyObject, optionalBoolean, optionalText, orderedIds, parseHttpUrl, requiredText } from '../common/input';
 import { FilesService } from '../files/files.service';
 import { CreatorService, PORTFOLIO_COLUMNS, PortfolioRow } from './creator.service';
 
@@ -38,6 +38,8 @@ export class ProfileService {
     if (displayName !== undefined) changes.display_name = displayName;
     const bio = optionalText(input.bio, '소개', CRELINK_LIMITS.bioMax);
     if (bio !== undefined) changes.bio = bio;
+    const guestbookEnabled = optionalBoolean(input.guestbookEnabled, '방명록 켜기');
+    if (guestbookEnabled !== undefined) changes.guestbook_enabled = guestbookEnabled;
     const avatar = await this.files.ownedFileId(this.database.pool, userId, input.avatarFileId);
     if (avatar !== undefined) changes.avatar_file_id = avatar;
     const columns = Object.keys(changes);

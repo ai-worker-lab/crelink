@@ -72,6 +72,7 @@ describe('API 기동과 health', () => {
       expect(tables.rows.map((row) => row.table_name).sort()).toEqual([
         'blocked_domains',
         'files',
+        'guestbook_entries',
         'landing_blocks',
         'landings',
         'link_click_rollups',
@@ -89,8 +90,8 @@ describe('API 기동과 health', () => {
         'visit_dimension_rollups',
         'visits',
       ]);
-      const applied = await client.query('SELECT version FROM schema_migrations');
-      expect(applied.rows).toEqual([{ version: '0001_crelink_mvp' }]);
+      const applied = await client.query('SELECT version FROM schema_migrations ORDER BY version');
+      expect(applied.rows).toEqual([{ version: '0001_crelink_mvp' }, { version: '0002_guestbook' }]);
     } finally {
       await client.end();
     }

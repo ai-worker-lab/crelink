@@ -259,6 +259,7 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
           ],
         },
       ],
+      guestbookEnabled: true,
       passAccepted: false,
       shortUrl: `${SHORT_URL}/${creator.slug}`,
     });

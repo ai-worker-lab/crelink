@@ -1,8 +1,7 @@
-import { Controller, Get, HttpStatus, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { LANDING_PASS_PARAM, PublicLandingResponse, PublicLinkView } from '@crelink/shared';
 import { AppConfig } from '../config.service';
 import { Database } from '../database';
-import { apiError } from '../common/http';
 import { FilesService } from '../files/files.service';
 import { LandingPassService } from '../short-link/landing-pass.service';
 import { CreatorService } from './creator.service';
@@ -26,26 +25,8 @@ export class PublicLandingController {
     @Param('publicId') publicId: string,
     @Query(LANDING_PASS_PARAM) pass: unknown,
   ): Promise<PublicLandingResponse> {
-    const result = /^[a-z0-9]{10}$/.test(publicId)
-      ? await this.database.query<{
-          id: string;
-          user_id: string;
-          display_name: string | null;
-          bio: string | null;
-          avatar_file_id: string | null;
-          suspended: boolean;
-        }>(
-          `SELECT l.id, l.user_id, l.display_name, l.bio, l.avatar_file_id, u.suspended_at IS NOT NULL AS suspended
-           FROM landings l JOIN users u ON u.id = l.user_id WHERE l.public_id = $1`,
-          [publicId],
-        )
-      : null;
-    const landing = result?.rows[0];
-    if (!landing) throw apiError(HttpStatus.NOT_FOUND, 'landing_not_found', '랜딩페이지를 찾을 수 없습니다.');
-    if (landing.suspended) {
-      throw apiError(HttpStatus.GONE, 'creator_suspended', '운영 정책에 따라 지금은 볼 수 없는 페이지입니다.');
-    }
     const db = this.database.pool;
+    const landing = await this.creator.publicLanding(db, publicId);
     const [blocks, links, socials, portfolio, shortLink] = await Promise.all([
       db.query<{ id: string }>('SELECT id FROM landing_blocks WHERE landing_id = $1 ORDER BY position', [landing.id]),
       db.query<{
@@ -90,6 +71,7 @@ export class PublicLandingController {
             clickUrl: `${this.config.shortLinkBaseUrl}/c/${link.public_id}`,
           })),
       })),
+      guestbookEnabled: landing.guestbook_enabled,
       passAccepted: this.landingPass.verify(publicId, pass),
       shortUrl: shortLink.url,
     };

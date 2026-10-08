@@ -71,6 +71,9 @@ export default async function ManageLandingPage({ params, searchParams }: Props)
                 <p className="section-help">
                   방문자에게 보이는 모습이에요(숨긴 링크·차단된 링크 제외). 여기서 누른 링크는 방문·클릭 기록 없이
                   저장된 주소로 바로 열려요.
+                  {own.landing.guestbookEnabled
+                    ? ' 방명록 탭에는 다른 방문자에게 보이지 않는 비밀글·숨긴 글도 함께 보이고, 글마다 숨기거나 숨김을 풀 수 있어요.'
+                    : null}
                 </p>
                 <div className="landing-preview">
                   <Landing landing={toLandingPreview(own)} headingLevel={2} />

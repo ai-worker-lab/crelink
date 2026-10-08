@@ -1226,6 +1226,172 @@ a.portfolio-card:hover {
   font-size: var(--ds-font-size-16);
 }
 
+/* 랜딩 링크·방명록 탭(R19). 편집·보기 전환(.mode-switch)과 같은 알약형 묶음을 폭에 맞춰 나눈다. */
+.landing-tabs {
+  display: flex;
+  gap: var(--ds-space-4);
+  padding: var(--ds-space-4);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-full);
+  background: var(--ds-color-surface-default);
+}
+.landing-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--ds-space-8) var(--ds-space-16);
+  border: 0;
+  border-radius: var(--ds-corner-full);
+  background: transparent;
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-14);
+  font-weight: var(--ds-font-weight-bold);
+}
+.landing-tab:hover:not([aria-selected='true']) {
+  background: var(--ds-color-surface-raised);
+  color: var(--ds-color-text-primary);
+}
+.landing-tab[aria-selected='true'] {
+  background: var(--ds-color-text-primary);
+  color: var(--ds-color-surface-default);
+}
+.landing-tabpanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-24);
+  min-width: 0;
+}
+.landing-tabpanel[hidden] {
+  display: none;
+}
+
+/* 방명록(R19). 글 카드는 링크 카드와 같은 면·테두리·그림자를 쓴다. */
+.guestbook {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-16);
+  min-width: 0;
+}
+.guestbook-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-12);
+  padding: var(--ds-space-16);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-lg);
+  background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
+}
+.guestbook-count {
+  align-self: flex-end;
+  font-family: var(--ds-font-mono);
+}
+.guestbook-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-12);
+}
+.check-field {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-8);
+  min-height: 44px;
+  font-size: var(--ds-font-size-14);
+  font-weight: var(--ds-font-weight-bold);
+  color: var(--ds-color-text-primary);
+  cursor: pointer;
+}
+.check-field input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--ds-color-text-primary);
+}
+.guestbook-secret {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-8);
+  min-width: 0;
+}
+.guestbook-signin {
+  text-align: center;
+}
+.guestbook-signin p {
+  margin: 0;
+}
+.guestbook-state-title {
+  margin-bottom: var(--ds-space-8);
+  font-size: var(--ds-font-size-18);
+  font-weight: var(--ds-font-weight-extrabold);
+  color: var(--ds-color-text-primary);
+}
+.guestbook-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.guestbook-entry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-8);
+  min-width: 0;
+  padding: var(--ds-space-16);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-lg);
+  background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
+}
+.guestbook-entry > p {
+  margin: 0;
+}
+.guestbook-entry-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-12);
+  min-width: 0;
+}
+.guestbook-avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: 50%;
+}
+.guestbook-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.guestbook-author {
+  font-weight: var(--ds-font-weight-bold);
+  overflow-wrap: anywhere;
+}
+.guestbook-date {
+  font-size: var(--ds-font-size-13);
+  color: var(--ds-color-text-subtle);
+}
+/* 본문은 평문이다. 줄바꿈을 그대로 두고, 폭보다 긴 단어·주소는 어디서든 끊는다(R16 가로 넘침 없음). */
+.guestbook-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ds-color-text-primary);
+}
+/* 크리에이터가 숨긴 글은 방문자에게 보이지 않으므로 흐리게 보여 준다(숨김 배지와 함께). */
+.guestbook-entry.is-hidden :is(.guestbook-entry-head, .guestbook-body) {
+  opacity: 0.45;
+}
+.guestbook-more {
+  width: 100%;
+}
+
 /* 랜딩 관리 화면(/me/landings/{publicId}). 공개 랜딩 구성 요소(.profile·.link-card)를 그대로 쓰고
    편집 모드의 끌기 손잡이·숨기기 스위치·하단 시트만 더한다. */
 .manage-toolbar {
@@ -1384,6 +1550,34 @@ a.portfolio-card:hover {
 .link-edit-item > :is(.link-edit-status, .blocked-reason) {
   margin: 0;
   padding-left: calc(40px + var(--ds-space-8));
+}
+/* 편집 모드의 방명록 켜기·끄기. 스위치 모양은 링크 숨기기 스위치(.hide-switch)를 그대로 쓴다. */
+.guestbook-setting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-12);
+  margin-top: var(--ds-space-16);
+  padding: var(--ds-space-16);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-lg);
+  background: var(--ds-color-surface-default);
+}
+.guestbook-setting-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-12);
+}
+.guestbook-setting-text {
+  flex: 1;
+  min-width: 0;
+}
+.guestbook-setting h2 {
+  margin: 0 0 var(--ds-space-4);
+  font-size: var(--ds-font-size-18);
+}
+.guestbook-setting p {
+  margin: 0;
+  font-size: var(--ds-font-size-14);
 }
 
 /* 하단 시트(<dialog> showModal). 모바일은 화면 아래에 붙고, 넓은 화면에서는 폭을 제한한다. */

@@ -37,6 +37,10 @@ export const CRELINK_LIMITS = {
   rawLogRetentionDays: 365,
   sessionDays: 30,
   operatorPageSize: 20,
+  /** 방명록 글 본문 최대 길이(앞뒤 공백을 자른 뒤, R19). */
+  guestbookBodyMax: 500,
+  /** 방명록 목록 한 번에 돌려주는 글 수(R19). */
+  guestbookPageSize: 20,
 } as const;
 
 export const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
@@ -104,7 +108,9 @@ export type CrelinkErrorCode =
   | 'date_range_invalid'
   | 'domain_invalid'
   | 'domain_exists'
-  | 'domain_not_found';
+  | 'domain_not_found'
+  | 'guestbook_disabled'
+  | 'guestbook_entry_not_found';
 
 /** `/notice?reason=`에 쓰는 사유. 단축 도메인 리디렉트와 로그인 콜백이 사용합니다. */
 export type NoticeReason =
@@ -116,11 +122,13 @@ export type NoticeReason =
   | 'oauth_state_invalid'
   | 'account_suspended';
 
-/** 쿠키 이름. `cl_session`은 본 도메인, `cl_vid`·`cl_oauth_state`는 각 발급 도메인. */
+/** 쿠키 이름. `cl_session`·`cl_return_to`는 본 도메인, `cl_vid`·`cl_oauth_state`는 각 발급 도메인. */
 export const COOKIE_NAMES = {
   session: 'cl_session',
   oauthState: 'cl_oauth_state',
   visitor: 'cl_vid',
+  /** 로그인 뒤 돌아갈 웹 주소(`LOGIN_RETURN_TO_PATTERN`에 맞는 값만). 웹 로그인 시작이 발급하고 콜백이 지웁니다. */
+  returnTo: 'cl_return_to',
 } as const;
 
 // ---------- 인증 (R15) ----------
@@ -214,6 +222,8 @@ export interface CreatorLandingState {
     displayName: string | null;
     bio: string | null;
     avatar: ImageRef | null;
+    /** 방명록 탭을 켰는지(R19, 기본 true). */
+    guestbookEnabled: boolean;
   };
   shortLink: ShortLinkView;
   links: LinkView[];
@@ -227,6 +237,8 @@ export interface UpdateLandingRequest {
   displayName?: string | null;
   bio?: string | null;
   avatarFileId?: string | null;
+  /** 방명록 켜기·끄기(R19). 꺼도 글은 남습니다. */
+  guestbookEnabled?: boolean;
 }
 
 export type SlugUnavailableReason = 'slug_invalid' | 'slug_reserved' | 'slug_taken' | 'same_as_current';
@@ -302,6 +314,8 @@ export interface PublicLandingView {
   socials: SocialLinkView[];
   portfolio: Array<Omit<PortfolioItemView, 'image' | 'position'> & { imageUrl: string | null }>;
   blocks: PublicBlockView[];
+  /** false면 방명록 탭을 그리지 않습니다(R19). */
+  guestbookEnabled: boolean;
 }
 
 /**
@@ -313,6 +327,65 @@ export interface PublicLandingResponse extends PublicLandingView {
   passAccepted: boolean;
   /** 이 랜딩의 현재 단축 주소 `{SHORT}/{slug}`(옛 주소 아님). */
   shortUrl: string;
+}
+
+// ---------- 방명록 (R19) ----------
+
+export interface GuestbookAuthorView {
+  /** 작성자 랜딩의 현재 표시 이름. null이면 웹이 '크리링 회원'으로 그립니다. */
+  displayName: string | null;
+  /** 작성자 랜딩의 현재 프로필 사진. null이면 기본 프로필(R17). */
+  avatarUrl: string | null;
+}
+
+/**
+ * 방명록 글. 보는 사람에게 허용된 글만 응답에 들어갑니다: 공개·숨기지 않은 글은 누구나, 비밀글은 작성자와 랜딩 크리에이터,
+ * 숨긴 글은 작성자와 랜딩 크리에이터. 작성자가 정지된 글은 아무에게도 보이지 않습니다.
+ */
+export interface GuestbookEntryView {
+  id: string;
+  body: string;
+  secret: boolean;
+  /** 랜딩 크리에이터가 숨긴 글이면 true. 보는 사람이 랜딩 크리에이터일 때만 true가 될 수 있고, 작성자에게는 숨김 사실을 알리지 않습니다. */
+  hidden: boolean;
+  /** 보는 사람이 작성자이면 true. 삭제 버튼의 근거입니다. */
+  mine: boolean;
+  author: GuestbookAuthorView;
+  createdAt: string;
+}
+
+/**
+ * `GET /api/landings/{publicId}/guestbook?cursor=` 응답. 세션 쿠키가 있으면 보는 사람을 판정하고 없으면 비회원으로 봅니다.
+ * 최신순 `CRELINK_LIMITS.guestbookPageSize`개. 404 `landing_not_found`·`guestbook_disabled`, 410 `creator_suspended`,
+ * 400 `validation_failed`(해석할 수 없는 커서).
+ */
+export interface GuestbookPage {
+  entries: GuestbookEntryView[];
+  /** 다음 쪽을 부를 불투명 커서. 더 없으면 null. */
+  nextCursor: string | null;
+  viewer: {
+    signedIn: boolean;
+    /** 보는 사람이 이 랜딩의 크리에이터이면 true. 숨기기 버튼의 근거입니다. */
+    isOwner: boolean;
+  };
+}
+
+/**
+ * `POST /api/landings/{publicId}/guestbook`(로그인). 응답은 `GuestbookEntryView`(201).
+ * `body`는 앞뒤 공백을 자른 뒤 1~`CRELINK_LIMITS.guestbookBodyMax`자, 줄바꿈 허용. `secret` 생략은 false.
+ * 401 `unauthenticated`, 400 `validation_failed`, 404 `landing_not_found`·`guestbook_disabled`, 410 `creator_suspended`.
+ */
+export interface CreateGuestbookEntryRequest {
+  body: string;
+  secret?: boolean;
+}
+
+/**
+ * `PUT /api/guestbook/{entryId}/hidden`(랜딩 크리에이터). 응답은 `GuestbookEntryView`.
+ * `DELETE /api/guestbook/{entryId}`(작성자)는 204. 둘 다 없거나 권한이 없는 글은 404 `guestbook_entry_not_found`(글의 존재를 드러내지 않음).
+ */
+export interface SetGuestbookEntryHiddenRequest {
+  hidden: boolean;
 }
 
 // ---------- 운영자 (R10, R13, R14) ----------
@@ -422,13 +495,31 @@ export const CRELINK_API_PATHS = {
   adminLinkBlock: (linkId: string) => `/api/admin/links/${encodeURIComponent(linkId)}/block`,
   adminBlockedDomains: '/api/admin/blocked-domains',
   adminBlockedDomain: (domain: string) => `/api/admin/blocked-domains/${encodeURIComponent(domain)}`,
+  /** `cursor`: 이전 응답의 `GuestbookPage.nextCursor`. */
+  landingGuestbook: (publicId: string, cursor?: string | null) =>
+    `/api/landings/${encodeURIComponent(publicId)}/guestbook${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+  guestbookEntry: (entryId: string) => `/api/guestbook/${encodeURIComponent(entryId)}`,
+  guestbookEntryHidden: (entryId: string) => `/api/guestbook/${encodeURIComponent(entryId)}/hidden`,
 } as const;
+
+/** 랜딩의 방명록 탭을 여는 주소 해시(`#guestbook`). 해시는 리디렉트를 지나도 유지되어 단축 주소(R7)를 거쳐도 탭이 열립니다. */
+export const GUESTBOOK_TAB_HASH = 'guestbook';
+
+/** 로그인 뒤 돌아갈 수 있는 웹 주소: 랜딩(`/p/{publicId}`)과 선택 방명록 해시뿐입니다. 그 밖은 버리고 `/me`로 갑니다(열린 리디렉트 방지). */
+export const LOGIN_RETURN_TO_PATTERN = /^\/p\/[a-z0-9]{10}(?:#guestbook)?$/;
+
+/** 웹 로그인 시작(`/auth/google`)의 돌아갈 주소 쿼리 이름. */
+export const LOGIN_RETURN_TO_PARAM = 'returnTo';
 
 /** 본 도메인(웹) 경로. API가 리디렉트 대상을 만들 때도 씁니다. */
 export const CRELINK_WEB_PATHS = {
   landing: (publicId: string, pass?: string) =>
     `/p/${encodeURIComponent(publicId)}${pass ? `?${LANDING_PASS_PARAM}=${encodeURIComponent(pass)}` : ''}`,
+  landingGuestbook: (publicId: string) => `/p/${encodeURIComponent(publicId)}#${GUESTBOOK_TAB_HASH}`,
   notice: (reason: NoticeReason) => `/notice?reason=${reason}`,
+  /** 웹 구글 로그인 시작. `returnTo`가 `LOGIN_RETURN_TO_PATTERN`에 맞으면 로그인 뒤 그 주소로 돌아갑니다. */
+  googleLogin: (returnTo?: string) =>
+    `/auth/google${returnTo ? `?${LOGIN_RETURN_TO_PARAM}=${encodeURIComponent(returnTo)}` : ''}`,
   googleCallback: '/auth/google/callback',
   privacy: '/privacy',
   docs: '/docs',
