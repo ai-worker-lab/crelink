@@ -1,4 +1,5 @@
-# main의 CI가 성공하면 운영(prod)에 배포합니다: 이미지(API·웹, GHCR :<SHA>) → 배포 대상마다 Tailscale+SSH로 릴리스 배포 → 운영 주소 검사.
+# main에 push되면(PR 머지) 운영(prod)에 배포합니다: 이미지(API·웹, GHCR :<SHA>) → 배포 대상마다 Tailscale+SSH로 릴리스 배포 → 운영 주소 검사.
+# main에서는 CI를 다시 돌리지 않습니다(PR에서 검사, 0060). 이미지 빌드가 실패하면 배포하지 않습니다.
 # 배포 대상은 infra/prod/targets.json(enabled), 서버 쪽은 deploy 사용자의 forced command(infra/prod/ssh-entry.sh)만 실행됩니다.
 # 서버 deploy.sh는 새 릴리스를 비활성 색에 올려 헬스를 통과할 때만 트래픽을 넘깁니다(Blue/Green 무중단, ADR 0011). 새 색이 헬스에 실패하면
 # 그 색만 내리고 활성 색·트래픽은 그대로 둔 채 배포 실패(종료 1)입니다. 운영 주소 검사(서버의 verify.sh가 Cloudflare를 거쳐 공개 주소 호출)가
@@ -16,9 +17,7 @@
 name: Deploy
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  push:
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -41,10 +40,8 @@ env:
 jobs:
   plan:
     name: plan
-    # workflow_run은 CI가 성공한 main push에서만, 수동 실행은 main에서만 배포합니다.
-    if: >-
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
-      || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    # main push와 main에서의 수동 실행만 배포합니다.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -60,9 +57,7 @@ jobs:
     steps:
       - name: 배포 대상 커밋
         id: target
-        env:
-          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: echo "sha=${RUN_SHA:-$GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+        run: echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
           ref: ${{ steps.target.outputs.sha }}

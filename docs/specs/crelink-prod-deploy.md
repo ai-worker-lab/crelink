@@ -128,8 +128,8 @@ Next.js 16(0039)부터 웹 standalone 서버는 SIGTERM에 진행 중 요청을 
 
 | 워크플로·job | 내용 |
 | --- | --- |
-| `ci.yml` `이미지 빌드 api`·`web` | PR·main push마다 두 이미지를 `linux/amd64`로 빌드만 합니다(푸시 없음, gha 캐시) |
-| `deploy.yml` 트리거 | `workflow_run`(`CI` 성공, main push) 또는 main에서 `workflow_dispatch`(`force`: 변경과 무관하게 두 이미지 새로 빌드). 동시 실행 그룹 `deploy-prod`(취소 안 함, `rollback.yml`과 공유) |
+| `ci.yml` `이미지 빌드 api`·`web` | PR마다 두 이미지를 `linux/amd64`로 빌드만 합니다(푸시 없음, gha 캐시). `ci.yml`은 main push에서 돌지 않습니다(0060) |
+| `deploy.yml` 트리거 | main `push`(PR 머지, CI를 다시 기다리지 않음) 또는 main에서 `workflow_dispatch`(`force`: 변경과 무관하게 두 이미지 새로 빌드). 동시 실행 그룹 `deploy-prod`(취소 안 함, `rollback.yml`과 공유) |
 | `plan` | 배포 커밋, 변경 영역(태그 기준: `api` ← `deploy/prod-api` 이후 `apps/api/`·`packages/shared/`·`pnpm-lock.yaml`·`.dockerignore`, `web` ← `deploy/prod-web` 이후 `apps/web/`·`packages/shared/`·`packages/design-tokens/`·같은 두 파일, `release` ← `deploy/prod` 이후 위 경로나 `infra/prod/`. 태그가 없으면 그 영역 예), `targets.json`의 `enabled` 대상 matrix와 플랫폼 합집합, 접속 설정 준비 여부(`vars.TS_OIDC_*`·`DEPLOY_SSH_KEY`가 없으면 배포를 건너뛰고 경고) |
 | `image` | matrix `api`·`web` 중 바뀐 영역만 GHCR `:<SHA>`로 push. 플랫폼에 arm64가 있을 때만 QEMU. 빌드 인자 `SENTRY_RELEASE=<배포 커밋 SHA>`·`SENTRY_ORG=vars.SENTRY_ORG`·`SENTRY_PROJECT`(api `vars.SENTRY_PROJECT_API`, web `vars.SENTRY_PROJECT_WEB`), 웹만 `NEXT_PUBLIC_SENTRY_DSN=vars.SENTRY_WEB_DSN`, BuildKit secret `sentry_auth_token=secrets.SENTRY_AUTH_TOKEN`. 토큰이 있으면 소스맵 업로드(실패하면 빌드 실패), 없으면 건너뜀 |
 | `deploy` | 대상 matrix(`max-parallel: 1`, `fail-fast`). `release`가 예이고 접속 설정이 있을 때. Tailscale(OIDC, `tag:ci`, 대상 `ping`) → `ssh deploy@<host> "deploy <SHA> <api 이미지 SHA> <web 이미지 SHA>"`(이미지 SHA는 plan의 `api_image`·`web_image`), stdin = GHCR 사용자·토큰 + `infra/prod` tar.gz(`tests`·`README.md`·`*.example`·`.env` 제외). 호스트 신원은 Tailscale이 보증하므로 `StrictHostKeyChecking accept-new`. 이어서 같은 job에서 `ssh deploy@<host> verify`(운영 주소 검사), 실패하면 `rollback`(직전 릴리스) 뒤 다시 `verify`하고 job 실패 |

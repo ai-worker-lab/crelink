@@ -4,6 +4,7 @@
 
 ## 2026-10-08
 
+- 런북 2-2 OIDC subject 설명과 5 최초 배포의 자동 배포 조건을 "main push(머지)"로 고침(Deploy가 `workflow_run` 대신 main push로 시작, 서버·스크립트 변경 없음). 근거 `docs/work/orchestrator/0060-ci-pr-only.md`.
 - GitHub Actions 없이 배포(Actions 사용량 한도 초과, 사용자 지시): 운영자 도구 `prod/deploy-local.sh`(`deploy.yml`과 같은 변경 판별 → 대상 서버에서 `docker build`(GHCR에 올리지 않음, Sentry 빌드 인자는 `gh variable get`, 소스맵 업로드 없음) → 서버 `ssh-entry.sh`를 `deploy` 사용자로 `deploy`(빈 자격 증명으로 서버 이미지 사용) → `verify`, 실패하면 `rollback` → 배포 기록 태그 push, `--dry-run`·`--force`, macOS bash 3.2 호환, shellcheck 통과), 런북 "16. GitHub Actions 없이 배포", `prod/README.md` 파일 표. 서버 스크립트·워크플로 변경 없음. 근거 `docs/work/orchestrator/0059-deploy-without-actions.md`.
   - 첫 운영 배포(`29e867b`, 1분 40초, `verify` 6개 통과) 뒤 고침: 운영자 macOS tar가 릴리스 묶음에 확장 속성 헤더를 넣어 서버 GNU tar가 경고를 내던 것을 `COPYFILE_DISABLE=1 tar --no-xattrs`로 뺌(0058과 함께 머지).
 - Sentry 조직 옮기기(`shaul1991` → `ai-worker-lab`, 새 프로젝트 방식): 암호문 `prod/secrets/home-server.sops.env`의 평문 키 `SENTRY_DSN`을 새 `crelink-api` DSN으로(다른 값은 복호화 해시 비교로 불변), 런북 15-1 현재 조직, 15-3 `SENTRY_ORG` 예시와 여러 GitHub 계정 안내, 15-5 "다른 조직으로 옮기기" 순서(토큰 → variables → 암호문 → `force` 배포 → 옛 모니터 끄기), 15-6 재적용 표시. GitHub variables `SENTRY_ORG=ai-worker-lab`·`SENTRY_WEB_DSN`(새 `crelink-web` DSN)과 secret `SENTRY_AUTH_TOKEN`(새 조직 토큰, 사용자가 넣음) 변경. 근거 `docs/work/orchestrator/0054-sentry-org-migration.md`.
