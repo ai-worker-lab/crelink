@@ -55,7 +55,6 @@ export default async function ManageLandingLayout({
             <span className="visually-hidden"> (새 창)</span>
           </a>
         ) : null}
-        <FeedbackButton />
         <LogoutButton />
       </SiteHeader>
       {!result.ok ? (
@@ -80,6 +79,7 @@ export default async function ManageLandingLayout({
           <ManagerShell>{children}</ManagerShell>
         </ManagerProvider>
       )}
+      <FeedbackButton />
     </div>
   );
 }

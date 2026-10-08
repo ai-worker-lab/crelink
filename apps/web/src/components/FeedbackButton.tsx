@@ -47,7 +47,8 @@ function createFeedbackIntegration() {
 }
 
 /**
- * 로그인한 관리 화면(`/me`·`/admin`) 머리글의 `의견 보내기` 버튼. 누르면 Sentry 의견 창을 엽니다.
+ * 로그인 화면(`/me`·`/admin`) 오른쪽 아래에 떠 있는 `의견 보내기` 버튼. 누르면 Sentry 의견 창을 엽니다. 머리글이 아니라 화면 틀 맨 끝에 둡니다.
+ * 1023px 이하는 이름 있는 아이콘 버튼입니다(`styles.css`의 `.feedback-fab`). 대화상자·하단 시트는 최상위 층이라 이 버튼을 덮습니다.
  * Sentry가 꺼진 빌드(`NEXT_PUBLIC_SENTRY_DSN` 없음)에서는 그리지 않습니다. 의견 통합은 이 버튼이 처음 그려질 때 붙여 공개 화면 번들에는 들어가지 않습니다.
  */
 export function FeedbackButton() {
@@ -66,8 +67,18 @@ export function FeedbackButton() {
 
   if (!SENTRY_DSN) return null;
   return (
-    <button ref={button} type="button" className="secondary" aria-haspopup="dialog">
-      의견 보내기
+    <button ref={button} type="button" className="feedback-fab" aria-haspopup="dialog">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+        <path
+          d="M5 5h14v10H9l-4 4V5Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span className="feedback-fab-label">의견 보내기</span>
     </button>
   );
 }

@@ -21,7 +21,6 @@ export default async function MePage() {
   return (
     <div className="app-page">
       <SiteHeader>
-        <FeedbackButton />
         <LogoutButton />
       </SiteHeader>
       <main className="app-main">
@@ -31,6 +30,7 @@ export default async function MePage() {
           action={{ href: '/me', label: '다시 시도', reload: true }}
         />
       </main>
+      <FeedbackButton />
     </div>
   );
 }
