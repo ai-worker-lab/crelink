@@ -19,16 +19,13 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { useId, useRef, useState } from 'react';
+import { useId, useRef } from 'react';
 import { browserApi } from '../../lib/api/browser';
-import { linkDraftOf } from '../../lib/landing-preview';
 import { useAction } from '../../lib/use-action';
-import { useWideLayout } from '../../lib/use-wide-layout';
 import { ActionStatus } from '../ActionStatus';
 import { EditableLinkCard } from './EditableLinkCard';
-import { EditSheet } from './EditSheet';
-import { LinkForm } from './LinkForm';
 import { useManager } from './ManagerContext';
+import { linkLimitNotice } from './limits';
 
 /** 끄는 동안 카드가 세로로만 움직이게 합니다(리스트형 구역). */
 const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
@@ -39,23 +36,15 @@ const SCREEN_READER_INSTRUCTIONS = {
 };
 
 /**
- * `페이지 편집`의 외부 링크 카드(PRD R18). 추가·수정·삭제는 넓은 화면에서 패널 안 펼침 폼, 좁은 화면에서 하단 시트(같은 `LinkForm`).
- * 폼은 한 번에 하나만 열리고 열린 동안 끌기를 막습니다. 순서는 끌어 놓기(`PUT /api/me/links/order`), 숨기기는 스위치(`PATCH hidden`)로
- * 바로 저장하고 실패하면 되돌립니다. 저장 뒤에는 편집 상태(`GET /api/me/landing`)를 다시 읽어 한도·순서를 서버 값과 맞춥니다.
+ * `페이지 편집` 외부 링크 구역 패널(PRD R18): 숨긴·차단 링크를 포함한 전체 목록, 한도 배지, `링크 추가`.
+ * 행의 `수정`·카드 누르기와 `링크 추가`는 그 링크를 골라 패널을 폼으로 바꿉니다. 순서는 끌어 놓기(`PUT /api/me/links/order`),
+ * 숨기기는 스위치(`PATCH hidden`)로 바로 저장하고 실패하면 되돌립니다. 저장 뒤에는 편집 상태를 다시 읽어 한도·순서를 서버 값과 맞춥니다.
+ * `notice`는 폼에서 돌아올 때 보여 줄 결과 안내입니다.
  */
-export function LinksSection() {
-  const { state, setState, reload, linkDraft, setLinkDraft, dirty } = useManager();
-  const wide = useWideLayout();
-  const { pending, error, notice, run, setError, setNotice } = useAction();
-  const formAction = useAction();
-  /** 폼을 열 때마다 늘어나는 번호. 폼 구성 요소의 key라서 한 번 연 폼은 한 인스턴스이고, 닫힌 폼의 늦은 업로드 결과는 버려집니다. */
-  const [formSession, setFormSession] = useState(0);
+export function LinksSection({ notice: doneNotice }: { notice?: string | null }) {
+  const { state, setState, reload, select, isLinkDirty } = useManager();
+  const { pending, error, notice, run } = useAction();
   const dndId = useId();
-  const headingId = useId();
-  const headingRef = useRef<HTMLHeadingElement>(null);
-  const addButtonRef = useRef<HTMLButtonElement>(null);
-  /** 폼을 연 요소. 닫힌 뒤 초점을 돌려줍니다. */
-  const openerRef = useRef<HTMLElement | null>(null);
   /** 이번 끌기에서 한 번이라도 다른 자리로 옮겼는지(스크린리더 안내용). */
   const movedSinceStart = useRef(false);
   const sensors = useSensors(
@@ -65,43 +54,11 @@ export function LinksSection() {
 
   const { links, limits } = state;
   const visibleFull = limits.visibleUsed >= limits.visibleMax;
-  const totalFull = limits.totalUsed >= limits.totalMax;
-  const formLink = linkDraft?.id ? (links.find((link) => link.id === linkDraft.id) ?? null) : null;
-  // 고치던 링크가 사라졌으면(다른 곳에서 지움) 폼을 그리지 않습니다.
-  const formOpen = linkDraft !== null && (linkDraft.id === null || formLink !== null);
-  const newFormOpen = formOpen && linkDraft?.id === null;
+  const limitNotice = linkLimitNotice(limits);
 
   function replaceLinks(next: LinkView[]) {
     setState((current) => ({ ...current, links: next }));
   }
-
-  function openForm(link: LinkView | null, opener: HTMLElement) {
-    if (link && linkDraft?.id === link.id) {
-      closeForm(null);
-      return;
-    }
-    setError(null);
-    setNotice(null);
-    formAction.setError(null);
-    openerRef.current = opener;
-    setFormSession((session) => session + 1);
-    setLinkDraft(linkDraftOf(link));
-  }
-
-  function closeForm(result: string | null) {
-    const opener = openerRef.current;
-    const wasNew = linkDraft?.id === null;
-    openerRef.current = null;
-    setLinkDraft(null);
-    if (result) setNotice(result);
-    // 연 요소가 남아 있으면(수정·링크 추가 버튼) 그리로, 지워졌으면 링크 구역 제목으로 초점을 돌려줍니다.
-    requestAnimationFrame(() => {
-      const target = wasNew ? addButtonRef.current : opener;
-      if (target?.isConnected) target.focus();
-      else headingRef.current?.focus();
-    });
-  }
-
   async function toggleHidden(link: LinkView, hidden: boolean) {
     const payload: UpdateLinkRequest = { hidden };
     // 스위치는 바로 바뀌고, 실패하면(예: 보이는 링크 한도 409) 원래대로 돌립니다.
@@ -166,36 +123,19 @@ export function LinksSection() {
     onDragCancel: ({ active }) => `${titleOf(active.id)} 링크 옮기기를 취소했어요. 원래 자리로 돌아갔어요.`,
   };
 
-  const form = (variant: 'inline' | 'sheet') => (
-    <LinkForm
-      key={formSession}
-      link={formLink}
-      variant={variant}
-      action={formAction}
-      onDone={closeForm}
-      onCancel={() => closeForm(null)}
-    />
-  );
-
   return (
-    <section className="card" aria-labelledby={headingId}>
-      <div className="card-head">
-        <h2 id={headingId} ref={headingRef} tabIndex={-1}>
-          외부 링크
-        </h2>
-        <div className="card-head-badges">
-          {dirty.link ? <span className="badge dirty-chip">저장 안 함</span> : null}
-          <p className={`limit-badge${visibleFull ? ' limit-full' : ''}`}>
-            보이는 링크 {limits.visibleUsed}/{limits.visibleMax}
-          </p>
-        </div>
+    <>
+      <div className="panel-badges">
+        <p className={`limit-badge${visibleFull ? ' limit-full' : ''}`}>
+          보이는 링크 {limits.visibleUsed}/{limits.visibleMax}
+        </p>
       </div>
       <p className="section-help">
         카드를 누르면 고칠 수 있고, 손잡이를 끌면 순서가 바뀌어요. 숨긴 링크와 차단된 링크는 방문자에게 보이지 않고
         한도에도 들어가지 않아요. 숨긴 링크 포함 전체 {limits.totalUsed}/{limits.totalMax}개.
       </p>
-      <ActionStatus error={error} notice={notice} />
-      {links.length === 0 && !newFormOpen ? (
+      <ActionStatus error={error} notice={notice ?? doneNotice ?? null} />
+      {links.length === 0 ? (
         <p className="empty-text">아직 추가한 링크가 없어요. 링크를 추가하면 미리보기에 바로 보여요.</p>
       ) : null}
       <DndContext
@@ -208,58 +148,31 @@ export function LinksSection() {
       >
         <SortableContext items={links.map((link) => link.id)} strategy={verticalListSortingStrategy}>
           <ul className="link-list link-edit-list">
-            {links.map((link) => {
-              const expanded = wide && formOpen && linkDraft?.id === link.id;
-              return (
-                <EditableLinkCard
-                  key={link.id}
-                  link={link}
-                  busy={pending}
-                  dragLocked={formOpen}
-                  inline={wide}
-                  expanded={expanded}
-                  onEdit={openForm}
-                  onToggleHidden={toggleHidden}
-                >
-                  {expanded ? form('inline') : null}
-                </EditableLinkCard>
-              );
-            })}
+            {links.map((link) => (
+              <EditableLinkCard
+                key={link.id}
+                link={link}
+                busy={pending}
+                dirty={isLinkDirty(link.id)}
+                onEdit={(target) => select({ kind: 'link', id: target.id })}
+                onToggleHidden={toggleHidden}
+              />
+            ))}
           </ul>
         </SortableContext>
       </DndContext>
-      {wide && newFormOpen ? (
-        <div className="item-card link-new-form">{form('inline')}</div>
-      ) : totalFull ? (
-        <p className="notice-box">
-          숨긴 링크를 포함해 링크는 최대 {limits.totalMax}개까지 둘 수 있어요. 쓰지 않는 링크를 지운 뒤 추가해 주세요.
-        </p>
-      ) : visibleFull ? (
-        <p className="notice-box">
-          보이는 링크 한도({limits.visibleMax}개)에 도달했어요. 다른 링크를 숨기거나 지우면 새 링크를 추가할 수 있어요.
-          한도를 늘리려면 크리링 운영자에게 문의해 주세요.
-        </p>
+      {limitNotice ? (
+        <p className="notice-box">{limitNotice}</p>
       ) : (
         <button
           type="button"
-          ref={addButtonRef}
           className="secondary link-add"
-          onClick={(event) => openForm(null, event.currentTarget)}
+          onClick={() => select({ kind: 'link', id: null })}
           disabled={pending}
-          aria-haspopup={wide ? undefined : 'dialog'}
         >
           링크 추가
         </button>
       )}
-      {!wide && formOpen ? (
-        <EditSheet
-          title={formLink ? '링크 수정' : '새 링크'}
-          pending={formAction.pending}
-          onDismiss={() => closeForm(null)}
-        >
-          {form('sheet')}
-        </EditSheet>
-      ) : null}
-    </section>
+    </>
   );
 }

@@ -3,12 +3,12 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 
 /**
- * 좁은 화면(1023px 이하)의 링크·포트폴리오 추가·수정 하단 시트. 네이티브 `<dialog>`를 `showModal()`로 열어 바깥을 비활성(inert)으로
+ * 좁은 화면(1023px 이하) `페이지 편집`에서 고른 대상(외부 링크·링크·포트폴리오·항목·방명록·프로필)의 하단 시트. 네이티브 `<dialog>`를 `showModal()`로 열어 바깥을 비활성(inert)으로
  * 만들고 포커스를 가둡니다. 열면 폼의 `[data-autofocus]` 입력(표시 이름·제목)에 포커스를 둡니다.
  * Esc·배경 누르기·머리의 닫기 아이콘 버튼으로 `onDismiss`를 부르고, 저장 중에는 닫지 않습니다(결과 안내를 잃지 않도록).
  * 브라우저가 dialog를 직접 닫아도(`close` 이벤트) 같은 규칙으로 맞춥니다(저장 중이면 다시 엶).
  * 닫기는 여는 쪽이 이 구성 요소를 그리지 않는 것으로 하며, 닫힌 뒤 포커스 복귀도 여는 쪽이 맡습니다.
- * 같은 폼 구성 요소를 넓은 화면에서는 패널 안 펼침 폼으로 씁니다(디자인 인계 `상호작용·접근성`).
+ * 같은 패널 내용을 넓은 화면에서는 오른쪽 편집 패널에 그립니다(디자인 인계 design/preview-direct-edit/handoff.md).
  */
 export function EditSheet({
   title,

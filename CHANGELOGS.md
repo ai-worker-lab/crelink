@@ -6,6 +6,7 @@
 
 ## 2026-10-08
 
+- 관리 화면 미리보기 직접 편집·프로필 메뉴 구현(0056 시안): PRD R18 요구 문장·수용 기준(미리보기에서 골라 패널·하단 시트에서 편집, 휴대폰 편집·미리보기 전환, `프로필` 메뉴), 기술 설계 `docs/specs/crelink-mvp.md`(화면 상태 표 관리 화면 행)·`docs/specs/crelink-guestbook.md`(방명록 스위치 위치), E2E `tests/e2e/`와 README. API·공유 계약 변경 없음. 세부는 [웹](apps/web/CHANGELOGS.md) 로그. 근거 `docs/work/orchestrator/0058-preview-direct-edit.md`.
 - GitHub Actions 사용량 한도 초과로 CI·CD가 돌지 않을 때의 배포 경로: 검증 루프 CD 절에 "로컬 `pnpm verify`·`smoke`·`e2e` 결과를 PR에 적고 머지한 뒤 `infra/prod/deploy-local.sh`로 배포, 머지 뒤 확인은 스크립트 출력" 추가. 세부는 [인프라](infra/CHANGELOGS.md) 로그. 근거 `docs/work/orchestrator/0059-deploy-without-actions.md`.
 - 페이지 편집 새 컨셉 시안(2026-10-08 사용자 승인): 사용자 결정(컨셉 `미리보기 직접 편집`, 프로필 메뉴 범위 `프로필 + SNS 채널`, 시안 먼저)으로 OpenDesign 프로젝트 `crelink-preview-direct-edit`(Local Codex)에서 만든 `design/preview-direct-edit/`(`index.html` — 1024px 이상 왼쪽 메뉴 4개(페이지 편집·프로필·방명록·주소 설정)·가운데 휴대폰 미리보기 무대·오른쪽 편집 패널, 미리보기 안 구역·항목을 골라 패널에서 편집, 무대 위 주소 막대가 `내 페이지` 머리 카드를 대신함, 1023px 이하 편집 칩이 있는 전체 폭 랜딩·하단 시트·`편집 | 미리보기` 전환; `handoff.md` 정보 구조·고르기 표·초안·반응형·상태·접근성·지금 구현과 달라지는 점·사용자 결정 4개(PRD R18 문장 변경, 숨긴·차단 링크 미리보기 제외, 머리 카드 제거, 휴대폰 전환, 구현은 0058)·기술 검토: 새 API·토큰 없음). 근거 `docs/work/designer/0056-preview-direct-edit-design.md`.
 - 0045 블록 안 스와이프 카드·쿠팡 파트너스 카드 정보 채우기를 사용자 결정으로 폐기(재개 조건 없음). 조사 문서 `docs/references/coupang-partners-card-data.md` 결론의 `미정` 줄을 종료로, 벤치마킹 문서 `docs/product/research/link-in-bio-benchmark.md`의 0045 참조를 폐기로 고침. 근거 `docs/work/orchestrator/0045-block-swipe-cards.md`.

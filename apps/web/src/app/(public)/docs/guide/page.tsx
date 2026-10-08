@@ -36,11 +36,12 @@ export default function GuidePage() {
             다음에 다시 들어올 때도 홈에서 로그인한 뒤 <strong>내 크리링 편집</strong>을 누르면 돼요.
           </li>
           <li>
-            관리 화면에는 <strong>페이지 편집</strong>·<strong>방명록</strong>·<strong>주소 설정</strong> 메뉴가 있어요.
-            넓은 화면에서는 오른쪽에 방문자에게 보이는 모습이 미리보기로 함께 보이고, 휴대폰에서는 아래의{' '}
-            <strong>미리보기</strong> 버튼으로 열어요. 저장하기 전 입력도 미리보기에 바로 보여요(
-            <strong>저장하지 않은 변경 포함</strong>). 미리보기 안 링크는 눌러도 열리지 않으니, 실제 페이지는 위쪽의{' '}
-            <strong>공개 페이지 열기</strong>로 확인해요.
+            관리 화면에는 <strong>페이지 편집</strong>·<strong>프로필</strong>·<strong>방명록</strong>·
+            <strong>주소 설정</strong> 메뉴가 있어요. 넓은 화면에서는 가운데에 방문자에게 보이는 모습이 미리보기로
+            보이고, 오른쪽 패널에서 고쳐요. 휴대폰에서는 위쪽의 <strong>편집</strong>·<strong>미리보기</strong>로 바꿔
+            봐요. 저장하기 전 입력도 미리보기에 바로 보여요(<strong>저장하지 않은 변경 포함</strong>). 미리보기 안
+            링크는 눌러도 열리지 않으니, 실제 페이지는 미리보기 위 주소 막대의 <strong>공개 페이지 열기</strong>로
+            확인해요.
           </li>
         </ol>
       </section>
@@ -48,9 +49,8 @@ export default function GuidePage() {
       <section aria-labelledby="guide-profile">
         <h2 id="guide-profile">2. 프로필 꾸미기</h2>
         <p>
-          <strong>페이지 편집</strong>에서 방문자에게 보일 내용을 넣어요. 카드는 랜딩페이지에 보이는 순서(프로필 → SNS
-          채널 → 외부 링크 → 포트폴리오 → 방명록)예요. 비워 둔 항목은 방문자 화면에 보이지 않고, 저장하지 않은 카드에는{' '}
-          <strong>저장 안 함</strong>이 붙어요.
+          <strong>프로필</strong> 메뉴에서 방문자가 처음 만나는 소개를 넣어요. 비워 둔 항목은 방문자 화면에 보이지 않고,
+          저장하지 않은 카드에는 <strong>저장 안 함</strong>이 붙어요.
         </p>
         <ul>
           <li>
@@ -65,8 +65,9 @@ export default function GuidePage() {
           </li>
           <li>
             <strong>포트폴리오</strong>: 협업·작업 이력을 제목·링크·이미지·설명으로 직접 넣어요(최대{' '}
-            {CRELINK_LIMITS.portfolioItems}개). <strong>포트폴리오 추가</strong>로 넣고, 항목마다 순서를 올리고 내리거나
-            고치고 지울 수 있어요. 순서는 누르는 즉시 저장돼요.
+            {CRELINK_LIMITS.portfolioItems}개). <strong>페이지 편집</strong>의 미리보기에서{' '}
+            <strong>+ 포트폴리오 추가</strong>나 항목을 누르면 오른쪽 패널(휴대폰은 아래에서 올라오는 창)에서 넣고
+            고치고 지울 수 있어요. 순서는 포트폴리오 구역에서 올리고 내리며 누르는 즉시 저장돼요.
           </li>
           <li>올릴 수 있는 이미지는 JPG·PNG·WebP·GIF, {IMAGE_MAX_MB}MB 이하예요.</li>
         </ul>
@@ -75,16 +76,18 @@ export default function GuidePage() {
       <section aria-labelledby="guide-links">
         <h2 id="guide-links">3. 외부 링크 관리</h2>
         <p>
-          <strong>페이지 편집</strong>의 <strong>외부 링크</strong> 카드에서 링크를 추가하고 고쳐요. 넓은 화면에서는
-          카드 안에 입력 칸이 펼쳐지고, 휴대폰에서는 아래에서 올라오는 창이 열려요.
+          <strong>페이지 편집</strong>의 미리보기에서 링크를 누르면 바로 그 링크를, 링크 구역을 누르면 전체 목록을
+          오른쪽 패널(휴대폰은 아래에서 올라오는 창)에서 고쳐요. 숨긴 링크는 미리보기에 없으니 링크 구역 목록에서
+          찾아요. 고치던 내용은 다른 곳을 눌러도 남아 있고, <strong>← 전체</strong>로 처음 목록에 돌아가요.
         </p>
         <ul>
           <li>
-            <strong>링크 추가</strong>를 누르고 표시 이름, 주소(<code>http://</code>나 <code>https://</code>로 시작),
-            설명(선택), 썸네일(선택)을 넣어 저장해요.
+            미리보기의 <strong>+ 링크 추가</strong>(또는 링크 구역의 <strong>링크 추가</strong>)를 누르고 표시 이름,
+            주소(<code>http://</code>나 <code>https://</code>로 시작), 설명(선택), 썸네일(선택)을 넣어 저장해요.
           </li>
           <li>
-            링크 카드나 <strong>수정</strong>을 누르면 고치거나 지울 수 있어요. 지운 링크는 되돌릴 수 없어요.
+            링크 구역 목록의 링크 카드나 <strong>수정</strong>을 눌러도 고치거나 지울 수 있어요. 지운 링크는 되돌릴 수
+            없어요.
           </li>
           <li>
             카드 옆 손잡이를 끌면 순서가 바뀌고 바로 저장돼요. 키보드에서는 손잡이에서 스페이스나 엔터로 든 뒤 위·아래
@@ -103,7 +106,7 @@ export default function GuidePage() {
         <h2 id="guide-share">4. 크리링 링크 공유하기</h2>
         <ol>
           <li>
-            관리 화면 위쪽의 내 페이지 카드나 <strong>주소 설정</strong>의 <strong>내 크리링 링크</strong>에서{' '}
+            관리 화면 미리보기 위 주소 막대나 <strong>주소 설정</strong>의 <strong>내 크리링 링크</strong>에서{' '}
             <strong>복사</strong>를 눌러요.
           </li>
           <li>인스타그램 앱에서 프로필 편집 &gt; 링크에 복사한 주소를 붙여 넣어요.</li>
@@ -114,8 +117,8 @@ export default function GuidePage() {
         <h3>주소 바꾸기</h3>
         <ul>
           <li>
-            <strong>주소 설정</strong>(또는 내 페이지 카드의 <strong>주소 변경</strong>)의 <strong>새 주소</strong>에
-            원하는 주소를 넣으면 쓸 수 있는지 바로 알려 줘요. 영소문자·숫자·하이픈(-) {CRELINK_LIMITS.slugMinLength}~
+            <strong>주소 설정</strong>(또는 주소 막대의 <strong>주소 변경</strong>)의 <strong>새 주소</strong>에 원하는
+            주소를 넣으면 쓸 수 있는지 바로 알려 줘요. 영소문자·숫자·하이픈(-) {CRELINK_LIMITS.slugMinLength}~
             {CRELINK_LIMITS.slugMaxLength}자이고, 처음과 끝은 영소문자나 숫자여야 해요.
           </li>
           <li>
@@ -146,8 +149,8 @@ export default function GuidePage() {
             보이지 않아요. <strong>숨김 해제</strong>로 되돌릴 수 있어요.
           </li>
           <li>
-            <strong>방명록 켜기</strong> 스위치(<strong>방명록</strong> 메뉴나 <strong>페이지 편집</strong>의 방명록
-            카드)를 끄면 방명록 탭이 사라지고 새 글을 받지 않아요. 남은 글은 지우지 않고, 다시 켜면 그대로 보여요.
+            <strong>방명록 켜기</strong> 스위치(<strong>방명록</strong> 메뉴나 <strong>페이지 편집</strong> 미리보기의
+            방명록)를 끄면 방명록 탭이 사라지고 새 글을 받지 않아요. 남은 글은 지우지 않고, 다시 켜면 그대로 보여요.
           </li>
           <li>
             글쓴이 이름과 사진은 그 회원의 크리링 프로필 이름·사진이에요. 비어 있으면 <strong>크리링 회원</strong>으로

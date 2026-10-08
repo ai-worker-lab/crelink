@@ -114,16 +114,14 @@ test('외부에서 랜딩 주소로 바로 열면 단축 주소를 거쳐 방문
   const name = `E2E 직접 접속 ${data.run}`;
   const creator = await data.user({ displayName: name });
 
-  // 크리에이터가 관리 화면 머리글의 `공개 페이지 열기`(같은 출처, 새 창)로 열면 단축 주소를 거치지 않고 바로 열림
+  // 크리에이터가 관리 화면 미리보기 무대 주소 막대의 `공개 페이지 열기`(같은 출처, 새 창)로 열면 단축 주소를 거치지 않고 바로 열림
   const own = await data.session(creator);
   await own.page.goto('/me');
-  const [opened] = await Promise.all([
-    own.context.waitForEvent('page'),
-    own.page
-      .getByRole('navigation', { name: '주요 메뉴' })
-      .getByRole('link', { name: '공개 페이지 열기 (새 창)', exact: true })
-      .click(),
-  ]);
+  const openLink = own.page
+    .getByRole('region', { name: '미리보기', exact: true })
+    .getByRole('link', { name: '공개 페이지 열기 (새 창)', exact: true });
+  await expect(openLink).toHaveAttribute('target', '_blank');
+  const [opened] = await Promise.all([own.context.waitForEvent('page'), openLink.click()]);
   await expect(opened.getByRole('heading', { name, level: 1 })).toBeVisible();
   expect(opened.url()).toBe(creator.landingUrl);
 

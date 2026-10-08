@@ -20,7 +20,7 @@ export interface SocialDraftRow extends SocialLinkView {
   key: number;
 }
 
-/** 열려 있는 링크 추가·수정 폼의 입력값. `id`가 null이면 새 링크입니다. */
+/** 링크 추가·수정 폼의 입력값. `id`가 null이면 새 링크입니다. 관리 화면은 항목마다 하나씩 들고 있습니다(`draftKey`). */
 export interface LinkDraft {
   id: string | null;
   title: string;
@@ -29,7 +29,7 @@ export interface LinkDraft {
   thumbnail: ImageRef | null;
 }
 
-/** 열려 있는 포트폴리오 추가·수정 폼의 입력값. `id`가 null이면 새 항목입니다. */
+/** 포트폴리오 추가·수정 폼의 입력값. `id`가 null이면 새 항목입니다. */
 export interface PortfolioDraft {
   id: string | null;
   title: string;
@@ -42,12 +42,17 @@ export interface PortfolioDraft {
 export interface LandingDrafts {
   profile?: ProfileDraft;
   socials?: ReadonlyArray<SocialLinkView>;
-  link?: LinkDraft | null;
-  portfolio?: PortfolioDraft | null;
+  links?: ReadonlyArray<LinkDraft>;
+  portfolio?: ReadonlyArray<PortfolioDraft>;
 }
 
 /** 미리보기에서 새 링크·포트폴리오 초안 카드에 쓰는 id(서버 id와 겹치지 않음). */
 export const DRAFT_ITEM_ID = 'draft';
+
+/** 항목별 초안의 열쇠: 저장된 항목은 그 id, 새 항목은 `DRAFT_ITEM_ID`. */
+export function draftKey(id: string | null): string {
+  return id ?? DRAFT_ITEM_ID;
+}
 
 export function profileDraftOf(landing: CreatorLandingState['landing']): ProfileDraft {
   return { displayName: landing.displayName ?? '', bio: landing.bio ?? '', avatar: landing.avatar };
@@ -124,7 +129,7 @@ export function isPortfolioDraftDirty(items: ReadonlyArray<PortfolioItemView>, d
  * (`apps/api/src/creator/public-landing.controller.ts`)와 같은 규칙으로 숨긴 링크와 차단된 링크를 빼고 순서를 유지합니다.
  * 크리에이터 미리보기가 방문·클릭 통계를 남기지 않도록 링크 주소(`clickUrl`)는 단축 도메인 클릭 기록 주소가 아니라 저장된 URL입니다.
  *
- * `drafts`를 주면 저장하지 않은 입력을 덮어 그립니다(관리 화면 실시간 미리보기, PRD R18).
+ * `drafts`를 주면 저장하지 않은 입력을 덮어 그립니다(관리 화면 실시간 미리보기, PRD R18). 링크·포트폴리오 초안은 항목마다 하나씩입니다.
  * - 프로필: 앞뒤 공백을 자르고 빈 값은 비움(저장과 같은 규칙).
  * - SNS: 빈 주소 행은 뺌(저장과 같은 규칙).
  * - 링크: 고치는 링크는 제자리에서 바꾸되 숨긴·차단된 링크는 그대로 빠지고, 새 링크는 표시 이름이 있을 때만 맨 끝에 붙습니다.
@@ -132,11 +137,16 @@ export function isPortfolioDraftDirty(items: ReadonlyArray<PortfolioItemView>, d
  * - 포트폴리오: 고치는 항목은 제자리에서, 새 항목은 제목이 있을 때만 맨 끝에.
  */
 export function toLandingPreview(state: CreatorLandingState, drafts: LandingDrafts = {}): PublicLandingView {
-  const { profile, socials, link: linkDraft = null, portfolio: portfolioDraft = null } = drafts;
+  const { profile, socials, links: linkDrafts = [], portfolio: portfolioDrafts = [] } = drafts;
+  const linkDraftById = new Map(linkDrafts.map((draft) => [draftKey(draft.id), draft]));
+  const portfolioDraftById = new Map(portfolioDrafts.map((draft) => [draftKey(draft.id), draft]));
+  const newLink = linkDraftById.get(DRAFT_ITEM_ID);
+  const newPortfolio = portfolioDraftById.get(DRAFT_ITEM_ID);
   const links: PublicLinkView[] = state.links
     .filter((link) => !link.hidden && !link.blocked)
     .map((link) => {
-      if (linkDraft?.id !== link.id) {
+      const linkDraft = linkDraftById.get(link.id);
+      if (!linkDraft) {
         return {
           id: link.id,
           title: link.title,
@@ -156,19 +166,20 @@ export function toLandingPreview(state: CreatorLandingState, drafts: LandingDraf
         clickUrl: url || link.url,
       };
     });
-  if (linkDraft && linkDraft.id === null && linkDraft.title.trim()) {
+  if (newLink?.title.trim()) {
     links.push({
       id: DRAFT_ITEM_ID,
-      title: linkDraft.title.trim(),
-      description: linkDraft.description.trim() || null,
-      thumbnailUrl: linkDraft.thumbnail?.url ?? null,
+      title: newLink.title.trim(),
+      description: newLink.description.trim() || null,
+      thumbnailUrl: newLink.thumbnail?.url ?? null,
       faviconUrl: '',
-      clickUrl: linkDraft.url.trim(),
+      clickUrl: newLink.url.trim(),
     });
   }
 
-  const portfolio: PublicLandingView['portfolio'] = state.portfolio.map((item) =>
-    portfolioDraft?.id === item.id
+  const portfolio: PublicLandingView['portfolio'] = state.portfolio.map((item) => {
+    const portfolioDraft = portfolioDraftById.get(item.id);
+    return portfolioDraft
       ? {
           id: item.id,
           title: portfolioDraft.title.trim() || item.title,
@@ -182,15 +193,15 @@ export function toLandingPreview(state: CreatorLandingState, drafts: LandingDraf
           url: item.url,
           description: item.description,
           imageUrl: item.image?.url ?? null,
-        },
-  );
-  if (portfolioDraft && portfolioDraft.id === null && portfolioDraft.title.trim()) {
+        };
+  });
+  if (newPortfolio?.title.trim()) {
     portfolio.push({
       id: DRAFT_ITEM_ID,
-      title: portfolioDraft.title.trim(),
-      url: portfolioDraft.url.trim() || null,
-      description: portfolioDraft.description.trim() || null,
-      imageUrl: portfolioDraft.image?.url ?? null,
+      title: newPortfolio.title.trim(),
+      url: newPortfolio.url.trim() || null,
+      description: newPortfolio.description.trim() || null,
+      imageUrl: newPortfolio.image?.url ?? null,
     });
   }
 
