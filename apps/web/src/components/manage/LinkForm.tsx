@@ -1,17 +1,18 @@
 'use client';
 
 import { CRELINK_API_PATHS, CRELINK_LIMITS, type CreateLinkRequest, type LinkView } from '@crelink/shared';
-import { useEffect, useId, useRef, type FormEvent } from 'react';
+import { useId, type FormEvent } from 'react';
 import { browserApi } from '../../lib/api/browser';
-import type { LinkDraft } from '../../lib/landing-preview';
+import { draftKey, type LinkDraft } from '../../lib/landing-preview';
 import type { ActionState } from '../../lib/use-action';
 import { ActionStatus } from '../ActionStatus';
 import { ImageField } from '../me/ImageField';
 import { useManager } from './ManagerContext';
 
 /**
- * 링크 추가·수정 폼(표시 이름·주소·설명·썸네일, 저장·삭제). 입력값은 관리 화면 초안(`linkDraft`)에 두어 미리보기가 바로 그립니다.
- * 넓은 화면은 패널 안 펼침(`inline`: 제목·취소 버튼, Esc로 취소), 좁은 화면은 하단 시트(`sheet`: 제목·닫기는 `EditSheet` 머리)가 감쌉니다.
+ * 링크 추가·수정 폼(표시 이름·주소·설명·썸네일, 저장·취소·삭제). 입력값은 관리 화면의 그 링크 초안(`linkDrafts`)에 두어 미리보기가 바로 그립니다.
+ * 넓은 화면은 편집 패널(`panel`: 제목은 패널 머리, Esc로 취소), 좁은 화면은 하단 시트(`sheet`: 제목·닫기는 `EditSheet` 머리)가 감쌉니다.
+ * `취소`는 초안을 버리고, 닫기·`← 전체`는 초안을 남깁니다. 다른 항목으로 옮긴 뒤 끝난 썸네일 업로드도 이 링크의 초안에 붙습니다.
  * 저장·삭제가 끝나면 편집 상태를 다시 읽은 뒤 결과 안내와 함께 `onDone`을 부릅니다. 삭제는 확인을 거칩니다.
  */
 export function LinkForm({
@@ -23,38 +24,24 @@ export function LinkForm({
 }: {
   /** 고칠 링크. null이면 새 링크. */
   link: LinkView | null;
-  variant: 'inline' | 'sheet';
+  variant: 'panel' | 'sheet';
   /** 감싸는 쪽(시트)이 저장 중 여부를 함께 보도록 밖에서 받습니다. */
   action: ActionState;
   onDone: (result: string) => void;
   onCancel: () => void;
 }) {
   const baseId = useId();
-  const titleInputRef = useRef<HTMLInputElement>(null);
-  /** 이 폼(한 번 연 것)이 아직 열려 있는지. 닫히거나 다른 폼으로 바뀐 뒤 끝난 썸네일 업로드는 버립니다. */
-  const opened = useRef(false);
-  const { linkDraft, setLinkDraft, reload } = useManager();
+  const { linkDrafts, editLinkDraft, reload } = useManager();
+  const key = draftKey(link?.id ?? null);
   const { pending, error, run } = action;
 
-  useEffect(() => {
-    opened.current = true;
-    return () => {
-      opened.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    // 시트는 showModal() 뒤에 EditSheet가 [data-autofocus]로 옮깁니다.
-    if (variant === 'inline') titleInputRef.current?.focus();
-  }, [variant]);
-
-  if (!linkDraft) return null;
-  const draft = linkDraft;
-  const update = (patch: Partial<LinkDraft>) =>
-    setLinkDraft((current) => (current ? { ...current, ...patch } : current));
+  const draft = linkDrafts.get(key);
+  if (!draft) return null;
+  const update = (patch: Partial<LinkDraft>) => editLinkDraft(key, patch);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!draft) return;
     const payload: CreateLinkRequest = {
       title: draft.title.trim(),
       url: draft.url.trim(),
@@ -80,28 +67,21 @@ export function LinkForm({
     if (removed) onDone(`'${link.title}' 링크를 지웠어요.`);
   }
 
-  const headingId = `${baseId}-heading`;
   return (
     <form
       className="form-stack edit-form"
       onSubmit={submit}
-      aria-labelledby={variant === 'inline' ? headingId : undefined}
+      aria-label={link ? `${link.title} 링크 수정` : '새 링크'}
       onKeyDown={(event) => {
-        if (variant === 'inline' && event.key === 'Escape' && !pending) {
+        if (variant === 'panel' && event.key === 'Escape' && !pending) {
           event.preventDefault();
           onCancel();
         }
       }}
     >
-      {variant === 'inline' ? (
-        <h3 id={headingId} className="form-title">
-          {link ? '링크 수정' : '새 링크'}
-        </h3>
-      ) : null}
       <div className="field">
         <label htmlFor={`${baseId}-title`}>표시 이름 (필수)</label>
         <input
-          ref={titleInputRef}
           id={`${baseId}-title`}
           className="input"
           data-autofocus
@@ -146,9 +126,7 @@ export function LinkForm({
       <ImageField
         label="썸네일"
         value={draft.thumbnail}
-        onChange={(thumbnail) => {
-          if (opened.current) update({ thumbnail });
-        }}
+        onChange={(thumbnail) => update({ thumbnail })}
         disabled={pending}
       />
       <ActionStatus error={error} />
@@ -156,11 +134,9 @@ export function LinkForm({
         <button type="submit" className="primary" disabled={pending}>
           {pending ? '저장 중…' : '저장'}
         </button>
-        {variant === 'inline' ? (
-          <button type="button" className="secondary" onClick={onCancel} disabled={pending}>
-            취소
-          </button>
-        ) : null}
+        <button type="button" className="secondary" onClick={onCancel} disabled={pending}>
+          취소
+        </button>
         {link ? (
           <button type="button" className="secondary danger" onClick={remove} disabled={pending}>
             삭제

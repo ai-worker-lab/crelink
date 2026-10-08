@@ -5,6 +5,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
   type Dispatch,
@@ -12,11 +13,15 @@ import {
   type SetStateAction,
 } from 'react';
 import { browserApi } from '../../lib/api/browser';
+import { targetKey, type LandingEditTarget } from '../../lib/landing-edit';
 import {
+  draftKey,
   isLinkDraftDirty,
   isPortfolioDraftDirty,
   isProfileDirty,
   isSocialsDirty,
+  linkDraftOf,
+  portfolioDraftOf,
   profileDraftOf,
   socialRowsOf,
   type LinkDraft,
@@ -26,7 +31,7 @@ import {
 } from '../../lib/landing-preview';
 import { useAction, type ActionState } from '../../lib/use-action';
 
-/** 카드별 `저장 안 함` 여부. 하나라도 참이면 미리보기에 `저장하지 않은 변경 포함`을 붙입니다. */
+/** 영역별 `저장 안 함` 여부. 하나라도 참이면 주소 막대에 `저장하지 않은 변경 포함`을 붙입니다. 링크·포트폴리오는 초안 중 하나라도 바뀌었으면 참입니다. */
 export interface ManagerDirty {
   profile: boolean;
   socials: boolean;
@@ -47,12 +52,29 @@ export interface ManagerContextValue {
   setProfile: Dispatch<SetStateAction<ProfileDraft>>;
   socials: SocialDraftRow[];
   setSocials: Dispatch<SetStateAction<SocialDraftRow[]>>;
-  /** 열린 링크 추가·수정 폼. 한 번에 하나만 열립니다. */
-  linkDraft: LinkDraft | null;
-  setLinkDraft: Dispatch<SetStateAction<LinkDraft | null>>;
-  /** 열린 포트폴리오 추가·수정 폼. */
-  portfolioDraft: PortfolioDraft | null;
-  setPortfolioDraft: Dispatch<SetStateAction<PortfolioDraft | null>>;
+  /** 항목별 링크 초안(열쇠 `draftKey(id)`). 다른 항목을 고르거나 메뉴를 옮겨도 남고, `취소`·저장 성공만 지웁니다. */
+  linkDrafts: ReadonlyMap<string, LinkDraft>;
+  editLinkDraft: (key: string, patch: Partial<LinkDraft>) => void;
+  discardLinkDraft: (key: string) => void;
+  isLinkDirty: (key: string) => boolean;
+  /** 항목별 포트폴리오 초안. 규칙은 링크와 같습니다. */
+  portfolioDrafts: ReadonlyMap<string, PortfolioDraft>;
+  editPortfolioDraft: (key: string, patch: Partial<PortfolioDraft>) => void;
+  discardPortfolioDraft: (key: string) => void;
+  isPortfolioDirty: (key: string) => boolean;
+  /** `페이지 편집`에서 고른 대상. null이면 처음 패널(구역 목록)입니다. */
+  selection: LandingEditTarget | null;
+  /**
+   * 대상을 고릅니다. 링크·포트폴리오 항목이면 초안이 없을 때 저장값으로 만들고, 바뀌지 않은 초안은 떠날 때 지웁니다.
+   * 처음 패널에서 고를 때 넘긴 `trigger`는 처음 패널로 돌아올 때 초점을 돌려줄 곳입니다(`takeEntryTrigger`).
+   */
+  select: (target: LandingEditTarget | null, trigger?: HTMLElement | null) => void;
+  takeEntryTrigger: () => HTMLElement | null;
+  /** 고른 대상을 지웁니다(초점은 옮기지 않음). `페이지 편집` 메뉴를 떠날 때 씁니다. */
+  resetSelection: () => void;
+  /** 페이지 편집 폼을 저장·삭제하는 중인지. 그동안 미리보기에서 다른 대상을 고르지 않습니다(저장 결과가 새 선택을 덮지 않게). */
+  formPending: boolean;
+  setFormPending: (pending: boolean) => void;
   dirty: ManagerDirty;
   /** 방명록 켜기 스위치(즉시 저장, 실패하면 되돌림). 저장 중에는 방명록 목록을 부르지 않습니다(꺼진 랜딩은 404). */
   guestbookAction: ActionState;
@@ -60,7 +82,7 @@ export interface ManagerContextValue {
   /** 방명록 관리 목록에서 글을 숨기거나 풀면 늘어, 미리보기 방명록이 다시 불러옵니다. */
   guestbookVersion: number;
   guestbookChanged: () => void;
-  /** 머리 카드 `주소 변경`이 `주소 설정` 메뉴의 새 주소 입력에 초점을 요청합니다. */
+  /** 주소 막대 `주소 변경`이 `주소 설정` 메뉴의 새 주소 입력에 초점을 요청합니다. */
   slugFocusRequest: number;
   requestSlugFocus: () => void;
   /** 초점 요청이 남아 있으면 true를 돌려주고 지웁니다(메뉴를 다시 열 때 또 옮기지 않도록). */
@@ -91,8 +113,11 @@ export function ManagerProvider({
   const [state, setState] = useState(initial);
   const [profile, setProfile] = useState(() => profileDraftOf(initial.landing));
   const [socials, setSocials] = useState(() => socialRowsOf(initial.socials));
-  const [linkDraft, setLinkDraft] = useState<LinkDraft | null>(null);
-  const [portfolioDraft, setPortfolioDraft] = useState<PortfolioDraft | null>(null);
+  const [linkDrafts, setLinkDrafts] = useState<ReadonlyMap<string, LinkDraft>>(() => new Map());
+  const [portfolioDrafts, setPortfolioDrafts] = useState<ReadonlyMap<string, PortfolioDraft>>(() => new Map());
+  const [selection, setSelection] = useState<LandingEditTarget | null>(null);
+  const [formPending, setFormPending] = useState(false);
+  const entryTrigger = useRef<HTMLElement | null>(null);
   const [guestbookVersion, setGuestbookVersion] = useState(0);
   const [slugFocusRequest, setSlugFocusRequest] = useState(0);
   const slugFocusPending = useRef(false);
@@ -126,6 +151,85 @@ export function ManagerProvider({
     if (!saved) setEnabled(!guestbookEnabled);
   }
 
+  // 저장본이 사라진 항목의 초안(다른 곳에서 지움)은 바뀐 것으로 보지 않고, 떠날 때 지웁니다.
+  const isLinkDirty = (key: string) => {
+    const draft = linkDrafts.get(key);
+    if (!draft || (draft.id !== null && !state.links.some((link) => link.id === draft.id))) return false;
+    return isLinkDraftDirty(state.links, draft);
+  };
+  const isPortfolioDirty = (key: string) => {
+    const draft = portfolioDrafts.get(key);
+    if (!draft || (draft.id !== null && !state.portfolio.some((item) => item.id === draft.id))) return false;
+    return isPortfolioDraftDirty(state.portfolio, draft);
+  };
+
+  function editLinkDraft(key: string, patch: Partial<LinkDraft>) {
+    setLinkDrafts((current) => {
+      const draft = current.get(key);
+      return draft ? new Map(current).set(key, { ...draft, ...patch }) : current;
+    });
+  }
+  function discardLinkDraft(key: string) {
+    setLinkDrafts((current) => {
+      if (!current.has(key)) return current;
+      const next = new Map(current);
+      next.delete(key);
+      return next;
+    });
+  }
+  function editPortfolioDraft(key: string, patch: Partial<PortfolioDraft>) {
+    setPortfolioDrafts((current) => {
+      const draft = current.get(key);
+      return draft ? new Map(current).set(key, { ...draft, ...patch }) : current;
+    });
+  }
+  function discardPortfolioDraft(key: string) {
+    setPortfolioDrafts((current) => {
+      if (!current.has(key)) return current;
+      const next = new Map(current);
+      next.delete(key);
+      return next;
+    });
+  }
+
+  function select(target: LandingEditTarget | null, trigger?: HTMLElement | null) {
+    if (selection === null && target !== null) entryTrigger.current = trigger ?? null;
+    // 떠나는 항목의 초안이 저장값과 같으면 지웁니다(다시 고르면 그때의 저장값으로 새로 만듦).
+    if (selection && (!target || targetKey(selection) !== targetKey(target))) {
+      if (selection.kind === 'link' && !isLinkDirty(draftKey(selection.id))) discardLinkDraft(draftKey(selection.id));
+      if (selection.kind === 'portfolio-item' && !isPortfolioDirty(draftKey(selection.id))) {
+        discardPortfolioDraft(draftKey(selection.id));
+      }
+    }
+    if (target?.kind === 'link') {
+      const key = draftKey(target.id);
+      const saved = target.id === null ? null : (state.links.find((link) => link.id === target.id) ?? null);
+      setLinkDrafts((current) => (current.has(key) ? current : new Map(current).set(key, linkDraftOf(saved))));
+    }
+    if (target?.kind === 'portfolio-item') {
+      const key = draftKey(target.id);
+      const saved = target.id === null ? null : (state.portfolio.find((item) => item.id === target.id) ?? null);
+      setPortfolioDrafts((current) =>
+        current.has(key) ? current : new Map(current).set(key, portfolioDraftOf(saved)),
+      );
+    }
+    setSelection(target);
+  }
+
+  // 메뉴를 떠날 때(PageEditor 언마운트) 부릅니다. 최신 select로 바뀌지 않은 초안도 함께 정리합니다.
+  const selectRef = useRef(select);
+  useEffect(() => {
+    selectRef.current = select;
+  });
+  const resetSelection = useCallback(() => {
+    selectRef.current(null);
+    entryTrigger.current = null;
+  }, []);
+  const takeEntryTrigger = useCallback(() => {
+    const trigger = entryTrigger.current;
+    entryTrigger.current = null;
+    return trigger;
+  }, []);
   const guestbookChanged = useCallback(() => setGuestbookVersion((version) => version + 1), []);
   const requestSlugFocus = useCallback(() => {
     slugFocusPending.current = true;
@@ -146,15 +250,25 @@ export function ManagerProvider({
     setProfile,
     socials,
     setSocials,
-    linkDraft,
-    setLinkDraft,
-    portfolioDraft,
-    setPortfolioDraft,
+    linkDrafts,
+    editLinkDraft,
+    discardLinkDraft,
+    isLinkDirty,
+    portfolioDrafts,
+    editPortfolioDraft,
+    discardPortfolioDraft,
+    isPortfolioDirty,
+    selection,
+    select,
+    takeEntryTrigger,
+    resetSelection,
+    formPending,
+    setFormPending,
     dirty: {
       profile: isProfileDirty(state.landing, profile),
       socials: isSocialsDirty(state.socials, socials),
-      link: linkDraft !== null && isLinkDraftDirty(state.links, linkDraft),
-      portfolio: portfolioDraft !== null && isPortfolioDraftDirty(state.portfolio, portfolioDraft),
+      link: [...linkDrafts.keys()].some(isLinkDirty),
+      portfolio: [...portfolioDrafts.keys()].some(isPortfolioDirty),
     },
     guestbookAction,
     toggleGuestbook,

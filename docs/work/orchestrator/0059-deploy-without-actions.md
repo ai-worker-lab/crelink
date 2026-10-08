@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 진행
+- 상태: 완료
 - 종류: 운영
 - 우선순위: P1 (AI 제안)
 - 작성일: 2026-10-08
@@ -13,10 +13,10 @@ GitHub Actions의 월 사용량 한도를 넘어 CI·CD job이 시작되지 않�
 
 ## 수용 기준
 
-- [ ] 운영자 컴퓨터에서 `infra/prod/deploy-local.sh` 한 번으로 `deploy.yml`과 같은 순서(변경 판별 → 이미지 → `ssh-entry.sh deploy` → 운영 주소 검사·실패 시 롤백 → 배포 기록 태그)로 배포된다. 이미지는 대상 서버에서 빌드한다(서버 플랫폼, GHCR·Actions 불필요).
-- [ ] `--dry-run`이 아무것도 바꾸지 않고 배포 커밋·빌드 영역·대상을 보여 준다.
-- [ ] 런북·`infra/prod/README.md`·검증 루프 문서에 절차와 한계(소스맵 업로드 없음, 이미지는 서버에만)가 있다.
-- [ ] 실제로 main을 이 방법으로 운영에 배포하고 운영 주소 검사가 통과한다.
+- [x] 운영자 컴퓨터에서 `infra/prod/deploy-local.sh` 한 번으로 `deploy.yml`과 같은 순서(변경 판별 → 이미지 → `ssh-entry.sh deploy` → 운영 주소 검사·실패 시 롤백 → 배포 기록 태그)로 배포된다. 이미지는 대상 서버에서 빌드한다(서버 플랫폼, GHCR·Actions 불필요).
+- [x] `--dry-run`이 아무것도 바꾸지 않고 배포 커밋·빌드 영역·대상을 보여 준다.
+- [x] 런북·`infra/prod/README.md`·검증 루프 문서에 절차와 한계(소스맵 업로드 없음, 이미지는 서버에만)가 있다.
+- [x] 실제로 main을 이 방법으로 운영에 배포하고 운영 주소 검사가 통과한다.
 
 ## 범위
 
@@ -35,3 +35,4 @@ GitHub Actions의 월 사용량 한도를 넘어 CI·CD job이 시작되지 않�
 ## 진행 기록
 
 - 2026-10-08: 생성, 브랜치 `work/0059-manual-deploy`(main에서, 별도 worktree). 확인: `ssh home-server`는 root, 서버 amd64·8코어·31GB, `deploy` 사용자는 docker 그룹, `/usr/local/lib/crelink/ssh-entry.sh` 설치됨, 활성 색 blue·릴리스 `ed4ce75`(0053)·API 이미지 `1643c70`. `lib.sh registry_login`은 토큰이 없으면 로그인하지 않고 서버 이미지만 씀(`ensure_image`는 있으면 pull 안 함). `gh variable list`로 Sentry 변수 4개 확인(secret `SENTRY_AUTH_TOKEN`·`DEPLOY_SSH_KEY`는 값을 읽을 수 없음).
+- 2026-10-08: PR #55 squash 머지(`29e867b`, CI는 한도 초과로 시작되지 않아 로컬 `bash -n`·`shellcheck`·`--dry-run`·`pnpm verify --docs`로 확인). 같은 커밋을 이 도구로 운영 배포: 판별 api 아니오(`1643c70`)·web 예·릴리스 예 → home-server에서 웹 이미지 빌드 → `deploy`(레지스트리 로그인 없이 서버 이미지) → green 기동·헬스 통과 → 트래픽 blue → green, 20초 drain 뒤 blue 정지 → `verify` 6개 통과(웹 `/`·`/privacy`·BFF health 200, 단축 없는 주소 302·notice, API 직접 접근 404) → 태그 `deploy/prod`·`deploy/prod-web` push. 전체 1분 40초. 0057(의견 보내기 떠 있는 버튼)·0044(Pretendard 굵기) 웹 변경이 이 배포로 운영에 나감. 고친 것: 운영자 macOS tar가 묶음에 확장 속성 헤더를 넣어 서버 tar가 경고를 냄 → `COPYFILE_DISABLE=1 tar --no-xattrs`(0058 브랜치에 포함).

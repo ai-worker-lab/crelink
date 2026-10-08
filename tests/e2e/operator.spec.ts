@@ -74,14 +74,19 @@ test('운영자: 크리에이터 통계·분포, 슬롯 부여 후 6번째 링�
   ).toHaveCount(1);
   await expectMobileFits(page, '/admin/creators/{id}');
 
-  // 추가 슬롯 1개 → 크리에이터가 보이는 링크 6번째 추가
+  // 추가 슬롯 1개 → 크리에이터가 보이는 링크 6번째 추가(`페이지 편집` 미리보기에서 외부 링크 구역을 골라 외부 링크 패널로)
   const creatorSession = await data.session(creator);
   const me = creatorSession.page;
   await me.goto(`/me/landings/${creator.publicId}`);
-  const links = me.getByRole('main').getByRole('region', { name: '외부 링크' });
-  const previewTitles = me.getByRole('complementary', { name: '미리보기' }).locator('.link-title');
+  const manage = me.getByRole('main');
+  const stage = me.getByRole('region', { name: '미리보기', exact: true });
+  const links = manage.getByRole('region', { name: '외부 링크', exact: true });
+  const previewTitles = stage.locator('.link-title');
+  const openLinks = stage.getByRole('button', { name: '외부 링크 구역 편집', exact: true });
+  await openLinks.click();
   await expect(links.getByText('보이는 링크 5/5')).toBeVisible();
   await expect(links.getByRole('button', { name: '링크 추가' })).toHaveCount(0);
+  await expect(stage.getByRole('button', { name: '링크 추가' })).toHaveCount(0);
 
   await page.getByLabel('추가 링크 슬롯').fill('1');
   await page.getByRole('button', { name: '슬롯 저장' }).click();
@@ -89,9 +94,11 @@ test('운영자: 크리에이터 통계·분포, 슬롯 부여 후 6번째 링�
   await expect(page.getByText('보이는 링크 5/6', { exact: false })).toBeVisible();
 
   await me.reload();
+  await openLinks.click();
   await expect(links.getByText('보이는 링크 5/6')).toBeVisible();
-  await links.getByRole('button', { name: '링크 추가' }).click();
-  const addForm = links.getByRole('form', { name: '새 링크' });
+  await links.getByRole('button', { name: '링크 추가', exact: true }).click();
+  await expect(manage.getByRole('heading', { name: '새 링크', level: 2, exact: true })).toBeFocused();
+  const addForm = manage.getByRole('form', { name: '새 링크', exact: true });
   await addForm.getByLabel('표시 이름 (필수)').fill('여섯 번째');
   await addForm.getByLabel('주소 (필수)').fill(data.externalUrl('sixth'));
   await addForm.getByRole('button', { name: '저장', exact: true }).click();
@@ -123,14 +130,15 @@ test('운영자: 크리에이터 통계·분포, 슬롯 부여 후 6번째 링�
 
   // 관리 화면에 차단 표시(스위치는 바꿀 수 없음), 미리보기에서도 빠짐, 같은 도메인(하위 도메인 포함) 저장 거부
   await me.reload();
+  await openLinks.click();
   const shopItem = links.getByRole('listitem').filter({ has: me.getByRole('button', { name: `${shop.title} 수정` }) });
   await expect(shopItem.getByText('차단됨', { exact: true })).toBeVisible();
   await expect(shopItem.getByText('크리링이 이 링크를 차단해 방문자에게 보이지 않아요. 사유: E2E 차단')).toBeVisible();
   await expect(shopItem.getByRole('switch', { name: `${shop.title} 숨기기` })).toHaveAttribute('aria-disabled', 'true');
   await expect(links.getByText('보이는 링크 5/6')).toBeVisible();
   await expect(previewTitles).toHaveText([blog.title, '유튜브', '카페', '공지', '여섯 번째']);
-  await links.getByRole('button', { name: '링크 추가' }).click();
-  const blockedForm = links.getByRole('form', { name: '새 링크' });
+  await links.getByRole('button', { name: '링크 추가', exact: true }).click();
+  const blockedForm = manage.getByRole('form', { name: '새 링크', exact: true });
   await blockedForm.getByLabel('표시 이름 (필수)').fill('차단 도메인 링크');
   await blockedForm.getByLabel('주소 (필수)').fill(`https://www.${domain}/other`);
   data.allowConsoleError(/status of 422 .*\/api\/backend\/api\/me\/links$/);
@@ -138,6 +146,7 @@ test('운영자: 크리에이터 통계·분포, 슬롯 부여 후 6번째 링�
   await expect(blockedForm.getByText('크리링 차단 목록에 있는 도메인이라 저장할 수 없어요.')).toBeVisible();
   await blockedForm.getByRole('button', { name: '취소' }).click();
   await expect(blockedForm).toHaveCount(0);
+  await expect(manage.getByRole('heading', { name: '외부 링크', level: 2, exact: true })).toBeFocused();
   await expect(links.getByRole('button', { name: '차단 도메인 링크 수정' })).toHaveCount(0);
   await expect(previewTitles).toHaveText([blog.title, '유튜브', '카페', '공지', '여섯 번째']);
 

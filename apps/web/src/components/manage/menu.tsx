@@ -22,7 +22,7 @@ const iconProps = {
 } as const;
 
 /**
- * 랜딩 관리 화면 메뉴(설계: design/desktop-landing-manager/handoff.md `확장 지점`). 메뉴 한 개 = 랜딩 아래 경로 한 개이고,
+ * 랜딩 관리 화면 메뉴(설계: design/preview-direct-edit/handoff.md `정보 구조`). 메뉴 한 개 = 랜딩 아래 경로 한 개이고,
  * 새 기능은 이 배열에 한 줄을 더하고 `app/me/landings/[publicId]/<segment>/page.tsx`를 두어 붙입니다.
  * 순서는 자주 쓰는 순이고 설정류는 늘 맨 끝입니다.
  */
@@ -34,6 +34,16 @@ export const MANAGER_MENU = [
       <svg {...iconProps}>
         <path d="M4 20h4L19 9a2 2 0 0 0-4-4L4 16v4Z" />
         <path d="m13.5 6.5 4 4" />
+      </svg>
+    ),
+  },
+  {
+    segment: 'profile',
+    label: '프로필',
+    icon: (
+      <svg {...iconProps}>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" />
       </svg>
     ),
   },

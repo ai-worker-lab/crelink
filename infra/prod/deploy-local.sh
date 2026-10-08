@@ -106,7 +106,8 @@ for host in "${targets[@]}"; do
 	git archive --format=tar "$sha" infra/prod | tar -xf - -C "$bundle"
 	{
 		printf '\n' # GHCR 자격 증명 없음: 서버에 있는 이미지만 씀
-		tar -czf - -C "$bundle/infra/prod" --exclude ./tests --exclude ./README.md --exclude '*.example' --exclude ./.env .
+		# macOS tar가 확장 속성(com.apple.provenance)을 넣으면 서버 GNU tar가 경고를 내므로 빼고 묶습니다.
+		COPYFILE_DISABLE=1 tar --no-xattrs -czf - -C "$bundle/infra/prod" --exclude ./tests --exclude ./README.md --exclude '*.example' --exclude ./.env .
 	} | remote_entry "$host" deploy "$sha" "$api_image" "$web_image" || die "$host 배포 실패(서버는 활성 색·트래픽을 바꾸지 않았습니다)."
 	rm -rf "$bundle"
 	if ! remote_entry "$host" verify </dev/null; then

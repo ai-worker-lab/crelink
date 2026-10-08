@@ -15,9 +15,9 @@ import { loadSignedIn } from '../../../../lib/api/server';
 export const dynamic = 'force-dynamic';
 
 /**
- * 랜딩 관리 화면(PRD R18) 틀: 머리글과 메뉴·관리 패널·실시간 미리보기. 메뉴(`components/manage/menu.tsx`)마다 이 아래 page가 하나씩 있고,
- * 편집 상태(`GET /api/me/landing`)와 저장하지 않은 입력은 이 레이아웃의 `ManagerProvider`가 들고 있어 메뉴를 옮겨도 남습니다.
- * 401은 홈(`/`)으로, 남의 랜딩 ID는 찾을 수 없음 안내, 그 밖의 API 오류는 다시 시도 안내입니다.
+ * 랜딩 관리 화면(PRD R18) 틀: 머리글과 메뉴·미리보기 무대·편집 패널. 메뉴(`components/manage/menu.tsx`)마다 이 아래 page가 하나씩 있고,
+ * 편집 상태(`GET /api/me/landing`)와 저장하지 않은 입력·고른 대상은 이 레이아웃의 `ManagerProvider`가 들고 있어 메뉴를 옮겨도 남습니다.
+ * 공개 페이지 열기·단축 주소는 무대의 주소 막대에 있습니다. 401은 홈(`/`)으로, 남의 랜딩 ID는 찾을 수 없음 안내, 그 밖의 API 오류는 다시 시도 안내입니다.
  */
 export default async function ManageLandingLayout({
   children,
@@ -39,22 +39,6 @@ export default async function ManageLandingLayout({
       {me.ok ? <MonitoringUser id={me.data.id} /> : null}
       <SiteHeader>
         {me.ok && me.data.role === 'operator' ? <Link href="/admin">운영자 화면</Link> : null}
-        {own ? (
-          <a className="secondary header-open" href={own.landing.url} target="_blank" rel="noopener">
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-              <path
-                d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span className="header-open-label">공개 페이지 열기</span>
-            <span className="visually-hidden"> (새 창)</span>
-          </a>
-        ) : null}
         <LogoutButton />
       </SiteHeader>
       {!result.ok ? (

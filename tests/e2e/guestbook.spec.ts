@@ -84,7 +84,7 @@ test('방명록: 비회원 읽기·로그인 안내, 공개글·비밀글 가시
   const managerMenu = owner.page.getByRole('navigation', { name: '관리 메뉴' });
   const manage = owner.page.getByRole('main');
   const manageList = manage.getByRole('list', { name: '방명록 글 목록' });
-  const preview = owner.page.getByRole('complementary', { name: '미리보기' });
+  const preview = owner.page.getByRole('region', { name: '미리보기', exact: true });
   const previewBodies = preview.locator('.guestbook-body');
   await owner.page.goto(`${managePath}/guestbook`);
   await expect(managerMenu.getByRole('link', { name: '방명록' })).toHaveAttribute('aria-current', 'page');
@@ -137,7 +137,7 @@ test('방명록: 비회원 읽기·로그인 안내, 공개글·비밀글 가시
   await expect(guest.page.getByText('아직 방명록이 없어요. 첫 방명록을 남겨 주세요.')).toBeVisible();
 
   // 6. 크리에이터가 `방명록` 메뉴에서 끄면 꺼짐 안내, 미리보기·공개 랜딩에 탭이 없고 API는 guestbook_disabled.
-  //    `페이지 편집`의 같은 스위치로 다시 켜면 남은 글이 보임
+  //    `페이지 편집`의 구역 목록에서 방명록을 골라 방명록 패널의 같은 스위치로 다시 켜면 남은 글이 보임
   await owner.page.reload();
   const toggle = manage.getByRole('switch', { name: '방명록 켜기' });
   await expect(toggle).toHaveAttribute('aria-checked', 'true');
@@ -157,12 +157,26 @@ test('방명록: 비회원 읽기·로그인 안내, 공개글·비밀글 가시
 
   await managerMenu.getByRole('link', { name: '페이지 편집' }).click();
   await expect(owner.page).toHaveURL(`${WEB_URL}${managePath}`);
-  const editToggle = manage.getByRole('region', { name: '방명록' }).getByRole('switch', { name: '방명록 켜기' });
+  const guestbookRow = manage.getByRole('button', { name: /방명록.*꺼짐/ });
+  await guestbookRow.click();
+  await expect(manage.getByRole('heading', { name: '방명록', level: 2, exact: true })).toBeFocused();
+  const editToggle = manage
+    .getByRole('region', { name: '방명록', exact: true })
+    .getByRole('switch', { name: '방명록 켜기' });
   await expect(editToggle).toHaveAttribute('aria-checked', 'false');
+  await expect(preview.getByRole('tab')).toHaveCount(0);
   await editToggle.click();
   await expect(manage.getByText('방명록을 켰어요. 방문자에게 방명록 탭이 보여요.')).toBeVisible();
   await expect(editToggle).toHaveAttribute('aria-checked', 'true');
+  // 방명록을 고른 동안 미리보기는 방명록 탭(방문자 시점이라 비밀글 없음)과 `방명록 탭 편집` 고르기 버튼
+  await expect(preview.getByRole('tab', { name: '방명록' })).toHaveAttribute('aria-selected', 'true');
+  await expect(preview.getByText('아직 방명록이 없어요. 첫 방명록을 남겨 주세요.')).toBeVisible();
+  // `전체`로 돌아오면 구역 목록의 방명록이 켜짐, 미리보기 탭은 링크로
+  await manage.getByRole('button', { name: '전체', exact: true }).click();
+  await expect(manage.getByRole('button', { name: /방명록.*켜짐/ })).toBeVisible();
   await expect(preview.getByRole('tab', { name: '링크' })).toHaveAttribute('aria-selected', 'true');
+  await preview.getByRole('button', { name: '방명록 탭 편집', exact: true }).click();
+  await expect(manage.getByRole('heading', { name: '방명록', level: 2, exact: true })).toBeFocused();
   await manage.getByRole('link', { name: '방명록 글 관리' }).click();
   await expect(owner.page).toHaveURL(`${WEB_URL}${managePath}/guestbook`);
   await expect(manageList.locator('.guestbook-body')).toHaveText([secretBody]);
