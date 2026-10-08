@@ -592,14 +592,14 @@ cp .images.env /opt/crelink/state/images.env
 
 ## 15. Sentry 오류·성능 모니터링
 
-결정·수집 범위·개인정보는 [ADR 0012](../../docs/adr/0012-error-monitoring-sentry.md), 키 위치 표는 [설계 "비밀값과 환경변수"](../../docs/specs/crelink-prod-deploy.md#비밀값과-환경변수)입니다. API·웹은 DSN이 비어 있으면 Sentry를 켜지 않으므로 이 절을 하기 전에는 아무것도 보내지 않고, `SENTRY_AUTH_TOKEN`이 없으면 이미지 빌드가 소스맵 업로드를 건너뜁니다. DSN·조직·프로젝트 이름은 비밀이 아니지만 토큰은 이 문서·채팅에 붙여 넣지 않습니다.
+결정·수집 범위·개인정보는 [ADR 0012](../../docs/adr/0012-error-monitoring-sentry.md)(오류·성능)와 [ADR 0014](../../docs/adr/0014-sentry-free-plan-features.md)(로그·지표·Cron·Uptime·리플레이·세션·의견), 키 위치 표는 [설계 "비밀값과 환경변수"](../../docs/specs/crelink-prod-deploy.md#비밀값과-환경변수)입니다. API·웹은 DSN이 비어 있으면 Sentry를 켜지 않으므로 이 절을 하기 전에는 아무것도 보내지 않고, `SENTRY_AUTH_TOKEN`이 없으면 이미지 빌드가 소스맵 업로드를 건너뜁니다. DSN·조직·프로젝트 이름은 비밀이 아니지만 토큰은 이 문서·채팅에 붙여 넣지 않습니다.
 
 ### 15-1. 조직·프로젝트 만들기(한 번)
 
 1. [sentry.io](https://sentry.io/signup/)에서 가입하고 조직을 만듭니다. 이름(slug) `crelink`(이미 쓰이면 다른 slug), **Data Storage Location = United States of America (US)**. 저장 위치는 나중에 바꿀 수 없고 바꾸려면 조직을 새로 만들어야 합니다. 조직 Settings에서 slug와 저장 위치를 확인합니다.
 2. 프로젝트 두 개: `crelink-api`(플랫폼 Node.js의 **NestJS**), `crelink-web`(**Next.js**). 설치 안내(wizard)의 코드 변경은 하지 않습니다(저장소에 이미 있음).
 3. 각 프로젝트 Settings > **Client Keys (DSN)**에서 DSN을 복사합니다(`https://<공개 키>@o<숫자>.ingest.<지역>.sentry.io/<프로젝트 ID>` 꼴).
-4. 요금제: 무료 Developer는 사용자 1명, 월 오류 5천 건·span 500만 개, 보관 30일입니다. 새 조직은 체험 기간 동안 Team 요금제 보관(오류 90일)이 적용됩니다. 보관 기간이 달라지는 요금제로 바꾸면 웹 `/privacy`의 "보유·이용 기간" 문구를 같은 변경에서 맞춥니다.
+4. 요금제: 무료 Developer는 사용자 1명, 월 오류 5천 건·span 500만 개·Logs 5GB·Application Metrics 5GB·리플레이 50건·Attachments 1GB, Cron·Uptime 모니터 각 1개, 보관 30일(모든 데이터 종류)입니다. 새 조직은 체험 기간 동안 Team 요금제 보관(오류 90일)이 적용됩니다. 보관 기간이 달라지는 요금제로 바꾸면 웹 `/privacy`의 "보유·이용 기간" 문구를 같은 변경에서 맞춥니다.
 
 ### 15-2. API DSN 넣기(암호문)
 
@@ -644,14 +644,30 @@ gh secret list && gh variable list
 - 오류: 웹은 `https://links.shaul.kr`에서 개발자 도구 콘솔에 `setTimeout(() => { throw new Error('sentry-check') })`를 실행하면 `crelink-web` Issues에 `sentry-check`가 생깁니다(브라우저 전송 확인용, 콘솔 코드라 소스맵과 무관). API는 4xx를 보내지 않고 일부러 500을 내는 경로가 없으므로 실제 오류가 생길 때 Issues에서 봅니다. 확인용 이슈는 Resolve·Delete합니다.
 - 소스맵: 실제 오류 이벤트의 스택에 원래 경로(웹 `src/app/...`, API `src/...`)와 줄이 보이면 적용된 것입니다. 압축 파일(`.next/...chunks`·`dist/...js`)만 보이면 이벤트의 release가 업로드한 릴리스와 같은지, 그 릴리스에 소스맵 artifact가 있는지 봅니다.
 - 개인정보: 이벤트의 User에 `id`(UUID)와 `ip_address`만 있고, Request의 쿠키·`Authorization`·`X-Crelink-Internal` 헤더와 본문이 없고, 쿼리 `code`·`state`·`pass`는 `[Filtered]`인지 봅니다.
+- 로그(Explore > Logs): `crelink-api`에 Nest 로그(기동 로그, `nest.context` 속성), `crelink-web`에 브라우저·서버 `console.warn`·`console.error`가 보입니다. 속성·본문에 쿠키·인증 헤더·토큰·이메일이 없는지 봅니다(`user.id`는 있음).
+- 지표(Explore > Metrics): `crelink.auth.login`(`result`)·`crelink.short_link.visit`·`crelink.link.click`. 단축 주소를 한 번 열고 링크를 한 번 누르면 수 분 안에 보입니다. 속성에 `user.id`·IP·이메일이 없는지 봅니다.
+- Cron(Monitors > Crons): API가 기동하면 바로 보관 정리를 한 번 돌려 `crelink-api-retention` 모니터가 생기고(코드가 upsert, 무료 1개), 체크인이 `In Progress` → `OK`로 보입니다. 이후 24시간마다(배포하면 기동 때 한 번 더) 체크인합니다.
+- Uptime(Monitors > Uptime): `Uptime check for links.shaul.kr/api/backend/api/health`가 1분마다 성공으로 보입니다(설정은 15-6).
+- 리플레이(Explore > Replays): 브라우저 오류가 난 세션만 생깁니다. 위 `sentry-check` 오류를 내면 그 세션 리플레이가 생기고, 화면 글자가 `*`로, 이미지가 빈 상자로 가려져 있는지 봅니다. 관리 화면에서 `의견 보내기` 창을 열어도 리플레이가 갑니다.
+- Release Health(Releases): `crelink-web` 릴리스에 브라우저 세션 수·crash free 비율이 보입니다.
+- 의견(Issues > User Feedback): `/me`나 `/admin`의 `의견 보내기`로 보낸 의견이 보이고 이름·이메일이 비어 있습니다. 스크린숏은 첨부했을 때만 있습니다. 확인용 의견은 지웁니다.
 
 ### 15-5. 끄기·장애·회전
 
-- **끄기**: API는 `sops set "$f" '["SENTRY_DSN"]' '""'` → 병합·배포. 웹은 `gh variable delete SENTRY_WEB_DSN` → 15-3의 `force` 실행(웹 이미지를 다시 빌드해야 꺼짐). 롤백하면 그 릴리스의 암호문·이미지 값으로 돌아가므로 끈 뒤 옛 릴리스로 롤백하면 다시 켜질 수 있습니다.
+- **끄기**: API는 `sops set "$f" '["SENTRY_DSN"]' '""'` → 병합·배포. 웹은 `gh variable delete SENTRY_WEB_DSN` → 15-3의 `force` 실행(웹 이미지를 다시 빌드해야 꺼짐). 롤백하면 그 릴리스의 암호문·이미지 값으로 돌아가므로 끈 뒤 옛 릴리스로 롤백하면 다시 켜질 수 있습니다. DSN을 비워도 Uptime 모니터는 Sentry가 계속 확인하므로 함께 끄려면 15-6의 모니터를 Disable·Delete합니다. Cron 모니터는 체크인이 끊기면 놓침(Missed) 이슈를 만들므로 같이 지웁니다.
 - **소스맵 업로드 실패로 배포가 막힘**(Sentry 장애 등): Sentry가 돌아온 뒤 실패한 job을 다시 실행합니다. 급하면 `gh secret delete SENTRY_AUTH_TOKEN` 뒤 다시 실행해 소스맵 없이 배포하고, 복구되면 15-3으로 토큰을 다시 넣습니다(그 배포의 스택은 압축 코드 위치로 보임).
 - **토큰 회전·유출**: Organization Tokens에서 새 토큰을 만들어 `gh secret set SENTRY_AUTH_TOKEN` → 옛 토큰 Revoke(조직 owner·manager만 가능). 새 토큰이 만들어지면 owner에게 보안 메일이 갑니다.
 - **DSN 회전**(남용된 이벤트가 들어올 때): 프로젝트 Client Keys에서 새 키를 만들고 API는 15-2, 웹은 15-3(`SENTRY_WEB_DSN` 교체 + `force`)으로 바꾼 뒤 옛 키를 비활성화합니다.
 - **한도 초과**: Sentry Stats·Subscription 화면에서 사용량을 봅니다. 무료 요금제는 한도를 넘으면 그 달 나머지 이벤트를 받지 않습니다. 반복 오류는 원인을 고치거나 Inbound Filters로 거릅니다.
+- **리플레이 한도 초과**: 월 50건을 넘으면 그 달 나머지 리플레이는 버려집니다(요금 없음). 같은 오류가 반복되면 오류를 고치거나 Inbound Filters로 거릅니다.
+
+### 15-6. 무료 기능 화면 설정(한 번)
+
+저장소에 없는 Sentry 화면 설정입니다. 2026-10-08 적용(0052).
+
+- **Uptime**: Monitors > Create Monitor > Uptime. Project `crelink-web`, Environment `production`, Interval `Every 1 minute`, Timeout 5초, URL `https://links.shaul.kr/api/backend/api/health`, Method `GET`, 헤더 없음, Allow Sampling 끔, Failure Threshold 3, Recovery Threshold 1, 설명에 이 절 링크. 이 주소는 웹 BFF 허용 목록의 `GET api/health`를 거쳐 API까지 가므로 웹·API 어느 쪽 장애든 잡힙니다(`/api/backend/health`는 BFF가 404). 무료 요금제는 1개뿐이라 자동 감지(Automatic Detection)로 생긴 모니터가 있으면 그것을 고쳐 씁니다. 이슈 알림은 `crelink-web` 프로젝트의 기존 이슈 알림을 따릅니다.
+- **Inbound Filters**: 각 프로젝트 Settings > Inbound Filters. `crelink-api`·`crelink-web` 모두 Browser Extension Errors, Localhost, Web Crawlers, Legacy Browsers(모든 브라우저), Health Check Transactions를 켭니다. 사용자 지정 필터(오류 메시지·IP·릴리스)는 Trial·Business 이상 요금제 기능이라 쓰지 않습니다.
+- **Cron**: 화면에서 만들지 않습니다. API가 첫 체크인 때 `crelink-api-retention`을 만듭니다(설정 원본 `apps/api/src/retention/retention.service.ts`).
 
 ## 로컬 시험
 
@@ -697,5 +713,9 @@ gh secret list && gh variable list
 | Sentry 조직 토큰(권한 고정, 한 번만 보임, owner 보안 메일·owner·manager만 폐기)과 `org:ci` 범위(2026-10-07) | <https://docs.sentry.io/account/auth-tokens/>, <https://docs.sentry.io/api/permissions/> |
 | Sentry 운영 회사·연락처(Functional Software, Inc. d/b/a Sentry, 45 Fremont Street 8th Floor San Francisco CA 94105, compliance@sentry.io)(2026-10-07) | <https://sentry.io/privacy/> |
 | Next.js SDK 기본 통합(BrowserSession 자동)·광고 차단기와 `tunnel`, 서버 쿠키 수집 기본값(2026-10-07) | <https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/integrations/>, <https://docs.sentry.io/platforms/javascript/guides/nextjs/troubleshooting/>, <https://docs.sentry.io/platforms/javascript/guides/nextjs/data-management/data-collected/> |
+| Sentry 데이터 종류별 보관 기간(Developer: 오류·로그·span·리플레이·Cron·Uptime·첨부·Application Metrics 모두 30일)(2026-10-08) | <https://docs.sentry.io/security-legal-pii/security/data-retention-periods/> |
+| Sentry Uptime(간격 1분~1시간, 실패 3회 기본, 2xx 성공, 리다이렉트 따라감, Allow Sampling, 확인 span은 span 한도에 안 셈, 자동 감지)·Uptime 확인 데이터가 저장 위치 밖에 저장될 수 있음(모니터 생성 화면 안내)(2026-10-08) | <https://docs.sentry.io/product/monitors-and-alerts/monitors/uptime-monitoring/> |
+| Sentry Inbound Filters(기본 필터 종류, 헬스 체크 트랜잭션 패턴, 리플레이·로그·지표에 적용되는 필터, 사용자 지정 필터는 Trial·Business 이상)(2026-10-08) | <https://docs.sentry.io/concepts/data-management/filtering/> |
+| Sentry 무료 요금제 범위(Logs 5GB·Application Metrics 5GB·리플레이 50·Cron 1·Uptime 1·첨부 1GB/월)(2026-10-08, 결제 화면과 요금제 페이지) | <https://sentry.io/pricing/> |
 
 `[확인 못 함]`: Tailscale WIF Custom claims의 와일드카드, `pg_dump`의 Supabase 버전·풀러 제약, `pg_stat_activity`에 보이는 Supavisor 연결의 구분, Sentry 화면 메뉴 이름(Traces·Releases 등)과 소스맵 업로드 로그 형식(첫 설정 때 확인), 유출된 `org:ci` 토큰으로 이벤트를 읽을 수 없는지.

@@ -1,7 +1,8 @@
-import type { ErrorEvent, NodeOptions } from '@sentry/nextjs';
+import type { Breadcrumb, ErrorEvent, Log, NodeOptions } from '@sentry/nextjs';
 
 /**
- * 웹(서버·브라우저) Sentry 공통 설정. 결정: docs/adr/0012-error-monitoring-sentry.md, 설명: apps/web/README.md#오류-모니터링
+ * 웹(서버·브라우저) Sentry 공통 설정. 결정: docs/adr/0012-error-monitoring-sentry.md, docs/adr/0014-sentry-free-plan-features.md,
+ * 설명: apps/web/README.md#오류-모니터링
  *
  * `NEXT_PUBLIC_SENTRY_DSN`은 빌드 시점에 번들에 들어갑니다(운영 이미지 빌드 인자). 비어 있으면 서버·브라우저 모두 Sentry를 초기화하지 않습니다
  * (로컬·시험·PR CI). DSN은 이벤트 전송만 허용하는 공개 값이라 브라우저 번들에 들어가도 됩니다.
@@ -12,6 +13,9 @@ export const SENTRY_ENVIRONMENT = process.env.NODE_ENV === 'production' ? 'produ
 
 /** 성능 추적 비율(요청·화면 이동의 10%). 사용자 결정. */
 export const TRACES_SAMPLE_RATE = 0.1;
+
+/** Sentry Logs로 보내는 콘솔 수준(서버·브라우저 공통). `console.log`·`info`·`debug`는 보내지 않습니다. */
+export const CONSOLE_LOG_LEVELS: ('warn' | 'error')[] = ['warn', 'error'];
 
 /** 이벤트·span에서 지우는 요청·응답 헤더(소문자). 세션 쿠키 `cl_session`, 인증 정보, API로 보내는 내부 토큰입니다. */
 const SCRUBBED_HEADERS = ['cookie', 'set-cookie', 'authorization', 'proxy-authorization', 'x-crelink-internal'];
@@ -54,4 +58,56 @@ export function scrubSpan(span: StreamedSpan): StreamedSpan {
     if (SCRUBBED_SPAN_ATTRIBUTE.test(key)) delete span.attributes[key];
   }
   return span;
+}
+
+/**
+ * 로그 속성·breadcrumb `data`에서 통째로 지우는 키: 쿠키·인증 헤더·토큰·비밀값·비밀번호·이메일·내부 토큰 헤더(`x-crelink-internal`)가 들어간 키와
+ * SDK가 스코프 사용자에서 붙이는 `user.email`·`user.name`.
+ */
+const SCRUBBED_KEY = /cookie|authorization|token|secret|password|email|x-crelink-internal|^user\.name$/i;
+const EMAIL_LIKE = /[^\s@<>"'`()[\]{},;:]+@[^\s@<>"'`()[\]{},;:]+\.[^\s@<>"'`()[\]{},;:]+/g;
+
+/** 이메일 모양 글자를 `[email]`로 바꿉니다(로그 본문·breadcrumb 문구·문자열 값이 같은 기준을 쓰도록 한 곳에 둠). */
+function scrubText(text: string): string {
+  return text.replace(EMAIL_LIKE, '[email]');
+}
+
+function scrubValue(value: unknown): unknown {
+  if (typeof value === 'string') return scrubText(value);
+  if (Array.isArray(value)) return value.map(scrubValue);
+  if (value && typeof value === 'object') return scrubRecord(value as Record<string, unknown>);
+  return value;
+}
+
+function scrubRecord(record: Record<string, unknown>): Record<string, unknown> {
+  const scrubbed: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (SCRUBBED_KEY.test(key)) continue;
+    scrubbed[key] = scrubValue(value);
+  }
+  return scrubbed;
+}
+
+/**
+ * Sentry Logs(`beforeSendLog`, 콘솔 warn·error)에서 개인정보를 지웁니다. 속성(중첩 객체 포함)의 쿠키·인증 헤더·토큰·비밀값·이메일 키와
+ * `user.email`·`user.name`을 지우고, 본문과 문자열 값의 이메일 모양 글자는 `[email]`로 바꿉니다. 내부 사용자 ID(`user.id`)는 오류 이벤트와 같이 남깁니다.
+ */
+export function scrubLog(log: Log): Log {
+  return {
+    ...log,
+    message: scrubText(String(log.message)),
+    attributes: log.attributes ? scrubRecord(log.attributes) : log.attributes,
+  };
+}
+
+/**
+ * breadcrumb(`beforeBreadcrumb`)에서 `scrubLog`와 같은 기준으로 개인정보를 지웁니다. 콘솔 breadcrumb(`category: 'console'`)의 `message`와
+ * `data.arguments`가 오류 이벤트의 breadcrumbs와 리플레이 기록에 그대로 들어가지 않게 합니다(SDK는 이 결과를 리플레이에 넘김).
+ */
+export function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb {
+  return {
+    ...breadcrumb,
+    message: breadcrumb.message === undefined ? undefined : scrubText(breadcrumb.message),
+    data: breadcrumb.data ? scrubRecord(breadcrumb.data) : breadcrumb.data,
+  };
 }

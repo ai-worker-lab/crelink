@@ -5,7 +5,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { AppConfig } from '../config.service';
 import { Database, isUniqueViolation } from '../database';
 import { apiError, insertWithRandomId } from '../common/http';
-import { GoogleClientConfig, GoogleOAuth, GoogleProfile } from './google-oauth';
+import { GoogleClientConfig, GoogleOAuth, googleVerifyFailureReason, GoogleProfile } from './google-oauth';
 
 /** 세션 쿠키 원문 토큰을 DB에 저장할 값(SHA-256 hex)으로 바꿉니다. */
 export function hashSessionToken(token: string): string {
@@ -68,7 +68,7 @@ export class AuthService {
       const verified = await this.google.verifyCode(google, code);
       profile = { ...verified, email: verified.email.trim().toLowerCase() };
     } catch (error) {
-      this.logger.warn(`구글 code 교환·ID 토큰 검증 실패: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.warn(`구글 code 교환·ID 토큰 검증 실패: ${googleVerifyFailureReason(error)}`);
       throw apiError(HttpStatus.UNAUTHORIZED, 'oauth_failed', '구글 로그인에 실패했습니다. 다시 시도해 주세요.');
     }
     try {

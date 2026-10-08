@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/nextjs';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ErrorPanel } from '../../components/ErrorPanel';
+import { FeedbackButton } from '../../components/FeedbackButton';
 import { LogoutButton } from '../../components/LogoutButton';
 import { MonitoringUser } from '../../components/MonitoringUser';
 import { SiteHeader } from '../../components/SiteHeader';
@@ -27,6 +28,7 @@ export default async function MePage() {
           <Link href={`/me/landings/${encodeURIComponent(landing.data.landing.publicId)}`}>링크 관리</Link>
         ) : null}
         {me.ok && me.data.role === 'operator' ? <Link href="/admin">운영자 화면</Link> : null}
+        <FeedbackButton />
         <LogoutButton />
       </SiteHeader>
       <main className="app-main">

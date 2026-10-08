@@ -12,6 +12,17 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ['127.0.0.1'],
   // next dev가 AGENTS.md에 영어 안내 블록을 써 넣지 않게 합니다. 같은 안내(설치된 Next.js 문서를 먼저 읽기)는 apps/web/AGENTS.md에 한국어로 둡니다.
   agentRules: false,
+  /**
+   * Sentry SDK 번들 줄이기(공식 `bundleSizeOptimizations`와 같은 플래그). `withSentryConfig`의 `bundleSizeOptimizations`·`webpack.treeshake`는
+   * webpack 빌드에서만 코드를 바꾸고 Turbopack 빌드에서는 적용되지 않아 Next의 `compiler.define`으로 직접 넣습니다.
+   * - `__SENTRY_DEBUG__`: SDK 디버그 로그 문장 제거(Sentry Logs와 무관).
+   * - `__RRWEB_EXCLUDE_IFRAME__`: 리플레이가 iframe 안을 녹화하지 않음(iframe을 쓰지 않음).
+   * - `__RRWEB_EXCLUDE_SHADOW_DOM__`: 리플레이가 shadow DOM 안을 녹화하지 않음(의견 보내기 창도 녹화에서 빠짐).
+   * 리플레이 압축 worker 제외(`__SENTRY_EXCLUDE_REPLAY_WORKER__`)는 worker를 따로 호스팅해야 해 쓰지 않습니다.
+   */
+  compiler: {
+    define: { __SENTRY_DEBUG__: false, __RRWEB_EXCLUDE_IFRAME__: true, __RRWEB_EXCLUDE_SHADOW_DOM__: true },
+  },
 };
 
 /**

@@ -1,6 +1,16 @@
 import * as Sentry from '@sentry/nestjs';
 import type { ErrorEvent } from '@sentry/nestjs';
-import { DEFAULT_TRACES_SAMPLE_RATE, parseTracesSampleRate, scrubEvent, scrubSpan, sentryOptions } from './sentry';
+import {
+  DEFAULT_TRACES_SAMPLE_RATE,
+  parseTracesSampleRate,
+  scrubEvent,
+  scrubLog,
+  scrubMetric,
+  scrubSpan,
+  sentryOptions,
+} from './sentry';
+
+const USER_ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
 
 describe('Sentry 설정', () => {
   it('SENTRY_DSN이 없거나 공백이면 설정이 없고(초기화하지 않음) Sentry는 꺼져 있다', () => {
@@ -65,5 +75,59 @@ describe('Sentry 설정', () => {
       },
     });
     expect(span.attributes).toEqual({ 'http.request.header.accept': ['*/*'] });
+  });
+
+  it('로그는 쿠키·인증·토큰·비밀값·이메일 속성과 user 이메일·이름을 지우고, 본문·문자열 속성의 이메일과 JWT를 가린다', () => {
+    const jwt = 'eyJhbGciOiJSUzI1NiJ9.eyJlbWFpbCI6ImFAYi5jb20ifQ.c2lnbmF0dXJl';
+    const log = scrubLog({
+      level: 'warn',
+      message: `구글 code 교환·ID 토큰 검증 실패: Invalid token signature: ${jwt} {"email":"Creator.One+x@Example.co.kr"}`,
+      attributes: {
+        'nest.context': 'AuthService',
+        'nest.stack': 'Error: creator@example.com 처리 실패\n    at login (auth.service.ts:1:1)',
+        'user.id': USER_ID,
+        'user.email': 'creator@example.com',
+        'user.name': 'Creator',
+        'http.request.header.cookie': 'cl_session=secret',
+        Authorization: 'Bearer secret',
+        sessionToken: 'secret',
+        client_secret: 'secret',
+        password: 'secret',
+        contactEmail: 'creator@example.com',
+        'sentry.environment': 'production',
+      },
+    });
+    expect(log.message).toBe('구글 code 교환·ID 토큰 검증 실패: Invalid token signature: [token] {"email":"[email]"}');
+    expect(log.attributes).toEqual({
+      'nest.context': 'AuthService',
+      'nest.stack': 'Error: [email] 처리 실패\n    at login (auth.service.ts:1:1)',
+      'user.id': USER_ID,
+      'sentry.environment': 'production',
+    });
+  });
+
+  it('지표 속성에서 사용자 ID·이메일·이름·IP를 지우고 열거값은 남긴다', () => {
+    const metric = scrubMetric({
+      name: 'crelink.auth.login',
+      type: 'counter',
+      value: 1,
+      attributes: {
+        result: 'success',
+        'user.id': USER_ID,
+        'user.email': 'creator@example.com',
+        'user.name': 'Creator',
+        'user.ip_address': '203.0.113.7',
+        'client.address': '203.0.113.7',
+        ip: '203.0.113.7',
+        email: 'creator@example.com',
+        'sentry.environment': 'production',
+      },
+    });
+    expect(metric).toEqual({
+      name: 'crelink.auth.login',
+      type: 'counter',
+      value: 1,
+      attributes: { result: 'success', 'sentry.environment': 'production' },
+    });
   });
 });

@@ -154,7 +154,7 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 
 ## 오류 모니터링
 
-Sentry(SaaS, 미국 리전)로 예상하지 못한 오류와 요청 10%의 성능 추적을 보냅니다. 결정과 대안·위험은 [ADR 0012](../../../docs/adr/0012-error-monitoring-sentry.md), 운영 설정 절차는 [런북](../../../infra/docs/prod-runbook.md), 개인정보 고지는 웹 `/privacy`입니다. SDK는 `@sentry/nestjs` 11.4입니다.
+Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 추적, Nest 로그(Logs), 업무 지표(Metrics), 보존 작업 체크인(Cron)을 보냅니다. 결정과 대안·위험은 [ADR 0012](../../../docs/adr/0012-error-monitoring-sentry.md)와 무료 기능 확장 [ADR 0014](../../../docs/adr/0014-sentry-free-plan-features.md), 운영 설정 절차는 [런북](../../../infra/docs/prod-runbook.md), 개인정보 고지는 웹 `/privacy`입니다. SDK는 `@sentry/nestjs` 11.4입니다.
 
 - 초기화: `src/instrument.ts`가 `main.ts`의 첫 import라 Nest·Express·pg보다 먼저 실행되고(자동 계측 조건), `apps/api/.env`를 읽은 뒤(`src/local-env.ts`) `sentryOptions`(`src/monitoring/sentry.ts`)로 `Sentry.init`합니다. `SENTRY_DSN`이 비면 초기화하지 않아 나머지 코드(`SentryModule.forRoot()`, 필터 데코레이터, `setUser`, `Sentry.close`)는 아무것도 보내지 않습니다. Jest 시험은 `main.ts`를 거치지 않으므로 Sentry가 꺼진 채 돕니다.
 - 보내는 오류: `ApiExceptionFilter`가 500 `internal_error`로 응답하는 오류만 `@SentryExceptionCaptured()`(500 처리 메서드에 붙임)로 보냅니다. Nest `HttpException`(4xx, 의도한 503 포함)과 본문 파서의 http-errors 4xx(400·413·415)는 보내지 않습니다. 이 데코레이터는 `HttpException`만 예상한 오류로 보므로 `catch`에 붙이면 http-errors 4xx도 보냅니다(실측: 데코레이터를 `catch`로 옮기면 아래 시험의 4xx 0건 검사가 실패).
@@ -162,8 +162,25 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류와 요청 10%의 성�
 - 보내지 않는 것: 쿠키(`cl_session` 원문 포함)·`Authorization`·`Proxy-Authorization`·`X-Crelink-Internal`·`Set-Cookie` 헤더, 요청 본문, DB 쿼리 파라미터(`databaseQueryData: false`, 쿼리 문은 매개변수화된 형태만). URL 쿼리의 `code`·`state`(구글 로그인)·`pass`(통과 표시)는 `[Filtered]`. `dataCollection`(SDK 11은 `sendDefaultPii` 대신 이것으로 정함)으로 막고, `beforeSend`·`beforeSendSpan`(`scrubEvent`·`scrubSpan`)이 이벤트와 span 속성에서 한 번 더 지웁니다. SDK 11은 성능 데이터를 span 단위로 보내므로(`traceLifecycle: 'stream'` 기본) `beforeSendTransaction` 대신 `beforeSendSpan`을 씁니다.
 - 그 밖에 SDK 기본으로 보내는 것: 프로세스 단위 세션(Release Health, 오류가 나면 `crashed`, `did`는 내부 사용자 ID), 버린 이벤트 수(client report).
 - 종료: [종료](#종료) 3단계의 `Sentry.close(2000)`.
-- 시험: `src/monitoring/sentry.spec.ts`(DSN 없음 → 설정 없음·`Sentry.isEnabled()` false, 기본값, 비율 검증, 헤더·쿠키 정리), `test/sentry.e2e-spec.ts`(가짜 transport: 예상 못 한 오류 1건·user가 `{ id, ip_address }`뿐이고 IP는 `X-Forwarded-For` 오른쪽 신뢰 값·쿠키 원문 없음, 동시 요청의 user가 섞이지 않음, 401·404·413·400은 0건, span에 user가 붙고 쿠키 헤더 없음). 이 시험은 모듈을 불러온 뒤 초기화하므로 Express·pg 자동 계측 span은 확인하지 못합니다(실제 기동에서는 `SessionGuard`·`SELECT …` 같은 span이 붙는 것을 가짜 수신 서버로 확인, [0042 진행 기록](../../../docs/work/orchestrator/0042-sentry-monitoring.md#진행-기록)).
+- 시험: `src/monitoring/sentry.spec.ts`(DSN 없음 → 설정 없음·`Sentry.isEnabled()` false, 기본값, 비율 검증, 헤더·쿠키 정리, 로그 속성·본문 정리, 지표 속성 정리), `test/sentry.e2e-spec.ts`(가짜 transport: 예상 못 한 오류 1건·user가 `{ id, ip_address }`뿐이고 IP는 `X-Forwarded-For` 오른쪽 신뢰 값·쿠키 원문 없음, 동시 요청의 user가 섞이지 않음, 401·404·413·400은 0건, span에 user가 붙고 쿠키 헤더 없음). 이 시험은 모듈을 불러온 뒤 초기화하므로 Express·pg 자동 계측 span은 확인하지 못합니다(실제 기동에서는 `SessionGuard`·`SELECT …` 같은 span이 붙는 것을 가짜 수신 서버로 확인, [0042 진행 기록](../../../docs/work/orchestrator/0042-sentry-monitoring.md#진행-기록)).
 - 로컬에서 전송 확인: 가짜 수신 서버를 띄우고 `apps/api/.env`에 `SENTRY_DSN=http://public@127.0.0.1:<포트>/1`을 넣어 `make api-restart`. 수신 서버는 `POST /api/1/envelope/`로 envelope(줄마다 JSON, 큰 본문은 gzip)를 받습니다.
+
+### 로그·지표·Cron
+
+`SENTRY_DSN`이 비면 Sentry client가 없어 `Sentry.logger`·`Sentry.metrics.count`·체크인은 아무것도 보내지 않고, `Sentry.withMonitor`는 작업만 실행합니다. 로그·지표는 SDK가 모아 몇 초마다 보내고, 종료 때 `Sentry.close`가 남은 것을 보냅니다. 근거: [0052](../../../docs/work/orchestrator/0052-sentry-free-features.md).
+
+- 로그(Sentry Logs): `main.ts`가 `NestFactory.create`의 `logger`로 `SentryConsoleLogger`(`src/monitoring/sentry-logger.ts`, Nest `ConsoleLogger` 하위 클래스)를 넘깁니다. 콘솔 출력은 그대로이고, `log`(Sentry `info`)·`warn`·`error`·`fatal`을 Sentry Logs로도 보냅니다. `debug`·`verbose`는 보내지 않습니다. 프레임워크 로그(기동 때 모듈·라우트 목록 등)와 모든 `new Logger(...)`가 대상입니다. 속성은 `nest.context`(로거 이름), 오류 스택이 있으면 `nest.stack`, SDK가 붙이는 release·environment·trace와 요청 중이면 `user.id`입니다. Jest 시험은 `main.ts`를 거치지 않고 `logger: false`로 앱을 만들어 이 로거를 쓰지 않습니다.
+- 로그 정리(`beforeSendLog: scrubLog`, `src/monitoring/sentry.ts`): 이름에 `cookie`·`authorization`·`token`·`secret`·`password`·`email`이 들어간 속성(대소문자 무시)과 `user.email`·`user.name`을 지우고, 본문과 남은 문자열 속성의 이메일 주소는 `[email]`, JWT(`eyJ…`)는 `[token]`으로 바꿉니다. `user.id`(내부 UUID)는 오류 이벤트처럼 남깁니다. 다른 로그는 쿠키·토큰·이메일을 넣지 않습니다.
+- 구글 검증 실패 경고(`AuthService`): `google-auth-library` 오류 문구는 이유 뒤에 ID 토큰 원문(`: eyJ…`)이나 payload JSON(`: {…}`, 이메일·이름·사진·sub)을 붙이므로, `googleVerifyFailureReason`(`src/auth/google-oauth.ts`)이 그 꼬리를 버리고 오류 이름과 이유만 남깁니다. 콘솔과 Sentry Logs에 같은 문구가 남습니다.
+- 업무 지표(Sentry Metrics, counter, `src/monitoring/metrics.ts`의 `countBusinessMetric`): 아래 표. 없는 주소·정지·숨김 링크 안내 302는 세지 않습니다. 방문·클릭은 리디렉트 시점에 세므로 기록 저장 실패(오류 로그)와 무관합니다. 새 지표(방명록 0050 등)는 `BusinessMetric`에 이름을 더하고 이 표를 고칩니다.
+- 지표 정리(`beforeSendMetric: scrubMetric`): `user.`로 시작하는 속성(SDK가 스코프 user에서 붙이는 `user.id`·`user.email`·`user.name`)과 이름에 `email` 또는 IP(`ip`·`ip_address`·`client.address`·`remote_addr`)가 들어간 속성을 지웁니다. 속성에는 낮은 카디널리티 열거값만 넣고 단축 주소·링크 ID·사용자·IP는 넣지 않습니다.
+- Cron: `RetentionService`가 실행(기동 시·24시간마다)을 `Sentry.withMonitor('crelink-api-retention', …)`로 감싸 `in_progress` → `ok`(성공)·`error`(예외) 체크인을 보냅니다. 실패하면 기존 `보존 작업 실패` 오류 로그도 그대로 남습니다. 첫 체크인이 Sentry에 모니터를 만듭니다(무료 1개). 모니터 설정: interval 1일(기동 때 실행 + `setInterval`이라 crontab이 아님), 시간대 `Asia/Seoul`, 체크인 여유 60분(`setInterval` 지연, 배포·재시작은 다음 실행을 앞당기기만 함), 최대 실행 30분(보통 수 초, 다른 인스턴스의 advisory lock 대기 포함). 실행 중 프로세스가 끝나면 `error`나 시간 초과로 남을 수 있습니다.
+
+| 지표 | 보내는 곳 | 속성 |
+| --- | --- | --- |
+| `crelink.auth.login` | `AuthController.callback`(`POST /api/auth/google/callback`) | `result`: `success`, `failure`(state·code 오류, 구글 검증 실패, 정지 계정, 로그인 설정 없음, 예상 못 한 오류) |
+| `crelink.short_link.visit` | `ShortLinkController.visit`(`GET /{slug}`)이 랜딩으로 302 할 때(방문 기록 시작) | 없음 |
+| `crelink.link.click` | `ShortLinkController.click`(`GET /c/{linkPublicId}`)이 외부 URL로 302 할 때(클릭 기록 시작) | 없음 |
 
 ### 소스맵
 

@@ -2,6 +2,7 @@ import { CRELINK_API_PATHS, type CreatorLandingState } from '@crelink/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ErrorPanel } from '../../../../components/ErrorPanel';
+import { FeedbackButton } from '../../../../components/FeedbackButton';
 import { Landing } from '../../../../components/landing/Landing';
 import { LogoutButton } from '../../../../components/LogoutButton';
 import { LandingEditor } from '../../../../components/manage/LandingEditor';
@@ -31,6 +32,7 @@ export default async function ManageLandingPage({ params, searchParams }: Props)
     <div className="app-page">
       <SiteHeader>
         <Link href="/me">내 크리링</Link>
+        <FeedbackButton />
         <LogoutButton />
       </SiteHeader>
       <main className="app-main">

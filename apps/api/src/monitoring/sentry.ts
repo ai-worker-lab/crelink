@@ -1,9 +1,9 @@
 import * as Sentry from '@sentry/nestjs';
-import type { ErrorEvent, NodeOptions } from '@sentry/nestjs';
+import type { ErrorEvent, Log, Metric, NodeOptions } from '@sentry/nestjs';
 
 /**
- * Sentry 설정과 이벤트 정리. `src/instrument.ts`가 다른 모듈보다 먼저 불러오므로 `@sentry/nestjs` 말고는 아무것도 불러오지 않습니다.
- * 결정: docs/adr/0012-error-monitoring-sentry.md, 설명: apps/api/docs/README.md#오류-모니터링
+ * Sentry 설정과 이벤트·로그·지표 정리. `src/instrument.ts`가 다른 모듈보다 먼저 불러오므로 `@sentry/nestjs` 말고는 아무것도 불러오지 않습니다.
+ * 결정: docs/adr/0012-error-monitoring-sentry.md, docs/adr/0014-sentry-free-plan-features.md, 설명: apps/api/docs/README.md#오류-모니터링
  */
 
 /** `SENTRY_TRACES_SAMPLE_RATE`가 비었을 때 성능 추적 비율(요청의 10%). */
@@ -16,6 +16,20 @@ export const SCRUBBED_HEADERS = ['cookie', 'set-cookie', 'authorization', 'proxy
 const SCRUBBED_QUERY_PARAMS = ['code', 'state', 'pass'];
 
 const SCRUBBED_SPAN_ATTRIBUTE = new RegExp(`^http\\.(request|response)\\.header\\.(${SCRUBBED_HEADERS.join('|')})$`);
+
+/**
+ * Sentry Logs 속성에서 지우는 이름: 쿠키·인증 헤더·토큰·비밀값·비밀번호·이메일. 스코프 user에서 SDK가 더하는 `user.email`·`user.name`도
+ * 지웁니다. `user.id`(내부 UUID)는 오류 이벤트와 같이 남깁니다.
+ */
+const SCRUBBED_LOG_ATTRIBUTE = /cookie|authorization|token|secret|password|email/i;
+const SCRUBBED_LOG_USER_ATTRIBUTES = ['user.email', 'user.name'];
+
+/** Sentry Metrics 속성에서 지우는 이름: 스코프 user(`user.id`·`user.email`·`user.name` 등)와 이메일·IP 속성. */
+const SCRUBBED_METRIC_ATTRIBUTE = /^user\.|email|(^|[._-])ip([._-]|$)|ip_?address|client\.address|remote_?addr/i;
+
+/** 로그 본문·문자열 속성에서 가리는 값: 이메일 주소와 JWT(라이브러리 오류 문구에 섞여 들어오는 경우의 마지막 방어). */
+const EMAIL_PATTERN = /[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[A-Za-z]{2,}/g;
+const JWT_PATTERN = /eyJ[\w-]{10,}(?:\.[\w-]+){0,2}/g;
 
 /** `SENTRY_TRACES_SAMPLE_RATE`: 비면 0.1, 0~1 사이 수가 아니면 오류(기동 거부). */
 export function parseTracesSampleRate(value: string | undefined): number {
@@ -35,6 +49,7 @@ export function parseTracesSampleRate(value: string | undefined): number {
  * - `userInfo: false`: SDK가 요청 헤더(`X-Forwarded-For` 첫 값, 클라이언트가 위조 가능)로 IP를 추론하지 않게 합니다. IP와 ID는
  *   요청마다 `setRequestUser`(신뢰 프록시 기준 `clientIp`)·`setUserId`(세션 가드)가 요청 격리 스코프의 user에 직접 넣습니다.
  * - 쿠키·요청 본문·DB 쿼리 파라미터는 보내지 않고, 인증 헤더와 로그인 `code`·`state`·통과 표시 `pass` 값은 지웁니다.
+ * - Logs(`src/monitoring/sentry-logger.ts`)는 `scrubLog`, 업무 지표(`src/monitoring/metrics.ts`)는 `scrubMetric`이 보내기 직전에 정리합니다.
  */
 export function sentryOptions(env: NodeJS.ProcessEnv): NodeOptions | null {
   const dsn = env.SENTRY_DSN?.trim();
@@ -54,6 +69,8 @@ export function sentryOptions(env: NodeJS.ProcessEnv): NodeOptions | null {
     },
     beforeSend: scrubEvent,
     beforeSendSpan: scrubSpan,
+    beforeSendLog: scrubLog,
+    beforeSendMetric: scrubMetric,
   };
 }
 
@@ -79,6 +96,30 @@ export function scrubSpan(span: StreamedSpan): StreamedSpan {
     if (SCRUBBED_SPAN_ATTRIBUTE.test(key)) delete span.attributes[key];
   }
   return span;
+}
+
+/**
+ * 로그에서 쿠키·인증·토큰·비밀값·이메일 속성과 `user.email`·`user.name`을 지우고, 본문과 남은 문자열 속성의 이메일 주소를 `[email]`,
+ * JWT를 `[token]`으로 가립니다. `user.id`(내부 UUID)와 `nest.context` 같은 나머지 속성은 남깁니다.
+ */
+export function scrubLog(log: Log): Log {
+  const attributes: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(log.attributes ?? {})) {
+    if (SCRUBBED_LOG_ATTRIBUTE.test(key) || SCRUBBED_LOG_USER_ATTRIBUTES.includes(key)) continue;
+    attributes[key] =
+      typeof value === 'string' ? value.replace(EMAIL_PATTERN, '[email]').replace(JWT_PATTERN, '[token]') : value;
+  }
+  const message = String(log.message).replace(EMAIL_PATTERN, '[email]').replace(JWT_PATTERN, '[token]');
+  return { ...log, message, attributes };
+}
+
+/** 지표 속성에서 스코프 user(`user.id`·`user.email`·`user.name` 등)와 이메일·IP 속성을 지웁니다. 지표 속성은 낮은 카디널리티 값만 둡니다. */
+export function scrubMetric(metric: Metric): Metric {
+  const attributes: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(metric.attributes ?? {})) {
+    if (!SCRUBBED_METRIC_ATTRIBUTE.test(key)) attributes[key] = value;
+  }
+  return { ...metric, attributes };
 }
 
 /** 요청 격리 스코프의 user를 IP로 시작합니다. 요청마다 처음 한 번 부릅니다(`src/monitoring/request-user.ts`). */
