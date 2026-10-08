@@ -15,8 +15,70 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # 바뀐 파일이 문서뿐인지 판정합니다. 문서뿐이면 빌드·DB 시험·smoke·이미지 빌드를 건너뛰고 `docs` job만 돌립니다.
+  # 문서 = `docs/`·`design/` 아래 파일과 `*.md`. 단 `RELEASES.md`는 웹 /docs/releases가 빌드 때 읽으므로 코드로 봅니다.
+  # 기준: docs/development/verification.md#ci
+  changes:
+    name: 변경 종류
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: 문서만 바뀌었는지 판정
+        id: classify
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # PR은 병합 커밋의 첫 부모(현재 기준 브랜치)와 비교하고, push는 이전 tip과 비교합니다. 비교할 수 없으면 코드로 봅니다.
+          if [[ "$EVENT" == pull_request ]]; then
+            base=HEAD^1
+          else
+            base="$BEFORE"
+          fi
+          if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! files=$(git diff --name-only "$base" HEAD); then
+            echo "비교 기준이 없어 전체 검사를 실행합니다."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # 기본 셸은 pipefail이라 일치가 없을 때 grep의 종료 코드 1을 `|| true`로 받습니다.
+          code_files=$(
+            printf '%s\n' "$files" | grep -Ev '^$|^(docs/|design/)|\.md$' || true
+            printf '%s\n' "$files" | grep -E '^RELEASES\.md$' || true
+          )
+          if [[ -n "$code_files" ]]; then
+            echo "코드 변경이 있어 전체 검사를 실행합니다:"; printf '%s\n' "$code_files"
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "문서만 바뀌어 문서 검사만 실행합니다:"; printf '%s\n' "$files"
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # 문서만 바뀐 변경의 검사: work item·문서·디자인 산출물 규칙(pnpm verify --docs).
+  docs:
+    name: docs
+    needs: changes
+    if: needs.changes.outputs.code == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify --docs --keep-going
+
   check:
     name: check (Node ${{ matrix.node }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -56,6 +118,8 @@ jobs:
 
   smoke:
     name: smoke
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -112,6 +176,8 @@ jobs:
   # 운영 이미지(API·웹)가 빌드되는지 확인합니다. 푸시하지 않습니다. 배포·멀티 플랫폼 빌드는 deploy.yml(infra/prod/targets.json의 플랫폼).
   image:
     name: 이미지 빌드 ${{ matrix.area }}
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     strategy:
       matrix:
         area: [api, web]

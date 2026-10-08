@@ -21,7 +21,7 @@ pnpm 모노레포 스켈레톤입니다: NestJS API(`apps/api`), Next.js 웹(`ap
 | --- | --- |
 | 로컬 실행(worktree마다 독립 포트·DB) | `make up` · `make status` · `make down` · `pnpm instance` |
 | 서비스 로그 | `pnpm logs <api\|web\|app\|infra> [--lines N]` |
-| 전체 검증(CI와 동일) | `pnpm verify` · 빠른 검증 `pnpm verify --fast` |
+| 전체 검증(CI와 동일) | `pnpm verify` · 빠른 검증 `pnpm verify --fast` · 문서만 `pnpm verify --docs` |
 | 실행 중 API·웹 브라우저 검증 | `pnpm smoke` |
 | work item 트리·검사·착수 가능 목록 | `pnpm work` · `pnpm work:check` · `pnpm work:next` |
 | 티켓 소유 범위 검사 | `pnpm work:scope [NNNN]` |

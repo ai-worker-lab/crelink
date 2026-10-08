@@ -10,6 +10,7 @@
 | --- | --- |
 | `pnpm verify` | `tokens:check → work:check → docs:check → design:check → lint → typecheck → build → test` |
 | `pnpm verify --fast` | `tokens:check → work:check → docs:check → design:check → lint → typecheck` |
+| `pnpm verify --docs` | `work:check → docs:check → design:check` (문서·디자인 산출물만 바뀐 변경. `*.md`와 `design/`은 Prettier·ESLint 대상이 아님, `.prettierignore`) |
 
 - 기본은 첫 실패에서 멈추고 남은 단계를 `건너뜀`으로 표시합니다. 모든 단계 결과를 보려면 `--keep-going`을 붙입니다.
 - `.local/instance.env`([인스턴스 설정](local-environment.md))가 있으면 그 값을 환경변수로 보충합니다. 이미 설정된 환경변수가 우선합니다. `test` 단계의 API 통합 테스트는 이 값의 `TEST_DATABASE_URL`로 현재 작업공간의 PostgreSQL에 연결합니다.
@@ -41,11 +42,13 @@
 
 ## CI
 
-[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)이 `main` 대상 PR과 `main` push에서 실행합니다.
+[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)이 `main` 대상 PR과 `main` push에서 실행합니다. 먼저 `changes` job이 바뀐 파일(PR은 기준 브랜치, push는 이전 tip과 비교)이 문서뿐인지 판정합니다. 문서는 `docs/`·`design/` 아래 파일과 `*.md`이고, `RELEASES.md`는 웹 `/docs/releases`가 빌드 때 읽으므로 코드로 봅니다. 문서뿐이면 `docs` job만, 아니면(비교할 수 없을 때 포함) `check`·`smoke`·이미지 빌드를 실행합니다. 건너뛴 job은 skipped로 끝나 워크플로가 성공하므로 Deploy는 그대로 `plan`만 돌고 재배포하지 않습니다.
 
 | job | 내용 |
 | --- | --- |
-| `check` | 지원 Node.js(`matrix.node`: 기준 LTS 24와 다음 LTS 후보 26)마다 `pnpm install --frozen-lockfile` 후 `pnpm verify --keep-going`. PostgreSQL 17 서비스 컨테이너에 `TEST_DATABASE_URL`로 연결합니다. 한 버전이 실패해도 나머지 버전 결과를 끝까지 봅니다. |
+| `변경 종류`(`changes`) | 전체 이력을 받아 위 기준으로 `code` 출력(`true`·`false`)을 정합니다. 판정 근거 파일 목록을 로그에 남깁니다. |
+| `docs` | 문서만 바뀌었을 때 `.nvmrc` Node로 `pnpm install --frozen-lockfile` 후 `pnpm verify --docs --keep-going`. |
+| `check` | 코드가 바뀌었을 때 지원 Node.js(`matrix.node`: 기준 LTS 24와 다음 LTS 후보 26)마다 `pnpm install --frozen-lockfile` 후 `pnpm verify --keep-going`. PostgreSQL 17 서비스 컨테이너에 `TEST_DATABASE_URL`로 연결합니다. 한 버전이 실패해도 나머지 버전 결과를 끝까지 봅니다. |
 | `smoke` | `.nvmrc` Node로 `node scripts/instance.mjs --print-env`의 슬롯 0 포트·주소(`API_PORT`·`WEB_PORT`·`API_URL`·`WEB_URL`, 원본 `infra/local/.env.example`)를 job 환경에 넣고, 공용 패키지·API·웹을 빌드해 PostgreSQL 서비스에 연결한 API(`node apps/api/dist/main.js`, `PORT=$API_PORT`)와 웹(`next start --port $WEB_PORT`)을 백그라운드로 띄운 뒤 준비를 기다려 `pnpm smoke`를 실행합니다. 실패하면 API·웹 로그를 출력합니다. |
 | `이미지 빌드 api`·`이미지 빌드 web` | 운영 이미지(`apps/api/Dockerfile`, `apps/web/Dockerfile`)가 `linux/amd64`로 빌드되는지 확인합니다(buildx, gha 캐시). 푸시하지 않습니다. 배포 대상 플랫폼 빌드는 `deploy.yml`이 합니다. |
 | `work scope` | `work/NNNN-*` 브랜치의 PR에서만 전체 이력을 받아 `pnpm work:scope --base origin/<기준 브랜치>`로 변경 파일이 티켓 역할의 소유 경로 안에 있는지 검사합니다. |
@@ -79,7 +82,7 @@ work item을 `검증` 상태로 올리거나 완료를 보고하기 전에 변�
 
 | 변경 영역 | 실행 |
 | --- | --- |
-| 문서·work item만 | `pnpm verify --fast` |
+| 문서·work item만 | `pnpm verify --docs`(CI `docs` job과 같음) |
 | 디자인(`design/`, 토큰 원본) | `pnpm tokens:generate`, `pnpm design:sync`, `pnpm design:check --require-lint`, `pnpm verify --fast`. 미리보기는 1280px·390px에서 직접 확인합니다([OpenDesign 사용 기준](../../design/docs/opendesign.md)). |
 | 스크립트·설정·`packages/*` | `pnpm verify` |
 | API(`apps/api/`) | `make infra-up` 후 `pnpm verify`, `make up` 후 `pnpm smoke` |
@@ -92,4 +95,4 @@ work item을 `검증` 상태로 올리거나 완료를 보고하기 전에 변�
 
 - `pnpm verify`: 맨 아래 `검증 요약`에서 `실패` 단계를 찾고, `해결 안내`의 명령을 먼저 실행합니다. 원인은 요약 위쪽의 `▶ <단계>` 아래 출력에 있습니다. 같은 단계만 다시 볼 때는 `pnpm <단계>`(예: `pnpm lint`)를 실행합니다.
 - `pnpm smoke`: 테스트 전 확인 단계가 실패하면 출력의 명령(`make up`, `pnpm logs api`, `pnpm exec playwright install chromium`)을 따릅니다. 테스트 실패는 Playwright 출력의 테스트 이름·기대값과 함께 적힌 설명(예: readiness 503이면 API의 `DATABASE_URL`)을 확인합니다. 콘솔 오류는 `pnpm logs web`·`pnpm logs api`와 함께 봅니다.
-- CI: 실패한 job의 단계 로그를 봅니다. `check`는 `pnpm verify` 요약을, `smoke`는 `pnpm smoke` 출력과 `API·웹 로그` 단계를 확인합니다.
+- CI: 실패한 job의 단계 로그를 봅니다. `check`는 `pnpm verify` 요약을, `docs`는 `pnpm verify --docs` 요약을, `smoke`는 `pnpm smoke` 출력과 `API·웹 로그` 단계를 확인합니다. 문서만 바꿨는데 전체 검사가 돌았다면 `변경 종류` job 로그의 코드 파일 목록을 봅니다.

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 저장소 검사 단계를 순서대로 실행하고 단계별 결과·시간과 실패 단계의 해결 안내를 요약합니다.
-// 사용법: pnpm verify [--fast] [--keep-going]. 기준 문서: docs/development/verification.md
+// 사용법: pnpm verify [--fast | --docs] [--keep-going]. 기준 문서: docs/development/verification.md
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,17 +24,23 @@ const HINTS = {
 };
 const FAST = ['tokens:check', 'work:check', 'docs:check', 'design:check', 'lint', 'typecheck'];
 const FULL = [...FAST, 'build', 'test'];
-const USAGE = '사용법: pnpm verify [--fast] [--keep-going]';
+// 문서만 바뀐 변경(CI `changes` job 판정)의 검사. 문서·디자인 산출물은 Prettier·ESLint 대상이 아니라(.prettierignore) lint를 뺍니다.
+const DOCS = ['work:check', 'docs:check', 'design:check'];
+const MODES = { '--fast': FAST, '--docs': DOCS };
+const USAGE = '사용법: pnpm verify [--fast | --docs] [--keep-going]';
 
 const args = process.argv.slice(2);
-const unknown = args.filter((arg) => arg !== '--fast' && arg !== '--keep-going');
-if (unknown.length > 0) {
-  console.error(`알 수 없는 인자: ${unknown.join(' ')}\n${USAGE}`);
+const unknown = args.filter((arg) => !(arg in MODES) && arg !== '--keep-going');
+const modes = args.filter((arg) => arg in MODES);
+if (unknown.length > 0 || modes.length > 1) {
+  console.error(
+    `${unknown.length > 0 ? `알 수 없는 인자: ${unknown.join(' ')}` : '--fast와 --docs는 함께 쓸 수 없습니다.'}\n${USAGE}`,
+  );
   process.exit(2);
 }
-const fast = args.includes('--fast');
+const mode = modes[0] ?? '';
 const keepGoing = args.includes('--keep-going');
-const steps = fast ? FAST : FULL;
+const steps = mode ? MODES[mode] : FULL;
 
 // 인스턴스 설정(.local/instance.env)은 이미 설정된 환경변수를 덮어쓰지 않고 보충합니다.
 const instance = readInstanceEnv(root);
@@ -69,7 +75,7 @@ const width = Math.max(...steps.map((step) => step.length));
 const total = results.reduce((sum, result) => sum + (result.seconds ?? 0), 0);
 const failed = results.filter((result) => result.status === '실패');
 const skipped = results.filter((result) => result.status === '건너뜀');
-console.log(`\n검증 요약 (${fast ? 'pnpm verify --fast' : 'pnpm verify'})`);
+console.log(`\n검증 요약 (pnpm verify${mode ? ` ${mode}` : ''})`);
 for (const { step, status, seconds, reason } of results) {
   const time = seconds === undefined ? '' : `${seconds.toFixed(1)}s`;
   console.log(`  ${step.padEnd(width)}  ${time.padStart(7)}  ${status}${reason ? ` (${reason})` : ''}`);
@@ -78,7 +84,9 @@ if (failed.length > 0) {
   console.log('\n해결 안내');
   for (const { step } of failed) console.log(`  ${step}: ${HINTS[step]}`);
   if (skipped.length > 0) {
-    console.log(`\n첫 실패에서 멈췄습니다. 남은 단계까지 모두 보려면 pnpm verify${fast ? ' --fast' : ''} --keep-going`);
+    console.log(
+      `\n첫 실패에서 멈췄습니다. 남은 단계까지 모두 보려면 pnpm verify${mode ? ` ${mode}` : ''} --keep-going`,
+    );
   }
 }
 console.log(
