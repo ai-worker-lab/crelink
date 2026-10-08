@@ -6,6 +6,7 @@
 
 ## 2026-10-08
 
+- Sentry 프로젝트를 `ai-worker-lab` 조직으로 옮김(사용자 결정: 이관 대신 새 프로젝트, 옛 `shaul1991` 조직은 삭제하지 않고 모니터만 끔): 새 `crelink-api`·`crelink-web`, 기본 이슈 알림·Inbound Filters·Uptime 모니터 재설정, 운영 DSN·조직 variables·소스맵 토큰 교체. 코드 변경 없음. 세부는 [인프라](infra/CHANGELOGS.md) 로그. 근거 `docs/work/orchestrator/0054-sentry-org-migration.md`.
 - Sentry 무료(Developer) 요금제 기능 모두 사용(사용자 결정, ADR 0014 승인): API Nest 로그(log·warn·error·fatal)를 Sentry Logs로, 업무 지표 `crelink.auth.login`·`crelink.short_link.visit`·`crelink.link.click`, 보관 정리 작업 Cron 체크인 `crelink-api-retention`, 웹 오류 세션 리플레이(글자·입력·미디어 가림, 일반 세션 0%)·브라우저 세션(Release Health)·브라우저·서버 콘솔 warn·error 로그·관리 화면 `의견 보내기`(이름·이메일 없음, 스크린숏 선택), 로그·지표에서 쿠키·토큰·이메일·IP·사용자 ID 정리. Sentry 화면에 Uptime 모니터(`https://links.shaul.kr/api/backend/api/health`, 1분)와 `crelink-api` Inbound Filters 적용. 루트 문서: ADR `docs/adr/0014-sentry-free-plan-features.md`(ADR 0012 결정 2의 리플레이·브라우저 세션 제외 대체, 상태 줄 갱신)·문서 색인, 외부 의존(Sentry), 운영 설계(변경 범위 0052·위험), MVP 설계 진단 항목, PRD R9 위험(국외 이전 항목), 로컬 개발 환경의 테스트 설명(웹 `node:test` 단위 테스트). 세부는 [인프라](infra/CHANGELOGS.md)·[백엔드 API](apps/api/CHANGELOGS.md)·[웹](apps/web/CHANGELOGS.md) 로그. 근거 `docs/work/orchestrator/0052-sentry-free-features.md`.
 
 ## 2026-10-07

@@ -596,7 +596,7 @@ cp .images.env /opt/crelink/state/images.env
 
 ### 15-1. 조직·프로젝트 만들기(한 번)
 
-1. [sentry.io](https://sentry.io/signup/)에서 가입하고 조직을 만듭니다. 이름(slug) `crelink`(이미 쓰이면 다른 slug), **Data Storage Location = United States of America (US)**. 저장 위치는 나중에 바꿀 수 없고 바꾸려면 조직을 새로 만들어야 합니다. 조직 Settings에서 slug와 저장 위치를 확인합니다.
+1. [sentry.io](https://sentry.io/signup/)에서 가입하고 조직을 만듭니다. 지금 쓰는 조직은 `ai-worker-lab`(2026-10-08부터, 0054. 그 전은 개인 조직 `shaul1991`), **Data Storage Location = United States of America (US)**. 저장 위치는 나중에 바꿀 수 없고 바꾸려면 조직을 새로 만들어야 합니다. 조직 Settings에서 slug와 저장 위치를 확인합니다.
 2. 프로젝트 두 개: `crelink-api`(플랫폼 Node.js의 **NestJS**), `crelink-web`(**Next.js**). 설치 안내(wizard)의 코드 변경은 하지 않습니다(저장소에 이미 있음).
 3. 각 프로젝트 Settings > **Client Keys (DSN)**에서 DSN을 복사합니다(`https://<공개 키>@o<숫자>.ingest.<지역>.sentry.io/<프로젝트 ID>` 꼴).
 4. 요금제: 무료 Developer는 사용자 1명, 월 오류 5천 건·span 500만 개·Logs 5GB·Application Metrics 5GB·리플레이 50건·Attachments 1GB, Cron·Uptime 모니터 각 1개, 보관 30일(모든 데이터 종류)입니다. 새 조직은 체험 기간 동안 Team 요금제 보관(오류 90일)이 적용됩니다. 보관 기간이 달라지는 요금제로 바꾸면 웹 `/privacy`의 "보유·이용 기간" 문구를 같은 변경에서 맞춥니다.
@@ -621,7 +621,7 @@ grep -E '^SENTRY_' "$f" | cut -c1-40   # 두 키 모두 평문(ENC[...]가 아�
 ### 15-3. GitHub variables·secret과 이미지 다시 빌드
 
 ```bash
-gh variable set SENTRY_ORG --body 'crelink'                    # 조직 slug
+gh variable set SENTRY_ORG --body 'ai-worker-lab'              # 조직 slug
 gh variable set SENTRY_PROJECT_API --body 'crelink-api'
 gh variable set SENTRY_PROJECT_WEB --body 'crelink-web'
 gh variable set SENTRY_WEB_DSN --body '<crelink-web DSN>'      # 공개 값(브라우저 번들에 들어감)
@@ -633,6 +633,8 @@ gh variable set SENTRY_WEB_DSN --body '<crelink-web DSN>'      # 공개 값(브�
 gh secret set SENTRY_AUTH_TOKEN     # 프롬프트에 붙여 넣음(셸 기록에 남지 않음)
 gh secret list && gh variable list
 ```
+
+이 저장소(`ai-worker-lab/crelink`)에 권한이 있는 GitHub 계정으로 실행합니다. 여러 계정이 로그인돼 있으면 명령 앞에 `GH_TOKEN=$(gh auth token --user <계정>)`을 붙이거나 `-R ai-worker-lab/crelink`와 함께 씁니다.
 
 웹 DSN과 소스맵 업로드는 이미지 빌드 때 쓰이고, Deploy는 바뀐 영역의 이미지만 새로 만듭니다. 설정한 뒤 두 이미지를 다시 만들어 배포합니다: `gh workflow run deploy.yml --ref main -f force=true`(Actions 화면에서 `force`를 켜고 실행해도 같음). 토큰이 있는데 업로드가 실패하면 그 이미지 job이 실패하고 배포하지 않습니다(15-5).
 
@@ -660,10 +662,11 @@ gh secret list && gh variable list
 - **DSN 회전**(남용된 이벤트가 들어올 때): 프로젝트 Client Keys에서 새 키를 만들고 API는 15-2, 웹은 15-3(`SENTRY_WEB_DSN` 교체 + `force`)으로 바꾼 뒤 옛 키를 비활성화합니다.
 - **한도 초과**: Sentry Stats·Subscription 화면에서 사용량을 봅니다. 무료 요금제는 한도를 넘으면 그 달 나머지 이벤트를 받지 않습니다. 반복 오류는 원인을 고치거나 Inbound Filters로 거릅니다.
 - **리플레이 한도 초과**: 월 50건을 넘으면 그 달 나머지 리플레이는 버려집니다(요금 없음). 같은 오류가 반복되면 오류를 고치거나 Inbound Filters로 거릅니다.
+- **다른 조직으로 옮기기**(0054에서 `shaul1991` → `ai-worker-lab`으로 한 방식): 새 조직에 15-1처럼 두 프로젝트를 새로 만들고(Transfer Project는 같은 저장 위치끼리만 되며 릴리스·세션이 옮겨지지 않음) 15-6 설정을 다시 합니다. 그다음 순서가 중요합니다: ① 새 조직의 Organization Token을 `SENTRY_AUTH_TOKEN`에 넣고 ② `SENTRY_ORG`·`SENTRY_WEB_DSN`을 바꾸고 ③ 15-2로 암호문 `SENTRY_DSN`을 바꿔 병합한 뒤 ④ `force` 배포로 두 이미지를 다시 만듭니다. ②를 ① 없이 하면 옛 조직 토큰으로 새 조직에 올리다 이미지 빌드가 실패합니다. 확인(15-4)이 끝나면 옛 조직의 Uptime 모니터와 Cron 모니터를 끕니다(그대로 두면 Uptime은 계속 확인하고, Cron은 체크인이 끊겨 놓침 이슈·알림을 만듭니다). 옛 조직의 기록은 보관 기간(30일) 동안 옛 조직에만 남습니다.
 
 ### 15-6. 무료 기능 화면 설정(한 번)
 
-저장소에 없는 Sentry 화면 설정입니다. 2026-10-08 적용(0052).
+저장소에 없는 Sentry 화면 설정입니다. 2026-10-08 적용(0052), 같은 날 조직 `ai-worker-lab`의 새 프로젝트에 다시 적용(0054).
 
 - **Uptime**: Monitors > Create Monitor > Uptime. Project `crelink-web`, Environment `production`, Interval `Every 1 minute`, Timeout 5초, URL `https://links.shaul.kr/api/backend/api/health`, Method `GET`, 헤더 없음, Allow Sampling 끔, Failure Threshold 3, Recovery Threshold 1, 설명에 이 절 링크. 이 주소는 웹 BFF 허용 목록의 `GET api/health`를 거쳐 API까지 가므로 웹·API 어느 쪽 장애든 잡힙니다(`/api/backend/health`는 BFF가 404). 무료 요금제는 1개뿐이라 자동 감지(Automatic Detection)로 생긴 모니터가 있으면 그것을 고쳐 씁니다. 이슈 알림은 `crelink-web` 프로젝트의 기존 이슈 알림을 따릅니다.
 - **Inbound Filters**: 각 프로젝트 Settings > Inbound Filters. `crelink-api`·`crelink-web` 모두 Browser Extension Errors, Localhost, Web Crawlers, Legacy Browsers(모든 브라우저), Health Check Transactions를 켭니다. 사용자 지정 필터(오류 메시지·IP·릴리스)는 Trial·Business 이상 요금제 기능이라 쓰지 않습니다.
