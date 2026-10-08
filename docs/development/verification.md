@@ -42,7 +42,7 @@
 
 ## CI
 
-[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)이 `main` 대상 PR과 `main` push에서 실행합니다. 먼저 `changes` job이 바뀐 파일(PR은 기준 브랜치, push는 이전 tip과 비교)이 문서뿐인지 판정합니다. 문서는 `docs/`·`design/` 아래 파일과 `*.md`이고, `RELEASES.md`는 웹 `/docs/releases`가 빌드 때 읽으므로 코드로 봅니다. 문서뿐이면 `docs` job만, 아니면(비교할 수 없을 때 포함) `check`·`smoke`·이미지 빌드를 실행합니다. 건너뛴 job은 skipped로 끝나 워크플로가 성공하므로 Deploy는 그대로 `plan`만 돌고 재배포하지 않습니다.
+[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)이 `main` 대상 PR에서만 실행합니다. main push(PR 머지)에서는 같은 내용을 PR에서 이미 검사했으므로 다시 돌리지 않습니다(Actions 무료 몫 절약, 0060). main에 브랜치 보호가 없어 머지 뒤 다시 검사하지 않으므로, PR은 최신 `main` 위에서 CI(Actions가 막혔을 때는 로컬 `pnpm verify`·`pnpm smoke`)가 통과한 뒤 머지합니다. 먼저 `changes` job이 바뀐 파일(병합 커밋의 첫 부모와 비교)이 문서뿐인지 판정합니다. 문서는 `docs/`·`design/` 아래 파일과 `*.md`이고, `RELEASES.md`는 웹 `/docs/releases`가 빌드 때 읽으므로 코드로 봅니다. 문서뿐이면 `docs` job만, 아니면(비교할 수 없을 때 포함) `check`·`smoke`·이미지 빌드를 실행합니다.
 
 | job | 내용 |
 | --- | --- |
@@ -57,7 +57,7 @@
 
 ## CD(운영 배포)
 
-[`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml)이 `main` push의 `CI`가 성공하면 운영에 배포합니다(main에서 수동 실행, `force`로 두 이미지 새로 빌드). 설계(각 job의 조건·흐름)는 [운영 배포·CD 기술 설계](../specs/crelink-prod-deploy.md#워크플로), 접속 설정·장애 대응은 [prod 런북](../../infra/docs/prod-runbook.md)입니다.
+[`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml)이 `main` push(PR 머지)마다 운영에 배포합니다(main에서 수동 실행, `force`로 두 이미지 새로 빌드). main에서는 CI를 다시 돌리지 않으므로 머지된 코드의 안전장치는 배포의 이미지 빌드(실패하면 배포하지 않음)와 `운영 주소 검사`·자동 롤백입니다. 문서만 바뀐 머지는 `plan`만 돌고 재배포하지 않습니다. 설계(각 job의 조건·흐름)는 [운영 배포·CD 기술 설계](../specs/crelink-prod-deploy.md#워크플로), 접속 설정·장애 대응은 [prod 런북](../../infra/docs/prod-runbook.md)입니다.
 
 | job | 내용 |
 | --- | --- |

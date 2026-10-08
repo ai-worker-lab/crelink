@@ -80,7 +80,7 @@ Tailscale SSH(`tailscale up --ssh`)가 켜져 있으면 tailnet에서 오는 22�
 | 항목 | 값 |
 | --- | --- |
 | Issuer | GitHub(`https://token.actions.githubusercontent.com`) |
-| Subject | `repo:ai-worker-lab@271170671/crelink@1406726921:ref:refs/heads/main` — main 브랜치에서 실행된 job만. Deploy(`workflow_run`·main 수동 실행)·Rollback(main만 허용)이 이 형식입니다. 이 저장소는 GitHub의 불변 subject(`use_immutable_subject`)를 써서 조직·저장소 이름 뒤에 숫자 ID가 붙습니다. 접두사 확인: `gh api repos/ai-worker-lab/crelink/actions/oidc/customization/sub`의 `sub_claim_prefix`. 옛 형식 `repo:ai-worker-lab/crelink:…`로 두면 토큰 교환이 403입니다 |
+| Subject | `repo:ai-worker-lab@271170671/crelink@1406726921:ref:refs/heads/main` — main 브랜치에서 실행된 job만. Deploy(main push·main 수동 실행)·Rollback(main만 허용)이 이 형식입니다. 이 저장소는 GitHub의 불변 subject(`use_immutable_subject`)를 써서 조직·저장소 이름 뒤에 숫자 ID가 붙습니다. 접두사 확인: `gh api repos/ai-worker-lab/crelink/actions/oidc/customization/sub`의 `sub_claim_prefix`. 옛 형식 `repo:ai-worker-lab/crelink:…`로 두면 토큰 교환이 403입니다 |
 | Scope | `auth_keys` 쓰기, 태그 `tag:ci` |
 
 **Generate credential** 뒤 표시되는 **Client ID**와 **Audience**를 복사합니다(비밀 아님). 토큰 교환이 실패하면 같은 화면의 자격 증명 항목에 마지막 오류가 표시됩니다.
@@ -187,7 +187,7 @@ SOPS_AGE_KEY_CMD='security find-generic-password -s crelink-sops-age -a operator
 2. 서버 복호화 확인(값은 출력하지 않음): `ssh home-server 'sudo -u deploy env SOPS_AGE_KEY_FILE=/etc/crelink/age.key sops decrypt --input-type dotenv --output-type dotenv /dev/stdin' < infra/prod/secrets/home-server.sops.env | wc -l`이 키 개수를 보이면 통과.
 3. GitHub Actions에서 **Deploy**를 main으로 `Run workflow`(`force` 켬). 배포 태그가 아직 없으므로 두 이미지를 만들고 서버에 보냅니다. 새 서버에는 edge가 없어 서버 단계(`deploy.sh`)가 이미지만 받아 두고 "edge가 준비되지 않았습니다"로 실패합니다(아무것도 바꾸지 않음, job 실패).
 4. 서버에서 edge와 첫 색을 띄웁니다: `ssh home-server` → `ls -t /opt/crelink/releases | head -n 1`로 방금 풀린 릴리스 SHA를 확인하고 `sudo /opt/crelink/releases/<SHA>/cutover.sh --dry-run <SHA> <API SHA> <웹 SHA>`(셋 다 그 커밋 SHA) → 점검이 모두 `ok`·`info`면 `--dry-run`을 빼고 실행합니다. 옛 스택이 없으므로 공백 단계는 건너뜁니다([14-3](#14-3-cutover-실행)과 같은 스크립트). 헬스 실패면 blue를 내리고 종료 1이므로 [6](#6-운영-확인)의 로그로 원인(대개 비밀값·DB 접속)을 고쳐 다시 실행합니다.
-5. 실패한 Deploy 실행을 **Re-run failed jobs**로 다시 돌립니다. 같은 릴리스가 green으로 한 번 더 배포되고(무중단) `운영 주소 검사`와 배포 기록 태그가 이어집니다. 이후에는 main CI 성공 시 자동입니다.
+5. 실패한 Deploy 실행을 **Re-run failed jobs**로 다시 돌립니다. 같은 릴리스가 green으로 한 번 더 배포되고(무중단) `운영 주소 검사`와 배포 기록 태그가 이어집니다. 이후에는 main 머지(push) 때 자동입니다.
 6. GeoIP를 넣습니다([8](#8-geoip)).
 7. 확인: 배포 job의 `운영 주소 검사` 단계 결과(운영 주소 6개), 구글 로그인, 단축 주소 생성·방문, 링크 클릭 기록의 IP가 내 공인 IP인지(Caddy·cloudflared 주소가 아닌지).
 
