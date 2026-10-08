@@ -24,6 +24,7 @@ CD 워크플로(`.github/workflows/deploy.yml`)는 이 폴더에서 `tests/`·`R
 | `geoip.sh` | `geoip.sh [--restart]`: DB-IP City Lite(`scripts/geoip.mjs`와 같은 월 후보 규칙)를 `geoip` 볼륨에 넣음. `--restart`는 지금 릴리스를 반대 색으로 다시 올려 전환(무중단) |
 | `lib.sh` | 공용 함수(단독 실행 안 함). 서버 배치·상태 파일(`state/active-color`)·환경변수·전환 순서는 머리말 |
 | `bootstrap.sh` | 서버 초기 설정(한 번, root, Ubuntu amd64·arm64): 패키지·sops·Docker, `deploy` 사용자·forced command, `/opt/crelink`(edge 폴더 포함), 네트워크 `crelink-edge`·볼륨 `crelink-prod_geoip`, `/run/crelink` tmpfiles, `/etc/crelink`(대상 이름·age 키), 선택 cloudflared. 방화벽은 건드리지 않음 |
+| `deploy-local.sh` | 운영자 컴퓨터에서 실행하는 도구(릴리스 묶음에 들어가도 서버는 쓰지 않음): GitHub Actions 없이 `deploy.yml`과 같은 순서로 배포(변경 판별 → 대상 서버에서 이미지 빌드 → `ssh-entry.sh deploy` → `verify`, 실패하면 `rollback` → 배포 기록 태그). 런북 "16. GitHub Actions 없이 배포" |
 | `tests/` | 로컬 Docker 시험(아래). 서버에 보내지 않음 |
 
 `deploy.sh`·`rollback.sh` 종료 코드: 0 성공(마지막 줄 `<릴리스> <API 이미지> <웹 이미지>`), 1 실패(아무것도 바꾸지 않음: 활성 색·`current`·`images.env`·트래픽 그대로), 2 edge 설정을 되돌리지 못함.

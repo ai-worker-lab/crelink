@@ -672,6 +672,21 @@ gh secret list && gh variable list
 - **Inbound Filters**: 각 프로젝트 Settings > Inbound Filters. `crelink-api`·`crelink-web` 모두 Browser Extension Errors, Localhost, Web Crawlers, Legacy Browsers(모든 브라우저), Health Check Transactions를 켭니다. 사용자 지정 필터(오류 메시지·IP·릴리스)는 Trial·Business 이상 요금제 기능이라 쓰지 않습니다.
 - **Cron**: 화면에서 만들지 않습니다. API가 첫 체크인 때 `crelink-api-retention`을 만듭니다(설정 원본 `apps/api/src/retention/retention.service.ts`).
 
+## 16. GitHub Actions 없이 배포
+
+GitHub Actions 사용량 한도 초과·장애로 `.github/workflows/deploy.yml`이 돌지 않을 때 운영자 컴퓨터에서 같은 순서로 배포합니다(2026-10-08 도입, 0059). 머지(main)는 그대로 하고, 머지 뒤 이 절차가 자동 배포를 대신합니다.
+
+1. 준비: 운영자 컴퓨터에서 `ssh home-server`(Tailscale, sudo 가능한 계정), `gh auth status`(GitHub variables 읽기), `jq`. 배포할 커밋이 `origin/main`에 있어야 합니다.
+2. 확인만: `infra/prod/deploy-local.sh --dry-run` — 배포할 커밋, 영역별 새로 빌드 여부(마지막 배포 태그 `deploy/prod-api`·`deploy/prod-web`·`deploy/prod`와 비교, `deploy.yml`과 같은 규칙), 대상.
+3. 배포: `infra/prod/deploy-local.sh`(기본 `origin/main`, 커밋을 인자로 줄 수 있음, `--force`는 두 이미지를 다시 빌드).
+   - 바뀐 영역 이미지를 **대상 서버에서 직접** `docker build`합니다(서버 플랫폼 그대로라 QEMU 없음). 태그는 GHCR 이름(`ghcr.io/ai-worker-lab/crelink-<영역>:<SHA>`)이지만 올리지 않습니다.
+   - Sentry 빌드 인자는 GitHub variables(`SENTRY_ORG`·`SENTRY_PROJECT_*`·`SENTRY_WEB_DSN`)를 `gh variable get`으로 읽습니다. 소스맵 업로드 토큰(secret)은 GitHub 밖에서 읽을 수 없어 소스맵은 올리지 않습니다(오류 이벤트·release·의견은 그대로, 스택 추적이 압축된 코드로 보임).
+   - 배포는 서버의 `ssh-entry.sh`를 `deploy` 사용자로 같은 명령(`deploy <SHA> <API> <웹>`, 첫 줄 빈 자격 증명)으로 불러 `deploy.sh`가 서버에 있는 이미지로 무중단 전환합니다(`registry_login`이 토큰 없음을 알리고 pull을 건너뜀).
+   - 운영 주소 검사(`verify`)가 실패하면 `rollback`으로 직전 릴리스로 되돌리고 실패로 끝납니다. 성공하면 배포 기록 태그를 옮겨 push합니다.
+4. 확인: 스크립트 출력의 `완료` 줄, `ssh home-server 'sudo -u deploy env SSH_ORIGINAL_COMMAND=status /usr/local/lib/crelink/ssh-entry.sh'`.
+
+주의: 이렇게 만든 이미지는 그 서버에만 있습니다. GitHub Actions의 롤백(`rollback.yml`, GHCR pull)이나 다른 대상 배포는 이 이미지를 받을 수 없으니, Actions가 돌아오면 `deploy.yml`을 `force`로 한 번 실행해 GHCR 이미지를 다시 만듭니다. 서버 롤백(`rollback.sh`)은 서버에 남은 이미지로 됩니다(이미지는 지우지 않음).
+
 ## 로컬 시험
 
 원격 없이 Docker로 이 구성을 확인하는 방법은 [infra/prod/README.md](../prod/README.md#로컬-시험)에 있습니다.
