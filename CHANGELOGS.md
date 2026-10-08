@@ -6,6 +6,7 @@
 
 ## 2026-10-08
 
+- 0045 블록 안 스와이프 카드·쿠팡 파트너스 카드 정보 채우기를 사용자 결정으로 폐기(재개 조건 없음). 조사 문서 `docs/references/coupang-partners-card-data.md` 결론의 `미정` 줄을 종료로, 벤치마킹 문서 `docs/product/research/link-in-bio-benchmark.md`의 0045 참조를 폐기로 고침. 근거 `docs/work/orchestrator/0045-block-swipe-cards.md`.
 - 문서만 바뀐 변경의 CI 줄이기(사용자 결정): `.github/workflows/ci.yml`에 `변경 종류`(`changes`) job을 두어 바뀐 파일이 `docs/`·`design/`·`*.md`뿐이면(`RELEASES.md` 제외, 비교 불가는 전체 검사) `docs` job(`pnpm verify --docs`)만 돌리고 `check`·`smoke`·이미지 빌드는 건너뜀. `scripts/verify.mjs`에 `--docs`(`work:check → docs:check → design:check`, `--fast`와 함께 쓰면 사용법 오류). 검증 문서 CI 절·완료 보고 전 확인 범위, `AGENTS.md` 명령표. Deploy는 이미 경로로 재배포를 건너뛰어 그대로. 근거 `docs/work/orchestrator/0055-ci-docs-only-fast.md`.
 - 운영 확인 규칙(사용자 지시: 운영에서 시험할 명분이 있으면 사용자에게 알리고 진행): 루트 `AGENTS.md` 규칙에 "main 머지는 곧 운영 배포, 머지 전에 알리고 머지 뒤에는 Deploy job 결과로 확인, 운영 직접 확인·시험은 명분이 있을 때만 이유·범위를 먼저 알리고 진행"을 더하고, 기준을 [검증 루프](docs/development/verification.md#운영-확인) `운영 확인` 절(명분이 되는 예·아닌 예·알릴 내용)에 둠. 계기: 0053 머지 뒤 Deploy의 `운영 주소 검사`가 이미 확인한 주소를 다시 부르고 운영 화면을 열고 기록용 PR을 따로 만든 일.
 - Sentry 프로젝트를 `ai-worker-lab` 조직으로 옮김(사용자 결정: 이관 대신 새 프로젝트, 옛 `shaul1991` 조직은 삭제하지 않음. 옛 모니터를 끈 뒤 사용자가 옛 프로젝트 두 개와 옛 조직 토큰을 지움): 새 `crelink-api`·`crelink-web`, 기본 이슈 알림·Inbound Filters·Uptime 모니터 재설정, 운영 DSN·조직 variables·소스맵 토큰 교체. 코드 변경 없음. 세부는 [인프라](infra/CHANGELOGS.md) 로그. 근거 `docs/work/orchestrator/0054-sentry-org-migration.md`.
