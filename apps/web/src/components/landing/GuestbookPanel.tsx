@@ -22,14 +22,33 @@ type Viewer = GuestbookPage['viewer'];
 type Phase = 'loading' | 'ready' | 'failed' | 'closed';
 
 /**
+ * 방명록을 그리는 자리.
+ * - `visitor`: 공개 랜딩의 방명록 탭(보는 사람에 맞는 작성 폼·로그인 안내·글별 버튼).
+ * - `manage`: 관리 화면 `방명록` 메뉴. 크리에이터 세션으로 모든 글(비밀글·숨긴 글 표시 포함)과 숨기기·숨김 해제, 작성 폼 없음.
+ * - `preview`: 관리 화면 미리보기. 크리에이터 응답에서 비밀글·숨긴 글을 걸러 방문자(비회원) 시점으로 그리고 버튼을 두지 않습니다.
+ */
+export type GuestbookPanelMode = 'visitor' | 'manage' | 'preview';
+
+/**
  * 랜딩 방명록 탭 내용(PRD R19). 보는 사람마다 결과가 달라(비밀글·숨김·내 글) SSR 대신 브라우저가 BFF로 부릅니다.
  * 상태와 API 응답의 대응: docs/specs/crelink-guestbook.md `화면 상태와 API 대응`.
  * - 비회원(`viewer.signedIn=false`)은 작성 폼 대신 로그인 안내(`/auth/google?returnTo=/p/{id}#guestbook`).
  * - 내 글(`mine`)은 삭제, 랜딩 크리에이터(`viewer.isOwner`)는 글마다 숨기기·숨김 해제.
  * - 쓰기 요청의 401은 홈으로 보내지 않고(`useAction`과 다름) 로그인 안내로 바꿉니다. 방문자가 보던 랜딩에 남게 하기 위해서입니다.
+ * - `reloadKey`가 바뀌면 첫 쪽을 다시 부릅니다. 글 삭제·숨기기·숨김 해제가 끝나면 `onChanged`를 부릅니다(관리 화면 미리보기 갱신).
  * 본문은 텍스트로만 그립니다(HTML 해석 없음).
  */
-export function GuestbookPanel({ publicId }: { publicId: string }) {
+export function GuestbookPanel({
+  publicId,
+  mode = 'visitor',
+  reloadKey,
+  onChanged,
+}: {
+  publicId: string;
+  mode?: GuestbookPanelMode;
+  reloadKey?: number;
+  onChanged?: () => void;
+}) {
   const baseId = useId();
   const [phase, setPhase] = useState<Phase>('loading');
   const [attempt, setAttempt] = useState(0);
@@ -69,7 +88,7 @@ export function GuestbookPanel({ publicId }: { publicId: string }) {
     return () => {
       current = false;
     };
-  }, [publicId, attempt]);
+  }, [publicId, attempt, reloadKey]);
 
   /** 쓰기 요청 오류를 화면 상태로 바꾸고 안내 문구를 돌려줍니다(없으면 화면 전체가 바뀐 경우). */
   function writeError(caught: unknown): string | undefined {
@@ -134,6 +153,7 @@ export function GuestbookPanel({ publicId }: { publicId: string }) {
       await browserApi<void>(CRELINK_API_PATHS.guestbookEntry(entry.id), { method: 'DELETE' });
       setEntries((current) => current.filter((item) => item.id !== entry.id));
       setStatus({ notice: '방명록 글을 지웠어요.' });
+      onChanged?.();
     } catch (caught) {
       setStatus({ error: writeError(caught) });
     } finally {
@@ -152,6 +172,7 @@ export function GuestbookPanel({ publicId }: { publicId: string }) {
       });
       setEntries((current) => current.map((item) => (item.id === saved.id ? saved : item)));
       setStatus({ notice: hidden ? '글을 숨겼어요. 작성자와 나만 볼 수 있어요.' : '숨김을 풀었어요.' });
+      onChanged?.();
     } catch (caught) {
       setStatus({ error: writeError(caught) });
     } finally {
@@ -198,9 +219,19 @@ export function GuestbookPanel({ publicId }: { publicId: string }) {
 
   const bodyId = `${baseId}-body`;
   const countId = `${baseId}-count`;
+  // 미리보기는 방문자 시점: 크리에이터 응답에서 비밀글·숨긴 글을 빼고 버튼을 두지 않습니다.
+  const preview = mode === 'preview';
+  const shown = preview ? entries.filter((entry) => !entry.secret && !entry.hidden) : entries;
   return (
     <div className="guestbook">
-      {viewer.signedIn ? (
+      {mode === 'manage' ? null : preview ? (
+        <div className="empty-state guestbook-signin">
+          <p>방명록은 로그인한 회원만 남길 수 있어요. 읽기는 누구나 할 수 있어요.</p>
+          <button type="button" className="primary" disabled>
+            로그인하고 남기기
+          </button>
+        </div>
+      ) : viewer.signedIn ? (
         <form className="guestbook-form" onSubmit={submit} aria-label="방명록 남기기">
           <div className="field">
             <label htmlFor={bodyId}>방명록 글</label>
@@ -252,16 +283,19 @@ export function GuestbookPanel({ publicId }: { publicId: string }) {
         </div>
       )}
       <ActionStatus error={status.error} notice={status.notice} />
-      {entries.length === 0 ? (
-        <p className="empty-text">아직 방명록이 없어요. 첫 방명록을 남겨 주세요.</p>
+      {shown.length === 0 ? (
+        <p className="empty-text">
+          {mode === 'manage' ? '아직 방명록이 없어요.' : '아직 방명록이 없어요. 첫 방명록을 남겨 주세요.'}
+        </p>
       ) : (
         <ul className="guestbook-list" aria-label="방명록 글 목록">
-          {entries.map((entry) => (
+          {shown.map((entry) => (
             <GuestbookEntry
               key={entry.id}
               entry={entry}
               authorId={`${baseId}-${entry.id}-author`}
-              isOwner={viewer.isOwner}
+              isOwner={!preview && viewer.isOwner}
+              canRemove={!preview && entry.mine}
               busy={busyId === entry.id}
               onRemove={remove}
               onSetHidden={setHidden}
@@ -283,6 +317,7 @@ function GuestbookEntry({
   entry,
   authorId,
   isOwner,
+  canRemove,
   busy,
   onRemove,
   onSetHidden,
@@ -290,6 +325,8 @@ function GuestbookEntry({
   entry: GuestbookEntryView;
   authorId: string;
   isOwner: boolean;
+  /** 내 글(`mine`)이고 버튼을 두는 자리(미리보기가 아님)일 때 삭제 버튼을 둡니다. */
+  canRemove: boolean;
   busy: boolean;
   onRemove: (entry: GuestbookEntryView) => void;
   onSetHidden: (entry: GuestbookEntryView, hidden: boolean) => void;
@@ -319,7 +356,7 @@ function GuestbookEntry({
         </p>
       ) : null}
       <p className="guestbook-body">{entry.body}</p>
-      {entry.mine || isOwner ? (
+      {canRemove || isOwner ? (
         <div className="button-row">
           {isOwner ? (
             <button
@@ -332,7 +369,7 @@ function GuestbookEntry({
               {entry.hidden ? '숨김 해제' : '숨기기'}
             </button>
           ) : null}
-          {entry.mine ? (
+          {canRemove ? (
             <button
               type="button"
               className="secondary danger"

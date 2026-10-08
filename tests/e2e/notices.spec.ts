@@ -49,8 +49,10 @@ test('운영자가 정지한 크리에이터: 단축 URL은 creator_suspended �
   const click = await visitor.context.request.get(creator.links[0].clickUrl, { maxRedirects: 0 });
   expect(click.headers().location).toBe(`${WEB_URL}/notice?reason=link_unavailable`);
 
-  // 정지하면 세션이 지워져 편집 화면은 홈으로 돌아갑니다.
+  // 정지하면 세션이 지워져 `/me`와 관리 화면은 홈으로 돌아갑니다.
   const suspended = await data.session(creator);
   await suspended.page.goto('/me');
+  await expect(suspended.page).toHaveURL(`${WEB_URL}/`);
+  await suspended.page.goto(`/me/landings/${creator.publicId}`);
   await expect(suspended.page).toHaveURL(`${WEB_URL}/`);
 });

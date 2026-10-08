@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  CRELINK_API_PATHS,
-  type CreatorLandingState,
-  type LinkView,
-  type ReorderRequest,
-  type UpdateLandingRequest,
-  type UpdateLinkRequest,
-} from '@crelink/shared';
+import { CRELINK_API_PATHS, type LinkView, type ReorderRequest, type UpdateLinkRequest } from '@crelink/shared';
 import {
   closestCenter,
   DndContext,
@@ -26,15 +19,16 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import Link from 'next/link';
 import { useId, useRef, useState } from 'react';
 import { browserApi } from '../../lib/api/browser';
-import { toLandingPreview } from '../../lib/landing-preview';
+import { linkDraftOf } from '../../lib/landing-preview';
 import { useAction } from '../../lib/use-action';
+import { useWideLayout } from '../../lib/use-wide-layout';
 import { ActionStatus } from '../ActionStatus';
-import { Landing } from '../landing/Landing';
 import { EditableLinkCard } from './EditableLinkCard';
-import { LinkSheet } from './LinkSheet';
+import { EditSheet } from './EditSheet';
+import { LinkForm } from './LinkForm';
+import { useManager } from './ManagerContext';
 
 /** 끄는 동안 카드가 세로로만 움직이게 합니다(리스트형 구역). */
 const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
@@ -44,23 +38,24 @@ const SCREEN_READER_INSTRUCTIONS = {
     '순서를 바꾸려면 스페이스 키나 엔터 키로 링크를 든 뒤 위·아래 화살표 키로 옮기고, 스페이스 키나 엔터 키로 내려놓으세요. Esc 키를 누르면 취소돼요.',
 };
 
-type SheetState = { link: LinkView | null; opener: HTMLElement | null };
-
 /**
- * 관리 화면 편집 모드. 공개 랜딩과 같은 배치(`Landing`)에서 리스트형 링크 구역만 편집할 수 있습니다.
- * 링크 추가·수정·삭제는 하단 시트, 순서는 끌어 놓기(`PUT /api/me/links/order`), 숨기기는 스위치(`PATCH hidden`).
- * 방명록 켜기·끄기는 스위치를 누르면 바로 저장합니다(`PATCH /api/me/landing { guestbookEnabled }`, PRD R19).
- * 저장 뒤에는 편집 상태(`GET /api/me/landing`)를 다시 읽어 한도·순서를 서버 값과 맞춥니다.
+ * `페이지 편집`의 외부 링크 카드(PRD R18). 추가·수정·삭제는 넓은 화면에서 패널 안 펼침 폼, 좁은 화면에서 하단 시트(같은 `LinkForm`).
+ * 폼은 한 번에 하나만 열리고 열린 동안 끌기를 막습니다. 순서는 끌어 놓기(`PUT /api/me/links/order`), 숨기기는 스위치(`PATCH hidden`)로
+ * 바로 저장하고 실패하면 되돌립니다. 저장 뒤에는 편집 상태(`GET /api/me/landing`)를 다시 읽어 한도·순서를 서버 값과 맞춥니다.
  */
-export function LandingEditor({ initial }: { initial: CreatorLandingState }) {
-  const [state, setState] = useState(initial);
-  const [sheet, setSheet] = useState<SheetState | null>(null);
+export function LinksSection() {
+  const { state, setState, reload, linkDraft, setLinkDraft, dirty } = useManager();
+  const wide = useWideLayout();
   const { pending, error, notice, run, setError, setNotice } = useAction();
-  const guestbookAction = useAction();
+  const formAction = useAction();
+  /** 폼을 열 때마다 늘어나는 번호. 폼 구성 요소의 key라서 한 번 연 폼은 한 인스턴스이고, 닫힌 폼의 늦은 업로드 결과는 버려집니다. */
+  const [formSession, setFormSession] = useState(0);
   const dndId = useId();
   const headingId = useId();
-  const guestbookHeadingId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  /** 폼을 연 요소. 닫힌 뒤 초점을 돌려줍니다. */
+  const openerRef = useRef<HTMLElement | null>(null);
   /** 이번 끌기에서 한 번이라도 다른 자리로 옮겼는지(스크린리더 안내용). */
   const movedSinceStart = useRef(false);
   const sensors = useSensors(
@@ -71,28 +66,38 @@ export function LandingEditor({ initial }: { initial: CreatorLandingState }) {
   const { links, limits } = state;
   const visibleFull = limits.visibleUsed >= limits.visibleMax;
   const totalFull = limits.totalUsed >= limits.totalMax;
-
-  async function reload() {
-    setState(await browserApi<CreatorLandingState>(CRELINK_API_PATHS.meLanding));
-  }
+  const formLink = linkDraft?.id ? (links.find((link) => link.id === linkDraft.id) ?? null) : null;
+  // 고치던 링크가 사라졌으면(다른 곳에서 지움) 폼을 그리지 않습니다.
+  const formOpen = linkDraft !== null && (linkDraft.id === null || formLink !== null);
+  const newFormOpen = formOpen && linkDraft?.id === null;
 
   function replaceLinks(next: LinkView[]) {
     setState((current) => ({ ...current, links: next }));
   }
 
-  function openSheet(link: LinkView | null, opener: HTMLElement) {
+  function openForm(link: LinkView | null, opener: HTMLElement) {
+    if (link && linkDraft?.id === link.id) {
+      closeForm(null);
+      return;
+    }
     setError(null);
     setNotice(null);
-    setSheet({ link, opener });
+    formAction.setError(null);
+    openerRef.current = opener;
+    setFormSession((session) => session + 1);
+    setLinkDraft(linkDraftOf(link));
   }
 
-  function closeSheet(result: string | null) {
-    const opener = sheet?.opener ?? null;
-    setSheet(null);
+  function closeForm(result: string | null) {
+    const opener = openerRef.current;
+    const wasNew = linkDraft?.id === null;
+    openerRef.current = null;
+    setLinkDraft(null);
     if (result) setNotice(result);
-    // 연 요소가 남아 있으면(수정·추가 버튼) 그리로, 지워졌으면 링크 구역 제목으로 포커스를 돌려줍니다.
+    // 연 요소가 남아 있으면(수정·링크 추가 버튼) 그리로, 지워졌으면 링크 구역 제목으로 초점을 돌려줍니다.
     requestAnimationFrame(() => {
-      if (opener?.isConnected) opener.focus();
+      const target = wasNew ? addButtonRef.current : opener;
+      if (target?.isConnected) target.focus();
       else headingRef.current?.focus();
     });
   }
@@ -120,28 +125,6 @@ export function LandingEditor({ initial }: { initial: CreatorLandingState }) {
         links: current.links.map((item) => (item.id === link.id ? { ...item, hidden: link.hidden } : item)),
       }));
     }
-  }
-
-  async function toggleGuestbook(guestbookEnabled: boolean) {
-    const payload: UpdateLandingRequest = { guestbookEnabled };
-    const setEnabled = (value: boolean) =>
-      setState((current) => ({ ...current, landing: { ...current.landing, guestbookEnabled: value } }));
-    // 링크 숨기기 스위치와 같이 바로 바꾸고, 실패하면 원래대로 돌립니다.
-    setEnabled(guestbookEnabled);
-    const saved = await guestbookAction.run(
-      async () => {
-        setState(
-          await browserApi<CreatorLandingState>(CRELINK_API_PATHS.meLanding, {
-            method: 'PATCH',
-            body: JSON.stringify(payload),
-          }),
-        );
-      },
-      guestbookEnabled
-        ? '방명록을 켰어요. 방문자에게 방명록 탭이 보여요.'
-        : '방명록을 껐어요. 남은 글은 지우지 않고 보관해요.',
-    );
-    if (!saved) setEnabled(!guestbookEnabled);
   }
 
   async function onDragEnd({ active, over }: DragEndEvent) {
@@ -183,22 +166,38 @@ export function LandingEditor({ initial }: { initial: CreatorLandingState }) {
     onDragCancel: ({ active }) => `${titleOf(active.id)} 링크 옮기기를 취소했어요. 원래 자리로 돌아갔어요.`,
   };
 
-  const linkZone = (
-    <section className="link-zone" aria-labelledby={headingId}>
-      <div className="section-head">
+  const form = (variant: 'inline' | 'sheet') => (
+    <LinkForm
+      key={formSession}
+      link={formLink}
+      variant={variant}
+      action={formAction}
+      onDone={closeForm}
+      onCancel={() => closeForm(null)}
+    />
+  );
+
+  return (
+    <section className="card" aria-labelledby={headingId}>
+      <div className="card-head">
         <h2 id={headingId} ref={headingRef} tabIndex={-1}>
           외부 링크
         </h2>
-        <p className={`limit-badge${visibleFull ? ' limit-full' : ''}`}>
-          보이는 링크 {limits.visibleUsed}/{limits.visibleMax}
-        </p>
+        <div className="card-head-badges">
+          {dirty.link ? <span className="badge dirty-chip">저장 안 함</span> : null}
+          <p className={`limit-badge${visibleFull ? ' limit-full' : ''}`}>
+            보이는 링크 {limits.visibleUsed}/{limits.visibleMax}
+          </p>
+        </div>
       </div>
       <p className="section-help">
         카드를 누르면 고칠 수 있고, 손잡이를 끌면 순서가 바뀌어요. 숨긴 링크와 차단된 링크는 방문자에게 보이지 않고
         한도에도 들어가지 않아요. 숨긴 링크 포함 전체 {limits.totalUsed}/{limits.totalMax}개.
       </p>
       <ActionStatus error={error} notice={notice} />
-      {links.length === 0 ? <p className="empty-text">아직 추가한 링크가 없어요.</p> : null}
+      {links.length === 0 && !newFormOpen ? (
+        <p className="empty-text">아직 추가한 링크가 없어요. 링크를 추가하면 미리보기에 바로 보여요.</p>
+      ) : null}
       <DndContext
         id={dndId}
         sensors={sensors}
@@ -209,19 +208,29 @@ export function LandingEditor({ initial }: { initial: CreatorLandingState }) {
       >
         <SortableContext items={links.map((link) => link.id)} strategy={verticalListSortingStrategy}>
           <ul className="link-list link-edit-list">
-            {links.map((link) => (
-              <EditableLinkCard
-                key={link.id}
-                link={link}
-                busy={pending}
-                onOpen={openSheet}
-                onToggleHidden={toggleHidden}
-              />
-            ))}
+            {links.map((link) => {
+              const expanded = wide && formOpen && linkDraft?.id === link.id;
+              return (
+                <EditableLinkCard
+                  key={link.id}
+                  link={link}
+                  busy={pending}
+                  dragLocked={formOpen}
+                  inline={wide}
+                  expanded={expanded}
+                  onEdit={openForm}
+                  onToggleHidden={toggleHidden}
+                >
+                  {expanded ? form('inline') : null}
+                </EditableLinkCard>
+              );
+            })}
           </ul>
         </SortableContext>
       </DndContext>
-      {totalFull ? (
+      {wide && newFormOpen ? (
+        <div className="item-card link-new-form">{form('inline')}</div>
+      ) : totalFull ? (
         <p className="notice-box">
           숨긴 링크를 포함해 링크는 최대 {limits.totalMax}개까지 둘 수 있어요. 쓰지 않는 링크를 지운 뒤 추가해 주세요.
         </p>
@@ -233,56 +242,24 @@ export function LandingEditor({ initial }: { initial: CreatorLandingState }) {
       ) : (
         <button
           type="button"
+          ref={addButtonRef}
           className="secondary link-add"
-          onClick={(event) => openSheet(null, event.currentTarget)}
+          onClick={(event) => openForm(null, event.currentTarget)}
           disabled={pending}
+          aria-haspopup={wide ? undefined : 'dialog'}
         >
           링크 추가
         </button>
       )}
+      {!wide && formOpen ? (
+        <EditSheet
+          title={formLink ? '링크 수정' : '새 링크'}
+          pending={formAction.pending}
+          onDismiss={() => closeForm(null)}
+        >
+          {form('sheet')}
+        </EditSheet>
+      ) : null}
     </section>
-  );
-
-  return (
-    <>
-      <p className="section-help">
-        프로필·SNS·포트폴리오는 <Link href="/me">내 크리링</Link>에서 고칠 수 있어요.
-      </p>
-      <div className="landing-preview">
-        <Landing landing={toLandingPreview(state)} headingLevel={2} links={linkZone} />
-      </div>
-      <section className="guestbook-setting" aria-labelledby={guestbookHeadingId}>
-        <div className="guestbook-setting-row">
-          <div className="guestbook-setting-text">
-            <h2 id={guestbookHeadingId}>방명록</h2>
-            <p>
-              켜면 랜딩페이지에 링크·방명록 탭이 생기고 로그인한 회원이 글을 남길 수 있어요. 꺼도 남은 글은 지우지
-              않아요. 글 숨기기는 보기 모드의 방명록 탭에서 할 수 있어요.
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            className="hide-switch"
-            aria-checked={state.landing.guestbookEnabled}
-            aria-label="방명록 켜기"
-            aria-disabled={guestbookAction.pending || undefined}
-            onClick={() => {
-              // 링크 숨기기 스위치와 같이 aria-disabled로 알리고 누르기만 무시합니다(포커스 유지).
-              if (!guestbookAction.pending) void toggleGuestbook(!state.landing.guestbookEnabled);
-            }}
-          >
-            <span className="hide-switch-track" aria-hidden="true">
-              <span className="hide-switch-thumb" />
-            </span>
-            <span className="hide-switch-text" aria-hidden="true">
-              {state.landing.guestbookEnabled ? '켜짐' : '꺼짐'}
-            </span>
-          </button>
-        </div>
-        <ActionStatus error={guestbookAction.error} notice={guestbookAction.notice} />
-      </section>
-      {sheet ? <LinkSheet link={sheet.link} onChanged={reload} onClose={closeSheet} /> : null}
-    </>
   );
 }

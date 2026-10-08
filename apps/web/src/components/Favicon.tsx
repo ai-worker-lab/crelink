@@ -22,10 +22,11 @@ export function DefaultLinkIcon() {
 /**
  * 방문자 브라우저가 링크 사이트의 아이콘(`https://{host}/favicon.ico`)을 직접 불러옵니다(설계: 서버가 대신 가져오지 않음).
  * 실패하면 기본 아이콘으로 바꿉니다. 화면이 연결되기 전에 이미 실패한 이미지는 ref에서 확인합니다.
+ * 주소가 비어 있으면(관리 화면 미리보기의 저장 전 링크) 불러오지 않고 기본 아이콘을 그립니다.
  */
 export function Favicon({ src }: { src: string }) {
   const [failed, setFailed] = useState(false);
-  if (failed) return <DefaultLinkIcon />;
+  if (failed || !src) return <DefaultLinkIcon />;
   return (
     <RemoteImage
       className="favicon"
