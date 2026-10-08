@@ -1,62 +1,55 @@
 import type { PublicLandingView } from '@crelink/shared';
-import type { ReactNode } from 'react';
 import { SOCIAL_PLATFORM_LABELS } from '../../lib/format';
 import { DefaultAvatar } from '../DefaultAvatar';
 import { Favicon } from '../Favicon';
 import { RemoteImage } from '../RemoteImage';
 import { SocialIcon } from '../SocialIcon';
-import { LandingTabs } from './LandingTabs';
+import { LandingTabs, type LandingTabsControl } from './LandingTabs';
 
 /**
  * 크리에이터 랜딩페이지 본문(프로필 머리·SNS·리스트형 링크 구역·포트폴리오). 공개 랜딩(`/p/{publicId}`)과
- * 관리 화면(`/me/landings/{publicId}`)의 보기·편집 모드가 같은 구성 요소를 씁니다.
+ * 관리 화면(`/me/landings/{publicId}/…`)의 실시간 미리보기가 같은 구성 요소를 씁니다.
  * 방명록을 켠 랜딩(`guestbookEnabled`)은 프로필 머리·SNS 아래에 `링크`·`방명록` 탭(`LandingTabs`)을 두고 링크·포트폴리오를
  * `링크` 탭 안에 그립니다. 끈 랜딩은 탭 없이 그대로입니다(PRD R19).
- * `links`를 주면 리스트형 링크 구역 자리에 그 내용(편집 모드의 링크 편집기)을 그리고 방명록 탭은 두지 않습니다.
+ * `preview`를 주면(관리 화면 미리보기) 탭은 그 값을 따르고 주소 해시를 바꾸지 않으며 방명록은 방문자 시점으로 그립니다.
+ * 미리보기 안 링크 누르기를 막는 것은 감싸는 쪽이 맡습니다.
  * 관리 화면처럼 페이지 제목이 따로 있으면 `headingLevel={2}`로 크리에이터 이름을 h2로 내립니다.
  */
 export function Landing({
   landing,
-  links,
+  preview,
   headingLevel = 1,
 }: {
   landing: PublicLandingView;
-  links?: ReactNode;
+  preview?: LandingTabsControl;
   headingLevel?: 1 | 2;
 }) {
   const Heading = headingLevel === 1 ? 'h1' : 'h2';
   const hasLinkContent = landing.portfolio.length > 0 || landing.blocks.some((block) => block.links.length > 0);
   const empty =
-    links === undefined &&
-    !landing.displayName &&
-    !landing.bio &&
-    !landing.avatarUrl &&
-    landing.socials.length === 0 &&
-    !hasLinkContent;
+    !landing.displayName && !landing.bio && !landing.avatarUrl && landing.socials.length === 0 && !hasLinkContent;
   const linkContent = (
     <>
-      {links !== undefined
-        ? links
-        : landing.blocks.map((block, blockIndex) =>
-            block.links.length > 0 ? (
-              <section key={blockIndex} aria-label="링크">
-                <ul className="link-list">
-                  {block.links.map((link) => (
-                    <li key={link.id}>
-                      <a className="link-card" href={link.clickUrl} rel="noopener">
-                        <LinkCardContent
-                          title={link.title}
-                          description={link.description}
-                          thumbnailUrl={link.thumbnailUrl}
-                          faviconUrl={link.faviconUrl}
-                        />
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null,
-          )}
+      {landing.blocks.map((block, blockIndex) =>
+        block.links.length > 0 ? (
+          <section key={blockIndex} aria-label="링크">
+            <ul className="link-list">
+              {block.links.map((link) => (
+                <li key={link.id}>
+                  <a className="link-card" href={link.clickUrl} rel="noopener">
+                    <LinkCardContent
+                      title={link.title}
+                      description={link.description}
+                      thumbnailUrl={link.thumbnailUrl}
+                      faviconUrl={link.faviconUrl}
+                    />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null,
+      )}
 
       {landing.portfolio.length > 0 ? (
         <section className="portfolio" aria-labelledby="portfolio-title">
@@ -125,9 +118,10 @@ export function Landing({
         </ul>
       ) : null}
 
-      {links === undefined && landing.guestbookEnabled ? (
+      {landing.guestbookEnabled ? (
         <LandingTabs
           publicId={landing.publicId}
+          control={preview}
           links={hasLinkContent || empty ? linkContent : <p className="empty-text">아직 올린 링크가 없어요.</p>}
         />
       ) : (
@@ -137,7 +131,7 @@ export function Landing({
   );
 }
 
-/** 리스트형 링크 카드 안쪽(썸네일·사이트 아이콘·표시 이름·설명). 편집 모드 카드도 같은 모양을 씁니다. */
+/** 리스트형 링크 카드 안쪽(썸네일·사이트 아이콘·표시 이름·설명). 관리 화면의 링크 행도 같은 모양을 씁니다. */
 export function LinkCardContent({
   title,
   description,
@@ -148,6 +142,7 @@ export function LinkCardContent({
   title: string;
   description: string | null;
   thumbnailUrl: string | null;
+  /** 비어 있으면(저장 전 초안) 기본 아이콘을 그립니다. */
   faviconUrl: string;
   descriptionId?: string;
 }) {

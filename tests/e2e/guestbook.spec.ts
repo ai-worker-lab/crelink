@@ -78,15 +78,33 @@ test('방명록: 비회원 읽기·로그인 안내, 공개글·비밀글 가시
   }
   await expect(stranger.page.getByRole('form', { name: '방명록 남기기' })).toBeVisible();
 
-  // 4. 크리에이터: 둘 다 보이고 공개글을 숨김 → 비회원·다른 회원에게서 사라지고, 작성자에게는 숨김 표시 없이 그대로
-  await openGuestbook(owner.page, creator.landingUrl);
-  await expect(bodies(owner.page)).toHaveText([secretBody, publicBody]);
-  await expect(list(owner.page).getByRole('button', { name: '삭제' })).toHaveCount(0);
-  const ownerPublic = list(owner.page).getByRole('listitem').filter({ hasText: publicBody });
+  // 4. 크리에이터: 관리 화면 `방명록` 메뉴에서 둘 다(비밀글 표시) 보고 공개글을 숨김
+  //    → 미리보기(방문자 시점)·비회원·다른 회원에게서 사라지고, 작성자에게는 숨김 표시 없이 그대로
+  const managePath = `/me/landings/${creator.publicId}`;
+  const managerMenu = owner.page.getByRole('navigation', { name: '관리 메뉴' });
+  const manage = owner.page.getByRole('main');
+  const manageList = manage.getByRole('list', { name: '방명록 글 목록' });
+  const preview = owner.page.getByRole('complementary', { name: '미리보기' });
+  const previewBodies = preview.locator('.guestbook-body');
+  await owner.page.goto(`${managePath}/guestbook`);
+  await expect(managerMenu.getByRole('link', { name: '방명록' })).toHaveAttribute('aria-current', 'page');
+  await expect(manageList.locator('.guestbook-body')).toHaveText([secretBody, publicBody]);
+  await expect(manageList.getByText('비밀글', { exact: true })).toHaveCount(1);
+  await expect(manageList.getByRole('button', { name: '삭제' })).toHaveCount(0);
+  await expect(manage.getByRole('form', { name: '방명록 남기기' })).toHaveCount(0);
+  // 미리보기는 방명록 탭이 열리고 방문자 시점: 비밀글·글별 버튼 없음, 로그인 안내는 누를 수 없음, 관리 화면 주소는 그대로
+  await expect(preview.getByRole('tab', { name: '방명록' })).toHaveAttribute('aria-selected', 'true');
+  await expect(previewBodies).toHaveText([publicBody]);
+  await expect(preview.getByRole('list', { name: '방명록 글 목록' }).getByRole('button')).toHaveCount(0);
+  await expect(preview.getByRole('button', { name: '로그인하고 남기기' })).toBeDisabled();
+  await expect(owner.page).toHaveURL(`${WEB_URL}${managePath}/guestbook`);
+  const ownerPublic = manageList.getByRole('listitem').filter({ hasText: publicBody });
   await ownerPublic.getByRole('button', { name: '숨기기' }).click();
-  await expect(owner.page.getByText('글을 숨겼어요. 작성자와 나만 볼 수 있어요.')).toBeVisible();
+  await expect(manage.getByText('글을 숨겼어요. 작성자와 나만 볼 수 있어요.')).toBeVisible();
   await expect(ownerPublic).toHaveClass(/is-hidden/);
   await expect(ownerPublic.getByText('숨김', { exact: true })).toBeVisible();
+  await expect(previewBodies).toHaveCount(0);
+  await expect(preview.getByText('아직 방명록이 없어요. 첫 방명록을 남겨 주세요.')).toBeVisible();
 
   for (const viewer of [guest, stranger]) {
     await openGuestbook(viewer.page, creator.landingUrl);
@@ -102,10 +120,11 @@ test('방명록: 비회원 읽기·로그인 안내, 공개글·비밀글 가시
   await expect(authorPublic.getByText('숨김', { exact: true })).toHaveCount(0);
   expect((await guestbookJson(author.context.request, creator.publicId)).text).not.toContain('"hidden":true');
 
-  // 숨김 해제 → 다시 모두에게 보임
+  // 숨김 해제 → 미리보기와 모두에게 다시 보임
   await ownerPublic.getByRole('button', { name: '숨김 해제' }).click();
-  await expect(owner.page.getByText('숨김을 풀었어요.')).toBeVisible();
+  await expect(manage.getByText('숨김을 풀었어요.')).toBeVisible();
   await expect(ownerPublic).not.toHaveClass(/is-hidden/);
+  await expect(previewBodies).toHaveText([publicBody]);
   await openGuestbook(guest.page, creator.landingUrl);
   await expect(bodies(guest.page)).toHaveText([publicBody]);
 
@@ -117,13 +136,18 @@ test('방명록: 비회원 읽기·로그인 안내, 공개글·비밀글 가시
   await openGuestbook(guest.page, creator.landingUrl);
   await expect(guest.page.getByText('아직 방명록이 없어요. 첫 방명록을 남겨 주세요.')).toBeVisible();
 
-  // 6. 크리에이터가 관리 화면에서 방명록을 끄면 공개 랜딩에 탭이 없고 API는 guestbook_disabled, 다시 켜면 남은 글이 보임
-  await owner.page.goto(`/me/landings/${creator.publicId}`);
-  const toggle = owner.page.getByRole('switch', { name: '방명록 켜기' });
+  // 6. 크리에이터가 `방명록` 메뉴에서 끄면 꺼짐 안내, 미리보기·공개 랜딩에 탭이 없고 API는 guestbook_disabled.
+  //    `페이지 편집`의 같은 스위치로 다시 켜면 남은 글이 보임
+  await owner.page.reload();
+  const toggle = manage.getByRole('switch', { name: '방명록 켜기' });
   await expect(toggle).toHaveAttribute('aria-checked', 'true');
+  await expect(manageList.locator('.guestbook-body')).toHaveText([secretBody]);
   await toggle.click();
-  await expect(owner.page.getByText('방명록을 껐어요. 남은 글은 지우지 않고 보관해요.')).toBeVisible();
+  await expect(manage.getByText('방명록을 껐어요. 남은 글은 지우지 않고 보관해요.')).toBeVisible();
   await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  await expect(manage.getByText('방명록이 꺼져 있어요. 켜면 이전 글이 그대로 다시 보여요.')).toBeVisible();
+  await expect(manageList).toHaveCount(0);
+  await expect(preview.getByRole('tab')).toHaveCount(0);
   await guest.page.goto(creator.landingUrl);
   await expect(guest.page.getByRole('heading', { name: 'E2E 방명록 주인', level: 1 })).toBeVisible();
   await expect(guest.page.getByRole('tab')).toHaveCount(0);
@@ -131,9 +155,20 @@ test('방명록: 비회원 읽기·로그인 안내, 공개글·비밀글 가시
   expect(disabled.status).toBe(404);
   expect(JSON.parse(disabled.text).code).toBe('guestbook_disabled');
 
-  await toggle.click();
-  await expect(owner.page.getByText('방명록을 켰어요. 방문자에게 방명록 탭이 보여요.')).toBeVisible();
-  await expect(toggle).toHaveAttribute('aria-checked', 'true');
+  await managerMenu.getByRole('link', { name: '페이지 편집' }).click();
+  await expect(owner.page).toHaveURL(`${WEB_URL}${managePath}`);
+  const editToggle = manage.getByRole('region', { name: '방명록' }).getByRole('switch', { name: '방명록 켜기' });
+  await expect(editToggle).toHaveAttribute('aria-checked', 'false');
+  await editToggle.click();
+  await expect(manage.getByText('방명록을 켰어요. 방문자에게 방명록 탭이 보여요.')).toBeVisible();
+  await expect(editToggle).toHaveAttribute('aria-checked', 'true');
+  await expect(preview.getByRole('tab', { name: '링크' })).toHaveAttribute('aria-selected', 'true');
+  await manage.getByRole('link', { name: '방명록 글 관리' }).click();
+  await expect(owner.page).toHaveURL(`${WEB_URL}${managePath}/guestbook`);
+  await expect(manageList.locator('.guestbook-body')).toHaveText([secretBody]);
+  await expect(preview.getByRole('tab', { name: '방명록' })).toHaveAttribute('aria-selected', 'true');
+  await expect(preview.getByText('아직 방명록이 없어요. 첫 방명록을 남겨 주세요.')).toBeVisible();
+  await expectMobileFits(owner.page, '관리 화면 방명록');
   await openGuestbook(author.page, creator.landingUrl);
   await expect(bodies(author.page)).toHaveText([secretBody]);
 

@@ -78,7 +78,8 @@ test('운영자: 크리에이터 통계·분포, 슬롯 부여 후 6번째 링�
   const creatorSession = await data.session(creator);
   const me = creatorSession.page;
   await me.goto(`/me/landings/${creator.publicId}`);
-  const links = me.getByRole('region', { name: '외부 링크' });
+  const links = me.getByRole('main').getByRole('region', { name: '외부 링크' });
+  const previewTitles = me.getByRole('complementary', { name: '미리보기' }).locator('.link-title');
   await expect(links.getByText('보이는 링크 5/5')).toBeVisible();
   await expect(links.getByRole('button', { name: '링크 추가' })).toHaveCount(0);
 
@@ -90,13 +91,20 @@ test('운영자: 크리에이터 통계·분포, 슬롯 부여 후 6번째 링�
   await me.reload();
   await expect(links.getByText('보이는 링크 5/6')).toBeVisible();
   await links.getByRole('button', { name: '링크 추가' }).click();
-  const addSheet = me.getByRole('dialog', { name: '새 링크' });
-  await addSheet.getByLabel('표시 이름 (필수)').fill('여섯 번째');
-  await addSheet.getByLabel('주소 (필수)').fill(data.externalUrl('sixth'));
-  await addSheet.getByRole('button', { name: '저장', exact: true }).click();
-  await expect(addSheet).toHaveCount(0);
+  const addForm = links.getByRole('form', { name: '새 링크' });
+  await addForm.getByLabel('표시 이름 (필수)').fill('여섯 번째');
+  await addForm.getByLabel('주소 (필수)').fill(data.externalUrl('sixth'));
+  await addForm.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(addForm).toHaveCount(0);
   await expect(links.getByText("'여섯 번째' 링크를 추가했어요.")).toBeVisible();
   await expect(links.getByText('보이는 링크 6/6')).toBeVisible();
+  await expect(previewTitles).toHaveText([shop.title, blog.title, '유튜브', '카페', '공지', '여섯 번째']);
+
+  // 운영자 자신의 관리 화면 머리글에는 운영자 화면 링크
+  await page.goto('/me');
+  await expect(
+    page.getByRole('navigation', { name: '주요 메뉴' }).getByRole('link', { name: '운영자 화면' }),
+  ).toHaveAttribute('href', '/admin');
 
   // 도메인 차단 → 기존 링크 차단
   await page.goto('/admin/blocked-domains');
@@ -113,22 +121,25 @@ test('운영자: 크리에이터 통계·분포, 슬롯 부여 후 6번째 링�
   const click = await visitorB.context.request.get(shop.clickUrl, { maxRedirects: 0 });
   expect(click.headers().location).toMatch(/\/notice\?reason=link_unavailable$/);
 
-  // 관리 화면에 차단 표시, 같은 도메인(하위 도메인 포함) 저장 거부
+  // 관리 화면에 차단 표시(스위치는 바꿀 수 없음), 미리보기에서도 빠짐, 같은 도메인(하위 도메인 포함) 저장 거부
   await me.reload();
   const shopItem = links.getByRole('listitem').filter({ has: me.getByRole('button', { name: `${shop.title} 수정` }) });
   await expect(shopItem.getByText('차단됨', { exact: true })).toBeVisible();
   await expect(shopItem.getByText('크리링이 이 링크를 차단해 방문자에게 보이지 않아요. 사유: E2E 차단')).toBeVisible();
+  await expect(shopItem.getByRole('switch', { name: `${shop.title} 숨기기` })).toHaveAttribute('aria-disabled', 'true');
   await expect(links.getByText('보이는 링크 5/6')).toBeVisible();
+  await expect(previewTitles).toHaveText([blog.title, '유튜브', '카페', '공지', '여섯 번째']);
   await links.getByRole('button', { name: '링크 추가' }).click();
-  const blockedSheet = me.getByRole('dialog', { name: '새 링크' });
-  await blockedSheet.getByLabel('표시 이름 (필수)').fill('차단 도메인 링크');
-  await blockedSheet.getByLabel('주소 (필수)').fill(`https://www.${domain}/other`);
+  const blockedForm = links.getByRole('form', { name: '새 링크' });
+  await blockedForm.getByLabel('표시 이름 (필수)').fill('차단 도메인 링크');
+  await blockedForm.getByLabel('주소 (필수)').fill(`https://www.${domain}/other`);
   data.allowConsoleError(/status of 422 .*\/api\/backend\/api\/me\/links$/);
-  await blockedSheet.getByRole('button', { name: '저장', exact: true }).click();
-  await expect(blockedSheet.getByText('크리링 차단 목록에 있는 도메인이라 저장할 수 없어요.')).toBeVisible();
-  await blockedSheet.getByRole('button', { name: '닫기' }).click();
-  await expect(blockedSheet).toHaveCount(0);
+  await blockedForm.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(blockedForm.getByText('크리링 차단 목록에 있는 도메인이라 저장할 수 없어요.')).toBeVisible();
+  await blockedForm.getByRole('button', { name: '취소' }).click();
+  await expect(blockedForm).toHaveCount(0);
   await expect(links.getByRole('button', { name: '차단 도메인 링크 수정' })).toHaveCount(0);
+  await expect(previewTitles).toHaveText([blog.title, '유튜브', '카페', '공지', '여섯 번째']);
 
   // 크리에이터 권한으로 /admin 접근
   await me.goto('/admin');

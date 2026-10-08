@@ -480,19 +480,9 @@ textarea.input {
   font-size: var(--ds-font-size-27);
   line-height: 1.3;
 }
-.page-subtitle {
-  margin-bottom: var(--ds-space-24);
-  font-size: var(--ds-font-size-14);
-  overflow-wrap: anywhere;
-}
 .breadcrumb {
   margin-bottom: var(--ds-space-8);
   font-size: var(--ds-font-size-14);
-}
-.editor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ds-space-24);
 }
 .card {
   min-width: 0;
@@ -503,9 +493,6 @@ textarea.input {
   background: var(--ds-color-surface-default);
   box-shadow: var(--card-shadow);
 }
-.editor > .card {
-  margin-bottom: 0;
-}
 .card h2 {
   margin-bottom: var(--ds-space-8);
   font-size: var(--ds-font-size-22);
@@ -513,13 +500,6 @@ textarea.input {
 }
 .card h3 {
   font-size: var(--ds-font-size-16);
-}
-.section-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--ds-space-8);
 }
 .section-help {
   margin-bottom: var(--ds-space-16);
@@ -1226,7 +1206,7 @@ a.portfolio-card:hover {
   font-size: var(--ds-font-size-16);
 }
 
-/* 랜딩 링크·방명록 탭(R19). 편집·보기 전환(.mode-switch)과 같은 알약형 묶음을 폭에 맞춰 나눈다. */
+/* 랜딩 링크·방명록 탭(R19). 알약형 묶음을 폭에 맞춰 나눈다. 고른 쪽은 본문 글자색 면에 흰 글자(강조색을 쓰지 않음). */
 .landing-tabs {
   display: flex;
   gap: var(--ds-space-4);
@@ -1392,58 +1372,305 @@ a.portfolio-card:hover {
   width: 100%;
 }
 
-/* 랜딩 관리 화면(/me/landings/{publicId}). 공개 랜딩 구성 요소(.profile·.link-card)를 그대로 쓰고
-   편집 모드의 끌기 손잡이·숨기기 스위치·하단 시트만 더한다. */
-.manage-toolbar {
+/* ---------- 랜딩 관리 화면(/me/landings/{publicId}/…, design/desktop-landing-manager/handoff.md) ----------
+   1200px 이상: 메뉴 · 관리 패널 · 미리보기 세 열. 1024~1199px: 메뉴는 위쪽 가로 탭, 패널 · 미리보기 두 열.
+   1023px 이하: 가로 탭 + 한 열 패널, 미리보기는 떠 있는 버튼과 전체 화면 대화상자(`use-wide-layout.ts`의 경계와 같은 값). */
+/* 머리글 높이(위아래 여백 12 + 버튼 44 + 테두리 1). 메뉴 탭·미리보기의 sticky 위치가 이 값을 씁니다. */
+.manager-page {
+  --manager-head: 69px;
+}
+.manager-page .site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  min-height: var(--manager-head);
+}
+.header-open {
+  gap: var(--ds-space-6);
+}
+.manager {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 600px) 384px;
+  grid-template-areas: 'menu panel preview';
+  align-items: start;
+  justify-content: center;
+  gap: var(--ds-space-24) calc(var(--ds-space-24) + var(--ds-space-4));
+  padding: var(--ds-space-24) calc(var(--ds-space-24) + var(--ds-space-4)) var(--ds-space-48);
+}
+.manager-menu {
+  grid-area: menu;
+  position: sticky;
+  top: calc(var(--manager-head) + var(--ds-space-24));
+}
+.manager-menu ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.manager-menu a {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-12);
+  min-height: 48px;
+  padding: 0 var(--ds-space-12);
+  border: 1px solid transparent;
+  border-radius: var(--ds-corner-md);
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-15);
+  font-weight: var(--ds-font-weight-bold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.manager-menu a:hover {
+  color: var(--ds-color-text-primary);
+}
+.manager-menu a[aria-current='page'] {
+  border-color: var(--ds-color-border-default);
+  background: var(--ds-color-surface-default);
+  color: var(--ds-color-text-primary);
+}
+.manager-panel {
+  grid-area: panel;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-16);
+  min-width: 0;
+}
+.manager-panel > .card {
+  margin-bottom: 0;
+}
+.card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ds-space-8) var(--ds-space-12);
+  margin-bottom: var(--ds-space-8);
+}
+.card-head h2,
+.card-title {
+  margin: 0;
+  font-size: var(--ds-font-size-22);
+  line-height: 1.3;
+}
+.card-subtitle {
+  margin: var(--ds-space-4) 0 0;
+  font-size: var(--ds-font-size-14);
+}
+.card-head-badges {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--ds-space-12);
-  margin-bottom: var(--ds-space-16);
+  gap: var(--ds-space-8);
 }
-/* 편집·보기 전환: 알약형 묶음. 고른 쪽은 본문 글자색 면에 흰 글자(강조색을 쓰지 않음). */
-.mode-switch {
-  display: inline-flex;
-  gap: var(--ds-space-4);
-  padding: var(--ds-space-4);
+/* 저장하지 않은 입력이 있는 카드·미리보기 표시. 배지 모양에 주의 색 글자(글자로도 알림). */
+.dirty-chip {
+  border-color: var(--ds-color-status-warning);
+  border-radius: var(--ds-corner-sm);
+  background: var(--ds-color-status-warning-subtle);
+  color: var(--ds-color-status-warning);
+  white-space: nowrap;
+}
+.account-email {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ds-color-text-primary);
+}
+
+/* 머리 카드: 사진 · 이름·단축 주소 · 주소 변경, 아래 줄에 붙여 넣기 안내. */
+.manager-summary {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ds-space-12) var(--ds-space-16);
+}
+.summary-avatar {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
   border: 1px solid var(--ds-color-border-default);
-  border-radius: var(--ds-corner-full);
-  background: var(--ds-color-surface-default);
+  border-radius: 50%;
 }
-.mode-switch > .secondary {
-  border-color: transparent;
-  background: transparent;
+.summary-text {
+  min-width: 0;
 }
-.mode-switch > .secondary:hover:not([aria-current='page']) {
-  background: var(--ds-color-surface-raised);
+.summary-name {
+  margin: 0;
+  font-weight: var(--ds-font-weight-extrabold);
+  color: var(--ds-color-text-primary);
+  overflow-wrap: anywhere;
 }
-.mode-switch > a[aria-current='page'] {
-  background: var(--ds-color-text-primary);
-  color: var(--ds-color-surface-default);
+.summary-name.is-empty {
+  color: var(--ds-color-text-subtle);
 }
-.landing-preview {
-  max-width: 560px;
-  margin: 0 auto;
-  padding: var(--ds-space-24) 0 var(--ds-space-32);
+.summary-url {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-4) var(--ds-space-8);
 }
-.link-zone h2 {
+.summary-url .url-text {
+  min-width: 0;
+  color: var(--ds-color-text-secondary);
+}
+.summary-help {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-top: var(--ds-space-12);
+  border-top: 1px solid var(--ds-color-border-default);
+  font-size: var(--ds-font-size-14);
+}
+
+/* 미리보기 열: 휴대폰 프레임(안쪽 폭 360) 안만 스크롤. */
+.manager-preview {
+  grid-area: preview;
+  position: sticky;
+  top: calc(var(--manager-head) + var(--ds-space-24));
+  min-width: 0;
+}
+.preview-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-8);
+}
+.preview-head h2 {
   margin: 0;
   font-size: var(--ds-font-size-18);
 }
-.link-zone .section-help {
-  margin: var(--ds-space-8) 0 var(--ds-space-12);
+.preview-help {
+  margin: var(--ds-space-4) 0 var(--ds-space-12);
+  font-size: var(--ds-font-size-13);
 }
-.link-zone .action-status,
-.link-zone .empty-text {
-  margin-bottom: var(--ds-space-12);
+.preview-device {
+  padding: var(--ds-space-12);
+  border-radius: calc(var(--ds-corner-lg) * 2);
+  background: var(--ds-color-background-device);
 }
-.link-zone .notice-box,
-.link-add {
-  margin-top: var(--ds-space-12);
+.preview-screen {
+  height: min(760px, calc(100vh - var(--manager-head) - 160px));
+  height: min(760px, calc(100dvh - var(--manager-head) - 160px));
+  min-height: 420px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: calc(var(--ds-corner-lg) + var(--ds-space-4));
+  background: var(--ds-color-background-screen);
 }
+.preview-main {
+  padding: var(--ds-space-24) var(--ds-space-16);
+}
+.preview-screen .profile-footer {
+  margin: 0;
+  padding: var(--ds-space-16);
+}
+/* 미리보기 안 링크는 이동하지 않으므로 눌러도 손가락 모양을 두지 않는다(탭 전환은 그대로). */
+.preview-screen a {
+  cursor: default;
+}
+/* 1023px 이하: 떠 있는 미리보기 버튼과 전체 화면 대화상자. */
+.preview-fab {
+  position: fixed;
+  bottom: calc(var(--ds-space-16) + env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 9;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-8);
+  min-height: 48px;
+  padding: 0 var(--ds-space-20);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-full);
+  background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
+  font-weight: var(--ds-font-weight-extrabold);
+  transform: translateX(-50%);
+}
+.preview-fab:hover {
+  border-color: var(--ds-color-text-primary);
+}
+.preview-dialog {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--ds-color-background-screen);
+  color: var(--ds-color-text-primary);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.preview-dialog::backdrop {
+  background: var(--ds-color-overlay-scrim);
+}
+.preview-dialog-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-8);
+  padding: var(--ds-space-8) var(--ds-space-16);
+  border-bottom: 1px solid var(--ds-color-border-default);
+  background: var(--ds-color-surface-bar);
+}
+.preview-dialog-head h2 {
+  margin: 0;
+  font-size: var(--ds-font-size-18);
+}
+.preview-dialog-head > .secondary {
+  margin-left: auto;
+}
+.preview-dialog .preview-screen {
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  border-radius: 0;
+}
+body:has(.preview-dialog[open]) {
+  overflow: hidden;
+}
+
+/* 불러오는 중 뼈대(반복 애니메이션 없음). */
+.skeleton-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-12);
+}
+.skeleton-bar {
+  display: block;
+  height: 40px;
+  border-radius: var(--ds-corner-md);
+  background: var(--ds-color-surface-raised);
+}
+.skeleton-card {
+  min-height: 180px;
+}
+.skeleton-summary {
+  min-height: 104px;
+}
+.skeleton-screen {
+  background: var(--ds-color-surface-raised);
+}
+
+/* 링크 편집 행(페이지 편집의 외부 링크 카드): 손잡이 · 링크 카드 · 숨기기 스위치 · 수정. */
 .link-add {
   width: 100%;
+  margin-top: var(--ds-space-12);
+}
+.link-edit-list + .notice-box,
+.link-new-form {
+  margin-top: var(--ds-space-12);
+}
+.manager-panel .action-status,
+.manager-panel .card > .empty-text,
+.manager-panel .card > .notice-box:not(:last-child) {
+  margin-bottom: var(--ds-space-12);
 }
 .link-edit-item {
   display: flex;
@@ -1457,6 +1684,12 @@ a.portfolio-card:hover {
 .link-edit-row {
   display: flex;
   align-items: stretch;
+  gap: var(--ds-space-8);
+}
+.link-edit-controls {
+  display: flex;
+  flex: none;
+  align-items: center;
   gap: var(--ds-space-8);
 }
 /* 터치로 끌 때 화면이 스크롤되지 않도록 손잡이만 touch-action을 끈다. */
@@ -1485,6 +1718,7 @@ a.portfolio-card:hover {
   flex: 1;
   min-width: 0;
   text-align: left;
+  cursor: pointer;
 }
 .link-edit-item.is-dragging .link-edit-card {
   border-color: var(--ds-color-text-primary);
@@ -1551,33 +1785,48 @@ a.portfolio-card:hover {
   margin: 0;
   padding-left: calc(40px + var(--ds-space-8));
 }
-/* 편집 모드의 방명록 켜기·끄기. 스위치 모양은 링크 숨기기 스위치(.hide-switch)를 그대로 쓴다. */
-.guestbook-setting {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ds-space-12);
-  margin-top: var(--ds-space-16);
-  padding: var(--ds-space-16);
-  border: 1px solid var(--ds-color-border-default);
+/* 넓은 화면의 펼침 편집: 행과 폼을 한 카드 테두리로 묶는다. */
+.link-edit-item.is-expanded {
+  padding: var(--ds-space-12);
+  border: 1px solid var(--ds-color-text-primary);
   border-radius: var(--ds-corner-lg);
   background: var(--ds-color-surface-default);
 }
-.guestbook-setting-row {
+.link-edit-form,
+.item-edit-form {
+  margin-top: var(--ds-space-6);
+  padding-top: var(--ds-space-16);
+  border-top: 1px solid var(--ds-color-border-default);
+}
+.item-card.is-expanded {
+  border-color: var(--ds-color-text-primary);
+}
+.edit-form-actions > .danger {
+  margin-left: auto;
+}
+.slug-input {
   display: flex;
   align-items: center;
-  gap: var(--ds-space-12);
+  gap: var(--ds-space-8);
 }
-.guestbook-setting-text {
-  flex: 1;
-  min-width: 0;
+.slug-prefix {
+  flex: none;
+  max-width: 50%;
+  color: var(--ds-color-text-subtle);
 }
-.guestbook-setting h2 {
-  margin: 0 0 var(--ds-space-4);
-  font-size: var(--ds-font-size-18);
+.icon-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-full);
+  background: var(--ds-color-surface-default);
 }
-.guestbook-setting p {
-  margin: 0;
-  font-size: var(--ds-font-size-14);
+.icon-button:hover:not(:disabled) {
+  border-color: var(--ds-color-text-primary);
 }
 
 /* 하단 시트(<dialog> showModal). 모바일은 화면 아래에 붙고, 넓은 화면에서는 폭을 제한한다. */
@@ -1603,16 +1852,34 @@ a.portfolio-card:hover {
 body:has(.sheet[open]) {
   overflow: hidden;
 }
+.sheet-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-12);
+  padding: var(--ds-space-12) var(--ds-space-20);
+  border-bottom: 1px solid var(--ds-color-border-default);
+  background: var(--ds-color-surface-default);
+}
 .sheet-body {
-  padding: var(--ds-space-20) var(--ds-space-20) calc(var(--ds-space-20) + env(safe-area-inset-bottom));
+  padding: var(--ds-space-20) var(--ds-space-20) 0;
 }
 .sheet-title {
   margin: 0;
   font-size: var(--ds-font-size-22);
   line-height: 1.3;
 }
-.sheet-actions > .danger {
-  margin-left: auto;
+/* 시트의 저장·삭제 줄은 아래에 붙어 있다(긴 폼에서도 바로 누를 수 있게). */
+.sheet .edit-form-actions {
+  position: sticky;
+  bottom: 0;
+  margin: 0 calc(var(--ds-space-20) * -1);
+  padding: var(--ds-space-12) var(--ds-space-20) calc(var(--ds-space-12) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--ds-color-border-default);
+  background: var(--ds-color-surface-default);
 }
 
 /* ---------- 불러오기 ---------- */
@@ -1646,11 +1913,131 @@ body:has(.sheet[open]) {
   .item-card {
     padding: var(--ds-space-12);
   }
+  .sheet-head {
+    padding: var(--ds-space-8) var(--ds-space-16);
+  }
   .sheet-body {
-    padding: var(--ds-space-16) var(--ds-space-16) calc(var(--ds-space-16) + env(safe-area-inset-bottom));
+    padding: var(--ds-space-16) var(--ds-space-16) 0;
+  }
+  .sheet .edit-form-actions {
+    margin: 0 calc(var(--ds-space-16) * -1);
+    padding: var(--ds-space-12) var(--ds-space-16) calc(var(--ds-space-12) + env(safe-area-inset-bottom));
   }
   .profile-main {
     padding: var(--ds-space-24) var(--ds-space-16);
+  }
+}
+/* 관리 화면 1024~1199px: 메뉴를 헤더 아래 가로 탭으로 옮기고 패널 · 미리보기 두 열. */
+@media (max-width: 1199px) {
+  .manager {
+    grid-template-columns: minmax(0, 1fr) 384px;
+    grid-template-areas:
+      'menu menu'
+      'panel preview';
+    justify-content: stretch;
+    padding-top: 0;
+  }
+  .manager-menu {
+    top: var(--manager-head);
+    z-index: 8;
+    margin: 0 calc((var(--ds-space-24) + var(--ds-space-4)) * -1);
+    padding: 0 calc(var(--ds-space-24) + var(--ds-space-4) - var(--ds-space-12));
+    overflow-x: auto;
+    border-bottom: 1px solid var(--ds-color-border-default);
+    background: var(--ds-color-surface-bar);
+  }
+  .manager-menu ul {
+    flex-direction: row;
+    gap: 0;
+  }
+  .manager-menu a {
+    gap: var(--ds-space-8);
+    padding: 0 var(--ds-space-12);
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+  }
+  .manager-menu a[aria-current='page'] {
+    border-bottom-color: var(--ds-color-text-primary);
+    background: transparent;
+  }
+  .manager-preview {
+    top: calc(var(--manager-head) + 49px + var(--ds-space-24));
+  }
+  .preview-screen {
+    height: min(760px, calc(100vh - var(--manager-head) - 49px - 160px));
+    height: min(760px, calc(100dvh - var(--manager-head) - 49px - 160px));
+  }
+}
+/* 관리 화면 1023px 이하: 한 열 패널, 미리보기는 떠 있는 버튼(대화상자). 서버가 그린 미리보기 열도 숨긴다. */
+@media (max-width: 1023px) {
+  .manager {
+    display: block;
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 0 var(--ds-space-20) calc(var(--ds-space-48) + 64px);
+  }
+  .manager-menu {
+    position: sticky;
+    margin: 0 calc(var(--ds-space-20) * -1) var(--ds-space-16);
+    padding: 0 var(--ds-space-8);
+  }
+  .manager .manager-preview {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .manager {
+    padding: 0 var(--ds-space-16) calc(var(--ds-space-48) + 64px);
+  }
+  .manager-menu {
+    margin: 0 calc(var(--ds-space-16) * -1) var(--ds-space-12);
+    padding: 0 var(--ds-space-4);
+  }
+  .manager-menu a > svg {
+    display: none;
+  }
+  /* 좁으면 `공개 페이지 열기`는 이름 있는 아이콘 버튼(이름은 스크린리더용으로 남김). */
+  .header-open {
+    width: 44px;
+    padding: 0;
+  }
+  .header-open-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .manager-summary {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: var(--ds-space-8) var(--ds-space-12);
+  }
+  .summary-avatar {
+    width: 48px;
+    height: 48px;
+  }
+  .summary-change {
+    grid-column: 2;
+    justify-self: start;
+  }
+  /* 링크 행: 스위치·수정은 카드 아래 줄로 내린다. */
+  .link-edit-row {
+    flex-wrap: wrap;
+  }
+  .link-edit-card {
+    flex-basis: calc(100% - 40px - var(--ds-space-8));
+  }
+  .link-edit-controls {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .slug-input {
+    flex-wrap: wrap;
+  }
+  .slug-prefix {
+    max-width: 100%;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -8,22 +8,19 @@ import {
   type SocialLinkView,
   type SocialPlatform,
 } from '@crelink/shared';
-import { useId, useRef, useState, type FormEvent } from 'react';
+import { useId, type FormEvent } from 'react';
 import { browserApi } from '../../lib/api/browser';
 import { SOCIAL_PLATFORM_LABELS } from '../../lib/format';
+import { socialItems, socialRowsOf } from '../../lib/landing-preview';
 import { useAction } from '../../lib/use-action';
 import { ActionStatus } from '../ActionStatus';
 import { SocialIcon } from '../SocialIcon';
+import { useManager } from '../manage/ManagerContext';
 
-interface Row extends SocialLinkView {
-  key: number;
-}
-
-/** SNS 채널 목록. 저장하면 전체를 교체합니다(`PUT /api/me/socials`). */
-export function SocialsSection({ socials, reload }: { socials: SocialLinkView[]; reload: () => Promise<void> }) {
+/** SNS 채널 목록. 행은 관리 화면 초안으로 두어 미리보기가 바로 그리고, 저장하면 전체를 교체합니다(`PUT /api/me/socials`). */
+export function SocialsSection() {
   const baseId = useId();
-  const [rows, setRows] = useState<Row[]>(() => socials.map((social, index) => ({ ...social, key: index })));
-  const nextKey = useRef(socials.length);
+  const { socials: rows, setSocials: setRows, reload, dirty } = useManager();
   const { pending, error, notice, run } = useAction();
   const full = rows.length >= CRELINK_LIMITS.socialLinks;
 
@@ -32,29 +29,30 @@ export function SocialsSection({ socials, reload }: { socials: SocialLinkView[];
   }
 
   function add() {
-    const key = nextKey.current;
-    nextKey.current += 1;
-    setRows((current) => [...current, { key, platform: 'instagram', url: '' }]);
+    setRows((current) => [
+      ...current,
+      { key: Math.max(-1, ...current.map((row) => row.key)) + 1, platform: 'instagram', url: '' },
+    ]);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const payload: ReplaceSocialsRequest = {
-      items: rows.map(({ platform, url }) => ({ platform, url: url.trim() })).filter((item) => item.url.length > 0),
-    };
-    const saved = await run(async () => {
+    const payload: ReplaceSocialsRequest = { items: socialItems(rows) };
+    await run(async () => {
       await browserApi<SocialLinkView[]>(CRELINK_API_PATHS.meSocials, {
         method: 'PUT',
         body: JSON.stringify(payload),
       });
-      await reload();
+      setRows(socialRowsOf((await reload()).socials));
     }, 'SNS 채널을 저장했어요.');
-    if (saved) setRows((current) => current.filter((row) => row.url.trim().length > 0));
   }
 
   return (
-    <section className="card" aria-labelledby="socials-title">
-      <h2 id="socials-title">SNS 채널</h2>
+    <section className="card" aria-labelledby={`${baseId}-title`}>
+      <div className="card-head">
+        <h2 id={`${baseId}-title`}>SNS 채널</h2>
+        {dirty.socials ? <span className="badge dirty-chip">저장 안 함</span> : null}
+      </div>
       <p className="section-help">
         계정 주소를 넣으면 방문자 화면에 아이콘으로 보여요. 최대 {CRELINK_LIMITS.socialLinks}개.
       </p>
@@ -116,7 +114,7 @@ export function SocialsSection({ socials, reload }: { socials: SocialLinkView[];
               SNS 채널 추가
             </button>
           )}
-          <button type="submit" className="primary" disabled={pending}>
+          <button type="submit" className="secondary" disabled={pending}>
             {pending ? '저장 중…' : 'SNS 채널 저장'}
           </button>
         </div>

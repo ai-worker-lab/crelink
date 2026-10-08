@@ -1,46 +1,35 @@
-import { CRELINK_API_PATHS, type CreatorLandingState, type MeResponse } from '@crelink/shared';
-import * as Sentry from '@sentry/nextjs';
+import { CRELINK_API_PATHS, type CreatorLandingState } from '@crelink/shared';
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { ErrorPanel } from '../../components/ErrorPanel';
 import { FeedbackButton } from '../../components/FeedbackButton';
 import { LogoutButton } from '../../components/LogoutButton';
-import { MonitoringUser } from '../../components/MonitoringUser';
+import { managerHref } from '../../components/manage/menu';
 import { SiteHeader } from '../../components/SiteHeader';
-import { CreatorEditor } from '../../components/me/CreatorEditor';
 import { loadSignedIn } from '../../lib/api/server';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: '내 크리링', robots: { index: false } };
 
+/**
+ * 로그인 뒤 도착지(`/auth/google/callback`·`/auth/return/go`)이자 홈의 `내 크리링 편집`. 내 랜딩(MVP는 1개)의 관리 화면 `페이지 편집`으로 보냅니다.
+ * 401(로그아웃·정지로 끊긴 세션)은 홈으로 보내고, 그 밖의 API 오류는 안내를 그립니다.
+ */
 export default async function MePage() {
-  const [landing, me] = await Promise.all([
-    loadSignedIn<CreatorLandingState>(CRELINK_API_PATHS.meLanding),
-    loadSignedIn<MeResponse>(CRELINK_API_PATHS.me),
-  ]);
-  // 로그인 사용자의 내부 ID만 이 요청(서버)과 브라우저의 Sentry 이벤트에 붙입니다. 이메일은 넣지 않습니다.
-  if (me.ok) Sentry.setUser({ id: me.data.id });
+  const landing = await loadSignedIn<CreatorLandingState>(CRELINK_API_PATHS.meLanding);
+  if (landing.ok) redirect(managerHref(landing.data.landing.publicId, ''));
   return (
     <div className="app-page">
-      {me.ok ? <MonitoringUser id={me.data.id} /> : null}
       <SiteHeader>
-        {landing.ok ? (
-          <Link href={`/me/landings/${encodeURIComponent(landing.data.landing.publicId)}`}>링크 관리</Link>
-        ) : null}
-        {me.ok && me.data.role === 'operator' ? <Link href="/admin">운영자 화면</Link> : null}
         <FeedbackButton />
         <LogoutButton />
       </SiteHeader>
       <main className="app-main">
-        {landing.ok ? (
-          <>
-            <h1 className="page-title">내 크리링</h1>
-            {me.ok ? <p className="page-subtitle">{me.data.email}</p> : null}
-            <CreatorEditor initial={landing.data} />
-          </>
-        ) : (
-          <ErrorPanel title="편집 화면을 불러오지 못했어요." message={landing.error.message} />
-        )}
+        <ErrorPanel
+          title="편집 화면을 불러오지 못했어요."
+          message={landing.error.message}
+          action={{ href: '/me', label: '다시 시도', reload: true }}
+        />
       </main>
     </div>
   );

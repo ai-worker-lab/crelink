@@ -133,7 +133,8 @@ migration은 `apps/api/migrations/`의 SQL 파일(기존 실행기). 모든 시�
 | --- | --- | --- |
 | `/` | 로그인 전·후 | `GET /api/me` 401이면 구글 로그인 버튼, 로그인 상태면 `/me`·운영자는 `/admin` 링크 |
 | `/auth/google/callback` | 성공·실패 | 성공 시 `/me`, `oauth_*`·`account_suspended`·`auth_not_configured`면 `/notice?reason=` |
-| `/me` | 로딩·정상·오류·401 | 401이면 `/`로. 빈 프로필·링크 0개도 정상 화면. 한도 도달 시 추가 버튼 대신 안내. 차단된 링크는 차단 표시. 주소 변경은 입력 중 사용 가능 여부, 30일 제한 시 다음 변경 가능일 |
+| `/me` | 이동 | 로그인 상태면 내 랜딩 관리 화면(`/me/landings/{publicId}`)으로, 401이면 `/`로 |
+| `/me/landings/{publicId}`·`/guestbook`·`/settings` | 로딩·정상·오류·401·남의 랜딩 | 관리 화면(PRD R18): 메뉴 `페이지 편집`·`방명록`·`주소 설정`, 편집 패널과 실시간 미리보기([디자인 인계](../../design/desktop-landing-manager/handoff.md)). 401이면 `/`로, 남의 랜딩이면 안내. 빈 프로필·링크 0개도 정상 화면. 한도 도달 시 추가 버튼 대신 안내. 차단된 링크는 차단 표시. 주소 변경은 입력 중 사용 가능 여부, 30일 제한 시 다음 변경 가능일. 옛 `?mode=view`는 페이지 편집으로 이동 |
 | `/p/{publicId}` | 정상·빈 랜딩·없음·정지·외부 진입 | 모든 항목이 비어도 크리링 표시와 함께 열림. 404·410은 안내 화면. 같은 출처도 유효한 통과 표시도 아니면 현재 단축 주소로 307 |
 | `/notice` | 사유별 안내 | `link_not_found`, `link_unavailable`, `creator_suspended`, 로그인 오류 |
 | `/privacy` | 고정 고지 | 수집 항목·목적·보관 기간(원본 1년)·쿠키 `cl_vid`. 법률 검토 전 문구임을 표시 |
@@ -209,3 +210,4 @@ API 통합 테스트(0016): 가입 트랜잭션, 주소 규칙(예약어·중복
 - 2026-10-06: 이미지 한도를 5MB → 4MB로 낮춤. 운영에서 업로드·조회가 웹 BFF(Vercel Function 본문 4.5MB 한도)를 지나기 때문(`docs/work/web/0026-web-internal-token-vercel.md`, 설계 `crelink-prod-deploy.md`).
 - 2026-10-06: 운영 웹을 Vercel이 아닌 배포 대상 서버의 컨테이너로 바꾸면서(`crelink-prod-deploy.md`) 위 4.5MB 근거는 없어짐. 이미지 한도 4MB는 MVP 임시값으로 유지하고, 운영 웹 호스트 본문 상한은 스택 Caddy의 `request_body` 6MB.
 - 2026-10-07: 외부에서 랜딩 주소로 들어와도 단축 주소를 거치게 함(PRD R7 사용자 결정). 단축 주소 302에 통과 표시, 공개 랜딩 API에 `passAccepted`·`shortUrl`, 웹 진입 판정과 루트 `loading.tsx` 이동(`docs/work/orchestrator/0038-landing-entry-via-short-link.md`).
+- 2026-10-08: 크리에이터 관리 화면을 랜딩별 관리 화면 하나로 합치고 편집·보기 모드를 실시간 미리보기로 대체(PRD R18 사용자 결정, 디자인 `design/desktop-landing-manager/`). `/me`는 이동만 하고, 화면 상태 표의 `/me` 행을 관리 화면 행으로 옮김. API 변경 없음(`docs/work/orchestrator/0053-desktop-landing-manager.md`).

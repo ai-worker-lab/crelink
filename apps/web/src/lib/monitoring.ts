@@ -25,7 +25,7 @@ const SCRUBBED_SPAN_ATTRIBUTE = new RegExp(`^http\\.(request|response)\\.header\
 /**
  * 서버(Node·Edge) 수집 범위. SDK 11은 `sendDefaultPii` 대신 `dataCollection`으로 정합니다.
  * - `userInfo: false`: 웹 서버는 신뢰할 프록시 판정 기준이 없어 SDK가 `X-Forwarded-For` 등 헤더로 IP를 추론하지 않게 합니다.
- *   방문자 IP는 브라우저 이벤트(Sentry가 접속 주소로 기록)와 API 이벤트(`clientIp`)에 남습니다. 로그인 사용자 ID는 `/me`가 직접 넣습니다.
+ *   방문자 IP는 브라우저 이벤트(Sentry가 접속 주소로 기록)와 API 이벤트(`clientIp`)에 남습니다. 로그인 사용자 ID는 관리 화면 레이아웃(`app/me/landings/[publicId]/layout.tsx`)이 직접 넣습니다.
  * - 쿠키·요청 본문은 보내지 않고, 인증 헤더와 로그인 `code`·`state`·통과 표시 `pass` 값은 지웁니다.
  */
 export const SERVER_DATA_COLLECTION: NodeOptions['dataCollection'] = {

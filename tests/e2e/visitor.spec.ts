@@ -108,21 +108,24 @@ test('방문자: 단축 URL(새·옛 주소) → 랜딩, 외부 링크 클릭은
   await expectMobileFits(page, '/p/{publicId}');
 });
 
-test('외부에서 랜딩 주소로 바로 열면 단축 주소를 거쳐 방문 1건이 기록되고, 주소창에는 통과 표시 없는 랜딩 주소가 남는다. 관리 화면 미리보기는 기록 없이 열린다', async ({
+test('외부에서 랜딩 주소로 바로 열면 단축 주소를 거쳐 방문 1건이 기록되고, 주소창에는 통과 표시 없는 랜딩 주소가 남는다. 관리 화면의 공개 페이지 열기는 기록 없이 열린다', async ({
   data,
 }) => {
   const name = `E2E 직접 접속 ${data.run}`;
   const creator = await data.user({ displayName: name });
 
-  // 크리에이터가 /me의 미리보기(같은 출처, 새 창)로 열면 단축 주소를 거치지 않고 바로 열림
+  // 크리에이터가 관리 화면 머리글의 `공개 페이지 열기`(같은 출처, 새 창)로 열면 단축 주소를 거치지 않고 바로 열림
   const own = await data.session(creator);
   await own.page.goto('/me');
-  const [preview] = await Promise.all([
+  const [opened] = await Promise.all([
     own.context.waitForEvent('page'),
-    own.page.getByRole('link', { name: '미리보기 (새 창)', exact: true }).click(),
+    own.page
+      .getByRole('navigation', { name: '주요 메뉴' })
+      .getByRole('link', { name: '공개 페이지 열기 (새 창)', exact: true })
+      .click(),
   ]);
-  await expect(preview.getByRole('heading', { name, level: 1 })).toBeVisible();
-  expect(preview.url()).toBe(creator.landingUrl);
+  await expect(opened.getByRole('heading', { name, level: 1 })).toBeVisible();
+  expect(opened.url()).toBe(creator.landingUrl);
 
   // 메신저에 공유된 랜딩 주소를 연 방문자: /p/{id} → 단축 주소(방문 기록) → /p/{id}?pass=… → 주소창은 /p/{id}
   const { page } = await data.session();
@@ -139,7 +142,7 @@ test('외부에서 랜딩 주소로 바로 열면 단축 주소를 거쳐 방문
     'SELECT slug, referrer_host FROM visits WHERE short_link_id = $1',
     [creator.shortLinkId],
   );
-  expect(rows, '미리보기는 방문으로 세지 않고, 직접 접속은 단축 주소에서 1건').toEqual([
+  expect(rows, '관리 화면에서 연 공개 페이지는 방문으로 세지 않고, 직접 접속은 단축 주소에서 1건').toEqual([
     { slug: creator.slug, referrer_host: 'open.kakao.com' },
   ]);
 
