@@ -6,6 +6,7 @@
 
 ## 2026-10-08
 
+- main 브랜치 보호(저장소 공개 전환 뒤, 여러 사람이 씀): `.github/workflows/ci.yml`에 모든 job 결과를 모으는 필수 검사 job `CI 통과`(실패·취소면 실패, 건너뜀은 통과), GitHub ruleset `main 보호`(직접·force push·삭제 금지, 선형 이력, PR 필수·squash만·승인 0, 필수 검사 `CI 통과`·최신 main 기준, admin은 PR 머지만 우회), 저장소 설정(squash만, 브랜치 갱신 제안, 머지 뒤 브랜치 삭제, 외부 기여자 fork PR 워크플로 승인, secret scanning·push protection). 검증 루프 CI 절에 머지 규칙과 Actions가 돌지 않을 때의 admin 우회 머지. 근거 `docs/work/orchestrator/0061-main-branch-protection.md`.
 - main 머지 뒤 CI 재실행 없앰(Actions 무료 몫 초과, 사용자 지시): `.github/workflows/ci.yml`은 `main` 대상 PR에서만(push 트리거와 push 비교 분기 제거), `deploy.yml`은 `workflow_run`(main push의 CI 성공) 대신 main `push`로 시작하고 배포 커밋은 push된 커밋. 2026-10 최근 100회 job 시간 815분 중 main push CI가 295분(36%). 검증 루프 CI·CD 절(최신 main 위 PR CI 통과 뒤 머지, 머지 뒤 안전장치는 배포 이미지 빌드·운영 주소 검사·자동 롤백), 배포 설계 워크플로 표, 런북 2·5의 트리거 서술 갱신. 근거 `docs/work/orchestrator/0060-ci-pr-only.md`.
 - 관리 화면 미리보기 직접 편집·프로필 메뉴 구현(0056 시안): PRD R18 요구 문장·수용 기준(미리보기에서 골라 패널·하단 시트에서 편집, 휴대폰 편집·미리보기 전환, `프로필` 메뉴), 기술 설계 `docs/specs/crelink-mvp.md`(화면 상태 표 관리 화면 행)·`docs/specs/crelink-guestbook.md`(방명록 스위치 위치), E2E `tests/e2e/`와 README. API·공유 계약 변경 없음. 세부는 [웹](apps/web/CHANGELOGS.md) 로그. 근거 `docs/work/orchestrator/0058-preview-direct-edit.md`.
 - GitHub Actions 사용량 한도 초과로 CI·CD가 돌지 않을 때의 배포 경로: 검증 루프 CD 절에 "로컬 `pnpm verify`·`smoke`·`e2e` 결과를 PR에 적고 머지한 뒤 `infra/prod/deploy-local.sh`로 배포, 머지 뒤 확인은 스크립트 출력" 추가. 세부는 [인프라](infra/CHANGELOGS.md) 로그. 근거 `docs/work/orchestrator/0059-deploy-without-actions.md`.

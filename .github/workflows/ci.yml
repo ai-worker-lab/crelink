@@ -211,3 +211,23 @@ jobs:
             exit 0
           fi
           pnpm work:scope --base "origin/$GITHUB_BASE_REF"
+
+  # main ruleset의 필수 검사는 이 job 하나입니다(0061). 개별 job을 필수로 걸면 문서만 바뀐 PR에서 matrix job이
+  # 건너뛰어 치환되지 않은 이름(`check (Node ${{ matrix.node }})`)으로 보고되고, 필수 이름이 오지 않아 머지가 막힙니다.
+  # 건너뛴 job은 통과로 보고, 하나라도 실패·취소면 실패합니다. job을 추가하면 needs에도 넣습니다.
+  ci-ok:
+    name: CI 통과
+    if: always()
+    needs: [changes, docs, check, smoke, image, work-scope]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: job 결과 확인
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "job 결과: $RESULTS"
+          if [[ "$RESULTS" == *failure* || "$RESULTS" == *cancelled* ]]; then
+            echo "실패하거나 취소된 job이 있습니다. 위 job 로그를 확인하세요."
+            exit 1
+          fi
