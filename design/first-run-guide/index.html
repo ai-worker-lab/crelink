@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>첫 사용 안내(시작 안내 카드) 시안 · 크리링</title>
+<link rel="stylesheet" href="../system/tokens.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ds-color-background-stage); color: var(--ds-color-text-primary); font-family: var(--ds-font-sans); font-size: var(--ds-font-size-15); line-height: 1.65; word-break: keep-all; }
+  h1, h2, h3, p, ol, ul { margin: 0; }
+  button { font: inherit; }
+  :focus-visible { outline: 3px solid var(--ds-color-text-primary); outline-offset: 2px; }
+
+  /* 시안 문서 틀(구현 대상 아님) */
+  .doc { padding: var(--ds-space-32); display: grid; gap: var(--ds-space-48); }
+  .doc-head { max-width: 900px; display: grid; gap: var(--ds-space-8); }
+  .doc-head h1 { font-size: var(--ds-font-size-27); font-weight: var(--ds-font-weight-extrabold); line-height: 1.15; }
+  .doc-head p { color: var(--ds-color-text-secondary); }
+  .state { display: grid; gap: var(--ds-space-16); }
+  .state-head { display: grid; gap: var(--ds-space-4); max-width: 900px; }
+  .state-head h2 { font-size: var(--ds-font-size-22); font-weight: var(--ds-font-weight-extrabold); line-height: 1.15; }
+  .state-head p { color: var(--ds-color-text-secondary); font-size: var(--ds-font-size-13); }
+  .row { display: flex; gap: var(--ds-space-32); align-items: flex-start; overflow-x: auto; padding-bottom: var(--ds-space-8); }
+  .frame-label { font-size: var(--ds-font-size-12); color: var(--ds-color-text-subtle); font-weight: var(--ds-font-weight-bold); margin-bottom: var(--ds-space-8); }
+  .viewport { border: 1px solid var(--ds-color-border-default); border-radius: var(--ds-corner-md); overflow: hidden; background: var(--ds-color-background-stage); flex: none; }
+  .w1280 { width: 1280px; }
+  .w390 { width: 390px; }
+
+  /* 관리 화면 틀(지금 구현 요약: preview-direct-edit) */
+  .m-head { height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--ds-space-24); background: var(--ds-color-surface-bar); border-bottom: 1px solid var(--ds-color-border-frame); font-weight: var(--ds-font-weight-extrabold); }
+  .m-head span { font-weight: var(--ds-font-weight-regular); font-size: var(--ds-font-size-13); color: var(--ds-color-text-secondary); }
+  .m-body { display: grid; grid-template-columns: 208px 1fr 410px; min-height: 760px; }
+  .m-menu { padding: var(--ds-space-24) var(--ds-space-16); display: grid; align-content: start; gap: var(--ds-space-4); border-right: 1px solid var(--ds-color-border-frame); background: var(--ds-color-surface-default); }
+  .m-menu a { display: block; padding: var(--ds-space-10) var(--ds-space-12); border-radius: var(--ds-corner-md); color: var(--ds-color-text-secondary); text-decoration: none; font-size: var(--ds-font-size-14); }
+  .m-menu a[aria-current] { background: var(--ds-color-surface-raised); color: var(--ds-color-text-primary); font-weight: var(--ds-font-weight-bold); }
+  .m-stage { padding: var(--ds-space-24); display: grid; justify-items: center; align-content: start; gap: var(--ds-space-16); }
+  .addr { width: 100%; max-width: 440px; display: flex; align-items: center; gap: var(--ds-space-8); padding: var(--ds-space-8) var(--ds-space-8) var(--ds-space-8) var(--ds-space-16); background: var(--ds-color-surface-default); border: 1px solid var(--ds-color-border-default); border-radius: var(--ds-corner-full); }
+  .addr code { flex: 1; font-family: var(--ds-font-mono); font-size: var(--ds-font-size-13); }
+  .phone { width: 384px; border: 12px solid var(--ds-color-background-device); border-radius: 40px; background: var(--ds-color-background-screen); height: 600px; overflow: hidden; }
+  .landing { padding: var(--ds-space-32) var(--ds-space-20); display: grid; justify-items: center; gap: var(--ds-space-12); text-align: center; }
+  .avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--ds-color-surface-raised); border: 1px solid var(--ds-color-border-default); display: grid; place-items: center; color: var(--ds-color-decoration-subtle); }
+  .landing .name { font-size: var(--ds-font-size-22); font-weight: var(--ds-font-weight-extrabold); }
+  .landing .muted { color: var(--ds-color-text-subtle); font-size: var(--ds-font-size-13); }
+  .linkcard { width: 100%; padding: var(--ds-space-12) var(--ds-space-16); border: 1px solid var(--ds-color-border-default); border-radius: var(--ds-corner-lg); background: var(--ds-color-surface-default); font-weight: var(--ds-font-weight-bold); text-align: left; box-shadow: var(--elev-raised); }
+  .add-slot { width: 100%; padding: var(--ds-space-12); border: 1px dashed var(--ds-color-border-strong); border-radius: var(--ds-corner-lg); color: var(--ds-color-text-secondary); font-size: var(--ds-font-size-14); }
+  .m-panel { padding: var(--ds-space-24); display: grid; align-content: start; gap: var(--ds-space-20); background: var(--ds-color-surface-default); border-left: 1px solid var(--ds-color-border-frame); }
+  .m-panel > h1 { font-size: var(--ds-font-size-22); font-weight: var(--ds-font-weight-extrabold); line-height: 1.15; }
+  .m-panel > p { color: var(--ds-color-text-secondary); font-size: var(--ds-font-size-14); }
+  .section-list { display: grid; gap: var(--ds-space-8); }
+  .section-list h2 { font-size: var(--ds-font-size-13); color: var(--ds-color-text-subtle); font-weight: var(--ds-font-weight-bold); }
+  .section-item { display: flex; justify-content: space-between; align-items: center; min-height: 48px; padding: 0 var(--ds-space-16); border: 1px solid var(--ds-color-border-default); border-radius: var(--ds-corner-md); font-size: var(--ds-font-size-14); }
+  .section-item span:last-child { color: var(--ds-color-text-subtle); font-size: var(--ds-font-size-13); }
+
+  /* 휴대폰(1023px 이하) 틀 */
+  .n-tabs { display: flex; gap: var(--ds-space-4); padding: 0 var(--ds-space-16); background: var(--ds-color-surface-bar); border-bottom: 1px solid var(--ds-color-border-frame); overflow-x: auto; }
+  .n-tabs a { padding: var(--ds-space-12) var(--ds-space-8); font-size: var(--ds-font-size-14); color: var(--ds-color-text-secondary); text-decoration: none; white-space: nowrap; }
+  .n-tabs a[aria-current] { color: var(--ds-color-text-primary); font-weight: var(--ds-font-weight-bold); box-shadow: inset 0 -2px 0 var(--ds-color-text-primary); }
+  .n-bar { display: flex; align-items: center; gap: var(--ds-space-8); padding: var(--ds-space-8) var(--ds-space-16); background: var(--ds-color-surface-bar); border-bottom: 1px solid var(--ds-color-border-frame); }
+  .n-bar code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--ds-font-mono); font-size: var(--ds-font-size-12); }
+  .toggle { display: inline-flex; border: 1px solid var(--ds-color-border-default); border-radius: var(--ds-corner-full); overflow: hidden; font-size: var(--ds-font-size-12); }
+  .toggle span { padding: var(--ds-space-6) var(--ds-space-10); }
+  .toggle span:first-child { background: var(--ds-color-text-primary); color: var(--ds-color-text-on-action); }
+  .n-content { padding: var(--ds-space-16); display: grid; gap: var(--ds-space-16); }
+  .n-content .landing { padding: var(--ds-space-16) 0; }
+
+  /* 버튼 */
+  .btn { min-height: 44px; padding: 0 var(--ds-space-16); border-radius: var(--ds-corner-full); border: 1px solid var(--ds-color-border-default); background: var(--ds-color-surface-default); color: var(--ds-color-text-primary); font-weight: var(--ds-font-weight-bold); font-size: var(--ds-font-size-14); cursor: pointer; display: inline-flex; align-items: center; gap: var(--ds-space-6); }
+  .btn:hover { border-color: var(--ds-color-text-primary); }
+  .btn.small { min-height: 36px; padding: 0 var(--ds-space-12); font-size: var(--ds-font-size-13); }
+  .btn.primary { background: var(--ds-color-action-primary); border-color: var(--ds-color-action-primary); color: var(--ds-color-text-on-action); font-weight: var(--ds-font-weight-extrabold); }
+  .btn.primary:hover { background: var(--ds-color-action-primary-pressed); border-color: var(--ds-color-action-primary-pressed); }
+  .icon-btn { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--ds-color-surface-default); color: var(--ds-color-text-secondary); display: grid; place-items: center; cursor: pointer; flex: none; }
+  .icon-btn:hover { background: var(--ds-color-surface-raised); color: var(--ds-color-text-primary); }
+  svg { width: 20px; height: 20px; }
+
+  /* 시작 안내 카드(구현 대상) */
+  .guide { background: var(--ds-color-surface-default); border: 1px solid var(--ds-color-border-default); border-radius: var(--ds-corner-lg); box-shadow: var(--elev-raised); padding: var(--ds-space-20); display: grid; gap: var(--ds-space-16); }
+  .guide-head { display: flex; align-items: flex-start; gap: var(--ds-space-8); margin: calc(var(--ds-space-8) * -1) calc(var(--ds-space-8) * -1) 0 0; }
+  .guide-head > div { flex: 1; display: grid; gap: var(--ds-space-4); padding-top: var(--ds-space-8); }
+  .guide-head h2 { font-size: var(--ds-font-size-18); font-weight: var(--ds-font-weight-extrabold); line-height: 1.15; }
+  .guide-head p { color: var(--ds-color-text-secondary); font-size: var(--ds-font-size-13); }
+  .progress { display: flex; align-items: center; gap: var(--ds-space-8); font-size: var(--ds-font-size-12); color: var(--ds-color-text-subtle); font-weight: var(--ds-font-weight-bold); }
+  .bar { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--ds-space-4); }
+  .bar i { height: 4px; border-radius: var(--ds-corner-full); background: var(--ds-color-border-default); }
+  .bar i.on { background: var(--ds-color-status-positive); }
+  .steps { list-style: none; padding: 0; display: grid; gap: var(--ds-space-8); }
+  .step { display: grid; grid-template-columns: 28px 1fr; gap: var(--ds-space-12); padding: var(--ds-space-12); border-radius: var(--ds-corner-md); border: 1px solid var(--ds-color-border-frame); }
+  .step.current { border-color: var(--ds-color-text-primary); }
+  .step.done .step-title { color: var(--ds-color-text-secondary); }
+  .mark { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: var(--ds-font-size-13); font-weight: var(--ds-font-weight-extrabold); border: 1px solid var(--ds-color-border-strong); color: var(--ds-color-text-secondary); background: var(--ds-color-surface-default); }
+  .current .mark { background: var(--ds-color-text-primary); border-color: var(--ds-color-text-primary); color: var(--ds-color-text-on-action); }
+  .done .mark { background: var(--ds-color-status-positive); border-color: var(--ds-color-status-positive); color: var(--ds-color-text-on-positive); }
+  .mark svg { width: 16px; height: 16px; }
+  .step-body { display: grid; gap: var(--ds-space-6); min-width: 0; }
+  .step-title { font-weight: var(--ds-font-weight-bold); font-size: var(--ds-font-size-15); line-height: 1.4; }
+  .step-desc { font-size: var(--ds-font-size-13); color: var(--ds-color-text-secondary); }
+  .step-state { font-size: var(--ds-font-size-12); color: var(--ds-color-status-positive); font-weight: var(--ds-font-weight-bold); }
+  .step-actions { display: flex; flex-wrap: wrap; gap: var(--ds-space-8); margin-top: var(--ds-space-4); }
+  .url-chip { display: inline-flex; align-items: center; min-height: 36px; padding: 0 var(--ds-space-12); border-radius: var(--ds-corner-sm); background: var(--ds-color-surface-raised); font-family: var(--ds-font-mono); font-size: var(--ds-font-size-13); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ig-howto { margin: var(--ds-space-4) 0 0; padding-left: var(--ds-space-20); font-size: var(--ds-font-size-13); color: var(--ds-color-text-secondary); display: grid; gap: var(--ds-space-2); }
+  .notice { display: flex; gap: var(--ds-space-8); align-items: flex-start; padding: var(--ds-space-10) var(--ds-space-12); border-radius: var(--ds-corner-sm); background: var(--ds-color-surface-raised); font-size: var(--ds-font-size-12); color: var(--ds-color-text-secondary); }
+  .notice svg { width: 16px; height: 16px; flex: none; margin-top: var(--ds-space-2); }
+  .status-line { font-size: var(--ds-font-size-13); color: var(--ds-color-status-positive); font-weight: var(--ds-font-weight-bold); display: flex; gap: var(--ds-space-6); align-items: center; }
+  .status-line svg { width: 16px; height: 16px; }
+  .guide-done { border-color: var(--ds-color-status-positive); background: var(--ds-color-surface-default); }
+  .guide-done .guide-head h2 { display: flex; gap: var(--ds-space-8); align-items: center; }
+  .guide-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--ds-space-8); flex-wrap: wrap; font-size: var(--ds-font-size-12); color: var(--ds-color-text-subtle); }
+  .guide-foot a { color: var(--ds-color-text-secondary); }
+  .gone-note { padding: var(--ds-space-12) var(--ds-space-16); border: 1px dashed var(--ds-color-border-strong); border-radius: var(--ds-corner-md); font-size: var(--ds-font-size-12); color: var(--ds-color-text-subtle); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .step, .mark, .bar i { transition: background-color 200ms cubic-bezier(0.23, 1, 0.32, 1), border-color 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 11v6M12 7.5v.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="9" r="4" fill="currentColor"/><path d="M4 21c1-4.5 4.5-6.5 8-6.5s7 2 8 6.5" fill="currentColor"/></symbol>
+</svg>
+
+<main class="doc">
+  <header class="doc-head" data-od-id="doc-head">
+    <h1>첫 사용 안내 · 시작 안내 카드</h1>
+    <p>가입 직후 빈 랜딩의 <strong>페이지 편집</strong> 화면에 세 단계 안내 카드를 둡니다. 1280px은 편집 패널 처음 화면 맨 위, 390px은 sticky 줄 아래 랜딩 위에 놓입니다. 상태별로 1280px·390px을 나란히 그렸습니다. 문구·판정 기준·접근성은 <a href="handoff.md">handoff.md</a>가 기준입니다.</p>
+  </header>
+
+  <!-- ============ 상태 A: 0단계 완료(빈 랜딩) ============ -->
+  <section class="state" id="state-0" data-od-id="state-0" aria-labelledby="s0-title">
+    <div class="state-head">
+      <h2 id="s0-title">상태 A · 0단계 완료(가입 직후 빈 랜딩)</h2>
+      <p>공개 항목 0개. ① 단계가 현재 단계(짙은 테두리·숫자 원)이고 주요 버튼 `링크 추가`가 화면의 유일한 주요 버튼입니다. ②·③은 미리 할 수 있지만 강조하지 않습니다.</p>
+    </div>
+    <div class="row">
+      <div>
+        <p class="frame-label">1280px · 페이지 편집 처음 패널</p>
+        <div class="viewport w1280">
+          <div class="m-head">크리링 <span>로그아웃</span></div>
+          <div class="m-body">
+            <nav class="m-menu" aria-label="관리 메뉴"><a aria-current="page" href="#state-0">페이지 편집</a><a href="#state-0">프로필</a><a href="#state-0">방명록</a><a href="#state-0">주소 설정</a></nav>
+            <div class="m-stage">
+              <div class="addr"><code>crelink.me/harufilm</code><button class="btn small">복사</button><button class="btn small">공개 페이지 열기</button></div>
+              <div class="phone"><div class="landing"><div class="avatar"><svg><use href="#i-person"/></svg></div><p class="muted">아직 준비 중인 페이지예요.</p><div class="add-slot">+ 링크 추가</div><div class="add-slot">+ 포트폴리오 추가</div></div></div>
+            </div>
+            <aside class="m-panel" aria-label="편집 패널">
+              <h1>페이지 편집</h1>
+              <section class="guide" aria-labelledby="g0-title">
+                <div class="guide-head"><div><h2 id="g0-title">인스타그램에 내 크리링 걸기</h2><p>세 단계를 마치면 팔로워가 내 페이지를 볼 수 있어요.</p></div><button class="icon-btn" aria-label="시작 안내 닫기"><svg><use href="#i-close"/></svg></button></div>
+                <div class="progress"><span>0/3 완료</span><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div></div>
+                <ol class="steps">
+                  <li class="step current" aria-current="step"><span class="mark">1</span><div class="step-body"><p class="step-title">링크나 포트폴리오 1개 추가하기</p><p class="step-desc">지금은 방문자에게 ‘아직 준비 중인 페이지예요.’만 보여요.</p><div class="step-actions"><button class="btn primary">링크 추가</button><button class="btn">포트폴리오 추가</button></div></div></li>
+                  <li class="step"><span class="mark">2</span><div class="step-body"><p class="step-title">내 크리링 링크 복사하기</p><div class="step-actions"><span class="url-chip">crelink.me/harufilm</span><button class="btn small">복사</button></div></div></li>
+                  <li class="step"><span class="mark">3</span><div class="step-body"><p class="step-title">인스타그램 프로필에 붙여 넣기</p><p class="step-desc">인스타그램 앱에서 프로필 편집 &gt; 링크에 복사한 주소를 붙여 넣어요.</p></div></li>
+                </ol>
+              </section>
+              <div class="section-list"><h2>구역 선택</h2><div class="section-item"><span>외부 링크</span><span>보이는 링크 0/5</span></div><div class="section-item"><span>포트폴리오</span><span>0/20</span></div><div class="section-item"><span>방명록</span><span>켜짐</span></div></div>
+            </aside>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="frame-label">390px · 편집 모드, sticky 줄 아래</p>
+        <div class="viewport w390">
+          <div class="m-head">크리링 <span>로그아웃</span></div>
+          <nav class="n-tabs" aria-label="관리 메뉴"><a aria-current="page" href="#state-0">페이지 편집</a><a href="#state-0">프로필</a><a href="#state-0">방명록</a><a href="#state-0">주소 설정</a></nav>
+          <div class="n-bar"><code>crelink.me/harufilm</code><button class="btn small">복사</button><span class="toggle"><span>편집</span><span>미리보기</span></span></div>
+          <div class="n-content">
+            <section class="guide" aria-labelledby="g0m-title">
+              <div class="guide-head"><div><h2 id="g0m-title">인스타그램에 내 크리링 걸기</h2><p>세 단계를 마치면 팔로워가 내 페이지를 볼 수 있어요.</p></div><button class="icon-btn" aria-label="시작 안내 닫기"><svg><use href="#i-close"/></svg></button></div>
+              <div class="progress"><span>0/3 완료</span><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div></div>
+              <ol class="steps">
+                <li class="step current" aria-current="step"><span class="mark">1</span><div class="step-body"><p class="step-title">링크나 포트폴리오 1개 추가하기</p><p class="step-desc">지금은 방문자에게 ‘아직 준비 중인 페이지예요.’만 보여요.</p><div class="step-actions"><button class="btn primary">링크 추가</button><button class="btn">포트폴리오 추가</button></div></div></li>
+                <li class="step"><span class="mark">2</span><div class="step-body"><p class="step-title">내 크리링 링크 복사하기</p><div class="step-actions"><span class="url-chip">crelink.me/harufilm</span><button class="btn small">복사</button></div></div></li>
+                <li class="step"><span class="mark">3</span><div class="step-body"><p class="step-title">인스타그램 프로필에 붙여 넣기</p><p class="step-desc">인스타그램 앱에서 프로필 편집 &gt; 링크에 복사한 주소를 붙여 넣어요.</p></div></li>
+              </ol>
+            </section>
+            <div class="landing"><div class="avatar"><svg><use href="#i-person"/></svg></div><p class="muted">아직 준비 중인 페이지예요.</p><div class="add-slot">+ 링크 추가</div><div class="add-slot">+ 포트폴리오 추가</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 상태 B: 1단계 완료 ============ -->
+  <section class="state" id="state-1" data-od-id="state-1" aria-labelledby="s1-title">
+    <div class="state-head">
+      <h2 id="s1-title">상태 B · 1단계 완료(첫 링크 저장 직후)</h2>
+      <p>공개 항목 1개 이상(서버 데이터). ①은 초록 체크와 `완료 · 방문자에게 1개가 보여요`, ②가 현재 단계로 넘어가고 `복사`가 주요 버튼이 됩니다. 카드 아래 상태 줄로 넘어감을 알립니다(<code>role="status"</code>).</p>
+    </div>
+    <div class="row">
+      <div>
+        <p class="frame-label">1280px</p>
+        <div class="viewport w1280">
+          <div class="m-head">크리링 <span>로그아웃</span></div>
+          <div class="m-body">
+            <nav class="m-menu" aria-label="관리 메뉴"><a aria-current="page" href="#state-1">페이지 편집</a><a href="#state-1">프로필</a><a href="#state-1">방명록</a><a href="#state-1">주소 설정</a></nav>
+            <div class="m-stage">
+              <div class="addr"><code>crelink.me/harufilm</code><button class="btn small">복사</button><button class="btn small">공개 페이지 열기</button></div>
+              <div class="phone"><div class="landing"><div class="avatar"><svg><use href="#i-person"/></svg></div><div class="linkcard">유튜브 채널</div><div class="add-slot">+ 링크 추가</div><div class="add-slot">+ 포트폴리오 추가</div></div></div>
+            </div>
+            <aside class="m-panel" aria-label="편집 패널">
+              <h1>페이지 편집</h1>
+              <section class="guide" aria-labelledby="g1-title">
+                <div class="guide-head"><div><h2 id="g1-title">인스타그램에 내 크리링 걸기</h2><p>세 단계를 마치면 팔로워가 내 페이지를 볼 수 있어요.</p></div><button class="icon-btn" aria-label="시작 안내 닫기"><svg><use href="#i-close"/></svg></button></div>
+                <div class="progress"><span>1/3 완료</span><div class="bar" aria-hidden="true"><i class="on"></i><i></i><i></i></div></div>
+                <ol class="steps">
+                  <li class="step done"><span class="mark"><svg aria-hidden="true"><use href="#i-check"/></svg></span><div class="step-body"><p class="step-title">링크나 포트폴리오 1개 추가하기</p><p class="step-state">완료 · 방문자에게 1개가 보여요</p></div></li>
+                  <li class="step current" aria-current="step"><span class="mark">2</span><div class="step-body"><p class="step-title">내 크리링 링크 복사하기</p><p class="step-desc">인스타그램에는 이 짧은 주소를 넣어요.</p><div class="step-actions"><span class="url-chip">crelink.me/harufilm</span><button class="btn primary">복사</button></div></div></li>
+                  <li class="step"><span class="mark">3</span><div class="step-body"><p class="step-title">인스타그램 프로필에 붙여 넣기</p><p class="step-desc">인스타그램 앱에서 프로필 편집 &gt; 링크에 복사한 주소를 붙여 넣어요.</p></div></li>
+                </ol>
+                <p class="status-line" role="status"><svg aria-hidden="true"><use href="#i-check"/></svg>1단계를 마쳤어요. 이제 내 크리링 링크를 복사해요.</p>
+              </section>
+              <div class="section-list"><h2>구역 선택</h2><div class="section-item"><span>외부 링크</span><span>보이는 링크 1/5</span></div><div class="section-item"><span>포트폴리오</span><span>0/20</span></div><div class="section-item"><span>방명록</span><span>켜짐</span></div></div>
+            </aside>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="frame-label">390px</p>
+        <div class="viewport w390">
+          <div class="m-head">크리링 <span>로그아웃</span></div>
+          <nav class="n-tabs" aria-label="관리 메뉴"><a aria-current="page" href="#state-1">페이지 편집</a><a href="#state-1">프로필</a><a href="#state-1">방명록</a><a href="#state-1">주소 설정</a></nav>
+          <div class="n-bar"><code>crelink.me/harufilm</code><button class="btn small">복사</button><span class="toggle"><span>편집</span><span>미리보기</span></span></div>
+          <div class="n-content">
+            <section class="guide" aria-labelledby="g1m-title">
+              <div class="guide-head"><div><h2 id="g1m-title">인스타그램에 내 크리링 걸기</h2><p>세 단계를 마치면 팔로워가 내 페이지를 볼 수 있어요.</p></div><button class="icon-btn" aria-label="시작 안내 닫기"><svg><use href="#i-close"/></svg></button></div>
+              <div class="progress"><span>1/3 완료</span><div class="bar" aria-hidden="true"><i class="on"></i><i></i><i></i></div></div>
+              <ol class="steps">
+                <li class="step done"><span class="mark"><svg aria-hidden="true"><use href="#i-check"/></svg></span><div class="step-body"><p class="step-title">링크나 포트폴리오 1개 추가하기</p><p class="step-state">완료 · 방문자에게 1개가 보여요</p></div></li>
+                <li class="step current" aria-current="step"><span class="mark">2</span><div class="step-body"><p class="step-title">내 크리링 링크 복사하기</p><p class="step-desc">인스타그램에는 이 짧은 주소를 넣어요.</p><div class="step-actions"><span class="url-chip">crelink.me/harufilm</span><button class="btn primary">복사</button></div></div></li>
+                <li class="step"><span class="mark">3</span><div class="step-body"><p class="step-title">인스타그램 프로필에 붙여 넣기</p><p class="step-desc">인스타그램 앱에서 프로필 편집 &gt; 링크에 복사한 주소를 붙여 넣어요.</p></div></li>
+              </ol>
+              <p class="status-line" role="status"><svg aria-hidden="true"><use href="#i-check"/></svg>1단계를 마쳤어요. 이제 내 크리링 링크를 복사해요.</p>
+            </section>
+            <div class="landing"><div class="avatar"><svg><use href="#i-person"/></svg></div><div class="linkcard">유튜브 채널</div><div class="add-slot">+ 링크 추가</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 상태 C: 2단계 완료(인스타그램 안내 펼침) ============ -->
+  <section class="state" id="state-2" data-od-id="state-2" aria-labelledby="s2-title">
+    <div class="state-head">
+      <h2 id="s2-title">상태 C · 2단계 완료(③ 인스타그램 안내 펼침)</h2>
+      <p>복사 버튼을 누르면(카드·주소 막대·sticky 줄·주소 설정 어디서든) ②가 완료되고 ③이 현재 단계가 됩니다. ③은 짧은 방법과 “크리링이 대신 등록하지 않음” 안내, 사용자가 직접 누르는 `붙여 넣었어요` 확인 버튼을 보입니다.</p>
+    </div>
+    <div class="row">
+      <div>
+        <p class="frame-label">1280px · 편집 패널 부분</p>
+        <div class="viewport" style="width: 410px">
+          <aside class="m-panel" aria-label="편집 패널">
+            <h1>페이지 편집</h1>
+            <section class="guide" aria-labelledby="g2-title">
+              <div class="guide-head"><div><h2 id="g2-title">인스타그램에 내 크리링 걸기</h2><p>세 단계를 마치면 팔로워가 내 페이지를 볼 수 있어요.</p></div><button class="icon-btn" aria-label="시작 안내 닫기"><svg><use href="#i-close"/></svg></button></div>
+              <div class="progress"><span>2/3 완료</span><div class="bar" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i></div></div>
+              <ol class="steps">
+                <li class="step done"><span class="mark"><svg aria-hidden="true"><use href="#i-check"/></svg></span><div class="step-body"><p class="step-title">링크나 포트폴리오 1개 추가하기</p><p class="step-state">완료 · 방문자에게 1개가 보여요</p></div></li>
+                <li class="step done"><span class="mark"><svg aria-hidden="true"><use href="#i-check"/></svg></span><div class="step-body"><p class="step-title">내 크리링 링크 복사하기</p><p class="step-state">복사했어요 · crelink.me/harufilm</p><div class="step-actions"><button class="btn small">다시 복사</button></div></div></li>
+                <li class="step current" aria-current="step"><span class="mark">3</span><div class="step-body"><p class="step-title">인스타그램 프로필에 붙여 넣기</p>
+                  <ol class="ig-howto"><li>인스타그램 앱에서 내 프로필 &gt; 프로필 편집을 열어요.</li><li>링크 &gt; 외부 링크 추가에 복사한 주소를 붙여 넣어요.</li><li>저장한 뒤 아래 버튼을 눌러요.</li></ol>
+                  <p class="notice"><svg aria-hidden="true"><use href="#i-info"/></svg><span>크리링은 인스타그램 계정에 접속하거나 링크를 대신 등록하지 않아요. 직접 붙여 넣어 주세요.</span></p>
+                  <div class="step-actions"><button class="btn primary">붙여 넣었어요</button></div></div></li>
+              </ol>
+              <p class="status-line" role="status"><svg aria-hidden="true"><use href="#i-check"/></svg>주소를 복사했어요.</p>
+            </section>
+          </aside>
+        </div>
+      </div>
+      <div>
+        <p class="frame-label">390px · 카드 부분</p>
+        <div class="viewport w390">
+          <div class="n-content">
+            <section class="guide" aria-labelledby="g2m-title">
+              <div class="guide-head"><div><h2 id="g2m-title">인스타그램에 내 크리링 걸기</h2><p>세 단계를 마치면 팔로워가 내 페이지를 볼 수 있어요.</p></div><button class="icon-btn" aria-label="시작 안내 닫기"><svg><use href="#i-close"/></svg></button></div>
+              <div class="progress"><span>2/3 완료</span><div class="bar" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i></div></div>
+              <ol class="steps">
+                <li class="step done"><span class="mark"><svg aria-hidden="true"><use href="#i-check"/></svg></span><div class="step-body"><p class="step-title">링크나 포트폴리오 1개 추가하기</p><p class="step-state">완료 · 방문자에게 1개가 보여요</p></div></li>
+                <li class="step done"><span class="mark"><svg aria-hidden="true"><use href="#i-check"/></svg></span><div class="step-body"><p class="step-title">내 크리링 링크 복사하기</p><p class="step-state">복사했어요 · crelink.me/harufilm</p><div class="step-actions"><button class="btn small">다시 복사</button></div></div></li>
+                <li class="step current" aria-current="step"><span class="mark">3</span><div class="step-body"><p class="step-title">인스타그램 프로필에 붙여 넣기</p>
+                  <ol class="ig-howto"><li>인스타그램 앱에서 내 프로필 &gt; 프로필 편집을 열어요.</li><li>링크 &gt; 외부 링크 추가에 복사한 주소를 붙여 넣어요.</li><li>저장한 뒤 아래 버튼을 눌러요.</li></ol>
+                  <p class="notice"><svg aria-hidden="true"><use href="#i-info"/></svg><span>크리링은 인스타그램 계정에 접속하거나 링크를 대신 등록하지 않아요. 직접 붙여 넣어 주세요.</span></p>
+                  <div class="step-actions"><button class="btn primary">붙여 넣었어요</button></div></div></li>
+              </ol>
+              <p class="status-line" role="status"><svg aria-hidden="true"><use href="#i-check"/></svg>주소를 복사했어요.</p>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 상태 D: 모두 완료(사라짐 직전) ============ -->
+  <section class="state" id="state-done" data-od-id="state-done" aria-labelledby="s3-title">
+    <div class="state-head">
+      <h2 id="s3-title">상태 D · 모두 완료(사라짐 직전)</h2>
+      <p>`붙여 넣었어요`를 누르면 카드가 한 줄 완료 카드로 줄어듭니다. 자동으로 사라지지 않고 `닫기`를 누르거나 화면을 떠나면 다음부터 보이지 않습니다(상태 E).</p>
+    </div>
+    <div class="row">
+      <div>
+        <p class="frame-label">1280px · 편집 패널 부분</p>
+        <div class="viewport" style="width: 410px">
+          <aside class="m-panel" aria-label="편집 패널">
+            <h1>페이지 편집</h1>
+            <section class="guide guide-done" aria-labelledby="g3-title">
+              <div class="guide-head"><div><h2 id="g3-title"><span class="mark done" style="background: var(--ds-color-status-positive); border-color: var(--ds-color-status-positive); color: var(--ds-color-text-on-positive)"><svg aria-hidden="true"><use href="#i-check"/></svg></span>준비를 마쳤어요</h2><p role="status">이제 인스타그램 프로필에서 내 크리링으로 들어올 수 있어요. 링크를 더 채워 보세요.</p></div><button class="icon-btn" aria-label="시작 안내 닫기"><svg><use href="#i-close"/></svg></button></div>
+              <div class="guide-foot"><span>3/3 완료</span><button class="btn small">닫기</button></div>
+            </section>
+            <div class="section-list"><h2>구역 선택</h2><div class="section-item"><span>외부 링크</span><span>보이는 링크 1/5</span></div><div class="section-item"><span>포트폴리오</span><span>0/20</span></div><div class="section-item"><span>방명록</span><span>켜짐</span></div></div>
+          </aside>
+        </div>
+      </div>
+      <div>
+        <p class="frame-label">390px · 카드 부분</p>
+        <div class="viewport w390">
+          <div class="n-content">
+            <section class="guide guide-done" aria-labelledby="g3m-title">
+              <div class="guide-head"><div><h2 id="g3m-title"><span class="mark done" style="background: var(--ds-color-status-positive); border-color: var(--ds-color-status-positive); color: var(--ds-color-text-on-positive)"><svg aria-hidden="true"><use href="#i-check"/></svg></span>준비를 마쳤어요</h2><p role="status">이제 인스타그램 프로필에서 내 크리링으로 들어올 수 있어요. 링크를 더 채워 보세요.</p></div><button class="icon-btn" aria-label="시작 안내 닫기"><svg><use href="#i-close"/></svg></button></div>
+              <div class="guide-foot"><span>3/3 완료</span><button class="btn small">닫기</button></div>
+            </section>
+            <div class="landing"><div class="avatar"><svg><use href="#i-person"/></svg></div><div class="linkcard">유튜브 채널</div><div class="add-slot">+ 링크 추가</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 상태 E: 사라진 뒤 ============ -->
+  <section class="state" id="state-gone" data-od-id="state-gone" aria-labelledby="s4-title">
+    <div class="state-head">
+      <h2 id="s4-title">상태 E · 사라진 뒤(모두 완료 후 닫음, 또는 도중에 닫음)</h2>
+      <p>카드 자리가 없어지고 지금 화면(구역 목록 / 랜딩)이 그대로 위로 올라옵니다. 초점은 패널 제목 `페이지 편집`(390px은 sticky 줄의 `복사`)으로 옮깁니다. 같은 안내는 사용 안내 문서(/docs/guide `4. 크리링 링크 공유하기`)에 늘 있습니다.</p>
+    </div>
+    <div class="row">
+      <div>
+        <p class="frame-label">1280px · 편집 패널 부분</p>
+        <div class="viewport" style="width: 410px">
+          <aside class="m-panel" aria-label="편집 패널">
+            <h1>페이지 편집</h1>
+            <p>미리보기에서 고칠 곳을 눌러요.</p>
+            <div class="section-list"><h2>구역 선택</h2><div class="section-item"><span>외부 링크</span><span>보이는 링크 1/5</span></div><div class="section-item"><span>포트폴리오</span><span>0/20</span></div><div class="section-item"><span>방명록</span><span>켜짐</span></div></div>
+          </aside>
+        </div>
+      </div>
+      <div>
+        <p class="frame-label">390px</p>
+        <div class="viewport w390">
+          <div class="n-bar"><code>crelink.me/harufilm</code><button class="btn small">복사</button><span class="toggle"><span>편집</span><span>미리보기</span></span></div>
+          <div class="n-content">
+            <div class="landing"><div class="avatar"><svg><use href="#i-person"/></svg></div><div class="linkcard">유튜브 채널</div><div class="add-slot">+ 링크 추가</div></div>
+            <p class="gone-note">시안 표시: 이 자리에 있던 시작 안내 카드가 사라졌어요.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+</body>
+</html>
