@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { targetKey, type LandingEditTarget } from '../../lib/landing-edit';
-import { DRAFT_ITEM_ID, toLandingPreview } from '../../lib/landing-preview';
+import { DRAFT_ITEM_ID, previewBannerSlot, toLandingPreview, type LandingDrafts } from '../../lib/landing-preview';
 import { CopyButton } from '../CopyButton';
 import { Landing } from '../landing/Landing';
 import type { LandingEditControl } from '../landing/LandingEdit';
@@ -142,12 +142,13 @@ export function PreviewLanding({ mode, framed }: { mode: PreviewMode; framed: bo
     if (mode === 'profile') screenRef.current?.scrollTo({ top: 0 });
   }, [mode]);
 
-  const drafted = toLandingPreview(state, {
+  const drafts: LandingDrafts = {
     profile,
     socials,
     links: [...linkDrafts.values()],
     portfolio: [...portfolioDrafts.values()],
-  });
+  };
+  const drafted = toLandingPreview(state, drafts);
   // 방명록 켜기를 저장하는 동안은 탭을 그리지 않습니다(저장 전에 목록을 부르면 꺼진 랜딩의 404를 받음).
   const landing = guestbookAction.pending ? { ...drafted, guestbookEnabled: false } : drafted;
 
@@ -165,6 +166,7 @@ export function PreviewLanding({ mode, framed }: { mode: PreviewMode; framed: bo
     if (dirty.link) dirtyKeys.add('links');
     if (dirty.portfolio) dirtyKeys.add('portfolio');
     if (dirty.profile || dirty.socials) dirtyKeys.add('profile');
+    const slot = previewBannerSlot(state, drafts);
     edit = {
       selectedKey: selection ? targetKey(selection) : null,
       onSelect: (target: LandingEditTarget, trigger: HTMLElement) => {
@@ -173,6 +175,7 @@ export function PreviewLanding({ mode, framed }: { mode: PreviewMode; framed: bo
       dirtyKeys,
       linkAddNotice: linkLimitNotice(state.limits),
       canAddPortfolio: state.portfolio.length < CRELINK_LIMITS.portfolioItems,
+      slotPlaceholder: slot.hidden === 'no_banners' ? { kind: slot.kind, afterLinkCount: slot.afterLinkCount } : null,
     };
   }
 

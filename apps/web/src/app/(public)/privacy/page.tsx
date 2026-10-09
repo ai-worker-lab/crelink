@@ -6,8 +6,8 @@ export const metadata: Metadata = { title: '개인정보 처리방침' };
 
 /**
  * 개인정보 수집·보관·국외 이전 고지(R9·R11·R19, Sentry). 근거: docs/specs/crelink-mvp.md `권한·보안·개인정보`,
- * docs/specs/crelink-guestbook.md `권한·보안·개인정보`, docs/adr/0012-error-monitoring-sentry.md,
- * docs/adr/0014-sentry-free-plan-features.md. 법률 검토 전 문구입니다.
+ * docs/specs/crelink-guestbook.md `권한·보안·개인정보`, docs/specs/crelink-ad-banner.md `권한·보안·개인정보`(배너 클릭·광고 노출 수),
+ * docs/adr/0012-error-monitoring-sentry.md, docs/adr/0014-sentry-free-plan-features.md. 법률 검토 전 문구입니다.
  */
 export default function PrivacyPage() {
   return (
@@ -24,8 +24,9 @@ export default function PrivacyPage() {
         <section aria-labelledby="privacy-visitor">
           <h2 id="privacy-visitor">방문자에게서 수집하는 항목</h2>
           <p>
-            크리에이터의 크리링 링크(단축 주소)로 들어오거나 랜딩페이지의 외부 링크를 누르면 다음을 기록해요. 다른
-            사이트나 메신저에서 랜딩페이지 주소로 바로 들어와도 크리링 링크를 거쳐 열리므로 같은 항목이 기록돼요.
+            크리에이터의 크리링 링크(단축 주소)로 들어오거나 랜딩페이지의 외부 링크·크리에이터 배너를 누르면 다음을
+            기록해요. 다른 사이트나 메신저에서 랜딩페이지 주소로 바로 들어와도 크리링 링크를 거쳐 열리므로 같은 항목이
+            기록돼요.
           </p>
           <ul>
             <li>접근 시각과 접근한 크리링 링크(단축 주소)</li>
@@ -34,7 +35,16 @@ export default function PrivacyPage() {
             <li>IP 주소 원문과 IP로 추정한 대략적인 위치(국가·도시 수준)</li>
             <li>재방문을 구분하는 방문자 식별 쿠키 값</li>
             <li>랜딩페이지에서 누른 외부 링크와 누른 시각</li>
+            <li>랜딩페이지에서 누른 크리에이터 배너와 누른 시각(외부 링크와 같은 항목을 함께 기록해요)</li>
           </ul>
+        </section>
+
+        <section aria-labelledby="privacy-ad-banner">
+          <h2 id="privacy-ad-banner">크리링 광고 노출·클릭 수</h2>
+          <p>
+            랜딩페이지의 크리링 광고 블록이 보이거나 눌리면 날짜·랜딩페이지·광고 배너별 횟수만 세어요. 누가 보거나
+            눌렀는지 알아볼 수 있는 정보(IP 주소·방문자 식별 쿠키·기기 정보)는 이 기록에 남기지 않아요.
+          </p>
         </section>
 
         <section aria-labelledby="privacy-creator">
@@ -105,6 +115,7 @@ export default function PrivacyPage() {
             <li>위험한 링크 차단 등 서비스 운영과 부정 이용 방지</li>
             <li>서비스 오류 파악과 성능 개선, 이용자 의견 확인(오류·성능 진단 정보)</li>
             <li>크리에이터 랜딩페이지 방명록 제공</li>
+            <li>크리링 광고 블록 운영(광고 배너별 노출·클릭 수 집계, 크리링 운영자만 조회)</li>
           </ul>
         </section>
 
@@ -112,13 +123,14 @@ export default function PrivacyPage() {
           <h2 id="privacy-retention">보관 기간</h2>
           <ul>
             <li>
-              접근 기록 원본(IP 주소 원문 포함)은 {CRELINK_LIMITS.rawLogRetentionDays / 365}년 보관한 뒤 자동으로
-              지워요.
+              접근 기록 원본(IP 주소 원문 포함, 크리에이터 배너 클릭 기록 포함)은{' '}
+              {CRELINK_LIMITS.rawLogRetentionDays / 365}년 보관한 뒤 자동으로 지워요.
             </li>
             <li>
-              지우기 전에 날짜별 합계(방문 수·순 방문자 수·클릭 수와 항목별 분포)를 만들어 계속 보관해요. 합계에는 IP
-              주소를 넣지 않아요.
+              지우기 전에 날짜별 합계(방문 수·순 방문자 수·클릭 수와 항목별 분포, 배너별 클릭 수)를 만들어 계속
+              보관해요. 합계에는 IP 주소를 넣지 않아요.
             </li>
+            <li>크리링 광고 노출·클릭 수는 개인을 알아볼 수 있는 정보가 없는 합계라 계속 보관해요.</li>
             <li>크리에이터 계정 정보와 입력한 내용은 계정을 이용하는 동안 보관해요.</li>
             <li>
               방명록 글은 작성자가 지울 때까지 보관해요. 크리에이터가 방명록을 꺼도 글은 지우지 않고 보관하며, 다시 켜면

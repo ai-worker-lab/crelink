@@ -3,8 +3,9 @@
 import { CRELINK_LIMITS } from '@crelink/shared';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { targetKey, type LandingEditTarget } from '../../lib/landing-edit';
+import { sectionOfKey, targetKey, type LandingEditTarget } from '../../lib/landing-edit';
 import { draftKey } from '../../lib/landing-preview';
+import { slotPositionLabel } from '../../lib/slot-order';
 import { useAction } from '../../lib/use-action';
 import { useWideLayout } from '../../lib/use-wide-layout';
 import { ActionStatus } from '../ActionStatus';
@@ -19,10 +20,11 @@ import { useManager } from './ManagerContext';
 import { managerHref, managerMenuLabel } from './menu';
 
 /**
- * `페이지 편집` 메뉴(디자인 design/preview-direct-edit/handoff.md `페이지 편집 상호작용`). 미리보기(`ManagerPreview`)나 구역 목록에서
- * 고른 대상(`selection`)에 따라 편집 패널이 구역 목록 → 외부 링크·링크 폼·포트폴리오·항목 폼·방명록·프로필 안내로 바뀝니다.
- * 1024px 이상은 오른쪽 패널(머리 `← 전체`), 1023px 이하는 하단 시트입니다. 고르면 초점은 패널 제목(시트는 첫 입력)으로,
- * 처음 패널로 돌아오면 처음 고른 요소로 돌아갑니다.
+ * `페이지 편집` 메뉴(디자인 design/preview-direct-edit/handoff.md `페이지 편집 상호작용`, design/ad-banner-block/handoff.md). 미리보기(`ManagerPreview`)나
+ * 구역 목록에서 고른 대상(`selection`)에 따라 편집 패널이 구역 목록 → 외부 링크·링크 폼·광고 블록·배너 슬롯·포트폴리오·항목 폼·방명록·
+ * 프로필 안내로 바뀝니다. 1024px 이상은 오른쪽 패널(머리 `← 전체`), 1023px 이하는 하단 시트입니다. 고르면 초점은 패널 제목(시트는 첫 입력)으로,
+ * 처음 패널로 돌아오면 처음 고른 요소로 돌아갑니다. 예외로 광고 블록 패널의 `외부 링크 목록에서 끌어 옮기기`는 외부 링크 패널을 열고
+ * 초점을 광고 행 손잡이로 옮깁니다.
  */
 export function PageEditor() {
   const wide = useWideLayout();
@@ -45,9 +47,12 @@ export function PageEditor() {
   const overviewRef = useRef<HTMLHeadingElement>(null);
   const key = selection ? targetKey(selection) : null;
   const [seenKey, setSeenKey] = useState(key);
+  /** `외부 링크 목록에서 끌어 옮기기`로 외부 링크 패널을 열었는지(초점을 패널 제목 대신 슬롯 행 손잡이로). */
+  const [slotHandleFocus, setSlotHandleFocus] = useState(false);
   if (seenKey !== key) {
     setSeenKey(key);
     formAction.setError(null);
+    if (key !== 'links') setSlotHandleFocus(false);
   }
   // 다른 메뉴로 옮기면 고른 대상을 지웁니다(초안은 남음). 돌아오면 처음 패널부터.
   useEffect(() => resetSelection, [resetSelection]);
@@ -73,7 +78,9 @@ export function PageEditor() {
     shownKey.current = key;
     if (!wide || previous === undefined || previous === key) return;
     if (key) {
-      titleRef.current?.focus({ preventScroll: true });
+      const handle =
+        key === 'links' && slotHandleFocus ? document.querySelector<HTMLElement>('[data-slot-handle]') : null;
+      (handle ?? titleRef.current)?.focus({ preventScroll: !handle });
       return;
     }
     // 처음 고른 요소로 돌려줍니다. 처음 패널의 구역 목록 버튼은 다시 그려져 끊겨 있으므로 같은 구역 버튼을 찾습니다.
@@ -85,7 +92,7 @@ export function PageEditor() {
     if (trigger?.isConnected) trigger.focus({ preventScroll: true });
     else if (sectionButton) sectionButton.focus({ preventScroll: true });
     else overviewRef.current?.focus({ preventScroll: true });
-  }, [key, wide, takeEntryTrigger]);
+  }, [key, wide, takeEntryTrigger, slotHandleFocus]);
 
   // 고치던 항목이 사라졌으면(다른 곳에서 지움) 처음 패널로 돌아갑니다.
   const link = selection?.kind === 'link' && selection.id ? state.links.find((item) => item.id === selection.id) : null;
@@ -93,9 +100,16 @@ export function PageEditor() {
     selection?.kind === 'portfolio-item' && selection.id
       ? state.portfolio.find((entry) => entry.id === selection.id)
       : null;
+  const banner =
+    selection?.kind === 'banner' && selection.id ? state.banners.find((entry) => entry.id === selection.id) : null;
+  const creatorSlot = state.slot.kind === 'creator';
+  // 슬롯이 부여·회수되어 종류가 바뀌었으면 그 패널도 사라진 것으로 봅니다.
   const missing =
     (selection?.kind === 'link' && selection.id !== null && !link) ||
-    (selection?.kind === 'portfolio-item' && selection.id !== null && !item);
+    (selection?.kind === 'portfolio-item' && selection.id !== null && !item) ||
+    (selection?.kind === 'ad-slot' && creatorSlot) ||
+    ((selection?.kind === 'banner-slot' || selection?.kind === 'banner') && !creatorSlot) ||
+    (selection?.kind === 'banner' && selection.id !== null && !banner);
   useEffect(() => {
     if (missing) select(null);
   }, [missing, select]);
@@ -139,7 +153,28 @@ export function PageEditor() {
   switch (selection.kind) {
     case 'links':
       title = '외부 링크';
-      body = <LinksSection notice={doneNotice?.key === formKey ? doneNotice.text : null} />;
+      body = (
+        <LinksSection notice={doneNotice?.key === formKey ? doneNotice.text : null} focusSlotHandle={slotHandleFocus} />
+      );
+      break;
+    case 'ad-slot':
+      title = '광고 블록';
+      help = '크리링 광고가 나오는 자리예요. 지우거나 숨길 수 없고, 링크 사이 원하는 위치로 옮길 수 있어요.';
+      body = (
+        <AdSlotPanel
+          onMove={() => {
+            setSlotHandleFocus(true);
+            go({ kind: 'links' });
+          }}
+        />
+      );
+      break;
+    case 'banner-slot':
+    case 'banner':
+      // 배너 목록(T15)·배너 폼(T16)이 이 패널을 채웁니다. 지금은 한도 배지와 보이는 배너 0장 안내만 둡니다.
+      title = selection.kind === 'banner' ? (banner ? `배너 · ${banner.alt}` : '새 배너') : '배너 슬롯';
+      help = '링크 사이에 넣는 내 배너예요. 여러 장이면 방문자가 넘겨 봐요.';
+      body = <BannerSlotPanel />;
       break;
     case 'link':
       title = link ? `링크 · ${link.title}` : '새 링크';
@@ -233,10 +268,43 @@ export function PageEditor() {
   );
 }
 
-/** 대상 열쇠(`targetKey`)가 속한 구역(`links`·`portfolio`·`guestbook`·`profile`). 돌아올 때 초점 받을 버튼·이름표를 찾는 데 씁니다. */
-function sectionOfKey(key: string): string {
-  const kind = key.split(':')[0];
-  return kind === 'link' ? 'links' : kind === 'portfolio-item' ? 'portfolio' : kind;
+/** 광고 블록 패널: 지금 위치, `외부 링크 목록에서 끌어 옮기기`, 한도 안내, 게시 0장 안내(디자인 design/ad-banner-block/handoff.md). */
+function AdSlotPanel({ onMove }: { onMove: () => void }) {
+  const { state } = useManager();
+  return (
+    <>
+      <p className="slot-position">
+        지금 위치 <strong>{slotPositionLabel(state.slot.slotIndex, state.links.length)}</strong>
+      </p>
+      <button type="button" className="secondary" onClick={onMove}>
+        외부 링크 목록에서 끌어 옮기기
+      </button>
+      <p className="section-help">광고 블록은 보이는 링크 한도({state.limits.visibleMax}개)에 들지 않아요.</p>
+      {state.adBanners.length === 0 ? (
+        <p className="notice-box">지금은 게시 중인 크리링 광고가 없어 방문자에게 보이지 않아요.</p>
+      ) : null}
+    </>
+  );
+}
+
+/** 배너 슬롯 패널 머리 부분: 보이는 배너·보관 한도 배지(링크 한도와 따로)와 보이는 배너 0장 안내. */
+function BannerSlotPanel() {
+  const { bannerLimits } = useManager().state;
+  return (
+    <>
+      <div className="panel-badges">
+        <p className={`limit-badge${bannerLimits.visibleUsed >= bannerLimits.visibleMax ? ' limit-full' : ''}`}>
+          보이는 배너 {bannerLimits.visibleUsed}/{bannerLimits.visibleMax}장
+        </p>
+        <p className={`limit-badge${bannerLimits.totalUsed >= bannerLimits.totalMax ? ' limit-full' : ''}`}>
+          숨긴 배너 포함 전체 {bannerLimits.totalUsed}/{bannerLimits.totalMax}장
+        </p>
+      </div>
+      {bannerLimits.visibleUsed === 0 ? (
+        <p className="notice-box">보이는 배너가 없어 방문자 화면에서 배너 슬롯이 보이지 않아요.</p>
+      ) : null}
+    </>
+  );
 }
 
 /**
@@ -245,7 +313,7 @@ function sectionOfKey(key: string): string {
  */
 function PageOverview({ headingRef }: { headingRef: React.RefObject<HTMLHeadingElement | null> }) {
   const { state, select, dirty } = useManager();
-  const { limits } = state;
+  const { limits, slot, bannerLimits } = state;
   const rows: Array<{ target: LandingEditTarget; title: string; meta: string; dirty: boolean }> = [
     {
       target: { kind: 'links' },
@@ -253,6 +321,19 @@ function PageOverview({ headingRef }: { headingRef: React.RefObject<HTMLHeadingE
       meta: `보이는 링크 ${limits.visibleUsed}/${limits.visibleMax}`,
       dirty: dirty.link,
     },
+    slot.kind === 'ad'
+      ? {
+          target: { kind: 'ad-slot' },
+          title: '광고 블록',
+          meta: slotPositionLabel(slot.slotIndex, state.links.length),
+          dirty: false,
+        }
+      : {
+          target: { kind: 'banner-slot' },
+          title: '배너 슬롯',
+          meta: `보이는 배너 ${bannerLimits.visibleUsed}/${bannerLimits.visibleMax}장 · 전체 ${bannerLimits.totalUsed}장`,
+          dirty: false,
+        },
     {
       target: { kind: 'portfolio' },
       title: '포트폴리오',

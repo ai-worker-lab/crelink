@@ -1881,6 +1881,186 @@ button.add-slot:hover,
   cursor: default;
 }
 
+/*
+ * 광고 블록·배너 슬롯(`BannerCarousel.tsx`, 디자인 design/ad-banner-block/handoff.md `공개 랜딩`). 링크 카드와 같은 흰 카드 틀(안쪽 여백 8) 안에
+ * 3:1 배너 가로 scroll-snap 트랙과 높이 44 조작 줄(`광고` 배지 · 위치 · 이전 · 다음 · 멈춤). 폭이 좁아 조작 줄이 넘치면 위치 표시만 숨긴다.
+ * 트랙 안 초점 링은 잘리지 않게 안쪽으로 그린다. 자동 넘김·반복 애니메이션은 없다.
+ */
+.banner-carousel {
+  position: relative;
+  container-type: inline-size;
+  padding: var(--ds-space-8);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-lg);
+  background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
+  transition: border-color 150ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.banner-carousel:has(.banner-link:hover) {
+  border-color: var(--ds-color-text-primary);
+}
+.banner-carousel:focus-visible {
+  outline: 3px solid var(--ds-color-text-primary);
+  outline-offset: 2px;
+}
+.banner-track {
+  position: relative;
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border-radius: var(--ds-corner-md);
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.banner-track::-webkit-scrollbar {
+  display: none;
+}
+.banner-slide {
+  flex: 0 0 100%;
+  min-width: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.banner-frame {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ds-corner-md);
+  background: transparent;
+  color: inherit;
+}
+.banner-frame:focus-visible,
+.banner-frame.edit-item.is-selected {
+  outline: 3px solid var(--ds-color-text-primary);
+  outline-offset: -3px;
+  box-shadow: none;
+}
+.banner-picture {
+  display: block;
+}
+.banner-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 1;
+  border-radius: var(--ds-corner-md);
+  background: var(--ds-color-surface-raised);
+  object-fit: cover;
+  object-position: center;
+}
+.banner-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ds-space-6);
+  min-height: 44px;
+  margin-top: var(--ds-space-8);
+}
+.banner-ad-badge {
+  flex: none;
+  margin-right: auto;
+  padding: var(--ds-space-2) var(--ds-space-8);
+  border: 1px solid var(--ds-color-border-strong);
+  border-radius: var(--ds-corner-sm);
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-12);
+  font-weight: var(--ds-font-weight-bold);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.banner-position {
+  margin-right: var(--ds-space-2);
+  color: var(--ds-color-text-secondary);
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-font-size-12);
+  white-space: nowrap;
+}
+.banner-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-full);
+  background: var(--ds-color-surface-default);
+  color: var(--ds-color-text-primary);
+  cursor: pointer;
+}
+.banner-button:hover:not(:disabled) {
+  border-color: var(--ds-color-text-primary);
+}
+.banner-button:disabled {
+  color: var(--ds-color-text-subtle);
+  cursor: default;
+}
+.banner-button:focus-visible {
+  outline: 3px solid var(--ds-color-text-primary);
+  outline-offset: 2px;
+}
+@container (max-width: 250px) {
+  .banner-position {
+    display: none;
+  }
+}
+/* 움직임 줄이기 설정이면 정지 이미지를 보이므로 멈춤 버튼(과 그것만 있는 조작 줄)을 숨긴다(서버 렌더와 첫 그림이 같도록 CSS로만). */
+@media (prefers-reduced-motion: reduce) {
+  .banner-pause,
+  .banner-controls.is-pause-only {
+    display: none;
+  }
+}
+/* 이미지를 모두 불러오지 못해 캐러셀이 사라진 자리는 간격도 남기지 않는다. */
+.banner-slot-item:empty {
+  display: none;
+}
+/* 관리 미리보기의 숨은 광고 블록·배너 슬롯 점선 자리. */
+.banner-placeholder {
+  margin: 0;
+  padding: var(--ds-space-16);
+  border: 1px dashed var(--ds-color-border-strong);
+  border-radius: var(--ds-corner-lg);
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-13);
+  text-align: center;
+}
+/* 외부 링크 패널의 광고 블록·배너 슬롯 행: 링크 행과 같은 모양이지만 카드 자체는 누를 수 없다. */
+.link-edit-row > .slot-edit-card,
+.link-edit-row > .slot-edit-card:hover {
+  border-color: var(--ds-color-border-default);
+  cursor: default;
+}
+.slot-edit-card .banner-ad-badge {
+  margin-right: 0;
+}
+.drag-handle[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+.slot-position {
+  margin: 0 0 var(--ds-space-12);
+}
+/* 편집 칩 꼬리: 1023px 이하에서는 짧은 말(`광고 블록 · 위치`). */
+.edit-tag-narrow {
+  display: none;
+}
+@media (max-width: 1023px) {
+  .edit-tag-wide {
+    display: none;
+  }
+  .edit-tag-narrow {
+    display: inline;
+  }
+}
+.skeleton-banner {
+  display: block;
+  margin: 200px var(--ds-space-20) 0;
+  aspect-ratio: 3 / 1;
+  border-radius: var(--ds-corner-lg);
+  background: var(--ds-color-border-default);
+}
+
 /* 1023px 이하 탭 아래 sticky 줄: 단축 주소 · 복사 · 공개 페이지 열기 · `편집 | 미리보기`. */
 .narrow-bar {
   position: sticky;

@@ -1,5 +1,12 @@
 // 관리 화면 실시간 미리보기의 초안 덮어쓰기(PRD R18). 실행: pnpm --filter @crelink/web test
-import type { CreatorLandingState, LinkView, PortfolioItemView, PublicLandingView } from '@crelink/shared';
+import type {
+  CreatorBannerView,
+  CreatorLandingState,
+  LinkView,
+  PortfolioItemView,
+  PublicBannerView,
+  PublicLandingView,
+} from '@crelink/shared';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -9,10 +16,34 @@ import {
   isSocialsDirty,
   linkDraftOf,
   portfolioDraftOf,
+  previewBannerSlot,
   profileDraftOf,
   socialRowsOf,
   toLandingPreview,
 } from './landing-preview.ts';
+
+const adBanner = (id: string, still: string | null = null): PublicBannerView => ({
+  id,
+  imageUrl: `/img/${id}`,
+  stillImageUrl: still,
+  alt: `광고 ${id}`,
+  clickUrl: `https://${id}.ad.example.com/`,
+});
+
+function creatorBanner(id: string, patch: Partial<CreatorBannerView> = {}): CreatorBannerView {
+  return {
+    id,
+    image: { fileId: `f-${id}`, url: `/img/${id}` },
+    stillImage: null,
+    alt: `배너 ${id}`,
+    url: null,
+    hidden: false,
+    blocked: false,
+    blockedReason: null,
+    position: 0,
+    ...patch,
+  };
+}
 
 function link(id: string, patch: Partial<LinkView> = {}): LinkView {
   return {
@@ -187,4 +218,64 @@ test('저장 안 함 판정은 저장 규칙(앞뒤 공백 자름)을 따르고,
   assert.equal(isLinkDraftDirty(saved.links, linkDraftOf(saved.links[0])), false);
   assert.equal(isLinkDraftDirty(saved.links, { ...linkDraftOf(saved.links[0]), description: '추가' }), true);
   assert.equal(isLinkDraftDirty(saved.links, linkDraftOf(null)), false);
+});
+
+test('광고 블록: 게시 중 배너가 있으면 slot을 싣고, afterLinkCount는 숨김·차단 포함 전체 순서의 slotIndex 앞 보이는 링크 수', () => {
+  // 링크 순서 a, h(숨김), b(차단), c. slotIndex 3 = c 앞 → 보이는 링크 a 하나 다음.
+  const view = toLandingPreview(
+    state({ adBanners: [adBanner('x'), adBanner('y')], slot: { kind: 'ad', slotIndex: 3, grantedAt: null } }),
+  );
+  assert.deepEqual(view.blocks[0].slot, { kind: 'ad', afterLinkCount: 1, banners: [adBanner('x'), adBanner('y')] });
+  const front = toLandingPreview(
+    state({ adBanners: [adBanner('x')], slot: { kind: 'ad', slotIndex: 0, grantedAt: null } }),
+  );
+  assert.equal(front.blocks[0].slot?.afterLinkCount, 0);
+  const back = toLandingPreview(state({ adBanners: [adBanner('x')] }));
+  assert.equal(back.blocks[0].slot?.afterLinkCount, 2);
+});
+
+test('게시 0장이면 slot null이고 미리보기 점선 자리(no_banners)는 위치를 유지한다', () => {
+  const saved = state({ slot: { kind: 'ad', slotIndex: 1, grantedAt: null } });
+  assert.equal(toLandingPreview(saved).blocks[0].slot, null);
+  const slot = previewBannerSlot(saved);
+  assert.equal(slot.hidden, 'no_banners');
+  assert.equal(slot.afterLinkCount, 1);
+});
+
+test('광고는 보이는 링크·포트폴리오가 없으면 no_content, 새 링크 초안이 있으면 보이고 슬롯이 맨 뒤면 초안도 슬롯 앞', () => {
+  const bare = state({ links: [link('h', { hidden: true })], portfolio: [], adBanners: [adBanner('x')] });
+  assert.equal(previewBannerSlot(bare).hidden, 'no_content');
+  assert.equal(toLandingPreview(bare).blocks[0].slot, null);
+  const drafted = previewBannerSlot(bare, { links: [{ ...linkDraftOf(null), title: '새 링크' }] });
+  assert.equal(drafted.hidden, null);
+  assert.equal(drafted.afterLinkCount, 1);
+  const portfolioOnly = previewBannerSlot(bare, { portfolio: [{ ...portfolioDraftOf(null), title: '새 작업' }] });
+  assert.equal(portfolioOnly.hidden, null);
+});
+
+test('배너 슬롯은 숨김·차단 배너를 빼고 저장된 URL·정지 이미지를 싣고, 빈 랜딩에서도 보인다', () => {
+  const granted = state({
+    links: [],
+    portfolio: [],
+    slot: { kind: 'creator', slotIndex: null, grantedAt: '2026-10-09T00:00:00.000Z' },
+    adBanners: [adBanner('x')],
+    banners: [
+      creatorBanner('b1', { url: 'https://me.example.com/', stillImage: { fileId: 's1', url: '/img/s1' } }),
+      creatorBanner('b2', { hidden: true }),
+      creatorBanner('b3', { blocked: true, blockedReason: '피싱' }),
+    ],
+  });
+  assert.deepEqual(toLandingPreview(granted).blocks[0].slot, {
+    kind: 'creator',
+    afterLinkCount: 0,
+    banners: [
+      { id: 'b1', imageUrl: '/img/b1', stillImageUrl: '/img/s1', alt: '배너 b1', clickUrl: 'https://me.example.com/' },
+    ],
+  });
+  const allHidden = state({
+    slot: { kind: 'creator', slotIndex: 0, grantedAt: '2026-10-09T00:00:00.000Z' },
+    banners: [creatorBanner('b2', { hidden: true })],
+  });
+  assert.equal(previewBannerSlot(allHidden).hidden, 'no_banners');
+  assert.equal(previewBannerSlot(allHidden).kind, 'creator');
 });

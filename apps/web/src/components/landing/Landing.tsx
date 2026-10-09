@@ -1,11 +1,12 @@
-import type { PublicLandingView } from '@crelink/shared';
+import type { PublicBannerSlotView, PublicLandingView } from '@crelink/shared';
 import { SOCIAL_PLATFORM_LABELS } from '../../lib/format';
 import { DRAFT_ITEM_ID } from '../../lib/landing-preview';
 import { DefaultAvatar } from '../DefaultAvatar';
 import { Favicon } from '../Favicon';
 import { RemoteImage } from '../RemoteImage';
 import { SocialIcon } from '../SocialIcon';
-import { AddSlot, EditItem, EditRegion, type LandingEditControl } from './LandingEdit';
+import { BannerCarousel, BannerPicture } from './BannerCarousel';
+import { AddSlot, EditItem, EditItemTag, EditRegion, type LandingEditControl } from './LandingEdit';
 import { LandingTabs, type LandingTabsControl } from './LandingTabs';
 
 /**
@@ -13,9 +14,12 @@ import { LandingTabs, type LandingTabsControl } from './LandingTabs';
  * 관리 화면(`/me/landings/{publicId}/…`)의 실시간 미리보기가 같은 구성 요소를 씁니다.
  * 방명록을 켠 랜딩(`guestbookEnabled`)은 프로필 머리·SNS 아래에 `링크`·`방명록` 탭(`LandingTabs`)을 두고 링크·포트폴리오를
  * `링크` 탭 안에 그립니다. 끈 랜딩은 탭 없이 그대로입니다(PRD R19).
+ * 첫 리스트 구역의 `slot`(광고 블록·배너 슬롯, PRD R20·R21)은 링크 목록 `ul` 안 `afterLinkCount` 자리의 `li`에 `BannerCarousel`로 그립니다.
+ * `slot`이 없거나 null이면 그리지 않습니다. 슬롯만 있는 랜딩도 링크 목록을 그리고 빈 랜딩으로 보지 않습니다.
  * `preview`를 주면(관리 화면 미리보기) 탭은 그 값을 따르고 주소 해시를 바꾸지 않으며 방명록은 방문자 시점으로 그립니다.
  * 미리보기 안 링크 누르기를 막는 것은 감싸는 쪽이 맡습니다.
  * `edit`를 주면(관리 화면 `페이지 편집`) 구역·항목을 고르는 층(`LandingEdit.tsx`)을 그리고, 비어 있어도 추가 자리를 둡니다.
+ * 숨긴 슬롯(`edit.slotPlaceholder`)은 그 위치에 점선 자리로 그립니다.
  * 관리 화면처럼 페이지 제목이 따로 있으면 `headingLevel={2}`로 크리에이터 이름을 h2로 내립니다.
  */
 export function Landing({
@@ -31,44 +35,72 @@ export function Landing({
 }) {
   const Heading = headingLevel === 1 ? 'h1' : 'h2';
   const links = landing.blocks.flatMap((block) => block.links);
-  const hasLinkContent = landing.portfolio.length > 0 || links.length > 0;
+  // 옛 API(Blue/Green 겹침 구간)는 slot을 보내지 않습니다.
+  const slot = landing.blocks[0]?.slot ?? null;
+  const hasLinkContent = landing.portfolio.length > 0 || links.length > 0 || slot !== null;
   const empty =
     !landing.displayName && !landing.bio && !landing.avatarUrl && landing.socials.length === 0 && !hasLinkContent;
 
-  const linkList =
-    links.length > 0 ? (
-      <ul className="link-list">
-        {links.map((link) => {
-          const content = (
-            <LinkCardContent
-              title={link.title}
-              description={link.description}
-              thumbnailUrl={link.thumbnailUrl}
-              faviconUrl={link.faviconUrl}
-            />
-          );
-          return (
-            <li key={link.id} className={edit ? 'edit-item-slot' : undefined}>
-              {edit ? (
-                <EditItem
-                  edit={edit}
-                  target={{ kind: 'link', id: link.id === DRAFT_ITEM_ID ? null : link.id }}
-                  kindLabel="링크"
-                  title={link.title}
-                  className="link-card"
-                >
-                  {content}
-                </EditItem>
-              ) : (
-                <a className="link-card" href={link.clickUrl} rel="noopener">
-                  {content}
-                </a>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    ) : null;
+  const linkItems = links.map((link) => {
+    const content = (
+      <LinkCardContent
+        title={link.title}
+        description={link.description}
+        thumbnailUrl={link.thumbnailUrl}
+        faviconUrl={link.faviconUrl}
+      />
+    );
+    return (
+      <li key={link.id} className={edit ? 'edit-item-slot' : undefined}>
+        {edit ? (
+          <EditItem
+            edit={edit}
+            target={{ kind: 'link', id: link.id === DRAFT_ITEM_ID ? null : link.id }}
+            kindLabel="링크"
+            title={link.title}
+            className="link-card"
+          >
+            {content}
+          </EditItem>
+        ) : (
+          <a className="link-card" href={link.clickUrl} rel="noopener">
+            {content}
+          </a>
+        )}
+      </li>
+    );
+  });
+  const placeholder = edit?.slotPlaceholder ?? null;
+  const slotContent = slot ? (
+    <BannerSlot slot={slot} displayName={landing.displayName} edit={edit} />
+  ) : edit && placeholder ? (
+    <EditRegion
+      edit={edit}
+      target={{ kind: placeholder.kind === 'ad' ? 'ad-slot' : 'banner-slot' }}
+      label={placeholder.kind === 'ad' ? '광고 블록' : '배너 슬롯'}
+      tail={placeholder.kind === 'ad' ? '위치 이동' : undefined}
+      narrowTail={placeholder.kind === 'ad' ? '위치' : undefined}
+      buttonLabel={placeholder.kind === 'ad' ? '광고 블록 위치 안내' : '배너 슬롯 편집'}
+    >
+      <p className="banner-placeholder">
+        {placeholder.kind === 'ad'
+          ? '광고 블록 · 지금은 게시 중인 크리링 광고가 없어 방문자에게 보이지 않아요'
+          : '배너 슬롯 · 보이는 배너가 없어 방문자에게 보이지 않아요'}
+      </p>
+    </EditRegion>
+  ) : null;
+  if (slotContent) {
+    const at = Math.min(slot?.afterLinkCount ?? placeholder?.afterLinkCount ?? 0, landing.blocks[0]?.links.length ?? 0);
+    linkItems.splice(
+      at,
+      0,
+      <li key="banner-slot" className="banner-slot-item">
+        {slotContent}
+      </li>,
+    );
+  }
+
+  const linkList = linkItems.length > 0 ? <ul className="link-list">{linkItems}</ul> : null;
 
   const portfolioList =
     landing.portfolio.length > 0 ? (
@@ -221,6 +253,92 @@ export function Landing({
         (tabs ?? linkContent)
       )}
     </article>
+  );
+}
+
+/**
+ * 광고 블록·배너 슬롯 한 개(디자인 design/ad-banner-block/handoff.md `공개 랜딩`). 장마다 연결 주소가 있으면 이미지 전체가 링크(같은 창),
+ * 없으면 누를 수 없는 이미지입니다. 관리 화면 `페이지 편집`(`edit`)에서는 링크를 그리지 않고, 광고 블록은 영역(`광고 블록 · 위치 이동`)으로,
+ * 배너 슬롯은 영역(`배너 슬롯 · 편집`)과 장마다 고르기 버튼(`배너 · <대체 문구>`)으로 감쌉니다. 이전·다음·멈춤 버튼은 그대로 동작합니다.
+ */
+function BannerSlot({
+  slot,
+  displayName,
+  edit,
+}: {
+  slot: PublicBannerSlotView;
+  displayName: string | null;
+  edit?: LandingEditControl;
+}) {
+  const ad = slot.kind === 'ad';
+  const carousel = (
+    <BannerCarousel
+      // 미리보기에서 배너 목록이 바뀌면 지금 장·실패 장을 처음부터 셉니다.
+      key={slot.banners.map((banner) => banner.id).join(' ')}
+      label={ad ? '크리링 광고' : `${displayName ?? '크리에이터'} 배너`}
+      ad={ad}
+      animated={slot.banners.map((banner) => banner.stillImageUrl !== null)}
+      slideTags={
+        edit && !ad
+          ? slot.banners.map((banner) => (
+              <EditItemTag
+                key={banner.id}
+                edit={edit}
+                target={{ kind: 'banner', id: banner.id }}
+                kindLabel="배너"
+                title={banner.alt}
+              />
+            ))
+          : undefined
+      }
+    >
+      {slot.banners.map((banner, index) => {
+        const picture = (
+          <BannerPicture src={banner.imageUrl} still={banner.stillImageUrl} alt={banner.alt} eager={index === 0} />
+        );
+        if (edit && !ad) {
+          return (
+            <EditItem
+              key={banner.id}
+              edit={edit}
+              target={{ kind: 'banner', id: banner.id }}
+              kindLabel="배너"
+              title={banner.alt}
+              className="banner-frame"
+              tagOutside
+            >
+              {picture}
+            </EditItem>
+          );
+        }
+        return banner.clickUrl && !edit ? (
+          <a key={banner.id} className="banner-frame banner-link" href={banner.clickUrl} rel="noopener">
+            {picture}
+          </a>
+        ) : (
+          <div key={banner.id} className="banner-frame">
+            {picture}
+          </div>
+        );
+      })}
+    </BannerCarousel>
+  );
+  if (!edit) return carousel;
+  return ad ? (
+    <EditRegion
+      edit={edit}
+      target={{ kind: 'ad-slot' }}
+      label="광고 블록"
+      tail="위치 이동"
+      narrowTail="위치"
+      buttonLabel="광고 블록 위치 안내"
+    >
+      {carousel}
+    </EditRegion>
+  ) : (
+    <EditRegion edit={edit} target={{ kind: 'banner-slot' }} label="배너 슬롯" buttonLabel="배너 슬롯 편집">
+      {carousel}
+    </EditRegion>
   );
 }
 
