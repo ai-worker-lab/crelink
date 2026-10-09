@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-10
@@ -39,3 +39,4 @@
 - 2026-10-10: 역할 `web` → `orchestrator`로 재분류(사용자 위임(2026-10-10, ADR 0015)에 따른 AI 승인). 수용 기준의 `tests/e2e/notices.spec.ts` 갱신은 web 소유 경로 밖이라(`pnpm work:scope` 실패) 웹과 E2E를 한 브랜치에서 함께 바꾸는 orchestrator 티켓으로 둡니다(`docs/work/README.md` 역할 규칙).
 - 2026-10-10: 착수·구현(AI 운영자 실행 `2df7ec6b-f95b-4faf-ad3a-bdbe85084a13`, 브랜치 `work/0151-landing-footer-cta-web`). `page.tsx` 바닥글을 `result.ok`면 `.footer-cta` 가입 유도 링크, 오류면 `크리링` 링크로 나눔. `ManagerPreview.tsx` 바닥글 `span` 문구, `styles.css` 바닥글 여백·44px 링크·`.footer-cta`/`.footer-link` 밑줄·미리보기 여백. 오류 화면 `크리링` 링크의 hover는 지금 모양 그대로 둠(시안의 hover 밑줄은 인계 문서 "지금 그대로"를 따름).
 - 2026-10-10 검증: 로컬 인스턴스(슬롯 71)에서 `pnpm e2e notices.spec` 2개 통과(빈 랜딩 가입 유도 링크 `href="/"`, 정지 크리에이터 `/p/{id}` 바닥글은 `크리링`만). 임시 Playwright 측정(지움): 정상 랜딩 1280·390·320px 가로 넘침 0, 바닥글 높이 61px, 가입 유도 링크 폭 109px·높이 44px, 세 요소 세로 중심 같음(한 줄). 404 화면 390px `크리링` · `개인정보 처리방침`, 높이 61px. 관리 화면 미리보기 1280px 문구 `나도 크리링 만들기 · 개인정보 처리방침`, 높이 61px, 링크 0개. 390px 랜딩·1280px 관리 화면 스크린숏을 눈으로 확인. `pnpm verify`(Node 24) 8개 통과, `pnpm smoke` 5개 통과, `pnpm work:scope 0151` 통과(재분류 뒤).
+- 2026-10-10: 완료(사용자 위임(2026-10-10, ADR 0015)에 따른 AI 승인, 실행 `1a2b976a-ed1b-4a12-bea7-c1d9b6768ff7`). 근거: PR #77 squash 머지, Deploy 37982111307 success(운영 주소 검사 포함).
