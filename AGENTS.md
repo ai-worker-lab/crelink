@@ -36,6 +36,7 @@ pnpm 모노레포 스켈레톤입니다: NestJS API(`apps/api`), Next.js 웹(`ap
 3. 구현 후 [검증 루프](docs/development/verification.md)를 실행하고 근거를 티켓 `진행 기록`에 남긴 뒤 `검증`으로 넘깁니다.
 4. 범위 밖 개선점이나 빠진 도구·가드레일을 발견하면 `분류 대기` work item으로 등록합니다.
 5. 여러 역할이 필요한 작업은 `orchestrator`가 [기술 설계와 티켓 분해](docs/specs/README.md)를 거쳐 [영역별 병렬 개발](docs/development/parallel-work.md)에 따라 나눕니다.
+6. subagent·생성 도구에 맡겨 되풀이하는 작업은 [위임과 반복 작업](docs/development/parallel-work.md#위임과-반복-작업)을 따릅니다. 요점은 기준 자료를 처음에 모두 넘기기, 회차마다 검사, 결함은 한 회차에 모아 고치기, 5회차·30분을 넘기면 보고하기입니다.
 
 ## 문서 지도
 
