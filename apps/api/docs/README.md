@@ -232,6 +232,18 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 - 기동 확인: `s3`면 `onApplicationBootstrap`에서 HeadBucket을 5초 한도로 한 번 보내고 결과를 로그로 남깁니다(`[S3FileStorage] 파일 저장소 s3 확인: <endpoint>/<bucket> 접근 가능` 또는 `… 확인 실패: … (오류 이름 HTTP 상태)`, 비밀값은 넣지 않음). 실패해도 기동은 계속합니다.
 - readiness에 넣지 않음: `/api/health/ready`는 DB만 봅니다. 이 결과가 이미지 HEALTHCHECK·배포 `up --wait`·Caddy 기동 조건이라, 저장소(home-server SeaweedFS) 장애나 회선 문제를 넣으면 업로드와 무관한 단축 이동(서비스의 핵심 경로)까지 배포 실패·롤백으로 막히기 때문입니다. 저장소 장애는 업로드·이미지 조회 500과 위 로그로 드러나고, 전환 직후 확인은 런북 절차가 맡습니다.
 
+## 크리링 배너 운영
+
+`src/admin/ad-banners.service.ts`·`ad-banners.controller.ts`(R20 ④⑨, R14). 계약은 `packages/shared/src/crelink.ts`의 `AdBannerView`·`AdBannerRequest`, 설계는 [광고 블록과 크리에이터 배너 슬롯 기술 설계](../../../docs/specs/crelink-ad-banner.md#서버-규칙)입니다. 권한은 다른 운영자 API와 같은 `OperatorGuard`이고 삭제 경로는 없습니다.
+
+- 목록 `GET /api/admin/ad-banners`: 전체를 `sort_order, created_at` 순으로, 상태는 한 문장 안의 같은 `now()`로 정합니다(`starts_at > now()` 예약, `ends_at <= now()` 끝남, 그 밖에는 게시 중. 공개 랜딩의 게시 중 조건과 같음). `counts`는 같은 결과에서 셉니다. 누적 노출·클릭은 `ad_banner_daily_stats`의 `sum(...)::int`(node-pg가 bigint를 문자열로 주므로)이고, 끝난 배너를 다시 열면 이어서 더합니다.
+- 등록 `POST`(201): 맨 뒤 순서 `coalesce(max(sort_order) + 1, 0)`, `created_by`는 등록한 운영자. 시각은 시간대가 붙은 ISO 8601만 받고(아니면 400 `validation_failed`) 응답은 UTC ISO입니다. 끝 ≤ 시작은 400 `banner_period_invalid`(DB CHECK는 예약 배너를 내릴 때 같아질 수 있어 `>=`). URL은 http·https(400 `link_url_invalid`), 차단 도메인과 하위 도메인은 422 `link_domain_blocked`.
+- 수정 `PATCH …/{id}`: 바뀐 필드만, 다른 운영자가 등록한 배너도 고칩니다. 결과가 게시 중·예약(끝이 없거나 지금보다 뒤)이면 저장된(또는 새) 호스트를 차단 도메인으로 다시 검사해, 차단으로 내려간 배너를 기간만 고쳐 다시 여는 길을 막습니다. 끝난 채로 두는 수정은 검사하지 않습니다.
+- 이미지: 새 파일은 운영자(`users.role = 'operator'`)가 올린 것이어야 하고(아니면 404 `file_not_found`, 운영자끼리는 서로의 파일을 씀), 저장된 값과 같은 id는 검사를 건너뜁니다. 정지 이미지 규칙: 이미지가 움직이면(`FilesService.isAnimated`, NULL이면 판정해 채움) 움직이지 않는 정지 이미지가 필요하고, 움직이지 않으면 정지 이미지는 null입니다. PATCH에서 이미지를 바꾸면 `stillImageFileId`도 같은 요청에 넣어야 합니다. 어기면 400 `validation_failed`.
+- 내리기 `PUT …/{id}/end`: `ends_at = least(coalesce(ends_at, now()), now())`, 예약 배너는 `starts_at = least(starts_at, now())`도 함께 당깁니다. 이미 끝난 배너는 바꾸지 않고 200(멱등). 수정·내리기는 배너 행 잠금(`FOR UPDATE`)으로 줄 섭니다.
+- 정렬 `PUT …/order`: 전체 id를 받아(아니면 400 `order_mismatch`) 0..n-1로 다시 매기고 새 순서의 목록을 돌려줍니다.
+- 등록·정렬·내리기는 트랜잭션 advisory lock(`pg_advisory_xact_lock(931475212)`, 보존 작업 931475211·migration 931475210과 다른 키)으로 줄 세워 맨 뒤 순서와 정렬이 동시 요청에 섞이지 않습니다.
+
 ## 통계와 보존 작업
 
 - 날짜 기준 시간대는 `Asia/Seoul`입니다(`STATS_TIME_ZONE`). 통계 기간은 `from`·`to` 양 끝 포함 최대 366일이고, 둘 다 없으면 오늘까지 30일입니다.
