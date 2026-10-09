@@ -6,6 +6,7 @@
 
 ## 2026-10-10
 
+- 0149 개발·빌드 도구 간접 의존성 보안 갱신을 `검증`으로 올렸습니다(AI 운영자 실행, P2 확정). `pnpm-workspace.yaml` `overrides`로 `handlebars` 4.7.10(critical 2·medium 1), `js-yaml` 4.3.2(high 1), `xcode`의 `uuid` 11.1.1(medium 1)로 올렸습니다. 6개 패키지 모두 `apps/api`·`apps/web` 운영 의존성에 없습니다. 고친 버전이 없거나 ESM 전용이라 못 올린 `node-forge`·`sprintf-js`·`decode-uri-component`(앱 개발 도구 한정)는 경보를 열어 둡니다. 근거 `docs/work/orchestrator/0149-dev-dependency-vulnerabilities.md`.
 - 0154 홈 소개 화면 보강 구현을 `검증`으로 올렸습니다(AI 운영자 실행, 웹 변경 내용은 `apps/web/CHANGELOGS.md`). 0142 디자인대로 로그인 전 홈에 예시 랜딩·사용 3단계·무료 범위·마지막 가입 버튼을 넣었고 E2E 홈 단언(`tests/e2e/slot-event.spec.ts`)을 함께 고쳤습니다. 검증 근거는 `docs/work/orchestrator/0154-home-intro-web.md` 진행 기록에 있습니다.
 - 0142 홈 소개 화면 보강 디자인 완료(AI 운영자 실행, 사용자 위임에 따른 AI 승인, 우선순위 P1 확정). 디자인 `design/home-intro/`(로그인 전 홈: 지금 제목·설명·첫 `구글로 시작하기` 그대로, 가상의 `예시 크리에이터` 랜딩, 사용 3단계, 무료로 쓸 수 있어요(숫자는 `CRELINK_LIMITS`), 마지막 가입 버튼, 이벤트 카드는 지금 자리 한 곳, 로그인한 홈은 그대로, 1280·390·320px, 새 토큰·API 없음). `design/system/DESIGN.md`에 로그인 전 홈 소개 규칙과 주요 버튼 두 곳 예외를 더했습니다. 구현 티켓 `docs/work/orchestrator/0154-home-intro-web.md`를 `준비`로 등록했습니다. 근거 `docs/work/designer/0142-home-intro-redesign.md`.
 - 0145 모집 채널 실행 문안과 사람 요청 목록 완료(AI 운영자 실행, 사용자 위임에 따른 AI 승인, 우선순위 P1 확정). 새 문서 `docs/product/acquisition-playbook.md`: 문안 근거 사실표, 공통 규칙 확인표 C1~C8, 지인 초대·디스콰이엇·커뮤니티 홍보 게시판·크리링 공식 인스타그램 문안, 보류 채널, 사람 요청 목록 H1~H5, 결과 재기·멈출 조건. 초기 사용자 모집 조사에서 연결했습니다. 사람 실행은 분류 대기 `docs/work/product/0153-acquisition-human-requests.md`로 등록했습니다. 0146을 `완료`로 바꿨습니다(PR #78, Deploy 37984965990). 근거 `docs/work/product/0145-acquisition-channel-playbook.md`.
