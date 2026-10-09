@@ -10,6 +10,7 @@
 - 광고 블록 요구 두 번째 결정과 추가 조사. 사용자 결정은 광고 블록 최소 1개(지금은 1개 고정), 위법이 아니면 광고를 실을지는 크리에이터가 정함, 배너 슬롯 계정 단위 부여, 배분 방식과 수익 보기는 추가 조사입니다. PRD R20·R21 요구 문장과 수용 기준, R22 참고 사실, 미정 질문을 고쳤습니다. 새 조사 문서는 `docs/product/research/ad-revenue-share.md`와 `docs/product/research/creator-ad-revenue-reporting.md`입니다. 앞 문서는 배분 기준·비율, 정산 주기·최소 지급액, 개인 지급 세무와 주민등록번호 근거, 지급 대행을 다룹니다. 뒤 문서는 예상·확정 보고 관행, 무효 트래픽 처리, R10·개인정보 영향을 다룹니다. 근거 `docs/work/product/0062-ad-banner-block-prd.md`.
 - 크리에이터 광고 수익 배분 철회(사용자 결정: "처음부터 복잡해진다. 크리링 플랫폼이 노출할 수 있는 광고 구좌만 생각하자"). PRD `docs/product/crelink.md`의 R22를 `철회` 행으로 바꾸고, 범위·참고 사실·미정 질문·위험을 고쳤습니다. 미정 질문에는 광고 구좌 판매 방식과 "크리에이터가 모든 광고를 빼는 경우"를 넣었습니다. 조사 문서 `docs/product/research/ad-revenue-share.md`·`creator-ad-revenue-reporting.md`에는 철회 상태를 적어 사실 기록으로 남겼습니다(광고주 과금 모델 비교만 계속 씀). 근거 `docs/work/product/0062-ad-banner-block-prd.md`.
 - 광고 배너를 쓸 수 있는 주체를 크리링 플랫폼으로 한정했습니다(사용자 결정: 지금 당장은 크리링 플랫폼만). PRD R20 요구 문장과 수용 기준 ④~⑥(크리링 배너만 등록, 크리에이터의 광고 고르기는 외부 광고를 받을 때)을 고쳤습니다. 범위와 위험도 고쳤고, 판매 방식·광고주 보고·업종 기준은 "외부 광고주를 받을 때 정할 것"으로 옮겼습니다. 근거 `docs/work/product/0062-ad-banner-block-prd.md`.
+- 광고 블록 요구 확정과 작업 분해(사용자 결정: 배너는 n장, R20·R21 수용 기준은 추천대로 채택). PRD R21 요구 문장과 수용 기준 ②(n은 설정값, 한도 안내), 수용 기준 표기, 미정 질문을 고쳤습니다. 에픽 `docs/work/epics/0063-ad-banner-block.md`, 디자인 티켓 `docs/work/designer/0064-ad-banner-block-design.md`, 기술 설계 티켓 `docs/work/orchestrator/0065-ad-banner-block-design-spec.md`(선행 0064)를 만들었습니다. 0062는 `검증`입니다. 근거 `docs/work/product/0062-ad-banner-block-prd.md`.
 
 ## 2026-10-08
 
