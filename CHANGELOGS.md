@@ -15,6 +15,8 @@
 - 광고 블록 디자인 승인 때 정한 것을 PRD에 반영했습니다. R20 ④·⑧과 R21 ②·④를 고쳤습니다. 크리링 배너 순서는 운영자가 정하고, 움직이는 이미지(GIF)를 받습니다. 배너 슬롯 한도는 보이는 배너만 세며 보관 상한을 따로 둡니다. 크리에이터 배너는 배너마다 차단하고, 운영자 화면에서 노출·클릭 수를 봅니다. 근거 `docs/work/product/0062-ad-banner-block-prd.md`.
 - 광고 블록·배너 슬롯 디자인 승인(0064 `완료`). orchestrator 기술 검토 결과는 통과(주의점 있음)였고, 의견 전문과 A1~A7 반영은 `design/ad-banner-block/handoff.md` `기술 검토` 절에 있습니다. 승인 때 정한 7가지는 `사용자 결정` 절에 있고, 본문의 배너 슬롯 한도·운영자 순서 정렬·노출·클릭 열·GIF 허용에 반영했습니다. `design/system/DESIGN.md` `모션`은 배너 이미지 안의 움직임만 예외로 허용합니다. 근거 `docs/work/designer/0064-ad-banner-block-design.md`.
 - 위임·반복 작업 기준(사용자 지시: 회고 내용을 AGENTS.md에 정리). 루트 `AGENTS.md` `작업 흐름` 6번에 요약과 링크를 두고, 세부는 `docs/development/parallel-work.md` `위임과 반복 작업` 절에 적었습니다. 내용은 기준 자료 선제 제공, 회차마다 기계 검사, 결함을 한 회차에 모아 고치기, 5회차·30분을 넘기면 보고와 진행 확인, "마지막" 뒤 추가 회차의 이유 기록, 절차 단계를 미루지 않기입니다. 계기는 0064 디자인 다듬기 11회(1시간 40분) 회고입니다. 근거 `docs/work/orchestrator/0066-opendesign-refine-rounds.md`.
+- 광고 블록·배너 슬롯 기술 설계 초안 `docs/specs/crelink-ad-banner.md`(사용자 승인 대기). 내용은 데이터 모델·migration 0003, 공유 계약 초안, 노출(서버·`passAccepted`·첫 장)·클릭(`{SHORT}/a/…`·`/b/…`) 기록, 운영자 순서·누적 집계, 한도 설정값, 화면 상태, 통합 브랜치 방식의 티켓 분해, E2E 검증 계획입니다. api·web·infra 검토를 반영했습니다. 미정 4건(GIF 접근성 처리, 크리에이터 배너 단위, 차단 도메인과 크리링 배너, 배너 클릭 통계 화면)은 사용자 결정 대기입니다. `docs/README.md`와 에픽 0063 `연결`에 링크했습니다. 근거 `docs/work/orchestrator/0065-ad-banner-block-design-spec.md`.
+- 광고 블록·배너 슬롯 기술 설계 미정 1~4를 정했습니다(사용자 결정, 모두 `[AI 제안]`대로). 1 움직이는 배너는 정지 이미지와 멈추기 버튼, 2 크리에이터 배너는 랜딩 단위, 3 차단 도메인에 걸린 크리링 배너는 내림, 4 운영자 화면에 배너별 클릭 표를 둡니다. 설계 `docs/specs/crelink-ad-banner.md`는 사용자가 읽은 뒤 승인을 정하므로 `초안` 상태입니다. 근거 `docs/work/orchestrator/0065-ad-banner-block-design-spec.md`.
 
 ## 2026-10-08
 
