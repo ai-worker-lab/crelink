@@ -50,6 +50,8 @@
 
 광고 블록·배너 슬롯: [광고 블록과 크리에이터 배너 슬롯 기술 설계](specs/crelink-ad-banner.md) — PRD R20·R21의 데이터·계약·노출 기록·티켓 분해(초안, 에픽 0063).
 
+링크 슬롯 +5 이벤트: [링크 슬롯 +5 이벤트 기술 설계](specs/crelink-slot-event.md) — PRD R24의 데이터(migration 0005)·계약·화면 상태·티켓 분해·운영 적용 절차(승인, 에픽 0089).
+
 ## 문서 위치
 
 - 제품·여러 영역 공통 문서: `docs/`(PRD·벤치마킹 `docs/product/`, 기술 설계 `docs/specs/`)

@@ -281,3 +281,4 @@ export interface SetSlotEventPeriodRequest {
 ## 변경 기록
 
 - 2026-10-10: 초안 → 승인(디자인 검토 의견 1~7 반영: 신청 404를 409와 같이 처리, 운영자 `page` 검사).
+- 2026-10-10: 통합(0125). 계약·화면 계약 변화 없음. E2E는 이벤트 기간을 바꾸므로 Playwright 프로젝트 `slot-event`를 `ad-banner` 뒤에 둡니다(위험과 스파이크 첫 줄대로). 범위 밖 발견 2건을 분류 대기로 등록했습니다: `docs/work/web/0126-format-datetime-server-locale.md`, `docs/work/orchestrator/0127-pm2-socket-path-too-long.md`.

@@ -4,7 +4,7 @@
 - 역할: api
 - 상위: 0089
 - 선행: 0120
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P0
 - 작성일: 2026-10-10
@@ -43,3 +43,4 @@
   - 실제 요청(`make up`, API 3320): `GET /api/public/slot-event` 200·`Cache-Control: no-store`·시드 열림, 비로그인 `POST …/entry`·`GET /api/admin/slot-event` 401. 개발 DB에 크리에이터·운영자 세션을 SQL로 만들어(확인 뒤 삭제) 신청 201 → 다시 200, `GET /api/me/landing` `visibleMax` 10·`slotEvent.entry`, 크리에이터의 운영자 경로 403, `?page=0` 400, 목록 200(`entryCount` 1·이메일·주소), 기간 끝 = 시작 400 `slot_event_period_invalid`, 시간대 없는 시각 400 `validation_failed`, 끝난 기간 저장 200(`ended`) 뒤 운영자 신청 409 `slot_event_closed`·신청 계정 200, 운영자 상세 `slotEvent`·`visibleMax` 10 확인. 기간은 시드 값(끝 없음)으로 되돌렸습니다.
   - 실행하지 못한 검사: `pnpm smoke`는 Playwright Chromium(`chromium_headless_shell-1248`)이 이 머신에 없어 시작 전에 실패했습니다. `pnpm verify`는 실행하지 않았습니다(웹 담당이 같은 브랜치에서 `slotEvent` 소비 코드를 고치는 중이라 웹 typecheck가 그 전까지 깨질 수 있음). `make up`의 pm2가 `.local/pm2/interactor.sock` 연결에서 `EINVAL`(worktree 경로가 길어 유닉스 소켓 경로 한도를 넘는 것으로 보임 [INFERENCE])을 내고 exit 2로 끝나지만 API·웹 프로세스는 떴습니다.
   - `pnpm work:scope 0121`: 이 티켓의 변경(`apps/api/**`, `docs/work/api/0121-slot-event-api.md`)은 모두 허용 경로 안입니다. 명령은 같은 통합 브랜치 작업 트리의 다른 역할 변경(`design/slot-event/**`, `docs/specs/crelink-slot-event.md`, `package.json`, `pnpm-lock.yaml`) 5개 때문에 exit 1입니다. `pnpm docs:check` 통과(Markdown 191개).
+- 2026-10-10: 0125 통합에서 확인하고 `완료`로 바꿨습니다. Node 24.20 `pnpm verify` 통과(API 190/190), `pnpm e2e` 14/14(`slot-event.spec.ts` 2개 포함)·`pnpm smoke` 5/5 통과.

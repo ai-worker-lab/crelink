@@ -4,7 +4,7 @@
 - 역할: web
 - 상위: 0089
 - 선행: 0120
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P0
 - 작성일: 2026-10-10
@@ -45,3 +45,4 @@
   - 검증(Node 22.23 기본, `pnpm verify`는 Node 24.20): `pnpm exec eslint apps/web` 오류 0, `pnpm exec prettier --check apps/web` 통과, `pnpm --filter @crelink/web typecheck`·`test`(48/48) 통과. `pnpm work:scope 0123 --base HEAD`: 내 변경은 모두 허용 경로이고 범위 밖 2개는 통합 담당의 `tests/e2e/playwright.config.ts`·`tests/e2e/slot-event.spec.ts`(통합 브랜치 기준 비교는 다른 역할 커밋 때문에 실패하므로 작업 트리만 확인, 0083 선례). `pnpm smoke` 5/5. `pnpm verify --keep-going`: tokens·work·docs·design·typecheck·build·test 통과, lint는 통합 담당이 쓰는 중인 `tests/e2e/slot-event.spec.ts`의 Prettier 서식만 실패.
   - 화면(Playwright Chromium, 실제 API, 저장소 밖 임시 스크립트로 개발 DB에 사용자·세션·신청 행을 만들고 끝에 지움): 1280·390px에서 C1·C2(끝 없음 `…부터`, 카드 안 버튼 없음, 아래 `구글로 시작하기`), C3(`내 크리링에서 신청하기` `href=/me` 보조 버튼, `내 크리링 편집` 그대로), C4(기간을 시작 전·끝남으로 바꾼 동안, 그리고 이벤트 code를 잠깐 바꿔 API 404인 동안 카드 없음·홈 그대로), `/docs/guide`·`/privacy` 문구. 모든 화면 `scrollWidth = clientWidth`, 앱 콘솔 오류 0. 기간과 code는 시드 값(`starts_at` 원래 값, `ends_at` null)으로 되돌림을 조회로 확인.
   - 확인하지 못한 것: 로그인 확인 오류(`/api/me`가 401 아닌 오류) 화면은 실제 API로 만들 수 없어 보지 않음(코드 경로는 로그인 전 카드와 같음).
+- 2026-10-10: 0125 통합에서 확인하고 `완료`로 바꿨습니다. 실제 API로 `tests/e2e/slot-event.spec.ts`(로그인 전·후 홈 안내, 끝난 뒤 숨김, 390px) 통과, `pnpm verify` 통과.

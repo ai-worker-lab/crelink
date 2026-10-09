@@ -3,7 +3,7 @@
 - 단계: 티켓
 - 역할: api
 - 상위: 0089
-- 상태: 진행
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P0
 - 작성일: 2026-10-10
@@ -14,7 +14,7 @@
 
 ## 수용 기준
 
-- [ ] `packages/shared/src/crelink.ts` 새 절 `링크 슬롯 이벤트 (R24)`에 설계 `공유 타입 초안`의 타입, `CrelinkErrorCode` 3개, `CRELINK_API_PATHS` 3개, `CreatorLandingState.slotEvent`·`OperatorCreatorDetail.slotEvent`, `LinkLimits.visibleMax` 주석이 있습니다. 확인: `pnpm --filter @crelink/shared build`.
+- [x] `packages/shared/src/crelink.ts` 새 절 `링크 슬롯 이벤트 (R24)`에 설계 `공유 타입 초안`의 타입, `CrelinkErrorCode` 3개, `CRELINK_API_PATHS` 3개, `CreatorLandingState.slotEvent`·`OperatorCreatorDetail.slotEvent`, `LinkLimits.visibleMax` 주석이 있습니다. 확인: `pnpm --filter @crelink/shared build`.
 
 ## 범위
 
@@ -33,3 +33,4 @@
 ## 진행 기록
 
 - 2026-10-10: 생성(0092 설계 분해). 통합 브랜치 `work/0092-slot-event-design`에서 orchestrator가 바로 반영했습니다(계약이 웹·API 병렬 착수의 선행이라).
+- 2026-10-10: `pnpm --filter @crelink/shared build` 통과. 설계 초안과 다른 점 하나: `OperatorSlotEventResponse.event`는 null이 아님(이벤트가 없으면 404이므로, 설계에도 반영). 0125 통합에서 API·웹이 이 계약을 끝까지 쓰는 것을 `pnpm verify`·E2E로 확인하고 `완료`로 바꿨습니다.
