@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: web
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-10
@@ -41,3 +41,7 @@
   - 결정: OG는 루트 레이아웃이 아니라 홈·문서 레이아웃에만 둠. 루트에 두면 공개 랜딩이 `og:title`(크리링)을 물려받아 크리에이터 미리보기와 어긋남. `SITE_URL`은 빌드 때 그려지는 화면도 같은 값을 내야 해서 코드 상수(운영 `WEB_URL`과 같은 값)로 둠.
   - 로컬 확인(`make up`, 슬롯 17): `/robots.txt`·`/sitemap.xml` 내용 기대대로, `/og-image.png` 200 `image/png`, `/` `og:title 크리링`·`og:url https://links.shaul.kr`·`og:image …/og-image.png` 1200×630, `/docs/guide` `og:title 크리링 문서`·`<title>사용 안내 | 크리링</title>`, `/p/zzzzzzzzzz`(same-origin) `og:` 없음·`noindex`(레이아웃이 OG를 물려주지 않음).
   - 사람 요청(범위 밖): Google Search Console·네이버 서치어드바이저 소유 확인과 sitemap 제출은 사람 계정이 필요합니다.
+  - 검증: `pnpm verify`(Node 24)·`pnpm work:scope 0141`·로컬 `pnpm smoke` 통과. PR [#71](https://github.com/ai-worker-lab/crelink/pull/71) CI 통과 뒤 `guard` 0 확인, squash 머지(`ed6e4c2`).
+  - 배포: 운영(prod), `ed6e4c2`, Deploy [37965904574](https://github.com/ai-worker-lab/crelink/actions/runs/37965904574) 2026-10-10 02:23(KST) 시작, 3분 30초, success(`운영 주소 검사` 포함).
+  - 운영 확인(읽기, 이유: 위험·복구의 robots 오작성 확인): `/robots.txt` 내용 기대대로, `/sitemap.xml` 200, `/og-image.png` 200 `image/png`. 공개 랜딩·단축 주소는 열지 않음(통계 오염 금지).
+- 2026-10-10: `완료`(실행 `e1f4ffa2-d409-4be6-b34e-a2b2b9551f53`, 사용자 위임(2026-10-10, ADR 0015)에 따른 AI 승인). 수용 기준 4개를 로컬·운영 경로에서 확인했습니다. 검색 등록(사람 계정)은 [0148](../orchestrator/0148-search-console-registration.md)로 넘겼습니다.
