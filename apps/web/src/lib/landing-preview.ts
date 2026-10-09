@@ -266,6 +266,15 @@ export function toLandingPreview(state: CreatorLandingState, drafts: LandingDraf
 }
 
 /**
+ * 방문자에게 보이는 외부 링크 + 포트폴리오 항목 수(저장 상태 기준, 초안 제외). 숨긴·차단된 링크는 세지 않는 `toLandingPreview` 결과를 세므로
+ * 공개 랜딩에 보이는 수이자 실사용자 정의(PRD `목표`)와 같은 기준입니다. 시작 안내 카드 ① 완료 판정이 씁니다.
+ */
+export function visibleItemCount(state: CreatorLandingState): number {
+  const view = toLandingPreview(state);
+  return view.blocks.reduce((sum, block) => sum + block.links.length, 0) + view.portfolio.length;
+}
+
+/**
  * 미리보기의 광고 블록·배너 슬롯 자리. 공개 랜딩 API와 같은 `resolveBannerSlot`(packages/shared)으로 종류·위치·숨김을 정합니다.
  * 숨김(`hidden`)이어도 위치를 돌려주므로, 관리 화면은 `'no_banners'`일 때 그 자리에 점선 자리를 그립니다(`'no_content'`는 그리지 않음).
  * - 링크가 보이는지는 저장 상태(숨김·차단)로 보고, 표시 이름이 있는 새 링크 초안은 맨 끝에 보이는 링크로 붙입니다(슬롯이 맨 뒤면 초안도 슬롯 앞).

@@ -22,6 +22,7 @@ import {
   profileDraftOf,
   socialRowsOf,
   toLandingPreview,
+  visibleItemCount,
 } from './landing-preview.ts';
 
 const adBanner = (id: string, still: string | null = null): PublicBannerView => ({
@@ -103,6 +104,16 @@ test('초안이 없으면 저장 상태에서 숨긴·차단 링크를 빼고 �
     view.portfolio.map((p) => p.id),
     ['p1', 'p2'],
   );
+});
+
+test('visibleItemCount: 숨긴·차단 링크를 뺀 보이는 링크 + 포트폴리오 수, 초안은 세지 않음(시작 안내 ①)', () => {
+  assert.equal(visibleItemCount(state()), 4);
+  assert.equal(visibleItemCount(state({ links: [], portfolio: [] })), 0);
+  assert.equal(
+    visibleItemCount(state({ links: [link('h', { hidden: true }), link('b', { blocked: true })], portfolio: [] })),
+    0,
+  );
+  assert.equal(visibleItemCount(state({ links: [], portfolio: [item('p1')] })), 1);
 });
 
 test('프로필 초안은 앞뒤 공백을 자르고 빈 값은 비움으로 덮는다', () => {

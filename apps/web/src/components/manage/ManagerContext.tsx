@@ -11,6 +11,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -18,6 +19,7 @@ import {
   type SetStateAction,
 } from 'react';
 import { browserApi, BrowserApiError } from '../../lib/api/browser';
+import { FIRST_RUN_NOTICE, firstRunGuideView, type FirstRunGuideView } from '../../lib/first-run-guide';
 import { targetKey, type LandingEditTarget } from '../../lib/landing-edit';
 import {
   bannerDraftOf,
@@ -31,6 +33,7 @@ import {
   portfolioDraftOf,
   profileDraftOf,
   socialRowsOf,
+  visibleItemCount,
   type BannerDraft,
   type LinkDraft,
   type PortfolioDraft,
@@ -38,6 +41,7 @@ import {
   type SocialDraftRow,
 } from '../../lib/landing-preview';
 import { useAction, type ActionState } from '../../lib/use-action';
+import { useFirstRunProgress } from '../../lib/use-first-run-progress';
 
 /** 편집 중 배너 슬롯이 회수됐을 때의 안내(handoff `슬롯 회수됨(편집 중)`, 오류 코드 `banner_slot_not_granted`). */
 export const BANNER_SLOT_REVOKED_NOTICE = '배너 슬롯이 회수되어 이 자리에 다시 크리링 광고 블록이 나와요.';
@@ -58,6 +62,21 @@ export interface ManagerDirty {
   link: boolean;
   portfolio: boolean;
   banner: boolean;
+}
+
+/** `페이지 편집` 시작 안내 카드(design/first-run-guide/handoff.md). 관리 화면 어느 메뉴의 `복사`든 ②로 기록하므로 여기에 둡니다. */
+export interface FirstRunGuide {
+  view: FirstRunGuideView;
+  /** 카드 상태 줄(`1단계를 마쳤어요…`·`주소를 복사했어요.`). `페이지 편집`을 떠나면 지웁니다. */
+  notice: string | null;
+  /** 단축 주소 `복사`가 성공했을 때 부릅니다(②). */
+  recordCopy: () => void;
+  /** `붙여 넣었어요`(③). 이번 `페이지 편집` 동안 완료 카드(D)를 보입니다. */
+  confirmInstagram: () => void;
+  /** 완료 카드 `닫기`·`시작 안내 닫기`(×). 이 기기에서는 다시 보이지 않습니다. */
+  dismiss: () => void;
+  /** `페이지 편집`을 떠날 때 부릅니다(상태 줄·완료 카드를 지워 다음 진입에는 세 단계를 마친 카드를 그리지 않음). */
+  reset: () => void;
 }
 
 export interface ManagerContextValue {
@@ -134,6 +153,7 @@ export interface ManagerContextValue {
    */
   applySlotEvent: () => Promise<SlotEventResult | null>;
   resetSlotEvent: () => void;
+  firstRunGuide: FirstRunGuide;
 }
 
 const ManagerContext = createContext<ManagerContextValue | null>(null);
@@ -183,6 +203,21 @@ export function ManagerProvider({
   const slotEventAction = useAction();
   const [slotEventResult, setSlotEventResult] = useState<SlotEventResult | null>(null);
   const { setError: setSlotEventError } = slotEventAction;
+  // 시작 안내 카드: ①은 저장 상태의 보이는 항목 수, ②·③·닫기는 기기 로컬 진행. 첫 항목을 저장해 ①을 막 마치면(② 전) 상태 줄로 알리고,
+  // 보이는 항목이 다시 0개가 되면 지웁니다.
+  const [firstRunProgress, updateFirstRun] = useFirstRunProgress(state.landing.publicId);
+  const [firstRunFinished, setFirstRunFinished] = useState(false);
+  const [firstRunNotice, setFirstRunNotice] = useState<string | null>(null);
+  const visibleCount = useMemo(() => visibleItemCount(state), [state]);
+  const [seenAdded, setSeenAdded] = useState(visibleCount > 0);
+  if (seenAdded !== visibleCount > 0) {
+    setSeenAdded(visibleCount > 0);
+    setFirstRunNotice(visibleCount > 0 && firstRunProgress && !firstRunProgress.copied ? FIRST_RUN_NOTICE.added : null);
+  }
+  const resetFirstRun = useCallback(() => {
+    setFirstRunFinished(false);
+    setFirstRunNotice(null);
+  }, []);
 
   async function reload() {
     const next = await browserApi<CreatorLandingState>(CRELINK_API_PATHS.meLanding);
@@ -427,6 +462,24 @@ export function ManagerProvider({
     slotEventResult,
     applySlotEvent,
     resetSlotEvent,
+    firstRunGuide: {
+      view: firstRunGuideView({ progress: firstRunProgress, visibleCount, finishedNow: firstRunFinished }),
+      notice: firstRunNotice,
+      recordCopy: () => {
+        updateFirstRun({ copied: true });
+        setFirstRunNotice(FIRST_RUN_NOTICE.copied);
+      },
+      confirmInstagram: () => {
+        updateFirstRun({ instagramConfirmed: true });
+        setFirstRunFinished(true);
+        setFirstRunNotice(null);
+      },
+      dismiss: () => {
+        updateFirstRun({ dismissed: true });
+        resetFirstRun();
+      },
+      reset: resetFirstRun,
+    },
   };
   return <ManagerContext value={value}>{children}</ManagerContext>;
 }
