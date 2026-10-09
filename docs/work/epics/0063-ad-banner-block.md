@@ -37,6 +37,7 @@ PRD R20·R21 수용 기준(2026-10-09 채택)을 사용자 관점에서 끝까�
 - 요구: [PRD R20·R21](../../product/crelink.md#요구사항)과 [위험과 미정 사항](../../product/crelink.md#위험과-미정-사항)
 - 제품 결정: [0062 광고 블록과 크리에이터 배너 슬롯 요구 정리](../product/0062-ad-banner-block-prd.md)
 - 근거: [벤치마킹 광고 절](../../product/research/link-in-bio-benchmark.md#광고-블록과-광고-제거2026-10-09-보강)
+- 설계: [광고 블록과 크리에이터 배너 슬롯 기술 설계](../../specs/crelink-ad-banner.md)(0065, 초안)
 
 ## 진행 기록
 

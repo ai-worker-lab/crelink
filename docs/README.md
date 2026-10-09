@@ -48,6 +48,8 @@
 
 운영 배포: [크리링 운영 배포·CD 기술 설계](specs/crelink-prod-deploy.md) — 구성, Caddy 공개 정책, 환경변수, CD 흐름, 위험(승인, 에픽 0024).
 
+광고 블록·배너 슬롯: [광고 블록과 크리에이터 배너 슬롯 기술 설계](specs/crelink-ad-banner.md) — PRD R20·R21의 데이터·계약·노출 기록·티켓 분해(초안, 에픽 0063).
+
 ## 문서 위치
 
 - 제품·여러 영역 공통 문서: `docs/`(PRD·벤치마킹 `docs/product/`, 기술 설계 `docs/specs/`)

@@ -15,7 +15,7 @@
 
 ## 수용 기준
 
-- [ ] `docs/specs/crelink-ad-banner.md`가 다음을 정한다.
+- [x] `docs/specs/crelink-ad-banner.md`가 다음을 정한다.
   - 데이터 모델: 크리링 배너, 계정별 배너 슬롯 부여, 크리에이터 배너, 링크 목록 안 광고 블록 위치, 노출·클릭 기록
   - 배너 장수 상한 n의 설정 위치와 처음 값
   - 공개 랜딩 응답 계약(`packages/shared`): 광고 블록·배너 슬롯이 링크 사이에 놓이는 방식
@@ -37,10 +37,19 @@
 
 - 요구: [PRD R20·R21](../../product/crelink.md#요구사항)
 - 디자인: [0064](../designer/0064-ad-banner-block-design.md)
-- 기존 설계: [MVP 기술 설계](../../specs/crelink-mvp.md), [방명록 기술 설계](../../specs/crelink-guestbook.md)
+- 설계 문서: [광고 블록과 크리에이터 배너 슬롯 기술 설계](../../specs/crelink-ad-banner.md)(초안)
+- 기존 설계: [MVP 기술 설계](../../specs/crelink-mvp.md), [방명록 기술 설계](../../specs/crelink-guestbook.md), [운영 배포 설계](../../specs/crelink-prod-deploy.md)
 - 계약: `packages/shared/src/crelink.ts`(`PublicLandingView.blocks`, 링크 `position`)
 
 ## 진행 기록
 
 - 2026-10-09: 생성했습니다. 선행은 디자인 0064입니다.
 - 2026-10-09: 착수했습니다. 브랜치는 `work/0065-ad-banner-block-design-spec`(main `e8e29db`에서 시작)입니다. 선행 0064 `완료`, PRD R20·R21(#59)과 디자인 인계(#60)가 main에 있습니다.
+- 2026-10-09: 설계 초안 `docs/specs/crelink-ad-banner.md`(`상태: 초안`)를 썼습니다. 정한 것은 다음과 같습니다.
+  - 데이터: 위치 `landing_blocks.slot_position`, 부여 `users.banner_slot_granted_at`, `ad_banners`·`creator_banners`(랜딩 단위 `[AI 제안]`), 기록 `ad_banner_daily_stats`·`creator_banner_clicks`(+집계), migration 0003(expand, 되돌리기 포함).
+  - 노출: 서버·`passAccepted`·첫 장 `[AI 제안]`. 클릭 경로 `{SHORT}/a/{배너}/{랜딩}`·`/b/{배너}`와 Caddy·`SHORT_DOMAIN_ROUTES` 변경.
+  - 운영자: 순서 `sort_order` + 전체 id 정렬, 노출·클릭 누적 합계 질의.
+  - 한도·처리: 설정값 `BANNER_SLOT_MAX` 5·`BANNER_SLOT_TOTAL_MAX` 20 `[임시값]`, GIF 처리 선택지 A~D(`[AI 제안]` C), 차단 도메인 추가 시 크리에이터 배너 차단·크리링 배너 내림 `[AI 제안]`.
+  - 진행: 통합 브랜치 방식, 티켓 분해안(api 7·infra 1·web 8·스파이크 1·designer 1·통합 1, 일부는 미정 1에 따라 생기거나 빠짐).
+  - 사용자 결정이 필요한 것은 설계 `미정` 1~4입니다.
+- 2026-10-09: 역할별 검토를 api·web·infra에 병렬로 한 번 맡겼습니다(읽기 전용). 세 역할 모두 "통과(수정 권장)"였고, 지적 37건을 한 회차에 반영했습니다. 주요 변경은 세 가지입니다. 기능 티켓은 통합 브랜치로 모아 main에 한 번 머지합니다. 링크 정렬 응답은 `LinkView[]`를 유지합니다. `resolveBannerSlot`이 숨김 사유와 위치를 돌려줍니다. 그 밖에 동시성·기간 경계·이미지 소유·정지 이미지 규칙, 화면 상태 표 보강, 티켓 재분할이 있습니다. 내역은 설계 `검토 기록`에 있습니다. 다음 단계는 사용자 승인과 미정 결정, 그 뒤 티켓 생성입니다.
