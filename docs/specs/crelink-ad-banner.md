@@ -1,6 +1,6 @@
 # 광고 블록과 크리에이터 배너 슬롯 기술 설계
 
-- 상태: 초안
+- 상태: 승인
 - 작성일: 2026-10-09
 - 에픽: `docs/work/epics/0063-ad-banner-block.md`
 - 입력: PRD R20·R21과 관련 R4·R5·R7·R9·R10·R11·R13·R14·R18·R19([docs/product/crelink.md](../product/crelink.md), R20·R21 수용 기준은 2026-10-09 채택), 디자인 인계 [design/ad-banner-block/handoff.md](../../design/ad-banner-block/handoff.md)(2026-10-09 사용자 승인, `사용자 결정` 1~7과 `기술 검토` 절), [디자인 시스템](../../design/system/DESIGN.md) 광고 블록·모션 줄, 기존 설계 [MVP](crelink-mvp.md)·[방명록](crelink-guestbook.md)·[운영 배포](crelink-prod-deploy.md). 새 기술 조사·ADR 없음(새 의존성 없음).
@@ -580,6 +580,8 @@ ORDER BY b.sort_order, b.created_at
 
 ## 티켓 분해
 
+work item 번호(2026-10-09 생성): T1 → 0067, T2 → 0068, T3 → 0069, T4 → 0070, T5 → 0071, T6 → 0072, T7 → 0073, T8 → 0074, S1 → 0075, D1 → 0076, T9 → 0077, T10 → 0078, T11 → 0079, T12 → 0080, T13 → 0081, T14 → 0082, T15 → 0083, T16 → 0084, T17 → 0085. 통합 브랜치는 통합 티켓 번호를 따라 `work/0085-ad-banner-integration`입니다([작업 관리](../work/README.md#착수와-점유) 여러 역할 묶기 규칙). 아래 표와 본문의 `work/0063-ad-banner-integration`은 이 이름으로 읽습니다.
+
 | 예정 | 단계 | 역할 | 선행 | 요구 | 수용 기준 요약(확인 방법) |
 | --- | --- | --- | --- | --- | --- |
 | T1 | 티켓 | api | — | R20, R21 | 계약·스키마. 대상: `packages/shared`의 위 타입·경로·오류 코드·상수, `resolveBannerSlot`과 그 단위 테스트(`packages/shared` `test` 스크립트), migration `0003_ad_banner.sql`(`lock_timeout`, 되돌리기 주석), `AppConfig` `BANNER_SLOT_MAX`·`BANNER_SLOT_TOTAL_MAX`, `.env.example`·환경변수 문서. 확인: `pnpm --filter @crelink/shared build`, `pnpm --filter @crelink/shared test`, migration 테스트(FK 연쇄 2건·CHECK), AppConfig 파싱 테스트. 미정 1·2가 확정된 뒤 착수합니다. 전체 typecheck는 통합 브랜치에서 T2·T5·T9·T10 뒤에 확인합니다. |
@@ -773,3 +775,4 @@ ORDER BY b.sort_order, b.created_at
 
 - 2026-10-09: 초안 작성, 같은 날 api·web·infra 검토 반영.
 - 2026-10-09: 사용자가 미정 1~4를 모두 `[AI 제안]`대로 정했습니다(1 C, 2 A, 3 A, 4 A). 그래서 조건부였던 T3·S1·T12·D1을 모두 진행합니다. 설계 승인은 사용자가 문서를 읽은 뒤 정하며, 상태는 `초안`으로 둡니다.
+- 2026-10-09: 사용자 지시("타임어택이다 완성시켜라")를 설계 승인으로 보고 `상태: 승인`으로 바꿨습니다. 티켓 0067~0085를 만들었습니다.
