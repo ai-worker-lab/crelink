@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: web
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-10
@@ -38,3 +38,4 @@
 - 2026-10-10: 분류·착수(사용자 위임(2026-10-10, ADR 0015)에 따른 AI 승인, 실행 `1a2b976a-ed1b-4a12-bea7-c1d9b6768ff7`, 브랜치 `work/0146-usage-guide-content`). 우선순위 P1 확정: 실사용자 0/100·7일 방문 3이라 유입이 병목이고, 사람 계정 없이 AI가 열 수 있는 유입 채널입니다.
 - 2026-10-10 구현: `apps/web/src/lib/docs.ts`에 `GUIDE_ARTICLES` 2편(`/docs/instagram-profile-links` 「인스타그램 프로필에 링크 여러 개 넣는 법」, `/docs/creator-portfolio-page` 「협업 제안을 받는 크리에이터 포트폴리오 페이지 만들기」). 문서 목록(`/docs`)에 `활용 가이드` 구역, `SITEMAP_PATHS`에 두 글. 문서 이동 메뉴(`DocsNav`)에는 넣지 않음(메뉴를 짧게 둠). 글마다 `title`·`description`·OG, 끝에 `크리링 시작하기`(→ `/`). 숫자는 `CRELINK_LIMITS`, 버튼·메뉴 이름은 사용 안내(`/docs/guide`)와 같게 썼습니다. 인스타그램 링크 개수·화면은 숫자를 적지 않고 공식 도움말(https://help.instagram.com/362497417173378)로 안내합니다. 다른 서비스 이름·비교는 쓰지 않았습니다. 경로는 공유 계약(`packages/shared`, api 소유)을 바꾸지 않으려고 웹 안 상수로 둡니다. 새 API·DB·개인정보 수집 없음.
 - 2026-10-10 검증: 로컬 인스턴스(슬롯 73)에서 임시 Playwright 측정(지움): `/docs`·두 글 모두 200, 390·1280px 가로 넘침 0, 글마다 제목·`description`·`og:url`(`https://links.shaul.kr/docs/…`)과 `크리링 시작하기`(→ `/`), `/docs` `활용 가이드` 구역에 두 글 링크, `/sitemap.xml`에 두 글 주소. 390px 글 스크린숏을 눈으로 확인. `pnpm verify`(Node 24) 8개 통과, `pnpm smoke` 5개 통과, `pnpm work:scope 0146` 통과.
+- 2026-10-10 완료: PR #78 squash 머지, Deploy 37984965990 success(운영 주소 검사 포함). AI 운영자 실행 `5b00b66d-da34-4ae0-b577-66981c116236`이 완료로 바꿨습니다.
