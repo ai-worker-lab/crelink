@@ -3,7 +3,7 @@
 - 단계: 티켓
 - 역할: infra
 - 상위: 0063
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-09
@@ -42,3 +42,4 @@
   - `pnpm work:scope`: 통과(변경 파일 5개 모두 소유 경로 안. 이 worktree 브랜치 기준이라 0085로 판정됨, 별도 브랜치로 옮기면 다시 확인).
   - compose 변경 없음 → `config --quiet`·`make infra-up`은 해당 없음. `harness.sh` 변경 없음.
   - 운영 영향: main 머지 다음 배포의 `edge_apply`부터 `go.shaul.kr/a/…`·`/b/…`가 Caddy 404 대신 API로 감. API 경로(T7)가 없으면 API 404라 화면·동작 차이 없음. 운영 주소 검사(`verify.sh`) 추가는 T17.
+- 2026-10-09: main 머지(#63) 뒤 0085 통합 브랜치에서 `infra/prod/tests/caddy-routing.sh`를 다시 돌려 통과 78, 실패 0을 확인했습니다. 운영 주소 검사(`verify.sh`)의 `/b/`·`/a/` 302 확인은 0085에서 더했습니다. 상태는 `완료`입니다.

@@ -4,7 +4,7 @@
 - 역할: api
 - 상위: 0063
 - 선행: 0068
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-09
@@ -49,3 +49,9 @@
   - `make up` 뒤 실제 HTTP(SQL로 넣은 표본): `/a/t7adlive01/t7landing1` 302 `https://ad.example/x?y=1`·`Cache-Control: no-store`·Set-Cookie 없음, DB `ad_banner_daily_stats` `clicks 1`; `/a/t7adended1/…`·`/a/…/zzzzzzzzzz` 302 `link_unavailable`; `/b/t7crlive01` 302 저장된 URL + `cl_vid` 발급, DB `creator_banner_clicks` 1행(IP·유입 호스트·mobile·Safari·iOS); `/b/t7crhidden`·`/b/zzzzzzzzzz` `link_unavailable`; `/a/abcde12345` 404, `/b` `link_not_found`; `/api/health/ready` 200. `pnpm smoke` 5건 통과.
   - `pnpm work:scope 0073 --base HEAD` 통과(기본 기준 origin/main은 통합 브랜치의 다른 티켓 변경까지 세어 실패하므로 HEAD 기준으로 확인).
   - 통합 선행조건: 운영 클릭은 T8(0074, Caddy `/a/`·`/b/` matcher)이 main에 들어가야 Caddy 404가 아님. 실제 운영자 통계 HTTP 확인은 운영자 로그인이 필요해 통합 테스트로만 확인.
+- 2026-10-09: 0085 통합에서 실제 웹·API로 확인하고 `완료`로 바꿨습니다(`tests/e2e/ad-banner.spec.ts`).
+  - `/a/`: 302로 저장된 URL로 보내고(`no-store`, 쿠키 없음), 랜딩별 클릭 +1입니다.
+  - `/b/`: 302하고 `creator_banner_clicks`에 visitor_id·IP를 남깁니다.
+  - 안내 화면: 숨김·차단·없는 배너는 `link_unavailable`입니다.
+  - 통계: 운영자 상세 `배너별 클릭` 표가 보입니다.
+  - 보존 작업은 API 통합 테스트로만 확인했습니다(E2E 범위 밖). 운영 Caddy(0074)는 main에 있습니다.

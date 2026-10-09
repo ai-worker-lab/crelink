@@ -4,7 +4,7 @@
 - 역할: api
 - 상위: 0063
 - 선행: 0067
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-09
@@ -45,3 +45,4 @@
   - 통합 `test/upload-animated.e2e-spec.ts` 3건 통과(세 형식 움직임·정지 응답과 `files.animated`, NULL 지연 판정·채운 값 재사용, 행·객체 없음 404). 전체 API 143/143.
   - `make up` 뒤 실제 `POST /api/me/files`: ffmpeg GIF 2프레임 201 `animated: true`, ffmpeg GIF 1프레임 `false`, PNG `false`, APNG `true`, 움직이는 WebP `true`, 세션 없음 401.
   - `pnpm verify --fast` 통과, `pnpm verify` 통과, `pnpm work:scope 0069 --base HEAD` 통과.
+- 2026-10-09: 0085 통합에서 확인하고 `완료`로 바꿨습니다. 운영자 화면에서 2장짜리 GIF를 올리면 `files.animated = true`이고, 웹이 만든 정지 PNG는 `false`로 저장됩니다(`tests/e2e/ad-banner.spec.ts` `운영자 크리링 배너`).

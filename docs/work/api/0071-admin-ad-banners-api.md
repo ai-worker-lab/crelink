@@ -4,7 +4,7 @@
 - 역할: api
 - 상위: 0063
 - 선행: 0067, 0069
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-09
@@ -49,3 +49,9 @@
   - `make infra-up` 뒤 `pnpm verify` 통과(API 21 suites 154/154, lint·typecheck·build). `pnpm verify --fast` 통과. `pnpm work:scope 0071 --base HEAD` 통과(변경 6개).
   - `make up` 뒤 실제 HTTP(`127.0.0.1:7520`, 운영자 2명·크리에이터 세션은 SQL로 넣고 이미지는 `POST /api/me/files`로 올림): 401·403, 등록 201(게시 중, 움직이는 GIF + 정지 이미지 예약), 정지 이미지 없음 400 `validation_failed`, `ftp://` 400 `link_url_invalid`, 시간대 없음 400, 끝 < 시작 400 `banner_period_invalid`, 크리에이터 파일 404. 카운터 3행(SQL) 뒤 목록 `impressions: 50`·`clicks: 8`. 도메인 차단 뒤 운영자 2의 문구만 수정 422, 주소 바꾼 수정 200. `/end` 두 번 같은 `endsAt`, 예약 배너 내리기는 `starts_at = ends_at`. 차단 주소로 다시 열기 422, 기간만 다시 열기 200. 정렬 `order_mismatch` 400·성공 200, 없는 배너 404. 최종 `counts` `{all: 2, live: 1, scheduled: 0, ended: 1}`.
   - `pnpm smoke` 5/5 통과.
+- 2026-10-09: 0085 통합에서 실제 웹 화면으로 확인하고 `완료`로 바꿨습니다(`tests/e2e/ad-banner.spec.ts` `운영자 크리링 배너`·`무료 랜딩`).
+  - 이미지: 운영자 계정의 `POST /api/me/files` 업로드로 등록합니다(PNG, GIF + 정지 이미지).
+  - 등록 오류: `link_url_invalid`·`link_domain_blocked`를 확인했습니다. 끝이 시작보다 앞인 기간은 웹이 먼저 막습니다.
+  - 상태와 순서: 예약은 `예약`에만 보이고, 정렬은 공개 랜딩 순서와 같습니다. 수정은 바뀐 필드만 PATCH합니다.
+  - 내리기·재열기: 내리면 `끝남`이 되고, 차단 도메인으로 끝난 배너를 기간만 고쳐 다시 열면 422입니다.
+  - 집계: 표의 노출·클릭이 DB 누적과 같습니다.

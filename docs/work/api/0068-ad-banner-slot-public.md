@@ -4,7 +4,7 @@
 - 역할: api
 - 상위: 0063
 - 선행: 0067
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-09
@@ -47,3 +47,8 @@
   - `make up` 뒤 실제 HTTP(`127.0.0.1:7120`, 세션·크리링 배너 행은 SQL로 넣음): 공개 랜딩 크리링 배너 없음 → `slot: null`, 게시 2장·예약 1장 → `kind: ad`·`afterLinkCount: 3`·2장·저장된 URL. `PUT /api/me/links/order` `slotIndex` 0 → 공개 0, 2 → 공개 2·편집 `slotIndex: 2`, 생략(역순) → 2 유지, 3(n) → `slotIndex: null`, -1 → 400 `validation_failed`, 빈 ids → 400 `order_mismatch`. `GET /apicore` 302의 `pass`로 → `passAccepted: true`·`/a/adcheck001/apicore001` 주소, `ad_banner_daily_stats` 첫 장만 1(서울 날짜), pass 없는 조회·`/api/me/landing` 뒤 그대로 1, 두 번째 pass 조회 2. 부여 + 배너(보임·숨김) → `kind: creator`·`/b/crcheck001` 1장, 편집 상태 `grantedAt`·`banners` 2·`bannerLimits` 1/5·2/20. 회수 → 다시 광고 2장. 없는 랜딩 404 `landing_not_found`.
   - `pnpm smoke` 5/5 통과.
   - `pnpm verify --fast` 통과, `pnpm verify` 통과(lint·typecheck·build, API 143/143). `pnpm work:scope 0068 --base HEAD` 통과(통합 브랜치 기준 변경 19개 모두 api 소유. 기본 기준(main)으로는 T1·S1·D1이 이미 넣은 웹·디자인·설계 파일이 함께 잡힘).
+- 2026-10-09: 0085 통합에서 실제 API·웹으로 확인하고 `완료`로 바꿨습니다(`tests/e2e/ad-banner.spec.ts` `무료 랜딩`). 확인 내용은 다음과 같습니다.
+  - 위치: 맨 뒤·맨 앞·2번째 링크 다음, 링크가 슬롯 너머로 옮겨도 공개 랜딩 순서가 같습니다.
+  - 노출: 단축 주소로 연 랜딩만 첫 장 노출 +1이고, 관리 미리보기·운영자 화면에서 연 랜딩은 늘지 않습니다.
+  - `clickUrl`: 통과 표시가 있으면 `/a/…`, 같은 출처면 저장된 URL입니다.
+  - 숨김: 게시 0장, 링크 모두 숨김(빈 랜딩), 포트폴리오만 있으면 광고 블록만 보입니다.

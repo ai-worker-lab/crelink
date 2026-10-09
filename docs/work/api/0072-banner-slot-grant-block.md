@@ -4,7 +4,7 @@
 - 역할: api
 - 상위: 0063
 - 선행: 0068
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-09
@@ -47,3 +47,7 @@
   - `pnpm verify --fast` 통과, `make infra-up` 뒤 `pnpm verify` 통과(API 21 suites 148/148).
   - `make up` 뒤 실제 HTTP(`127.0.0.1:7620`, 세션·크리에이터·배너 행은 SQL, 이미지는 운영자 `POST /api/me/files`): 상세 `grantedAt: null`·배너 2·한도 2/5·2/20 → 부여 200(`grantedAt`) → 공개 `kind: creator`·2장. 부여 400 `validation_failed`(`"yes"`)·404 `creator_not_found`·크리에이터 403 `forbidden`·익명 401 `unauthenticated`. 배너 차단 200(`blocked: true`·`신고`) → 풀기 200(사유 null), 없는 배너 404 `banner_not_found`, `blocked: 1` 400. `POST /api/admin/blocked-domains` `t6spam.example` 201 → `www.t6spam.example` 배너 차단(`차단 도메인: t6spam.example`)·한도 1/5, 공개 랜딩 1장, 게시 중 크리링 배너 끝남(시작 그대로)·예약 배너 시작=끝·다른 도메인 게시 중 그대로. 회수 → `grantedAt: null`·배너 2 보관, 공개 `kind: ad`·남은 크리링 배너 1장.
   - `pnpm smoke` 5/5 통과.
+- 2026-10-09: 0085 통합에서 실제 웹 화면으로 확인하고 `완료`로 바꿨습니다(`tests/e2e/ad-banner.spec.ts` `배너 슬롯`·`운영자 크리링 배너`).
+  - 부여·회수: 부여하면 같은 자리가 배너 슬롯, 회수하면 광고 블록으로 돌아가고 배너 6장은 보관됩니다. 다시 부여하면 이전 배너가 그대로 보입니다.
+  - 배너 차단: 차단·풀기가 됩니다.
+  - 차단 도메인 추가: 크리에이터 배너는 차단되고(사유 유지), 게시 중 크리링 배너는 끝납니다.

@@ -3,7 +3,7 @@
 - 단계: 티켓
 - 역할: web
 - 상위: 0063
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-09
@@ -63,3 +63,4 @@
     - 첫 장면이 기본 이미지가 아닌 APNG(IDAT가 애니메이션 밖)와 Safari 데스크톱 앱은 시험하지 않았습니다.
   - 실행한 검사: `pnpm --filter @crelink/web test`(22건 통과, 새 9건 포함), `pnpm --filter @crelink/web typecheck`(통과), 바꾼 파일 `prettier --check`·`eslint`(통과), `pnpm work:scope`(통과). 화면을 바꾸지 않아 `make up`·`pnpm smoke`·폭 확인은 해당 없음(T12가 `ImageField`에 붙일 때 함). 전체 `pnpm verify`는 돌리지 않았습니다.
   - orchestrator: 설계 `변경 기록`에 위 결론과 `ImageDecoder` 제외를 옮겨 주세요.
+- 2026-10-09: 결론은 설계 `변경 기록`(S1 결과)에 옮겨져 있습니다. 0085 통합 E2E에서 Chromium이 `createImageBitmap(file)`으로 GIF 첫 장면 정지 이미지를 만들어 올렸습니다(`tests/e2e/ad-banner.spec.ts`). 상태는 `완료`입니다.

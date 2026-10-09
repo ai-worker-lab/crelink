@@ -3,7 +3,7 @@
 - 단계: 티켓
 - 역할: api
 - 상위: 0063
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-09
@@ -47,3 +47,4 @@
   - `make infra-up` 뒤 `pnpm --filter @crelink/api test -- test/migrations.e2e-spec.ts src/config.service.spec.ts` 26/26 통과.
   - `pnpm verify --fast` 통과(lint·typecheck 전체). `pnpm verify` 통과(shared 55, web 13, API 125/125).
   - 격리 인스턴스(`PORT_SLOT=37`, Compose project `crelink-t1contract`)에서 `make up` 뒤 실제 요청: `GET /api/me/landing` 200(`slot` `{kind:'ad', slotIndex:null, grantedAt:null}`, `bannerLimits` 5·20)·세션 없음 401, `GET /api/public/landings/{id}` 200(`blocks[0].slot: null`)·없는 랜딩 404, `GET /api/admin/creators/{id}` 200(`bannerSlot`·`banners`·`bannerLimits`)·크리에이터 세션 403, `GET …/stats` 200(`bannerClicks: []`), `POST /api/me/files` GIF 201(`animated: false`)·파일 없음 400. `BANNER_SLOT_MAX=6 BANNER_SLOT_TOTAL_MAX=5`로 `node dist/main.js` 기동 거부(종료 코드 1, 키 이름만 담은 오류). `pnpm smoke` 5/5 통과.
+- 2026-10-09: 0085 통합에서 확인하고 `완료`로 바꿨습니다. 슬롯 0 인스턴스(통합 브랜치 코드로 재기동, migration `0003_ad_banner` 적용)에서 공유 계약을 실제 API·웹이 끝까지 씁니다. `tests/e2e/ad-banner.spec.ts` 4/4, 전체 `pnpm e2e` 12/12, `pnpm verify` 통과(API 175/175).

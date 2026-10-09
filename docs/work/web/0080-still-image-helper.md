@@ -4,7 +4,7 @@
 - 역할: web
 - 상위: 0063
 - 선행: 0067, 0075
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-09
@@ -45,3 +45,4 @@
   - `pnpm --filter @crelink/web test` 27/27 통과(새 5건 포함), `pnpm --filter @crelink/web typecheck` 통과, 바꾼 파일 `prettier`·`eslint` 통과, `pnpm verify --fast` 통과.
   - 브라우저(Playwright Chromium, 1280·390px): 아직 배너 모드를 쓰는 화면이 없어(T13·T16) 임시 확인 화면(확인 뒤 지움)과 계약 `UploadFileResponse` mock API(`GIF`로 시작하면 `animated: true`, 저장소 밖 `.local/`)로 확인. S1 표본 `anim-1500x900.gif` → 업로드 2번(원본 GIF, `anim-1500x900-still.png` 1200×400 PNG 11,024B), 값의 `stillImage.fileId`가 둘째 업로드, 미리보기 240×80(3:1), 도움말 문구. `animated: false` 응답(WebP) → `stillImage: null`. 깨진 GIF(`GIF89a…`) → `still_image_failed` 오류 줄. 가로 넘침 0, 콘솔 오류 0.
   - 실제 API의 `animated` 판정은 T3(0069) 뒤에 연결됩니다. 지금 API는 늘 `false`라 정지 이미지를 만들지 않습니다(0067 최소 연결).
+- 2026-10-09: 0085 통합에서 실제 API(0069 판정)로 확인하고 `완료`로 바꿨습니다. 운영자 대화상자에서 GIF를 올리면 `움직이는 이미지라 첫 장면 정지 이미지를 함께 올렸어요.`가 보입니다. 저장된 배너의 `still_file_id` 파일은 `animated = false`이고 원본은 `true`입니다(`tests/e2e/ad-banner.spec.ts`).
