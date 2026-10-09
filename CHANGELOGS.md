@@ -4,6 +4,10 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-10-10
+
+- AI 운영자와 실사용자 100명 목표, 링크 슬롯 +5 이벤트 work item 등록(사용자 결정: 운영부터 기획·개발까지 모든 권한을 AI 전용 계정에 위임, 실행마다 기록, 30분 트리거, 1차 목표 사이트 보강과 실사용자 100명, 신청자 한정 슬롯 +5 이벤트). 에픽 `docs/work/epics/0088-ai-operator.md`·`docs/work/epics/0089-slot-event.md`, PRD·조사 `docs/work/product/0090-growth-goal-ai-operator-prd.md`, 설계·통합 `docs/work/orchestrator/0091-ai-operator-design.md`·`docs/work/orchestrator/0092-slot-event-design.md`. 병렬 작업용으로 후속 번호 범위와 migration 번호(0004·0005)를 나눴습니다.
+
 ## 2026-10-09
 
 - 광고 블록과 크리에이터 배너 슬롯 요구(사용자 결정: 무료는 지울 수 없는 크리링 광고 블록, 유료는 같은 자리의 크리에이터 배너 슬롯, 링크 사이 어디든 끌어서 위치 변경, 스와이프 배너, 리틀리 광고 블록처럼 수익 배분, 운영자 등록 광고로 시작, 배너 슬롯은 운영자 수동 부여). PRD `docs/product/crelink.md`: R20~R22(수용 기준은 `[AI 제안]`), 대상 사용자(운영자)·범위·참고 사실·미정 질문 6개·위험 5개. 벤치마킹 `docs/product/research/link-in-bio-benchmark.md`: `광고 블록과 광고 제거` 절(리틀리AD 수익 구조·정산·세금·이용 조건, 인포크 Pro `광고 없음`, Google 게시자 정책). 코드·디자인 변경은 없음. `design/system/DESIGN.md`의 공개 랜딩 장식 금지 규칙과 부딪치는 점은 디자인 work item에서 다룸. 근거 `docs/work/product/0062-ad-banner-block-prd.md`.
