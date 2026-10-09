@@ -38,6 +38,11 @@ const rules: ReadonlyArray<{ methods: readonly string[]; pattern: RegExp; upload
   { methods: ['PUT'], pattern: new RegExp(`^api/admin/banners/${ID}/block$`) },
   { methods: ['GET', 'POST'], pattern: /^api\/admin\/blocked-domains$/ },
   { methods: ['DELETE'], pattern: new RegExp(`^api/admin/blocked-domains/${ID}$`) },
+  // 광고 배너 목록 `GET`은 서버 렌더만 부르므로 넣지 않습니다(설계 docs/specs/crelink-ad-banner.md `권한·보안`).
+  { methods: ['POST'], pattern: /^api\/admin\/ad-banners$/ },
+  { methods: ['PUT'], pattern: /^api\/admin\/ad-banners\/order$/ },
+  { methods: ['PATCH'], pattern: new RegExp(`^api/admin/ad-banners/${ID}$`) },
+  { methods: ['PUT'], pattern: new RegExp(`^api/admin/ad-banners/${ID}/end$`) },
   { methods: ['GET', 'POST'], pattern: new RegExp(`^api/landings/${ID}/guestbook$`) },
   { methods: ['DELETE'], pattern: new RegExp(`^api/guestbook/${ID}$`) },
   { methods: ['PUT'], pattern: new RegExp(`^api/guestbook/${ID}/hidden$`) },
