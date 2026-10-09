@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>크리링 · 첫 광고 배너(크리에이터 가입 유도)</title>
+<link rel="stylesheet" href="../system/tokens.css">
+<style>
+/* 배너 글자를 웹과 같은 Pretendard 1.3.9 정적 woff2로 그린다(웹 apps/web/public 원본 그대로). */
+@font-face{font-family:Pretendard;src:url("../../apps/web/public/Pretendard-Regular.woff2") format("woff2");font-weight:400}
+@font-face{font-family:Pretendard;src:url("../../apps/web/public/Pretendard-Bold.woff2") format("woff2");font-weight:700}
+@font-face{font-family:Pretendard;src:url("../../apps/web/public/Pretendard-ExtraBold.woff2") format("woff2");font-weight:800}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--ds-color-background-stage);color:var(--ds-color-text-primary);font:var(--ds-font-weight-regular) var(--ds-font-size-15)/1.65 var(--ds-font-sans);word-break:keep-all;-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}
+.page{max-width:1280px;margin:0 auto;padding:var(--ds-space-40) var(--ds-space-32) var(--ds-space-48);display:flex;flex-direction:column;gap:var(--ds-space-48)}
+.intro{display:flex;flex-direction:column;gap:var(--ds-space-8);max-width:760px}
+.intro h1{font-size:var(--ds-font-size-27);font-weight:var(--ds-font-weight-extrabold);line-height:1.15}
+.intro p{color:var(--ds-color-text-secondary)}
+.candidate{display:flex;flex-direction:column;gap:var(--ds-space-20);padding-top:var(--ds-space-32);border-top:1px solid var(--ds-color-border-default)}
+.candidate-head{display:flex;flex-wrap:wrap;align-items:center;gap:var(--ds-space-8) var(--ds-space-12)}
+.candidate-head h2{font-size:var(--ds-font-size-22);font-weight:var(--ds-font-weight-extrabold);line-height:1.15}
+.pick{padding:var(--ds-space-2) var(--ds-space-8);border:1px solid var(--ds-color-status-positive);border-radius:var(--ds-corner-sm);background:var(--ds-color-status-positive-subtle);color:var(--ds-color-status-positive);font-size:var(--ds-font-size-12);font-weight:var(--ds-font-weight-bold);line-height:1.4}
+.meta{display:grid;grid-template-columns:max-content 1fr;gap:var(--ds-space-4) var(--ds-space-16);font-size:var(--ds-font-size-14);color:var(--ds-color-text-secondary)}
+.meta dt{font-weight:var(--ds-font-weight-bold);color:var(--ds-color-text-primary)}
+.meta dd{margin:0}
+.meta code{font-family:var(--ds-font-mono);font-size:var(--ds-font-size-13)}
+.label{font-size:var(--ds-font-size-13);font-weight:var(--ds-font-weight-bold);color:var(--ds-color-text-subtle)}
+.views{display:flex;flex-wrap:wrap;align-items:flex-start;gap:var(--ds-space-32)}
+.view{display:flex;flex-direction:column;gap:var(--ds-space-8);min-width:0}
+.full{width:100%}
+.full-scroll{overflow-x:auto;max-width:100%}
+.full-scroll img{display:block;box-sizing:content-box;width:1200px;height:400px;border:1px solid var(--ds-color-border-default)}
+.art-view{max-width:100%;overflow-x:auto}
+.art-view .note{max-width:480px}
+
+/* ---------- 배너 원본: 480×160 논리 크기를 토큰으로 그리고 2.5배(1200×400)로 렌더한다 ---------- */
+.art{position:relative;isolation:isolate;display:flex;align-items:center;justify-content:space-between;gap:var(--ds-space-16);width:480px;height:160px;overflow:hidden;padding:var(--ds-space-20) var(--ds-space-24);font-family:var(--ds-font-sans);word-break:keep-all}
+.art-copy{display:flex;flex-direction:column;gap:var(--ds-space-8);min-width:0}
+.art-brand{font-size:var(--ds-font-size-18);font-weight:var(--ds-font-weight-extrabold);line-height:1.2}
+.art-title{font-size:var(--ds-font-size-38);font-weight:var(--ds-font-weight-extrabold);line-height:1.15}
+.art-cta{flex:none;padding:var(--ds-space-10) var(--ds-space-20);border-radius:var(--ds-corner-full);font-size:var(--ds-font-size-18);font-weight:var(--ds-font-weight-extrabold);line-height:1.2;white-space:nowrap}
+
+/* A: 짙은 면(본문 글자색) + 흰 글자 + 강조색 행동 알약. 흰 링크 카드와 확실히 다르다. */
+.art-a{background:var(--ds-color-text-primary);color:var(--ds-color-text-on-action)}
+.art-a .art-cta{background:var(--ds-color-action-primary);color:var(--ds-color-text-on-action)}
+/* A는 크리링·행동 문구를 22로 키워 320px 화면(0.225배)에서도 12px을 넘긴다. */
+.art-a .art-brand,.art-a .art-cta{font-size:var(--ds-font-size-22)}
+
+/* B: 옅은 면 + 오른쪽에 크리링 랜딩을 줄여 그린 그림(글자 없는 도형) + 강조색 행동 알약. */
+.art-b{justify-content:flex-start;background:var(--ds-color-surface-raised);color:var(--ds-color-text-primary);padding-right:168px}
+.art-b .art-copy{gap:var(--ds-space-4)}
+.art-b .art-title{font-size:var(--ds-font-size-27)}
+.art-b .art-cta{align-self:flex-start;margin-top:var(--ds-space-2);padding:var(--ds-space-6) var(--ds-space-16);background:var(--ds-color-action-primary);color:var(--ds-color-text-on-action)}
+.art-mock{position:absolute;top:var(--ds-space-20);right:var(--ds-space-24);display:flex;flex-direction:column;align-items:center;gap:var(--ds-space-6);width:128px;height:156px;padding:var(--ds-space-12) var(--ds-space-10);border:1px solid var(--ds-color-border-default);border-radius:var(--ds-corner-lg);background:var(--ds-color-surface-default);box-shadow:var(--elev-raised)}
+.m-avatar{width:32px;height:32px;border:1px solid var(--ds-color-border-default);border-radius:50%;background:var(--ds-color-surface-raised)}
+.m-name{width:56px;height:6px;margin-bottom:var(--ds-space-4);border-radius:var(--ds-corner-full);background:var(--ds-color-text-primary)}
+.m-link{width:100%;height:18px;border:1px solid var(--ds-color-border-default);border-radius:var(--ds-corner-sm);background:var(--ds-color-surface-default)}
+
+/* C: 강조색 옅은 면(흰 바탕 위) + 짙은 행동 알약. 강조색은 면의 옅은 색에만 쓴다. */
+.art-c{background:var(--ds-color-surface-default);color:var(--ds-color-text-primary)}
+.art-c::before{content:"";position:absolute;inset:0;z-index:-1;background:var(--ds-color-action-primary-subtle)}
+.art-c .art-title{font-size:var(--ds-font-size-27)}
+.art-c .art-cta{background:var(--ds-color-text-primary);color:var(--ds-color-text-on-action)}
+
+/* ---------- 390px 공개 랜딩(지금 웹 CSS의 .profile-main·.link-card·.banner-carousel 값을 옮김, 700px 이하 여백 24·16) ---------- */
+.phone{box-sizing:content-box;width:390px;flex:none;overflow:hidden;border:1px solid var(--ds-color-border-frame);border-radius:var(--ds-corner-lg);background:var(--ds-color-background-stage)}
+.p-main{padding:var(--ds-space-24) var(--ds-space-16)}
+.p-profile{display:flex;flex-direction:column;gap:var(--ds-space-24)}
+.p-head{display:flex;flex-direction:column;align-items:center;gap:var(--ds-space-8);text-align:center}
+.p-avatar{display:grid;place-items:center;width:96px;height:96px;border:1px solid var(--ds-color-border-default);border-radius:50%;background:var(--ds-color-surface-raised);color:var(--ds-color-text-subtle);font-size:var(--ds-font-size-34);font-weight:var(--ds-font-weight-extrabold)}
+.p-name{font-size:var(--ds-font-size-22);font-weight:var(--ds-font-weight-extrabold);line-height:1.3}
+.p-links{display:flex;flex-direction:column;gap:var(--ds-space-12);margin:0;padding:0;list-style:none}
+.link-card{display:flex;align-items:center;gap:var(--ds-space-12);min-height:56px;padding:var(--ds-space-12) var(--ds-space-16);border:1px solid var(--ds-color-border-default);border-radius:var(--ds-corner-lg);background:var(--ds-color-surface-default);box-shadow:var(--elev-raised);color:var(--ds-color-text-primary);text-decoration:none}
+.link-text{display:flex;flex-direction:column;gap:var(--ds-space-2);min-width:0}
+.link-title{font-weight:var(--ds-font-weight-bold)}
+.link-description{font-size:var(--ds-font-size-14);color:var(--ds-color-text-secondary)}
+.banner-carousel{padding:var(--ds-space-8);border:1px solid var(--ds-color-border-default);border-radius:var(--ds-corner-lg);background:var(--ds-color-surface-default);box-shadow:var(--elev-raised)}
+.banner-frame{display:block;border-radius:var(--ds-corner-md)}
+.banner-image{display:block;width:100%;height:auto;aspect-ratio:3/1;border-radius:var(--ds-corner-md);background:var(--ds-color-surface-raised);object-fit:cover;object-position:center}
+.banner-controls{display:flex;align-items:center;justify-content:flex-end;gap:var(--ds-space-6);min-height:44px;margin-top:var(--ds-space-8)}
+.banner-ad-badge{flex:none;margin-right:auto;padding:var(--ds-space-2) var(--ds-space-8);border:1px solid var(--ds-color-border-strong);border-radius:var(--ds-corner-sm);color:var(--ds-color-text-secondary);font-size:var(--ds-font-size-12);font-weight:var(--ds-font-weight-bold);line-height:1.4}
+.p-footer{display:flex;justify-content:center;gap:var(--ds-space-8);padding:var(--ds-space-20);border-top:1px solid var(--ds-color-border-default);font-size:var(--ds-font-size-14);color:var(--ds-color-text-subtle)}
+.p-footer strong{font-size:var(--ds-font-size-16)}
+.note{max-width:360px;font-size:var(--ds-font-size-13);color:var(--ds-color-text-secondary)}
+
+@media (max-width:700px){.page{padding:var(--ds-space-24) var(--ds-space-16)}.phone{box-sizing:border-box;width:100%;max-width:392px}}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="intro">
+    <h1>첫 크리링 광고 배너 · 크리에이터 가입 유도</h1>
+    <p>공개 랜딩 광고 블록(PRD R20)에 처음 올릴 크리링 배너 후보 3개입니다. 방문자(크리에이터의 인스타그램 팔로워)를 크리링 홈 <code>/</code>(<code>구글로 시작하기</code>)로 보냅니다. 배너 이미지에는 <code>광고</code> 글자를 넣지 않습니다. 블록 조작 줄의 <code>광고</code> 배지가 늘 붙기 때문입니다.</p>
+    <p>후보마다 위에서부터 운영자가 올릴 PNG(1200×400 실제 크기), 390px 공개 랜딩 안 모습(링크 2개 다음 자리, PNG를 그대로 씀), PNG를 렌더한 HTML 원본(480×160 논리 크기, 2.5배로 렌더)을 보여 줍니다.</p>
+  </header>
+
+  <section class="candidate" aria-labelledby="cand-a" data-od-id="candidate-a">
+    <div class="candidate-head"><h2 id="cand-a">후보 A · 나도 이런 페이지 만들기</h2><span class="pick">추천</span></div>
+    <dl class="meta">
+      <dt>문구</dt><dd>크리링 · 나도 이런 페이지 만들기 · 무료로 시작하기</dd>
+      <dt>파일</dt><dd><code>assets/first-ad-banner-a.png</code></dd>
+      <dt>대체 문구</dt><dd>크리링, 나도 이런 페이지 만들기, 무료로 시작하기</dd>
+    </dl>
+    <div class="view full"><span class="label">배너 단독 · 1200×400 PNG</span><div class="full-scroll"><img src="assets/first-ad-banner-a.png" width="1200" height="400" alt="크리링, 나도 이런 페이지 만들기, 무료로 시작하기"></div></div>
+    <div class="views">
+      <div class="view"><span class="label">공개 랜딩 390px · 광고 블록(배너 1장)</span>
+        <div class="phone"><div class="p-main"><article class="p-profile">
+          <header class="p-head"><span class="p-avatar" aria-hidden="true">하</span><h3 class="p-name">하루필름</h3><p>브이로그와 여행 숏폼을 만들어요. 협업 문의는 이메일로 주세요.</p></header>
+          <ul class="p-links">
+            <li><a class="link-card" href="#cand-a"><span class="link-text"><span class="link-title">유튜브 · 하루필름 브이로그</span><span class="link-description">주말마다 새 영상을 올려요</span></span></a></li>
+            <li><a class="link-card" href="#cand-a"><span class="link-text"><span class="link-title">협업 문의 메일</span><span class="link-description">haru.film@gmail.com</span></span></a></li>
+            <li><section class="banner-carousel" aria-label="크리링 광고" data-od-id="ad-block-a"><a class="banner-frame" href="#cand-a"><img class="banner-image" src="assets/first-ad-banner-a.png" width="1200" height="400" alt="크리링, 나도 이런 페이지 만들기, 무료로 시작하기"></a><div class="banner-controls"><span class="banner-ad-badge">광고</span></div></section></li>
+            <li><a class="link-card" href="#cand-a"><span class="link-text"><span class="link-title">필름 카메라 장비 목록</span><span class="link-description">제가 쓰는 카메라와 필름</span></span></a></li>
+          </ul>
+        </article></div><footer class="p-footer"><strong>크리링</strong><span>개인정보 처리방침</span></footer></div>
+      </div>
+      <div class="view art-view"><span class="label">HTML 원본 · 480×160 논리 크기</span>
+        <div class="art art-a" id="art-a" data-file="first-ad-banner-a.png">
+          <div class="art-copy"><span class="art-brand">크리링</span><span class="art-title">나도 이런<br>페이지 만들기</span></div>
+          <span class="art-cta">무료로 시작하기</span>
+        </div>
+        <p class="note">지금 웹 CSS로 잰 배너 표시 크기는 390px 랜딩 340×113(0.283배), 1280px 랜딩 422×141(0.352배), 320px 랜딩 270×90(0.225배)입니다. 가장 작은 글자(크리링·행동 문구, 원본 55px)는 390px에서 약 15.6px, 1280px에서 약 19.3px, 320px에서 약 12.4px이고 제목(원본 95px)은 약 26.9px·33.4px·21.4px입니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="candidate" aria-labelledby="cand-b" data-od-id="candidate-b">
+    <div class="candidate-head"><h2 id="cand-b">후보 B · 프로필 링크 하나로 나를 소개하세요</h2></div>
+    <dl class="meta">
+      <dt>문구</dt><dd>크리링 · 프로필 링크 하나로 나를 소개하세요 · 무료로 만들기</dd>
+      <dt>파일</dt><dd><code>assets/first-ad-banner-b.png</code></dd>
+      <dt>대체 문구</dt><dd>크리링, 프로필 링크 하나로 나를 소개하세요, 무료로 만들기</dd>
+    </dl>
+    <div class="view full"><span class="label">배너 단독 · 1200×400 PNG</span><div class="full-scroll"><img src="assets/first-ad-banner-b.png" width="1200" height="400" alt="크리링, 프로필 링크 하나로 나를 소개하세요, 무료로 만들기"></div></div>
+    <div class="views">
+      <div class="view"><span class="label">공개 랜딩 390px · 광고 블록(배너 1장)</span>
+        <div class="phone"><div class="p-main"><article class="p-profile">
+          <header class="p-head"><span class="p-avatar" aria-hidden="true">하</span><h3 class="p-name">하루필름</h3><p>브이로그와 여행 숏폼을 만들어요. 협업 문의는 이메일로 주세요.</p></header>
+          <ul class="p-links">
+            <li><a class="link-card" href="#cand-b"><span class="link-text"><span class="link-title">유튜브 · 하루필름 브이로그</span><span class="link-description">주말마다 새 영상을 올려요</span></span></a></li>
+            <li><a class="link-card" href="#cand-b"><span class="link-text"><span class="link-title">협업 문의 메일</span><span class="link-description">haru.film@gmail.com</span></span></a></li>
+            <li><section class="banner-carousel" aria-label="크리링 광고" data-od-id="ad-block-b"><a class="banner-frame" href="#cand-b"><img class="banner-image" src="assets/first-ad-banner-b.png" width="1200" height="400" alt="크리링, 프로필 링크 하나로 나를 소개하세요, 무료로 만들기"></a><div class="banner-controls"><span class="banner-ad-badge">광고</span></div></section></li>
+            <li><a class="link-card" href="#cand-b"><span class="link-text"><span class="link-title">필름 카메라 장비 목록</span><span class="link-description">제가 쓰는 카메라와 필름</span></span></a></li>
+          </ul>
+        </article></div><footer class="p-footer"><strong>크리링</strong><span>개인정보 처리방침</span></footer></div>
+      </div>
+      <div class="view art-view"><span class="label">HTML 원본 · 480×160 논리 크기</span>
+        <div class="art art-b" id="art-b" data-file="first-ad-banner-b.png">
+          <div class="art-copy"><span class="art-brand">크리링</span><span class="art-title">프로필 링크 하나로<br>나를 소개하세요</span><span class="art-cta">무료로 만들기</span></div>
+          <div class="art-mock" aria-hidden="true"><span class="m-avatar"></span><span class="m-name"></span><span class="m-link"></span><span class="m-link"></span><span class="m-link"></span></div>
+        </div>
+        <p class="note">오른쪽 그림은 글자 없는 도형으로 그린 크리링 랜딩입니다. 제목(원본 67.5px)은 390px에서 약 19.1px, 가장 작은 글자(원본 45px)는 약 12.8px입니다(1280px에서 23.7px·15.8px).</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="candidate" aria-labelledby="cand-c" data-od-id="candidate-c">
+    <div class="candidate-head"><h2 id="cand-c">후보 C · SNS·포트폴리오·링크를 한 페이지에</h2></div>
+    <dl class="meta">
+      <dt>문구</dt><dd>크리링 · SNS·포트폴리오·링크를 한 페이지에 · 무료로 만들기</dd>
+      <dt>파일</dt><dd><code>assets/first-ad-banner-c.png</code></dd>
+      <dt>대체 문구</dt><dd>크리링, SNS·포트폴리오·링크를 한 페이지에, 무료로 만들기</dd>
+    </dl>
+    <div class="view full"><span class="label">배너 단독 · 1200×400 PNG</span><div class="full-scroll"><img src="assets/first-ad-banner-c.png" width="1200" height="400" alt="크리링, SNS·포트폴리오·링크를 한 페이지에, 무료로 만들기"></div></div>
+    <div class="views">
+      <div class="view"><span class="label">공개 랜딩 390px · 광고 블록(배너 1장)</span>
+        <div class="phone"><div class="p-main"><article class="p-profile">
+          <header class="p-head"><span class="p-avatar" aria-hidden="true">하</span><h3 class="p-name">하루필름</h3><p>브이로그와 여행 숏폼을 만들어요. 협업 문의는 이메일로 주세요.</p></header>
+          <ul class="p-links">
+            <li><a class="link-card" href="#cand-c"><span class="link-text"><span class="link-title">유튜브 · 하루필름 브이로그</span><span class="link-description">주말마다 새 영상을 올려요</span></span></a></li>
+            <li><a class="link-card" href="#cand-c"><span class="link-text"><span class="link-title">협업 문의 메일</span><span class="link-description">haru.film@gmail.com</span></span></a></li>
+            <li><section class="banner-carousel" aria-label="크리링 광고" data-od-id="ad-block-c"><a class="banner-frame" href="#cand-c"><img class="banner-image" src="assets/first-ad-banner-c.png" width="1200" height="400" alt="크리링, SNS·포트폴리오·링크를 한 페이지에, 무료로 만들기"></a><div class="banner-controls"><span class="banner-ad-badge">광고</span></div></section></li>
+            <li><a class="link-card" href="#cand-c"><span class="link-text"><span class="link-title">필름 카메라 장비 목록</span><span class="link-description">제가 쓰는 카메라와 필름</span></span></a></li>
+          </ul>
+        </article></div><footer class="p-footer"><strong>크리링</strong><span>개인정보 처리방침</span></footer></div>
+      </div>
+      <div class="view art-view"><span class="label">HTML 원본 · 480×160 논리 크기</span>
+        <div class="art art-c" id="art-c" data-file="first-ad-banner-c.png">
+          <div class="art-copy"><span class="art-brand">크리링</span><span class="art-title">SNS·포트폴리오·링크를<br>한 페이지에</span></div>
+          <span class="art-cta">무료로 만들기</span>
+        </div>
+        <p class="note">제목(원본 67.5px)은 390px에서 약 19.1px, 가장 작은 글자(원본 45px)는 약 12.8px입니다(1280px에서 23.7px·15.8px). 바탕은 흰 면 위에 강조색 옅은 면(<code>--ds-color-action-primary-subtle</code>)을 겹친 색입니다.</p>
+      </div>
+    </div>
+  </section>
+</main>
+</body>
+</html>
