@@ -7,5 +7,6 @@ import { GeoIpService, TrackingService } from './tracking.service';
   imports: [LandingPassModule],
   controllers: [ShortLinkController],
   providers: [GeoIpService, TrackingService],
+  exports: [TrackingService],
 })
 export class ShortLinkModule {}

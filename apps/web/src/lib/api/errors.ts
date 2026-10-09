@@ -36,6 +36,13 @@ const API_ERROR_MESSAGES: Record<CrelinkErrorCode, string> = {
   domain_not_found: '차단 목록에 없는 도메인이에요.',
   guestbook_disabled: '방명록을 닫은 페이지예요.',
   guestbook_entry_not_found: '방명록 글을 찾을 수 없어요. 새로고침한 뒤 다시 시도해 주세요.',
+  // 배너 고정 문구(설계 docs/specs/crelink-ad-banner.md `상수·경로·오류 코드`). n·m을 넣은 문장과 회수 흐름은 배너 패널이 코드로 직접 처리합니다.
+  banner_not_found: '배너를 찾을 수 없어요. 새로고침해 주세요.',
+  banner_limit_reached: '보이는 배너 한도에 닿았어요.',
+  banner_total_limit_reached: '배너 보관 한도에 닿았어요.',
+  banner_slot_not_granted: '배너 슬롯이 회수되어 이 자리에 다시 크리링 광고 블록이 나와요.',
+  ad_banner_not_found: '광고 배너를 찾을 수 없어요. 새로고침해 주세요.',
+  banner_period_invalid: '게시 끝은 시작보다 뒤여야 해요.',
 };
 
 /** 웹(BFF·클라이언트)에서만 생기는 오류 코드. */
@@ -44,6 +51,8 @@ const WEB_ERROR_MESSAGES: Record<string, string> = {
   upstream_unavailable: 'API 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.',
   api_not_configured: 'API 서버 주소가 설정되지 않았어요.',
   route_not_allowed: '허용되지 않은 API 요청이에요.',
+  /** 배너 이미지의 첫 장면 정지 이미지를 만들지 못함(`ImageField` 배너 모드, `lib/banner-image.ts`). */
+  still_image_failed: '움직이는 이미지의 첫 장면을 만들지 못했어요. 다른 이미지를 골라 주세요.',
 };
 
 /**

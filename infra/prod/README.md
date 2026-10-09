@@ -16,7 +16,7 @@ CD 워크플로(`.github/workflows/deploy.yml`)는 이 폴더에서 `tests/`·`R
 | `certs/supabase-ca.crt` | Supabase 루트 CA(공개 인증서) |
 | `images.env.example` | 서버 `state/images.env` 형식(`API_IMAGE`·`WEB_IMAGE`). compose 문법 확인용 |
 | `ssh-entry.sh` | `deploy` 사용자의 SSH forced command(`deploy`·`rollback`·`status`·`verify`). `bootstrap.sh`가 `/usr/local/lib/crelink/`에 설치하며 워크플로로는 바뀌지 않음 |
-| `verify.sh` | 운영 주소 검사(서버에서 Cloudflare를 거쳐 공개 주소 6개). 주소는 릴리스 암호문의 평문 `WEB_URL`·`SHORT_LINK_BASE_URL`. 워크플로가 `ssh deploy@<host> verify`로 부름 |
+| `verify.sh` | 운영 주소 검사(서버에서 Cloudflare를 거쳐 검사 10개: 웹 `/`·`/privacy`·BFF health, 없는 단축 주소, 없는 배너 클릭 `/b/`·`/a/`의 302와 안내 주소, `/api/health` 404). 주소는 릴리스 암호문의 평문 `WEB_URL`·`SHORT_LINK_BASE_URL`. 워크플로가 `ssh deploy@<host> verify`로 부름 |
 | `measure-gap.sh` | 배포 공백 측정(bash·curl): 스택 입구에 Host별 요청을 일정 간격으로 보내 실패(5xx·응답 없음) 수와 최장 연속 실패 구간을 출력. 서버에서는 `/opt/crelink/current/measure-gap.sh`, 로컬에서는 `-- <명령>`으로 배포 명령을 감쌈. 사용법은 머리말, 절차는 런북 "6-1. 배포 공백 측정" |
 | `deploy.sh` | `releases/<SHA>/deploy.sh <릴리스 SHA> <API SHA\|-> <웹 SHA\|->`: 복호화·문법 확인 → 이미지 pull → edge 준비 확인(없으면 무변경 종료 1) → `lib.sh switch_color`(비활성 색 `up --wait` → edge 안 헬스 → Caddy 업스트림 교체·validate·reload → 상태·`releases.log` → drain 뒤 옛 색 정지) → 성공 시 최근 5개 외 릴리스 정리. 새 색이 실패하면 그 색만 내리고 무변경 종료 1 |
 | `rollback.sh` | `rollback.sh [릴리스 SHA]`: 기본은 `releases.log`에서 지금 릴리스를 배포한 마지막 `deploy` 줄의 이전 릴리스. 그 릴리스의 설정·비밀값·이미지 전체를 같은 `switch_color`로 반대 색에 올림(무중단). blue/green 이전 형식 릴리스는 거부 |

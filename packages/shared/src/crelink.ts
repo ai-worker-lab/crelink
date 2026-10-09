@@ -41,7 +41,15 @@ export const CRELINK_LIMITS = {
   guestbookBodyMax: 500,
   /** 방명록 목록 한 번에 돌려주는 글 수(R19). */
   guestbookPageSize: 20,
+  /** 배너 대체 문구 최대 길이(R20 ④, R21 ②). 한도 n·보관 상한은 공유 상수가 아니라 API 설정값이며 웹은 `BannerLimits`만 씁니다. */
+  bannerAltMax: 100,
 } as const;
+
+/** 배너 비율(가로:세로). 공개 랜딩·관리 미리보기·운영자 미리보기·정지 이미지 자르기가 같은 값을 씁니다. 근거: docs/specs/crelink-ad-banner.md. */
+export const BANNER_ASPECT_RATIO = { width: 3, height: 1 } as const;
+
+/** 움직이는 배너의 첫 장면 정지 이미지 최대 크기(px). 바꾸면 정지 이미지를 다시 만들어야 합니다. */
+export const BANNER_STILL_SIZE = { width: 1200, height: 400 } as const;
 
 export const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
@@ -110,7 +118,13 @@ export type CrelinkErrorCode =
   | 'domain_exists'
   | 'domain_not_found'
   | 'guestbook_disabled'
-  | 'guestbook_entry_not_found';
+  | 'guestbook_entry_not_found'
+  | 'banner_not_found'
+  | 'banner_limit_reached'
+  | 'banner_total_limit_reached'
+  | 'banner_slot_not_granted'
+  | 'ad_banner_not_found'
+  | 'banner_period_invalid';
 
 /** `/notice?reason=`에 쓰는 사유. 단축 도메인 리디렉트와 로그인 콜백이 사용합니다. */
 export type NoticeReason =
@@ -213,6 +227,34 @@ export interface LinkLimits {
   totalUsed: number;
 }
 
+/** 크리에이터 배너 한도(R21 ②). 이 랜딩의 배너만 셉니다. max 값은 API 설정 `BANNER_SLOT_MAX`·`BANNER_SLOT_TOTAL_MAX`입니다. */
+export interface BannerLimits {
+  /** 보이게 둘 수 있는 최대 장수(n). */
+  visibleMax: number;
+  /** 숨기지 않고 차단되지 않은 배너 수. */
+  visibleUsed: number;
+  /** 숨김·차단 포함 보관 상한. */
+  totalMax: number;
+  totalUsed: number;
+}
+
+/** 크리에이터 배너(R21). 관리 화면과 운영자 크리에이터 상세가 같은 모양을 씁니다. */
+export interface CreatorBannerView {
+  /** uuid. */
+  id: string;
+  image: ImageRef;
+  /** 움직이는 배너의 첫 장면 정지 이미지(3:1). 움직이지 않으면 null. */
+  stillImage: ImageRef | null;
+  alt: string;
+  /** 연결 URL. 없으면 누를 수 없는 배너입니다. */
+  url: string | null;
+  hidden: boolean;
+  /** 운영자 차단 또는 차단 도메인. 주소를 바꿔도 유지됩니다(R21 ④). */
+  blocked: boolean;
+  blockedReason: string | null;
+  position: number;
+}
+
 /** `GET /api/me/landing` 응답. 편집 화면 전체 상태입니다. */
 export interface CreatorLandingState {
   landing: {
@@ -230,6 +272,16 @@ export interface CreatorLandingState {
   socials: SocialLinkView[];
   portfolio: PortfolioItemView[];
   limits: LinkLimits;
+  /**
+   * 링크 목록 안 광고 블록·배너 슬롯 자리(R20 ①②, R21 ①).
+   * slotIndex: 숨김·차단 포함 전체 링크 순서에서 슬롯 앞 링크 수. null = 맨 뒤에 붙어 있음. grantedAt: 배너 슬롯 부여 시각(없으면 null).
+   */
+  slot: { kind: BannerSlotKind; slotIndex: number | null; grantedAt: string | null };
+  /** 게시 중 크리링 배너(미리보기용, clickUrl = 저장된 URL). */
+  adBanners: PublicBannerView[];
+  /** 이 랜딩의 크리에이터 배너 전체(숨김·차단 포함, 순서대로). 회수 뒤에도 보관분이 들어 있고, 웹은 slot.kind = 'creator'일 때만 씁니다. */
+  banners: CreatorBannerView[];
+  bannerLimits: BannerLimits;
 }
 
 /** `PATCH /api/me/landing`. 빈 문자열·null은 비움입니다. 응답은 `CreatorLandingState`. */
@@ -267,9 +319,18 @@ export interface CreateLinkRequest {
 /** `PATCH /api/me/links/{id}`. 응답은 `LinkView`. */
 export type UpdateLinkRequest = Partial<CreateLinkRequest>;
 
-/** `PUT /api/me/links/order`. 내 링크 id 전체를 원하는 순서로 보냅니다. 응답은 `LinkView[]`. */
+/** 같은 종류의 id 전체를 원하는 순서로 보냅니다. 포트폴리오·크리에이터 배너(`PUT /api/me/banners/order`)·크리링 배너(`PUT /api/admin/ad-banners/order`) 정렬이 씁니다. */
 export interface ReorderRequest {
   ids: string[];
+}
+
+/**
+ * `PUT /api/me/links/order`. 내 링크 id 전체를 원하는 순서로 보냅니다. 응답은 `LinkView[]`.
+ * slotIndex: 숨김·차단 포함 전체 순서에서 슬롯 앞 링크 수(0 이상 정수). 링크 수 이상이면 맨 뒤. 생략하면 지금 상대 위치를 유지합니다(옛 웹 호환).
+ * 0 이상 정수가 아니면 400 `validation_failed`, id 집합이 다르면 400 `order_mismatch`.
+ */
+export interface LinkOrderRequest extends ReorderRequest {
+  slotIndex?: number;
 }
 
 /** `PUT /api/me/socials`. 전체 교체. 응답은 `SocialLinkView[]`. */
@@ -285,10 +346,36 @@ export interface PortfolioItemRequest {
   description?: string | null;
 }
 
-/** `POST /api/me/files` (multipart 필드 `file`) 응답(201). */
-export type UploadFileResponse = ImageRef;
+/** `POST /api/me/files` (multipart 필드 `file`) 응답(201). animated: GIF·WebP·APNG가 움직이는 이미지인지(업로드 때 판정). */
+export interface UploadFileResponse extends ImageRef {
+  animated: boolean;
+}
 
-// ---------- 공개 랜딩 (R3, R5, R12) ----------
+/**
+ * `POST /api/me/banners`(201, 배너 슬롯 부여된 크리에이터). 응답은 `CreatorBannerView`.
+ * 403 `banner_slot_not_granted`, 400 `validation_failed`·`link_url_invalid`, 404 `file_not_found`, 422 `link_domain_blocked`,
+ * 409 `banner_total_limit_reached`·`banner_limit_reached`.
+ */
+export interface CreateBannerRequest {
+  imageFileId: string;
+  /** 이미지가 움직이면 필수(움직이지 않는 이미지), 아니면 null. */
+  stillImageFileId?: string | null;
+  /** 1~`CRELINK_LIMITS.bannerAltMax`자. */
+  alt: string;
+  /** http·https. null·생략이면 연결 없음. */
+  url?: string | null;
+  hidden?: boolean;
+}
+
+/**
+ * `PATCH /api/me/banners/{id}`. 바뀐 필드만 보냅니다. imageFileId를 바꾸면 stillImageFileId도 같은 요청에 넣습니다.
+ * 응답은 `CreatorBannerView`. 오류는 POST와 같고 404 `banner_not_found`가 더해집니다.
+ * `DELETE /api/me/banners/{id}`는 204(403 `banner_slot_not_granted`, 404 `banner_not_found`).
+ * `PUT /api/me/banners/order`는 `ReorderRequest`(이 랜딩 배너 전체) → `CreatorBannerView[]`.
+ */
+export type UpdateBannerRequest = Partial<CreateBannerRequest>;
+
+// ---------- 공개 랜딩 (R3, R5, R12, R20, R21) ----------
 
 export interface PublicLinkView {
   id: string;
@@ -300,9 +387,78 @@ export interface PublicLinkView {
   clickUrl: string;
 }
 
+/** 'ad' = 크리링 광고 블록(R20), 'creator' = 크리에이터 배너 슬롯(R21). */
+export type BannerSlotKind = 'ad' | 'creator';
+
+/** 공개 랜딩·미리보기의 배너 한 장. id: 공개 응답은 배너 공개 ID, 미리보기의 크리에이터 배너는 `CreatorBannerView.id`(uuid). */
+export interface PublicBannerView {
+  id: string;
+  imageUrl: string;
+  /** 움직이는 배너의 첫 장면 정지 이미지(3:1). 움직이지 않으면 null. */
+  stillImageUrl: string | null;
+  alt: string;
+  /**
+   * 공개 API: 광고는 passAccepted일 때 `{SHORT}/a/{bannerPublicId}/{landingPublicId}`, 아니면 저장된 URL.
+   * 크리에이터 배너는 `{SHORT}/b/{bannerPublicId}`. 연결 URL이 없으면 null. 미리보기는 저장된 URL.
+   */
+  clickUrl: string | null;
+}
+
+export interface PublicBannerSlotView {
+  kind: BannerSlotKind;
+  /** 이 구역의 보이는 링크 중 슬롯 앞에 오는 수(0 = 맨 앞). */
+  afterLinkCount: number;
+  /** 1장 이상. */
+  banners: PublicBannerView[];
+}
+
 export interface PublicBlockView {
   type: 'list';
   links: PublicLinkView[];
+  /** 숨김 조건이면 null(R20 ⑥, R21 ③). 첫 list 구역에만 붙습니다. 웹은 없거나 null이면 그리지 않습니다. */
+  slot: PublicBannerSlotView | null;
+}
+
+/** `resolveBannerSlot`의 숨김 사유. 'no_content' = 광고인데 보이는 링크·포트폴리오가 없음, 'no_banners' = 보일 배너가 없음. */
+export type BannerSlotHiddenReason = 'no_banners' | 'no_content';
+
+export interface ResolveBannerSlotInput<B> {
+  /** 계정에 배너 슬롯이 부여됐는지(R21 ①). */
+  granted: boolean;
+  /** 숨김·차단 포함 전체 순서에서 슬롯 앞 링크 수. null = 맨 뒤. */
+  slotIndex: number | null;
+  /** 전체 순서의 링크마다 방문자에게 보이는지. */
+  linkVisible: readonly boolean[];
+  hasPortfolio: boolean;
+  /** 게시 중 크리링 배너(순서대로). */
+  adBanners: readonly B[];
+  /** 보이는(숨김·차단 아님) 크리에이터 배너(순서대로). */
+  creatorBanners: readonly B[];
+}
+
+export interface ResolvedBannerSlot<B> {
+  kind: BannerSlotKind;
+  /** 보이는 링크 중 슬롯 앞에 오는 수. 숨김일 때도 계산해 미리보기가 점선 자리를 그립니다. */
+  afterLinkCount: number;
+  banners: B[];
+  hidden: BannerSlotHiddenReason | null;
+}
+
+/**
+ * 슬롯 배치·숨김 규칙(R20 ①⑥, R21 ①③). 공개 랜딩 API와 관리 미리보기(`toLandingPreview`)가 함께 씁니다.
+ * 공개 API는 hidden이 null이 아니면 `slot: null`로 바꿉니다. 미리보기는 'no_banners'일 때만 그 자리에 점선 자리를 그립니다.
+ */
+export function resolveBannerSlot<B>(input: ResolveBannerSlotInput<B>): ResolvedBannerSlot<B> {
+  const kind: BannerSlotKind = input.granted ? 'creator' : 'ad';
+  const banners = [...(input.granted ? input.creatorBanners : input.adBanners)];
+  const before = Math.min(input.slotIndex ?? Infinity, input.linkVisible.length);
+  let afterLinkCount = 0;
+  for (let index = 0; index < before; index += 1) if (input.linkVisible[index]) afterLinkCount += 1;
+  const hasVisibleLink = input.linkVisible.some(Boolean);
+  let hidden: BannerSlotHiddenReason | null = null;
+  if (kind === 'ad' && !hasVisibleLink && !input.hasPortfolio) hidden = 'no_content';
+  else if (banners.length === 0) hidden = 'no_banners';
+  return { kind, afterLinkCount, banners, hidden };
 }
 
 /** 방문자가 보는 공개 랜딩 내용. 공개 랜딩(`/p/{publicId}`)과 관리 화면 보기 모드가 같은 모양으로 그립니다. */
@@ -415,6 +571,11 @@ export interface OperatorCreatorDetail extends OperatorCreatorSummary {
   extraLinkSlots: number;
   limits: LinkLimits;
   links: LinkView[];
+  /** 배너 슬롯 부여 시각(R21 ①). null이면 부여되지 않음(광고 블록). */
+  bannerSlot: { grantedAt: string | null };
+  /** 크리에이터 배너 전체(회수 뒤 보관분·숨김·차단 포함, 순서대로). */
+  banners: CreatorBannerView[];
+  bannerLimits: BannerLimits;
 }
 
 export interface CountByValue {
@@ -434,6 +595,11 @@ export interface OperatorCreatorStats {
   operatingSystems: CountByValue[];
   countries: CountByValue[];
   linkClicks: Array<{ linkId: string; title: string | null; clicks: number }>;
+  /**
+   * 크리에이터 배너별 클릭(R21 ④, 원본과 보존 집계 합계). bannerId는 배너 공개 ID, 지운 배너는 alt null.
+   * `totals.linkClicks`·`daily`에는 넣지 않습니다.
+   */
+  bannerClicks: Array<{ bannerId: string; alt: string | null; clicks: number }>;
 }
 
 /** `PUT /api/admin/creators/{userId}/extra-slots`. 응답은 `OperatorCreatorDetail`. */
@@ -446,7 +612,12 @@ export interface SetSuspensionRequest {
   suspended: boolean;
 }
 
-/** `PUT /api/admin/links/{linkId}/block`. 응답은 `LinkView`. */
+/** `PUT /api/admin/creators/{userId}/banner-slot`. 부여·회수(회수해도 배너는 보관). 응답은 `OperatorCreatorDetail`. 400 `validation_failed`, 404 `creator_not_found`. */
+export interface SetBannerSlotRequest {
+  granted: boolean;
+}
+
+/** `PUT /api/admin/links/{linkId}/block`은 `LinkView`, `PUT /api/admin/banners/{bannerId}/block`은 `CreatorBannerView`(404 `banner_not_found`)를 돌려줍니다. */
 export interface SetLinkBlockRequest {
   blocked: boolean;
   reason?: string | null;
@@ -463,6 +634,58 @@ export interface AddBlockedDomainRequest {
   domain: string;
   reason?: string | null;
 }
+
+/**
+ * 크리링 배너 상태(같은 시각 기준). live: 시작 ≤ 지금이고 끝이 없거나 지금보다 뒤, scheduled: 시작 > 지금, ended: 끝 ≤ 지금.
+ */
+export type AdBannerStatus = 'live' | 'scheduled' | 'ended';
+
+/** 크리링 배너(R20 ④). */
+export interface AdBannerView {
+  /** uuid. */
+  id: string;
+  image: ImageRef;
+  stillImage: ImageRef | null;
+  alt: string;
+  url: string;
+  /** 시간대가 붙은 ISO 8601. */
+  startsAt: string;
+  endsAt: string | null;
+  status: AdBannerStatus;
+  /** 게시 시작부터의 누적 노출·클릭(설계 결정 6). */
+  impressions: number;
+  clicks: number;
+  createdAt: string;
+}
+
+/** `GET /api/admin/ad-banners` 응답. 전체를 순서대로 돌려주며 웹이 item.status로 걸러 봅니다. */
+export interface AdBannerListResponse {
+  items: AdBannerView[];
+  counts: { all: number; live: number; scheduled: number; ended: number };
+}
+
+/**
+ * `POST /api/admin/ad-banners`(201, 맨 뒤 순서). 응답은 `AdBannerView`.
+ * startsAt·endsAt는 시간대가 붙은 ISO 8601(없으면 400 `validation_failed`), endsAt > startsAt(아니면 400 `banner_period_invalid`).
+ * 400 `validation_failed`·`link_url_invalid`·`banner_period_invalid`, 404 `file_not_found`, 422 `link_domain_blocked`.
+ */
+export interface AdBannerRequest {
+  imageFileId: string;
+  /** 이미지가 움직이면 필수, 아니면 null. */
+  stillImageFileId?: string | null;
+  alt: string;
+  /** http·https. */
+  url: string;
+  startsAt: string;
+  endsAt?: string | null;
+}
+
+/**
+ * `PATCH /api/admin/ad-banners/{id}`. 바뀐 필드만 보냅니다. 응답은 `AdBannerView`. 오류는 POST와 같고 404 `ad_banner_not_found`가 더해집니다.
+ * `PUT /api/admin/ad-banners/{id}/end`는 `AdBannerView`(끝남, 멱등, 404 `ad_banner_not_found`).
+ * `PUT /api/admin/ad-banners/order`는 `ReorderRequest`(크리링 배너 전체) → `AdBannerView[]`(400 `order_mismatch`).
+ */
+export type UpdateAdBannerRequest = Partial<AdBannerRequest>;
 
 /** 단축 주소 리디렉트가 랜딩 주소에 붙이는 통과 표시 쿼리 이름. 웹은 이 표시가 유효할 때만 외부에서 온 요청을 그대로 그립니다(PRD R7). */
 export const LANDING_PASS_PARAM = 'pass';
@@ -483,6 +706,9 @@ export const CRELINK_API_PATHS = {
   mePortfolioItem: (id: string) => `/api/me/portfolio/${encodeURIComponent(id)}`,
   mePortfolioOrder: '/api/me/portfolio/order',
   meFiles: '/api/me/files',
+  meBanners: '/api/me/banners',
+  meBanner: (id: string) => `/api/me/banners/${encodeURIComponent(id)}`,
+  meBannersOrder: '/api/me/banners/order',
   file: (id: string) => `/api/files/${encodeURIComponent(id)}`,
   /** `pass`: 단축 주소 리디렉트가 랜딩 주소에 붙인 통과 표시(`LANDING_PASS_PARAM`). 있으면 그대로 넘겨 검증을 받습니다. */
   publicLanding: (publicId: string, pass?: string) =>
@@ -495,6 +721,12 @@ export const CRELINK_API_PATHS = {
   adminLinkBlock: (linkId: string) => `/api/admin/links/${encodeURIComponent(linkId)}/block`,
   adminBlockedDomains: '/api/admin/blocked-domains',
   adminBlockedDomain: (domain: string) => `/api/admin/blocked-domains/${encodeURIComponent(domain)}`,
+  adminCreatorBannerSlot: (userId: string) => `/api/admin/creators/${encodeURIComponent(userId)}/banner-slot`,
+  adminBannerBlock: (bannerId: string) => `/api/admin/banners/${encodeURIComponent(bannerId)}/block`,
+  adminAdBanners: '/api/admin/ad-banners',
+  adminAdBanner: (id: string) => `/api/admin/ad-banners/${encodeURIComponent(id)}`,
+  adminAdBannerEnd: (id: string) => `/api/admin/ad-banners/${encodeURIComponent(id)}/end`,
+  adminAdBannersOrder: '/api/admin/ad-banners/order',
   /** `cursor`: 이전 응답의 `GuestbookPage.nextCursor`. */
   landingGuestbook: (publicId: string, cursor?: string | null) =>
     `/api/landings/${encodeURIComponent(publicId)}/guestbook${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,

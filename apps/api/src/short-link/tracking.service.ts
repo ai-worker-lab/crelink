@@ -5,6 +5,8 @@ import maxmind, { CityResponse, Reader } from 'maxmind';
 import { isIP } from 'node:net';
 import { AppConfig } from '../config.service';
 import { Database } from '../database';
+import { countBusinessMetric } from '../monitoring/metrics';
+import { STATS_TIME_ZONE } from '../retention/retention.service';
 
 const REFERRER_MAX = 2048;
 const USER_AGENT_MAX = 512;
@@ -83,7 +85,7 @@ export function requestFacts(request: Request, trustedProxyHops: number): Reques
   };
 }
 
-/** 방문(R2·R9)과 외부 링크 클릭 기록. 리디렉트는 이 저장을 기다리지 않습니다. */
+/** 방문(R2·R9), 외부 링크·크리에이터 배너 클릭, 크리링 배너 노출·클릭 기록. 리디렉트는 이 저장을 기다리지 않습니다. */
 @Injectable()
 export class TrackingService {
   private readonly logger = new Logger(TrackingService.name);
@@ -148,6 +150,50 @@ export class TrackingService {
         browser,
         os,
       ],
+    );
+  }
+
+  /** 크리에이터 배너 클릭 원본(R21 ④, `link_clicks`와 같은 항목). 1년 뒤 보존 작업이 `creator_banner_click_rollups`로 옮깁니다. */
+  async recordBannerClick(
+    banner: { id: string; publicId: string; shortLinkId: string },
+    visitorId: string,
+    facts: RequestFacts,
+  ): Promise<void> {
+    const { country, city, deviceType, browser, os } = this.describe(facts);
+    await this.database.query(
+      `INSERT INTO creator_banner_clicks (banner_id, banner_public_id, short_link_id, visitor_id, ip, country, city, referrer_host, user_agent, device_type, browser, os)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        banner.id,
+        banner.publicId,
+        banner.shortLinkId,
+        visitorId,
+        facts.ip,
+        country,
+        city,
+        facts.referrerHost,
+        facts.userAgent,
+        deviceType,
+        browser,
+        os,
+      ],
+    );
+  }
+
+  /**
+   * 크리링 배너 노출·클릭 카운터(R20 ⑧). 개인 식별 정보 없이 날짜(Asia/Seoul)·배너·랜딩별 행에 1을 더합니다.
+   * 노출은 공개 랜딩 API(`passAccepted`일 때 첫 장), 클릭은 `GET {SHORT}/a/{배너}/{랜딩}`이 부릅니다. 둘 다 `inBackground`로 감쌉니다.
+   * 지표 `crelink.ad_banner.impression`·`crelink.ad_banner.click`은 기록 시작 때 셉니다(저장 실패와 무관, 방문·클릭 지표와 같음).
+   */
+  async recordAdStat(kind: 'impression' | 'click', adBannerId: string, landingPublicId: string): Promise<void> {
+    countBusinessMetric(kind === 'impression' ? 'crelink.ad_banner.impression' : 'crelink.ad_banner.click');
+    const column = kind === 'impression' ? 'impressions' : 'clicks';
+    await this.database.query(
+      `INSERT INTO ad_banner_daily_stats (day, ad_banner_id, landing_public_id, ${column})
+       VALUES ((now() AT TIME ZONE $1)::date, $2, $3, 1)
+       ON CONFLICT (ad_banner_id, day, landing_public_id)
+       DO UPDATE SET ${column} = ad_banner_daily_stats.${column} + 1`,
+      [STATS_TIME_ZONE, adBannerId, landingPublicId],
     );
   }
 

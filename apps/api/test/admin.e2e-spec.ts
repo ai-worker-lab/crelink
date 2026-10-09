@@ -304,6 +304,7 @@ describe('운영자 API (R10, R13, R14)와 보존 작업 (R11)', () => {
         { linkId: linkPublicId, title: '클릭 링크', clicks: 3 },
         { linkId: 'deletedlnk', title: null, clicks: 1 },
       ],
+      bannerClicks: [],
     });
 
     for (const query of [

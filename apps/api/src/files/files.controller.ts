@@ -41,7 +41,7 @@ export class FilesController {
   @UseGuards(SessionGuard)
   @UseFilters(FileTooLargeFilter)
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: CRELINK_LIMITS.imageMaxBytes, files: 1 } }))
-  upload(
+  async upload(
     @CurrentUser() user: SessionUser,
     @UploadedFile() file: Express.Multer.File | undefined,
   ): Promise<UploadFileResponse> {

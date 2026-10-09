@@ -48,17 +48,22 @@ describe('API 기동과 health', () => {
     expect(await response.json()).toEqual({ code: 'not_found', message: '요청한 경로를 찾을 수 없습니다.' });
   });
 
-  it('등록된 라우트는 단축 도메인 두 정의만 /api 밖이고 나머지는 모두 /api 아래다', () => {
-    // setGlobalPrefix exclude(`\:slug`·`c/\:linkPublicId`)의 매칭 규칙이 프레임워크 업그레이드로 바뀌면 여기서 드러납니다.
+  it('등록된 라우트는 단축 도메인 네 정의만 /api 밖이고 나머지는 모두 /api 아래다', () => {
+    // setGlobalPrefix exclude(`SHORT_DOMAIN_ROUTES`)의 매칭 규칙이 프레임워크 업그레이드로 바뀌거나 새 exclude가
+    // `/api/*` 두 단계 경로의 접두사를 빼면 여기서 드러납니다.
     const express = app.getHttpAdapter().getInstance() as Express;
     const routes = (express.router.stack as RouterLayer[])
       .filter((layer) => layer.route)
       .flatMap(({ route }) => Object.keys(route!.methods).map((method) => `${method.toUpperCase()} ${route!.path}`));
     expect(routes.filter((route) => !route.split(' ')[1].startsWith('/api/')).sort()).toEqual([
       'GET /:slug',
+      'GET /a/:bannerPublicId/:landingPublicId',
+      'GET /b/:bannerPublicId',
       'GET /c/:linkPublicId',
     ]);
-    expect(routes).toEqual(expect.arrayContaining(['GET /api/health', 'GET /api/me', 'POST /api/me/files']));
+    expect(routes).toEqual(
+      expect.arrayContaining(['GET /api/health', 'GET /api/health/ready', 'GET /api/me', 'POST /api/me/files']),
+    );
     expect(routes.length).toBeGreaterThan(20);
   });
 
@@ -70,7 +75,12 @@ describe('API 기동과 health', () => {
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'",
       );
       expect(tables.rows.map((row) => row.table_name).sort()).toEqual([
+        'ad_banner_daily_stats',
+        'ad_banners',
         'blocked_domains',
+        'creator_banner_click_rollups',
+        'creator_banner_clicks',
+        'creator_banners',
         'files',
         'guestbook_entries',
         'landing_blocks',
@@ -91,7 +101,11 @@ describe('API 기동과 health', () => {
         'visits',
       ]);
       const applied = await client.query('SELECT version FROM schema_migrations ORDER BY version');
-      expect(applied.rows).toEqual([{ version: '0001_crelink_mvp' }, { version: '0002_guestbook' }]);
+      expect(applied.rows).toEqual([
+        { version: '0001_crelink_mvp' },
+        { version: '0002_guestbook' },
+        { version: '0003_ad_banner' },
+      ]);
     } finally {
       await client.end();
     }

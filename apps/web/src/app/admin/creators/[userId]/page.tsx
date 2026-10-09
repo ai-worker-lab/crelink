@@ -7,7 +7,13 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AdminShell } from '../../../../components/admin/AdminShell';
-import { ExtraSlotsForm, LinkBlockControl, SuspensionToggle } from '../../../../components/admin/CreatorControls';
+import {
+  BannerSlotControl,
+  BlockControl,
+  ExtraSlotsForm,
+  SuspensionToggle,
+} from '../../../../components/admin/CreatorControls';
+import { RemoteImage } from '../../../../components/RemoteImage';
 import { loadSignedIn, type ServerApiResult } from '../../../../lib/api/server';
 import { formatDate, formatNumber, recentRange } from '../../../../lib/format';
 
@@ -104,6 +110,12 @@ function CreatorDetail({
         <div className="control-grid">
           <ExtraSlotsForm userId={creator.userId} extraSlots={creator.extraLinkSlots} />
           <SuspensionToggle userId={creator.userId} suspended={creator.suspended} />
+          <BannerSlotControl
+            userId={creator.userId}
+            grantedAt={creator.bannerSlot.grantedAt}
+            limits={creator.bannerLimits}
+            bannerCount={creator.banners.length}
+          />
         </div>
       </section>
 
@@ -158,7 +170,54 @@ function CreatorDetail({
                       {link.blocked ? <span className="badge badge-danger">차단됨</span> : null}
                     </p>
                   </div>
-                  <LinkBlockControl link={link} />
+                  <BlockControl
+                    blocked={link.blocked}
+                    blockedReason={link.blockedReason}
+                    path={CRELINK_API_PATHS.adminLinkBlock(link.id)}
+                    noun="링크"
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="card" aria-labelledby="banners-title">
+        <h2 id="banners-title">배너</h2>
+        {creator.banners.length === 0 ? (
+          <p className="empty-text">만든 배너가 없어요.</p>
+        ) : (
+          <ul className="edit-list">
+            {creator.banners.map((banner) => (
+              <li key={banner.id} className={`item-card${banner.blocked ? ' item-blocked' : ''}`}>
+                <div className="item-body">
+                  <RemoteImage
+                    className="item-thumb item-thumb-banner"
+                    src={banner.image.url}
+                    alt=""
+                    width={120}
+                    height={40}
+                    loading="lazy"
+                  />
+                  <div className="item-text">
+                    <h3 className="item-title">{banner.alt}</h3>
+                    {banner.url ? (
+                      <p className="url-text">{banner.url}</p>
+                    ) : (
+                      <p className="item-description">연결 없음</p>
+                    )}
+                    <p className="badges">
+                      {banner.hidden ? <span className="badge">숨김</span> : null}
+                      {banner.blocked ? <span className="badge badge-danger">차단됨</span> : null}
+                    </p>
+                  </div>
+                  <BlockControl
+                    blocked={banner.blocked}
+                    blockedReason={banner.blockedReason}
+                    path={CRELINK_API_PATHS.adminBannerBlock(banner.id)}
+                    noun="배너"
+                  />
                 </div>
               </li>
             ))}
@@ -253,6 +312,33 @@ function Stats({ stats }: { stats: OperatorCreatorStats }) {
               {stats.linkClicks.map((row) => (
                 <tr key={row.linkId}>
                   <th scope="row">{row.title ?? '(지운 링크)'}</th>
+                  <td className="num">{formatNumber(row.clicks)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <h3>배너별 클릭</h3>
+      {stats.bannerClicks.length === 0 ? (
+        <p className="empty-text">이 기간에 배너 클릭이 없어요.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="data-table">
+            <caption className="visually-hidden">배너별 클릭 수</caption>
+            <thead>
+              <tr>
+                <th scope="col">배너</th>
+                <th scope="col" className="num">
+                  클릭
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats.bannerClicks.map((row) => (
+                <tr key={row.bannerId}>
+                  <th scope="row">{row.alt ?? '(지운 배너)'}</th>
                   <td className="num">{formatNumber(row.clicks)}</td>
                 </tr>
               ))}

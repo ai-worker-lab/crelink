@@ -1,11 +1,15 @@
-import type {
-  CreatorLandingState,
-  ImageRef,
-  LinkView,
-  PortfolioItemView,
-  PublicLandingView,
-  PublicLinkView,
-  SocialLinkView,
+import {
+  resolveBannerSlot,
+  type CreatorBannerView,
+  type CreatorLandingState,
+  type ImageRef,
+  type LinkView,
+  type PortfolioItemView,
+  type PublicBannerView,
+  type PublicLandingView,
+  type PublicLinkView,
+  type ResolvedBannerSlot,
+  type SocialLinkView,
 } from '@crelink/shared';
 
 /** 프로필 카드 입력값(저장 전). 빈 문자열은 저장할 때 null(비움)이 됩니다. */
@@ -38,12 +42,25 @@ export interface PortfolioDraft {
   image: ImageRef | null;
 }
 
+/**
+ * 배너 추가·수정 폼의 입력값(설계 docs/specs/crelink-ad-banner.md `배너 초안 규칙`). `id`가 null이면 새 배너입니다.
+ * `stillImage`는 `image`가 움직이는 이미지일 때 함께 올린 첫 장면 정지 이미지입니다(`ImageField` 배너 모드).
+ */
+export interface BannerDraft {
+  id: string | null;
+  image: ImageRef | null;
+  stillImage: ImageRef | null;
+  alt: string;
+  url: string;
+}
+
 /** 미리보기에 덮어 그릴 저장하지 않은 입력. 없는 항목은 저장된 값 그대로입니다. */
 export interface LandingDrafts {
   profile?: ProfileDraft;
   socials?: ReadonlyArray<SocialLinkView>;
   links?: ReadonlyArray<LinkDraft>;
   portfolio?: ReadonlyArray<PortfolioDraft>;
+  banners?: ReadonlyArray<BannerDraft>;
 }
 
 /** 미리보기에서 새 링크·포트폴리오 초안 카드에 쓰는 id(서버 id와 겹치지 않음). */
@@ -124,6 +141,27 @@ export function isPortfolioDraftDirty(items: ReadonlyArray<PortfolioItemView>, d
   );
 }
 
+export function bannerDraftOf(banner: CreatorBannerView | null): BannerDraft {
+  return {
+    id: banner?.id ?? null,
+    image: banner?.image ?? null,
+    stillImage: banner?.stillImage ?? null,
+    alt: banner?.alt ?? '',
+    url: banner?.url ?? '',
+  };
+}
+
+export function isBannerDraftDirty(banners: ReadonlyArray<CreatorBannerView>, draft: BannerDraft): boolean {
+  const saved = draft.id === null ? null : banners.find((banner) => banner.id === draft.id);
+  const base = bannerDraftOf(saved ?? null);
+  return (
+    draft.alt !== base.alt ||
+    draft.url !== base.url ||
+    (draft.image?.fileId ?? null) !== (base.image?.fileId ?? null) ||
+    (draft.stillImage?.fileId ?? null) !== (base.stillImage?.fileId ?? null)
+  );
+}
+
 /**
  * 편집 상태(`GET /api/me/landing`)를 방문자가 보는 공개 랜딩 형태로 바꿉니다. 공개 API
  * (`apps/api/src/creator/public-landing.controller.ts`)와 같은 규칙으로 숨긴 링크와 차단된 링크를 빼고 순서를 유지합니다.
@@ -135,6 +173,8 @@ export function isPortfolioDraftDirty(items: ReadonlyArray<PortfolioItemView>, d
  * - 링크: 고치는 링크는 제자리에서 바꾸되 숨긴·차단된 링크는 그대로 빠지고, 새 링크는 표시 이름이 있을 때만 맨 끝에 붙습니다.
  *   주소를 바꿨거나 새 링크면 사이트 아이콘이 아직 없으므로 `faviconUrl`을 비워(`''`) 기본 아이콘으로 그립니다.
  * - 포트폴리오: 고치는 항목은 제자리에서, 새 항목은 제목이 있을 때만 맨 끝에.
+ * - 광고 블록·배너 슬롯: `previewBannerSlot`(공개 API와 같은 `resolveBannerSlot`) 결과가 숨김이 아니면 `blocks[0].slot`, 숨김이면 null.
+ *   배너 초안도 거기서 덮어 그립니다.
  */
 export function toLandingPreview(state: CreatorLandingState, drafts: LandingDrafts = {}): PublicLandingView {
   const { profile, socials, links: linkDrafts = [], portfolio: portfolioDrafts = [] } = drafts;
@@ -205,6 +245,7 @@ export function toLandingPreview(state: CreatorLandingState, drafts: LandingDraf
     });
   }
 
+  const slot = previewBannerSlot(state, drafts);
   return {
     publicId: state.landing.publicId,
     displayName: profile ? profile.displayName.trim() || null : state.landing.displayName,
@@ -212,7 +253,72 @@ export function toLandingPreview(state: CreatorLandingState, drafts: LandingDraf
     avatarUrl: profile ? (profile.avatar?.url ?? null) : (state.landing.avatar?.url ?? null),
     socials: socials ? socialItems(socials) : state.socials,
     portfolio,
-    blocks: [{ type: 'list', links }],
+    blocks: [
+      {
+        type: 'list',
+        links,
+        slot:
+          slot.hidden === null ? { kind: slot.kind, afterLinkCount: slot.afterLinkCount, banners: slot.banners } : null,
+      },
+    ],
     guestbookEnabled: state.landing.guestbookEnabled,
   };
+}
+
+/**
+ * 미리보기의 광고 블록·배너 슬롯 자리. 공개 랜딩 API와 같은 `resolveBannerSlot`(packages/shared)으로 종류·위치·숨김을 정합니다.
+ * 숨김(`hidden`)이어도 위치를 돌려주므로, 관리 화면은 `'no_banners'`일 때 그 자리에 점선 자리를 그립니다(`'no_content'`는 그리지 않음).
+ * - 링크가 보이는지는 저장 상태(숨김·차단)로 보고, 표시 이름이 있는 새 링크 초안은 맨 끝에 보이는 링크로 붙입니다(슬롯이 맨 뒤면 초안도 슬롯 앞).
+ * - 포트폴리오는 저장된 항목이나 제목이 있는 새 초안이 있으면 있는 것으로 봅니다.
+ * - 크리링 배너는 `adBanners`(게시 중, 저장된 URL), 크리에이터 배너는 숨김·차단이 아닌 `banners`(id는 uuid, 주소는 저장된 URL)입니다.
+ * - 배너 초안(설계 `배너 초안 규칙`): 고치는 배너는 제자리에서 바꾸되 숨김·차단 배너는 그대로 빠집니다. 이미지를 지운 초안은 저장된 이미지를,
+ *   빈 대체 문구는 저장된 문구를 그립니다. 새 배너(`DRAFT_ITEM_ID`)는 이미지가 있을 때만 맨 끝에 붙으므로 보이는 배너 0장이던 슬롯도 나타납니다.
+ */
+export function previewBannerSlot(
+  state: CreatorLandingState,
+  drafts: LandingDrafts = {},
+): ResolvedBannerSlot<PublicBannerView> {
+  const newLink = drafts.links?.find((draft) => draft.id === null);
+  const newPortfolio = drafts.portfolio?.find((draft) => draft.id === null);
+  const linkVisible = state.links.map((link) => !link.hidden && !link.blocked);
+  if (newLink?.title.trim()) linkVisible.push(true);
+  return resolveBannerSlot<PublicBannerView>({
+    granted: state.slot.kind === 'creator',
+    slotIndex: state.slot.slotIndex,
+    linkVisible,
+    hasPortfolio: state.portfolio.length > 0 || Boolean(newPortfolio?.title.trim()),
+    adBanners: state.adBanners,
+    creatorBanners: creatorBannersOf(state.banners, drafts.banners ?? []),
+  });
+}
+
+function creatorBannersOf(
+  banners: ReadonlyArray<CreatorBannerView>,
+  bannerDrafts: ReadonlyArray<BannerDraft>,
+): PublicBannerView[] {
+  const draftById = new Map(bannerDrafts.map((draft) => [draftKey(draft.id), draft]));
+  const views: PublicBannerView[] = banners
+    .filter((banner) => !banner.hidden && !banner.blocked)
+    .map((banner) => {
+      const draft = draftById.get(banner.id);
+      const image = draft?.image ? { image: draft.image, still: draft.stillImage } : null;
+      return {
+        id: banner.id,
+        imageUrl: image ? image.image.url : banner.image.url,
+        stillImageUrl: image ? (image.still?.url ?? null) : (banner.stillImage?.url ?? null),
+        alt: draft?.alt.trim() || banner.alt,
+        clickUrl: draft ? draft.url.trim() || null : banner.url,
+      };
+    });
+  const newBanner = draftById.get(DRAFT_ITEM_ID);
+  if (newBanner?.image) {
+    views.push({
+      id: DRAFT_ITEM_ID,
+      imageUrl: newBanner.image.url,
+      stillImageUrl: newBanner.stillImage?.url ?? null,
+      alt: newBanner.alt.trim() || '새 배너',
+      clickUrl: newBanner.url.trim() || null,
+    });
+  }
+  return views;
 }

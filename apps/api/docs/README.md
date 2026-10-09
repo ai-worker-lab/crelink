@@ -35,6 +35,8 @@
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | `s3`면 필수(비밀) | 버킷 범위 읽기·쓰기 자격 증명. 운영 값은 SeaweedFS `s3.json`의 identity `crelink`이고 대상별 SOPS 암호문에만 둡니다. |
 | `GEOIP_MMDB_PATH` | 아니오 | mmdb(DB-IP Lite City 등, CC BY 4.0이라 웹 `/privacy`에 출처 표시) 경로. 비면 국가·도시를 null로 두고 기동 시 경고를 한 번 남김. 파일을 열지 못해도 같은 동작에 오류 로그. 컨테이너는 볼륨 `/data/geoip`. |
 | `TRUSTED_PROXY_HOPS` | 아니오 | 앞단의 신뢰할 리버스 프록시 수(기본 0). 0이면 소켓 주소, N이면 `X-Forwarded-For`의 오른쪽에서 N번째 값을 방문·클릭 IP로 씁니다([방문자 IP](#방문자-ip)). 운영(Caddy 1단)은 `1`. 0 이상의 정수가 아니면 기동 거부. |
+| `BANNER_SLOT_MAX` | 아니오 | 크리에이터 배너 슬롯에서 보이게(숨김·차단 아님) 둘 수 있는 배너 수 n, 랜딩마다(기본 5, `[임시값]`). 1 이상의 정수가 아니면 기동 거부. 지금 장수보다 낮추면 있는 배너는 그대로 두고 추가·숨김 해제만 막습니다. 응답 `bannerLimits.visibleMax`. |
+| `BANNER_SLOT_TOTAL_MAX` | 아니오 | 숨김·차단 포함 크리에이터 배너 보관 상한, 랜딩마다(기본 20, `[임시값]`). `BANNER_SLOT_MAX` 이상의 정수가 아니면 기동 거부. 응답 `bannerLimits.totalMax`. 운영 값을 바꿀 때는 비밀이 아니므로 `.sops.yaml` `unencrypted_regex`에 키를 먼저 더합니다(`DATABASE_POOL_MAX`와 같은 절차, [설계](../../../docs/specs/crelink-ad-banner.md#설정값)). |
 | `SENTRY_DSN` | 아니오(운영 선택) | Sentry DSN. 비면 Sentry를 초기화하지 않습니다(로컬·시험·PR CI). 운영 값은 대상별 SOPS 암호문의 평문 키(이벤트 전송만 허용하는 공개 값). [오류 모니터링](#오류-모니터링). |
 | `SENTRY_ENVIRONMENT` | 아니오 | 이벤트 환경 이름. 비면 `NODE_ENV=production`이면 `production`, 아니면 `development`. |
 | `SENTRY_RELEASE` | 아니오 | release. 운영 이미지는 빌드 인자로 배포 커밋 SHA가 이미지 ENV에 들어가 소스맵 업로드 release와 같습니다. 비면 release 없이 보냅니다. |
@@ -124,11 +126,13 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 
 ## 단축 도메인
 
-- 같은 프로세스가 `/api` 접두사 밖의 `GET /{slug}`와 `GET /c/{linkPublicId}`를 처리합니다(`src/short-link/`). `app.setup.ts`의 `setGlobalPrefix` exclude는 요청 URL이 아니라 라우트 정의 경로에 맞춰 보기 때문에, `:`를 이스케이프한 `\:slug`·`c/\:linkPublicId`로 두 정의만 제외합니다. 그냥 `:slug`를 쓰면 `/api/me`·`/api/health` 같은 한 단계 경로가 접두사를 잃습니다. 이 매칭은 Nest 11.2와 12.1이 같습니다: `test/health.e2e-spec.ts`가 등록된 Express 라우트 표에서 `/api` 밖 라우트가 정확히 `GET /:slug`·`GET /c/:linkPublicId`뿐인지 확인하며, 두 버전에서 모두 통과했습니다.
+- 같은 프로세스가 `/api` 접두사 밖의 `GET /{slug}`, `GET /c/{linkPublicId}`, `GET /a/{bannerPublicId}/{landingPublicId}`, `GET /b/{bannerPublicId}`를 처리합니다(`src/short-link/`). `app.setup.ts`의 `setGlobalPrefix` exclude(`SHORT_DOMAIN_ROUTES`)는 요청 URL이 아니라 라우트 정의 경로에 맞춰 보기 때문에, `:`를 이스케이프한 `\:slug`·`c/\:linkPublicId`·`a/\:bannerPublicId/\:landingPublicId`·`b/\:bannerPublicId`로 네 정의만 제외합니다. 그냥 `:slug`를 쓰면 `/api/me`·`/api/health` 같은 한 단계 경로가 접두사를 잃습니다. 이 매칭은 Nest 11.2와 12.1이 같습니다: `test/health.e2e-spec.ts`가 등록된 Express 라우트 표에서 `/api` 밖 라우트가 정확히 이 네 정의뿐이고 `/api/health/ready` 같은 두 단계 경로가 접두사를 유지하는지 확인합니다. 운영 edge(Caddy 단축 호스트)는 단축 주소와 `^/(c/[a-z0-9]{10}|a/[a-z0-9]{10}/[a-z0-9]{10}|b/[a-z0-9]{10})$`만 API로 넘기고, API도 배너·랜딩 공개 ID가 `[a-z0-9]{10}`이 아니면 DB를 보지 않고 안내로 보냅니다.
 - 그래서 접두사 없는 `/health`, `/me`, `/api` 같은 요청은 단축 주소로 해석되고, 예약어라 없는 주소 안내로 302 합니다. 예약어 목록은 `RESERVED_SLUGS`(공유 계약).
 - `GET /{slug}`: 대소문자를 무시하고 현재 주소 또는 `retired_at + 90일` 안의 옛 주소를 찾습니다. 찾으면 방문을 기록(응답을 기다리지 않음)하고 302 `{WEB_URL}/p/{publicId}?pass={통과 표시}`. 없으면 302 `…/notice?reason=link_not_found`, 정지 크리에이터면 `…reason=creator_suspended`.
 - `GET /c/{linkPublicId}`: 클릭을 기록하고 DB에 저장된 URL(저장 시 http·https만 허용)로 302. 숨김·차단·삭제·정지면 302 `…/notice?reason=link_unavailable`. 열린 리디렉트를 막기 위해 요청 값으로 대상 URL을 만들지 않습니다.
-- 두 리디렉트 모두 `Cache-Control: no-store`이고, 방문자 쿠키 `cl_vid`(UUID, HttpOnly, SameSite=Lax, 1년)는 없거나 형식이 틀릴 때만 새로 발급합니다.
+- `GET /a/{bannerPublicId}/{landingPublicId}`(크리링 배너 클릭, R20 ⑧): 배너가 지금 게시 중(`starts_at <= now() < ends_at`)이고 랜딩이 있고 크리에이터가 정지가 아니면 `TrackingService.recordAdStat('click')`로 날짜(Asia/Seoul)·배너·랜딩 카운터(`ad_banner_daily_stats.clicks`)를 올리고(응답을 기다리지 않음) 저장된 URL로 302. 끝남·예약·없음·정지면 302 `…/notice?reason=link_unavailable`. 개인 식별 정보를 남기지 않으므로 방문자 쿠키를 읽거나 발급하지 않습니다. 공개 랜딩 API가 `passAccepted`일 때만 이 주소를 주므로 서비스 화면에서 연 랜딩의 클릭은 세지 않습니다. 누구나 주소를 만들어 수를 늘릴 수 있다는 점은 `/c/`와 같은 수준으로 받아들였습니다([기술 설계](../../../docs/specs/crelink-ad-banner.md) `노출·클릭 기록` 절).
+- `GET /b/{bannerPublicId}`(크리에이터 배너 클릭, R21 ④): 연결 URL이 있고 숨김·차단이 아니고 계정이 배너 슬롯 부여됨·정지 아님이면 `creator_banner_clicks`에 링크 클릭과 같은 항목(방문자 쿠키·IP·국가·도시·유입 호스트·UA·기기·브라우저·OS)을 남기고 저장된 URL로 302. 단축 URL은 `short_links.landing_id = creator_banners.landing_id`로 찾습니다. URL 없음·숨김·차단·회수·정지·삭제면 `link_unavailable`. 배너를 지워도 기록은 `banner_public_id` 사본으로 남습니다.
+- 리디렉트는 모두 `Cache-Control: no-store`이고, 방문자 쿠키 `cl_vid`(UUID, HttpOnly, SameSite=Lax, 1년)는 `/{slug}`·`/c/`·`/b/`에서 없거나 형식이 틀릴 때만 새로 발급합니다. `/a/`는 쿠키를 다루지 않습니다.
 
 ### 랜딩 통과 표시
 
@@ -181,6 +185,9 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 | `crelink.auth.login` | `AuthController.callback`(`POST /api/auth/google/callback`) | `result`: `success`, `failure`(state·code 오류, 구글 검증 실패, 정지 계정, 로그인 설정 없음, 예상 못 한 오류) |
 | `crelink.short_link.visit` | `ShortLinkController.visit`(`GET /{slug}`)이 랜딩으로 302 할 때(방문 기록 시작) | 없음 |
 | `crelink.link.click` | `ShortLinkController.click`(`GET /c/{linkPublicId}`)이 외부 URL로 302 할 때(클릭 기록 시작) | 없음 |
+| `crelink.ad_banner.impression` | `TrackingService.recordAdStat('impression')`: 공개 랜딩 API가 `passAccepted`이고 광고 블록이 보일 때 첫 장 1건(기록 시작) | 없음 |
+| `crelink.ad_banner.click` | `TrackingService.recordAdStat('click')`: 광고 클릭 경로(기록 시작) | 없음 |
+| `crelink.creator_banner.click` | `ShortLinkController.creatorBannerClick`(`GET /b/{bannerPublicId}`)이 외부 URL로 302 할 때(클릭 기록 시작) | 없음 |
 
 ### 소스맵
 
@@ -193,7 +200,12 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 - 단축 주소(R8, `src/creator/slug.service.ts`): 입력은 앞뒤 공백을 빼고 소문자로 바꾼 뒤 `SLUG_PATTERN`·3~30자·예약어를 봅니다. 다른 단축 URL의 현재 주소나 90일 안의 옛 주소면 409 `slug_taken`. 자기 옛 주소는 되돌릴 수 있습니다. 첫 변경(`slug_changed_at`이 없음)은 바로, 그 뒤에는 마지막 변경에서 30일 뒤부터(429 `slug_change_too_soon`). 자동 주소로 되돌려도 30일 제한은 마지막 변경 시각 기준이라 우회할 수 없습니다. 같은 주소로 바꾸는 요청은 아무것도 바꾸지 않고 200입니다. 예약 기간이 끝난 남의 옛 주소는 행을 지우고 새로 만듭니다.
 - 링크 한도(R13): 보이는(숨기지 않고 차단되지 않은) 링크 ≤ 5 + `extra_link_slots`(409 `link_limit_reached`), 숨긴 링크 포함 ≤ 50(409 `link_total_limit_reached`). 추가와 숨김 해제에서 확인하며, 같은 사용자의 링크 변경은 사용자 행 잠금으로 줄 세웁니다. 운영자 추가 슬롯은 0~45.
 - 차단 도메인(R14): 링크 호스트가 차단 도메인이거나 그 하위 도메인이면 추가·URL 수정이 422 `link_domain_blocked`. 운영자가 도메인을 추가하면 같은 트랜잭션에서 기존 링크의 `blocked_at`을 채웁니다. 목록에서 빼도 이미 차단된 링크는 운영자가 링크별로 풉니다.
+- 광고 블록·배너 슬롯 위치(R20 ①②, R21 ①, [기술 설계](../../../docs/specs/crelink-ad-banner.md#위치-모델)): 위치는 첫 list 구역의 `landing_blocks.slot_position`(NULL = 맨 뒤, k = `position < k`인 링크들 다음) 하나이고 링크 한도에 들지 않습니다. `PUT /api/me/links/order`가 링크를 0..n-1로 다시 매기며 같은 트랜잭션에서 저장합니다: `slotIndex`(0 이상 정수, 아니면 400 `validation_failed`)가 n 이상이면 NULL, 아니면 그 값. 생략하면(옛 웹) 다시 매기기 전의 슬롯 앞 링크 수(`SLOT_INDEX_SQL`)를 새 위치로 둬 상대 위치를 유지합니다. 편집 상태 `slot.slotIndex`도 같은 식(빈 번호와 무관)이고, `slot.kind`는 `users.banner_slot_granted_at`이 있으면 `creator`입니다.
+- 공개 랜딩 슬롯(`src/creator/public-landing.controller.ts`): 첫 list 구역에만 `resolveBannerSlot`(공유 계약)을 적용하고 숨김이면 `slot: null`입니다. 링크는 숨김·차단 포함 전체를 읽어 위치를 계산하고 보이는 링크만 내려 줍니다. 배너 질의는 1개(부여됨: 그 랜딩의 숨김·차단 아닌 크리에이터 배너, 아니면 게시 중 `starts_at <= now() < ends_at` 크리링 배너 `sort_order, created_at`)입니다. `clickUrl`: 광고는 `passAccepted`일 때만 `{SHORT}/a/{배너}/{랜딩}`, 아니면 저장된 URL(R20 ⑧ 서비스 화면 제외). 크리에이터 배너는 늘 `{SHORT}/b/{배너}`이고 연결 URL이 없으면 null. `passAccepted`이고 광고 블록이 보이면 첫 장 노출을 `TrackingService.recordAdStat`로 `ad_banner_daily_stats`(Asia/Seoul 날짜·배너·랜딩 공개 ID, 개인 식별 정보 없음)에 더합니다(응답을 기다리지 않음). 관리 미리보기(`GET /api/me/landing`의 `adBanners`)는 저장된 URL이고 세지 않습니다(R7 ⑥).
+- 배너 슬롯 부여·배너 차단(운영자, R21 ①④⑤, R14): `PUT /api/admin/creators/{userId}/banner-slot { granted }`는 `banner_slot_granted_at`을 다시 부여해도 처음 시각으로 두고(`coalesce`), 회수하면 NULL로 바꿉니다. 배너 행은 보관하고 위치(`slot_position`)는 그대로입니다. `PUT /api/admin/banners/{id}/block { blocked, reason? }`는 링크 차단과 같은 규칙(`blocked_at` 유지, 풀면 사유도 비움, 404 `banner_not_found`)입니다. `GET /api/admin/creators/{userId}`의 `bannerSlot`·`banners`(이 랜딩 전체, 숨김·차단·보관 포함)·`bannerLimits`는 편집 상태와 같은 도우미로 채웁니다. 차단 도메인을 더하면 같은 트랜잭션에서 걸리는 크리에이터 배너도 차단하고, 걸리는 게시 중·예약 크리링 배너는 내립니다(`ends_at = least(coalesce(ends_at, now()), now())`, 예약이면 `starts_at`도 지금). 도메인을 목록에서 빼도 차단·내림은 되돌리지 않습니다.
+- 크리에이터 배너 쓰기(R21 ②④⑤⑥, `src/creator/banners.service.ts`): `POST /api/me/banners`(201, 맨 뒤 순서), `PATCH`·`DELETE /api/me/banners/{id}`, `PUT /api/me/banners/order`(이 랜딩 배너 전체, 아니면 400 `order_mismatch`). 모든 쓰기는 한 트랜잭션에서 사용자 행 잠금 → 부여 확인(아니면 403 `banner_slot_not_granted`, 회수 뒤 보관 배너를 고치는 길 없음) → 배너·파일 소유(404 `banner_not_found`·`file_not_found`) → 한도 순서라 회수와 줄을 섭니다. 한도는 랜딩마다 추가 때 보관 상한(409 `banner_total_limit_reached`)을 먼저, 보이는(숨김·차단 아님) 배너가 늘 때(추가·숨김 해제)만 n(409 `banner_limit_reached`)을 봅니다. 차단 배너는 수정·삭제·숨김 전환이 되고 주소를 바꿔도 `blocked_at`은 그대로입니다. 새 연결 URL(http·https, null·빈 문자열 = 연결 없음)은 차단 도메인이면 422 `link_domain_blocked`. 정지 이미지: 이미지가 움직이면(`FilesService.isAnimated`) `stillImageFileId`가 필요하고 그 파일은 움직이지 않아야 하며, 움직이지 않는 이미지에는 둘 수 없습니다. PATCH에서 이미지를 바꾸면 `stillImageFileId`도 같은 요청에 넣습니다. 어기면 400 `validation_failed`.
 - 이미지(`src/files/`): multipart 필드 `file`, `CRELINK_LIMITS.imageMaxBytes`(4MB, MVP 임시값. 운영 edge Caddy의 웹 호스트 본문 한도는 6MB) 이하. 형식은 클라이언트 Content-Type이 아니라 파일 앞부분(매직 바이트)으로 JPEG·PNG·WebP·GIF만 받습니다. 저장은 `FileStorage` 경계 뒤의 로컬 디스크 또는 S3 호환 저장소([이미지 저장소](#이미지-저장소))이고, `GET /api/files/{id}`는 누구나 받을 수 있으며 1년 캐시합니다(id는 UUID, 내용 불변).
+- 움직임 판정(`src/files/animated-image.ts`, 배너 정지 이미지 규칙의 근거): 업로드 때 GIF(이미지 서술자 2개 이상)·WebP(`VP8X` 애니메이션 플래그 또는 `ANIM` 청크)·PNG(`IDAT` 앞 `acTL`)를 판정해 `files.animated`에 저장하고 `UploadFileResponse.animated`로 돌려줍니다. 0003 전에 올린 파일은 NULL이며 `FilesService.isAnimated`가 쓸 때 저장소 바이트로 판정해 채웁니다.
 
 ## 방명록
 
@@ -223,9 +235,22 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 - 기동 확인: `s3`면 `onApplicationBootstrap`에서 HeadBucket을 5초 한도로 한 번 보내고 결과를 로그로 남깁니다(`[S3FileStorage] 파일 저장소 s3 확인: <endpoint>/<bucket> 접근 가능` 또는 `… 확인 실패: … (오류 이름 HTTP 상태)`, 비밀값은 넣지 않음). 실패해도 기동은 계속합니다.
 - readiness에 넣지 않음: `/api/health/ready`는 DB만 봅니다. 이 결과가 이미지 HEALTHCHECK·배포 `up --wait`·Caddy 기동 조건이라, 저장소(home-server SeaweedFS) 장애나 회선 문제를 넣으면 업로드와 무관한 단축 이동(서비스의 핵심 경로)까지 배포 실패·롤백으로 막히기 때문입니다. 저장소 장애는 업로드·이미지 조회 500과 위 로그로 드러나고, 전환 직후 확인은 런북 절차가 맡습니다.
 
+## 크리링 배너 운영
+
+`src/admin/ad-banners.service.ts`·`ad-banners.controller.ts`(R20 ④⑨, R14). 계약은 `packages/shared/src/crelink.ts`의 `AdBannerView`·`AdBannerRequest`, 설계는 [광고 블록과 크리에이터 배너 슬롯 기술 설계](../../../docs/specs/crelink-ad-banner.md#서버-규칙)입니다. 권한은 다른 운영자 API와 같은 `OperatorGuard`이고 삭제 경로는 없습니다.
+
+- 목록 `GET /api/admin/ad-banners`: 전체를 `sort_order, created_at` 순으로, 상태는 한 문장 안의 같은 `now()`로 정합니다(`starts_at > now()` 예약, `ends_at <= now()` 끝남, 그 밖에는 게시 중. 공개 랜딩의 게시 중 조건과 같음). `counts`는 같은 결과에서 셉니다. 누적 노출·클릭은 `ad_banner_daily_stats`의 `sum(...)::int`(node-pg가 bigint를 문자열로 주므로)이고, 끝난 배너를 다시 열면 이어서 더합니다.
+- 등록 `POST`(201): 맨 뒤 순서 `coalesce(max(sort_order) + 1, 0)`, `created_by`는 등록한 운영자. 시각은 시간대가 붙은 ISO 8601만 받고(아니면 400 `validation_failed`) 응답은 UTC ISO입니다. 끝 ≤ 시작은 400 `banner_period_invalid`(DB CHECK는 예약 배너를 내릴 때 같아질 수 있어 `>=`). URL은 http·https(400 `link_url_invalid`), 차단 도메인과 하위 도메인은 422 `link_domain_blocked`.
+- 수정 `PATCH …/{id}`: 바뀐 필드만, 다른 운영자가 등록한 배너도 고칩니다. 결과가 게시 중·예약(끝이 없거나 지금보다 뒤)이면 저장된(또는 새) 호스트를 차단 도메인으로 다시 검사해, 차단으로 내려간 배너를 기간만 고쳐 다시 여는 길을 막습니다. 끝난 채로 두는 수정은 검사하지 않습니다.
+- 이미지: 새 파일은 운영자(`users.role = 'operator'`)가 올린 것이어야 하고(아니면 404 `file_not_found`, 운영자끼리는 서로의 파일을 씀), 저장된 값과 같은 id는 검사를 건너뜁니다. 정지 이미지 규칙: 이미지가 움직이면(`FilesService.isAnimated`, NULL이면 판정해 채움) 움직이지 않는 정지 이미지가 필요하고, 움직이지 않으면 정지 이미지는 null입니다. PATCH에서 이미지를 바꾸면 `stillImageFileId`도 같은 요청에 넣어야 합니다. 어기면 400 `validation_failed`.
+- 내리기 `PUT …/{id}/end`: `ends_at = least(coalesce(ends_at, now()), now())`, 예약 배너는 `starts_at = least(starts_at, now())`도 함께 당깁니다. 이미 끝난 배너는 바꾸지 않고 200(멱등). 수정·내리기는 배너 행 잠금(`FOR UPDATE`)으로 줄 섭니다.
+- 정렬 `PUT …/order`: 전체 id를 받아(아니면 400 `order_mismatch`) 0..n-1로 다시 매기고 새 순서의 목록을 돌려줍니다.
+- 등록·정렬·내리기는 트랜잭션 advisory lock(`pg_advisory_xact_lock(931475212)`, 보존 작업 931475211·migration 931475210과 다른 키)으로 줄 세워 맨 뒤 순서와 정렬이 동시 요청에 섞이지 않습니다.
+
 ## 통계와 보존 작업
 
 - 날짜 기준 시간대는 `Asia/Seoul`입니다(`STATS_TIME_ZONE`). 통계 기간은 `from`·`to` 양 끝 포함 최대 366일이고, 둘 다 없으면 오늘까지 30일입니다.
-- 보존 작업(R11, `src/retention/retention.service.ts`): 기동 시와 24시간마다 실행합니다. 트랜잭션 advisory lock(`pg_advisory_xact_lock`)으로 여러 인스턴스가 동시에 돌지 않게 하고, 늦게 온 인스턴스는 기다렸다가 남은 것만 처리합니다. 오늘(Asia/Seoul)에서 365일 전 0시보다 이전의 `visits`·`link_clicks`를 날짜·단축 URL 단위로 `visit_daily_rollups`, 값별로 `visit_dimension_rollups`(유입 호스트·기기·브라우저·OS·국가, 값이 없으면 `unknown`), 링크별로 `link_click_rollups`에 더하고 같은 트랜잭션에서 원본을 지웁니다. 집계에는 IP를 넣지 않습니다. 결과 건수는 로그로 남깁니다.
+- 보존 작업(R11, `src/retention/retention.service.ts`): 기동 시와 24시간마다 실행합니다. 트랜잭션 advisory lock(`pg_advisory_xact_lock`)으로 여러 인스턴스가 동시에 돌지 않게 하고, 늦게 온 인스턴스는 기다렸다가 남은 것만 처리합니다. 오늘(Asia/Seoul)에서 365일 전 0시보다 이전의 `visits`·`link_clicks`를 날짜·단축 URL 단위로 `visit_daily_rollups`, 값별로 `visit_dimension_rollups`(유입 호스트·기기·브라우저·OS·국가, 값이 없으면 `unknown`), 링크별로 `link_click_rollups`에 더하고, `creator_banner_clicks`는 배너별로 `creator_banner_click_rollups`에만 더한 뒤(`visit_daily_rollups.link_clicks`에 섞지 않음) 같은 트랜잭션에서 원본을 지웁니다. 집계에는 IP를 넣지 않습니다. 결과 건수는 로그로 남깁니다. `ad_banner_daily_stats`는 개인 식별 정보가 없는 집계라 계속 보관합니다.
 - 통계 API는 원본과 집계를 합칩니다. 집계된 날짜의 순 방문자는 날짜별 순 방문자 합이라, 원본 기간의 순 방문자(기간 전체에서 중복 제거)와 계산 방식이 다릅니다.
 - 링크별 클릭의 `linkId`는 링크 공개 ID(`{SHORT}/c/{linkPublicId}`의 값)입니다. 지운 링크도 기록이 남아 있으면 `title: null`로 나옵니다.
+- 배너별 클릭(`bannerClicks`, R21 ④·미정 4 A)은 `creator_banner_clicks` 원본과 `creator_banner_click_rollups`를 합친 기간 합계입니다. `bannerId`는 배너 공개 ID(`{SHORT}/b/{bannerPublicId}`의 값)이고, 지운 배너는 `alt: null`입니다. `totals.linkClicks`·`daily`에는 넣지 않습니다.

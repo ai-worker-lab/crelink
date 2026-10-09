@@ -394,6 +394,13 @@ textarea.input {
   font-size: var(--ds-font-size-12);
   color: var(--ds-color-text-subtle);
 }
+/* 배너 이미지(3:1, 설계 docs/specs/crelink-ad-banner.md `BANNER_ASPECT_RATIO`) */
+.image-preview.image-preview-banner {
+  width: 240px;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 1;
+}
 /* 기본 프로필(프로필 사진이 없을 때, PRD R17). 크기·테두리는 함께 붙는 .profile-avatar·.image-preview가 정한다. */
 .default-avatar {
   display: block;
@@ -670,6 +677,12 @@ textarea.input {
   object-fit: cover;
   border: 1px solid var(--ds-color-border-default);
   border-radius: var(--ds-corner-sm);
+}
+/* 크리에이터 배너 썸네일(3:1, 운영자 크리에이터 상세 `배너` 카드) */
+.item-thumb.item-thumb-banner {
+  width: 120px;
+  height: 40px;
+  max-width: 100%;
 }
 .item-actions {
   display: flex;
@@ -1868,6 +1881,194 @@ button.add-slot:hover,
   cursor: default;
 }
 
+/*
+ * 광고 블록·배너 슬롯(`BannerCarousel.tsx`, 디자인 design/ad-banner-block/handoff.md `공개 랜딩`). 링크 카드와 같은 흰 카드 틀(안쪽 여백 8) 안에
+ * 3:1 배너 가로 scroll-snap 트랙과 높이 44 조작 줄(`광고` 배지 · 위치 · 이전 · 다음 · 멈춤). 폭이 좁아 조작 줄이 넘치면 위치 표시만 숨긴다.
+ * 트랙 안 초점 링은 잘리지 않게 안쪽으로 그린다. 자동 넘김·반복 애니메이션은 없다.
+ */
+.banner-carousel {
+  position: relative;
+  container-type: inline-size;
+  padding: var(--ds-space-8);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-lg);
+  background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
+  transition: border-color 150ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.banner-carousel:has(.banner-link:hover) {
+  border-color: var(--ds-color-text-primary);
+}
+.banner-carousel:focus-visible {
+  outline: 3px solid var(--ds-color-text-primary);
+  outline-offset: 2px;
+}
+.banner-track {
+  position: relative;
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border-radius: var(--ds-corner-md);
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.banner-track::-webkit-scrollbar {
+  display: none;
+}
+.banner-slide {
+  flex: 0 0 100%;
+  min-width: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.banner-frame {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ds-corner-md);
+  background: transparent;
+  color: inherit;
+}
+.banner-frame:focus-visible,
+.banner-frame.edit-item.is-selected {
+  outline: 3px solid var(--ds-color-text-primary);
+  outline-offset: -3px;
+  box-shadow: none;
+}
+.banner-picture {
+  display: block;
+}
+.banner-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 1;
+  border-radius: var(--ds-corner-md);
+  background: var(--ds-color-surface-raised);
+  object-fit: cover;
+  object-position: center;
+}
+.banner-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ds-space-6);
+  min-height: 44px;
+  margin-top: var(--ds-space-8);
+}
+.banner-ad-badge {
+  flex: none;
+  margin-right: auto;
+  padding: var(--ds-space-2) var(--ds-space-8);
+  border: 1px solid var(--ds-color-border-strong);
+  border-radius: var(--ds-corner-sm);
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-12);
+  font-weight: var(--ds-font-weight-bold);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.banner-position {
+  margin-right: var(--ds-space-2);
+  color: var(--ds-color-text-secondary);
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-font-size-12);
+  white-space: nowrap;
+}
+.banner-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-full);
+  background: var(--ds-color-surface-default);
+  color: var(--ds-color-text-primary);
+  cursor: pointer;
+}
+.banner-button:hover:not(:disabled) {
+  border-color: var(--ds-color-text-primary);
+}
+.banner-button:disabled {
+  color: var(--ds-color-text-subtle);
+  cursor: default;
+}
+.banner-button:focus-visible {
+  outline: 3px solid var(--ds-color-text-primary);
+  outline-offset: 2px;
+}
+@container (max-width: 250px) {
+  .banner-position {
+    display: none;
+  }
+}
+/* 움직임 줄이기 설정이면 정지 이미지를 보이므로 멈춤 버튼(과 그것만 있는 조작 줄)을 숨긴다(서버 렌더와 첫 그림이 같도록 CSS로만). */
+@media (prefers-reduced-motion: reduce) {
+  .banner-pause,
+  .banner-controls.is-pause-only {
+    display: none;
+  }
+}
+/* 이미지를 모두 불러오지 못해 캐러셀이 사라진 자리는 간격도 남기지 않는다. */
+.banner-slot-item:empty {
+  display: none;
+}
+/* 관리 미리보기의 숨은 광고 블록·배너 슬롯 점선 자리. */
+.banner-placeholder {
+  margin: 0;
+  padding: var(--ds-space-16);
+  border: 1px dashed var(--ds-color-border-strong);
+  border-radius: var(--ds-corner-lg);
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-13);
+  text-align: center;
+}
+/*
+ * 슬롯이 링크 목록 맨 앞이면 슬롯 구역 칩(오른쪽 위)이 바깥 `외부 링크` 구역 칩과 같은 자리에 겹쳐 그 칩을 누를 수 없다.
+ * 맨 앞일 때만 슬롯 칩을 왼쪽 위로 옮긴다.
+ */
+.banner-slot-item:first-child > .edit-region > .edit-tag {
+  right: auto;
+  left: var(--ds-space-4);
+}
+/* 외부 링크 패널의 광고 블록·배너 슬롯 행: 링크 행과 같은 모양이지만 카드 자체는 누를 수 없다. */
+.link-edit-row > .slot-edit-card,
+.link-edit-row > .slot-edit-card:hover {
+  border-color: var(--ds-color-border-default);
+  cursor: default;
+}
+.slot-edit-card .banner-ad-badge {
+  margin-right: 0;
+}
+.drag-handle[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+.slot-position {
+  margin: 0 0 var(--ds-space-12);
+}
+/* 편집 칩 꼬리: 1023px 이하에서는 짧은 말(`광고 블록 · 위치`). */
+.edit-tag-narrow {
+  display: none;
+}
+@media (max-width: 1023px) {
+  .edit-tag-wide {
+    display: none;
+  }
+  .edit-tag-narrow {
+    display: inline;
+  }
+}
+.skeleton-banner {
+  display: block;
+  margin: 200px var(--ds-space-20) 0;
+  aspect-ratio: 3 / 1;
+  border-radius: var(--ds-corner-lg);
+  background: var(--ds-color-border-default);
+}
+
 /* 1023px 이하 탭 아래 sticky 줄: 단축 주소 · 복사 · 공개 페이지 열기 · `편집 | 미리보기`. */
 .narrow-bar {
   position: sticky;
@@ -2322,5 +2523,326 @@ body:has(.sheet[open]) {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- 배너 슬롯 패널·배너 폼(0083·0084, design/ad-banner-block/handoff.md `배너 슬롯 패널`) ---------- */
+/*
+ * 배너 행: 손잡이 · 3:1 썸네일 96×32 · 대체 문구(한 줄 말줄임)·도메인, 아래 줄에 숨기기 스위치 · 수정.
+ * 패널 폭(380~430)에 썸네일까지 한 줄로 두면 대체 문구가 두세 글자만 남아, 링크 행의 좁은 화면 배치처럼 조작을 아래 줄로 내린다.
+ */
+.banner-edit-card {
+  padding: var(--ds-space-8) var(--ds-space-12);
+}
+.banner-edit-item > .link-edit-row {
+  flex-wrap: wrap;
+}
+.banner-edit-item .link-edit-card {
+  flex-basis: calc(100% - 40px - var(--ds-space-8));
+}
+.banner-edit-item .link-edit-controls {
+  width: 100%;
+  justify-content: flex-end;
+}
+.banner-slot-badges + .section-help {
+  margin-top: var(--ds-space-12);
+}
+.panel-section > .banner-slot-badges + .section-help {
+  margin-top: 0;
+}
+.banner-edit-thumb {
+  flex: none;
+  width: 96px;
+  height: 32px;
+  border-radius: var(--ds-corner-sm);
+  background: var(--ds-color-surface-raised);
+  object-fit: cover;
+}
+.banner-edit-alt,
+.banner-edit-domain {
+  display: block;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.banner-edit-list ~ :is(.link-add, .notice-box),
+.banner-empty-notice {
+  margin-top: var(--ds-space-12);
+}
+.manager-panel .banner-empty-notice,
+.manager-panel .banner-edit-list ~ :is(.link-add, .notice-box) {
+  margin-top: 0;
+}
+/* 배너 폼: 저장 실패 줄 안 `다시 시도`. */
+.banner-form-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-8);
+}
+.banner-form-error > p {
+  margin: 0;
+}
+.banner-form-image {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-6);
+}
+.banner-alt-count {
+  font-family: var(--ds-font-mono);
+}
+/* 좁은 화면 회수 안내: sticky 줄 아래, 미리보기 위. */
+.manager-panel > .banner-slot-notice {
+  margin-top: var(--ds-space-12);
+}
+@media (max-width: 1023px) {
+  .banner-edit-thumb {
+    width: 72px;
+    height: 24px;
+  }
+}
+
+/*
+ * 운영자 광고 배너(`/admin/ad-banners`, `AdBanners.tsx`·`AdBannerDialog.tsx`, 디자인 design/ad-banner-block/handoff.md `광고 배너`).
+ * 넓은 화면은 표(손잡이 · 썸네일 120×40 · 대체 문구 · URL · 기간 · 상태 · 노출 · 클릭 · 행동)이고, 700px 이하는 같은 표를 카드로 그린다
+ * (노출·클릭은 `노출 n · 클릭 n` 한 줄). 대화상자는 넓은 화면에서 가운데 최대 560, 700px 이하는 하단 시트(`.sheet`).
+ */
+.ad-banners-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ds-space-8) var(--ds-space-16);
+  margin-bottom: var(--ds-space-16);
+}
+.ad-banners-head > div {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.ad-banners-head > .primary {
+  flex: none;
+}
+.ad-banners-head .section-help {
+  margin-bottom: 0;
+}
+.ad-banners-warning {
+  margin-bottom: var(--ds-space-16);
+}
+.ad-banners-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-8);
+  margin-bottom: var(--ds-space-12);
+}
+.ad-banners-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-6);
+  min-height: 44px;
+  padding: var(--ds-space-8) var(--ds-space-16);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-full);
+  background: var(--ds-color-surface-default);
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-14);
+  font-weight: var(--ds-font-weight-bold);
+  white-space: nowrap;
+}
+.ad-banners-filter:hover {
+  border-color: var(--ds-color-text-primary);
+}
+.ad-banners-filter[aria-pressed='true'] {
+  border-color: var(--ds-color-action-primary);
+  background: var(--ds-color-action-primary);
+  color: var(--ds-color-text-on-action);
+}
+.ad-banners-count {
+  font-family: var(--ds-font-mono);
+}
+.ad-banners-empty {
+  padding: var(--ds-space-24) 0;
+}
+.ad-banners-table :is(th, td) {
+  vertical-align: middle;
+}
+.ad-banners-table tbody th.ad-col-alt {
+  min-width: 112px;
+  font-weight: var(--ds-font-weight-bold);
+  overflow-wrap: anywhere;
+}
+.ad-col-handle {
+  width: 56px;
+}
+.ad-col-url {
+  min-width: 96px;
+  max-width: 200px;
+}
+.ad-period {
+  display: block;
+  white-space: nowrap;
+}
+.ad-banner-thumb {
+  display: block;
+  width: 120px;
+  height: 40px;
+  border-radius: var(--ds-corner-sm);
+  background: var(--ds-color-surface-raised);
+  object-fit: cover;
+}
+.ad-status {
+  white-space: nowrap;
+}
+.ad-status-live {
+  border-color: var(--ds-color-status-positive);
+  background: var(--ds-color-status-positive-subtle);
+  color: var(--ds-color-status-positive);
+}
+.ad-status-scheduled {
+  border-color: var(--ds-color-status-warning);
+  background: var(--ds-color-status-warning-subtle);
+  color: var(--ds-color-status-warning);
+}
+.ad-status-ended {
+  border-color: var(--ds-color-border-default);
+  color: var(--ds-color-text-subtle);
+}
+.ad-stat-label {
+  display: none;
+}
+.ad-banner-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: var(--ds-space-6);
+}
+.ad-banner-row.is-dragging {
+  position: relative;
+  z-index: 1;
+  background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
+}
+.ad-banner-row.is-dragging .drag-handle {
+  cursor: grabbing;
+}
+.ad-banner-period {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--ds-space-16);
+}
+.ad-banner-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-8);
+  padding: var(--ds-space-12);
+  border-radius: var(--ds-corner-md);
+  background: var(--ds-color-background-stage);
+}
+.ad-banner-preview h3 {
+  margin: 0;
+  font-size: var(--ds-font-size-14);
+}
+.ad-banner-preview .banner-carousel {
+  width: 100%;
+  max-width: 448px;
+}
+.ad-banner-preview-empty {
+  margin: 0;
+  padding: var(--ds-space-24) var(--ds-space-12);
+  border: 1px dashed var(--ds-color-border-strong);
+  border-radius: var(--ds-corner-md);
+  color: var(--ds-color-text-subtle);
+  font-size: var(--ds-font-size-14);
+  text-align: center;
+}
+.ad-banners-skeleton-filters {
+  max-width: 420px;
+}
+.ad-banners-skeleton-row {
+  height: 64px;
+}
+@media (min-width: 701px) {
+  .ad-banner-dialog {
+    margin: auto;
+    border-bottom: 1px solid var(--ds-color-border-default);
+    border-radius: var(--ds-corner-lg);
+  }
+}
+@media (max-width: 700px) {
+  .ad-banners-table-wrap {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+  .ad-banners-table,
+  .ad-banners-table tbody,
+  .ad-banners-table tr,
+  .ad-banners-table :is(th, td) {
+    display: block;
+  }
+  .ad-banners-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+  }
+  .ad-banners-table tbody {
+    display: grid;
+    gap: var(--ds-space-12);
+  }
+  /* 카드: 첫 줄은 손잡이(전체 걸러보기) · 썸네일, 그 아래 칸은 한 줄씩. 노출·클릭 두 칸만 같은 줄(`노출 1,240 · 클릭 38`). */
+  .ad-banners-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ds-space-6) var(--ds-space-8);
+    padding: var(--ds-space-16);
+    border: 1px solid var(--ds-color-border-default);
+    border-radius: var(--ds-corner-lg);
+    background: var(--ds-color-surface-default);
+    box-shadow: var(--card-shadow);
+  }
+  .ad-banners-table :is(th, td) {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: none;
+    padding: 0;
+    border: 0;
+  }
+  .ad-banners-table .ad-col-handle {
+    flex: none;
+    width: auto;
+  }
+  .ad-banners-table .ad-col-thumb {
+    flex: 1 1 0;
+  }
+  .ad-banner-thumb {
+    width: 100%;
+    max-width: 342px;
+    height: auto;
+    aspect-ratio: 3 / 1;
+  }
+  .ad-period {
+    display: inline;
+    white-space: normal;
+  }
+  .ad-banners-table .ad-col-stat {
+    flex: none;
+    color: var(--ds-color-text-secondary);
+    text-align: left;
+  }
+  .ad-banners-table .ad-col-clicks::before {
+    content: '·';
+    margin-right: var(--ds-space-8);
+  }
+  .ad-stat-label {
+    display: inline;
+  }
+  .ad-banner-actions {
+    justify-content: flex-start;
+    margin-top: var(--ds-space-6);
   }
 }

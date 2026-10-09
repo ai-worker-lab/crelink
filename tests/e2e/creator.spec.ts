@@ -244,7 +244,8 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
   await pick('외부 링크 구역 편집').click();
   await expect(panelTitle('외부 링크')).toBeFocused();
   const links = main.getByRole('region', { name: '외부 링크', exact: true });
-  const titles = links.locator('.link-edit-card .link-title');
+  // 광고 블록 행(`.slot-edit-card`, 맨 뒤)은 링크가 아니라 뺍니다. 광고 행 정렬은 ad-banner.spec.ts가 봅니다.
+  const titles = links.locator('.link-edit-card:not(.slot-edit-card) .link-title');
   await expect(links.getByText('아직 추가한 링크가 없어요.', { exact: false })).toBeVisible();
   await expect(links.getByText('보이는 링크 0/5')).toBeVisible();
 
@@ -378,7 +379,8 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
   await handle4.focus();
   await page.keyboard.press('Space');
   await expect(handle4).toHaveAttribute('aria-pressed', 'true');
-  await expect(announcement).toHaveText('링크 4 링크를 들었어요. 지금 5번째, 전체 6개예요.');
+  // 전체 개수에는 맨 뒤의 광고 블록 행도 들어갑니다(링크 6 + 광고 행 1).
+  await expect(announcement).toHaveText('링크 4 링크를 들었어요. 지금 5번째, 전체 7개예요.');
   // 들어 올린 직후 dnd-kit이 목록 위치를 재기 전에 누른 화살표는 무시되므로, 안내가 바뀔 때까지 ↑를 다시 누릅니다.
   await expect(async () => {
     await page.keyboard.press('ArrowUp');
@@ -586,7 +588,7 @@ test('크리에이터: 모바일 터치로 링크를 끌어 순서 변경(390px 
   // 390px은 `편집` 화면의 미리보기에서 외부 링크 구역을 고르면 외부 링크 목록이 하단 시트로 열림
   const openLinks = page.getByRole('main').getByRole('button', { name: '외부 링크 구역 편집', exact: true });
   const links = page.getByRole('dialog', { name: '외부 링크', exact: true });
-  const titles = links.locator('.link-edit-card .link-title');
+  const titles = links.locator('.link-edit-card:not(.slot-edit-card) .link-title');
   await openLinks.click();
   await expect(titles).toHaveText(['첫째', '둘째', '셋째']);
 

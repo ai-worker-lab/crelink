@@ -9,16 +9,19 @@ import { useEffect, useId, useRef, type ReactNode } from 'react';
  * 브라우저가 dialog를 직접 닫아도(`close` 이벤트) 같은 규칙으로 맞춥니다(저장 중이면 다시 엶).
  * 닫기는 여는 쪽이 이 구성 요소를 그리지 않는 것으로 하며, 닫힌 뒤 포커스 복귀도 여는 쪽이 맡습니다.
  * 같은 패널 내용을 넓은 화면에서는 오른쪽 편집 패널에 그립니다(디자인 인계 design/preview-direct-edit/handoff.md).
+ * 운영자 광고 배너 대화상자도 이 시트를 쓰고, `className`으로 넓은 화면에서 가운데 대화상자 모양을 더합니다.
  */
 export function EditSheet({
   title,
   pending,
   onDismiss,
+  className,
   children,
 }: {
   title: string;
   pending: boolean;
   onDismiss: () => void;
+  className?: string;
   children: ReactNode;
 }) {
   const headingId = useId();
@@ -35,7 +38,7 @@ export function EditSheet({
   return (
     <dialog
       ref={dialogRef}
-      className="sheet"
+      className={className ? `sheet ${className}` : 'sheet'}
       aria-labelledby={headingId}
       onCancel={(event) => {
         // 닫기는 여는 쪽이 시트를 지우는 것으로 하므로 브라우저 기본 닫기는 막습니다.

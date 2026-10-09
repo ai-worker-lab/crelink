@@ -1,9 +1,10 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CRELINK_API_PATHS, CRELINK_LIMITS, ImageRef } from '@crelink/shared';
+import { CRELINK_API_PATHS, CRELINK_LIMITS, ImageRef, UploadFileResponse } from '@crelink/shared';
 import { randomUUID } from 'node:crypto';
 import { AppConfig } from '../config.service';
 import { Database, Queryable } from '../database';
 import { apiError, UUID_PATTERN } from '../common/http';
+import { isAnimatedImage } from './animated-image';
 import { FileStorage } from './file-storage';
 
 /** 이미지 한도 초과 안내. 한도는 계약 상수(`CRELINK_LIMITS.imageMaxBytes`)에서 계산합니다. */
@@ -36,7 +37,8 @@ export class FilesService {
     return fileId ? { fileId, url: this.imageUrl(fileId) } : null;
   }
 
-  async upload(userId: string, file: Express.Multer.File | undefined): Promise<ImageRef> {
+  /** 업로드 때 형식과 움직임(GIF·WebP·APNG, `files.animated`)을 판정해 저장합니다. */
+  async upload(userId: string, file: Express.Multer.File | undefined): Promise<UploadFileResponse> {
     if (!file) throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', '업로드할 이미지 파일(file)을 보내 주세요.');
     if (file.size > CRELINK_LIMITS.imageMaxBytes) {
       throw apiError(HttpStatus.BAD_REQUEST, 'file_too_large', IMAGE_TOO_LARGE_MESSAGE);
@@ -49,13 +51,35 @@ export class FilesService {
         'JPEG, PNG, WebP, GIF 이미지만 올릴 수 있습니다.',
       );
     }
+    const animated = isAnimatedImage(contentType, file.buffer);
     const id = randomUUID();
     await this.storage.put(id, file.buffer);
     await this.database.query(
-      'INSERT INTO files (id, owner_user_id, storage_key, content_type, size) VALUES ($1, $2, $3, $4, $5)',
-      [id, userId, id, contentType, file.size],
+      'INSERT INTO files (id, owner_user_id, storage_key, content_type, size, animated) VALUES ($1, $2, $3, $4, $5, $6)',
+      [id, userId, id, contentType, file.size, animated],
     );
-    return { fileId: id, url: this.imageUrl(id) };
+    return { fileId: id, url: this.imageUrl(id), animated };
+  }
+
+  /**
+   * 파일이 움직이는 이미지인지. `files.animated`가 NULL(0003 전에 올린 파일)이면 저장소에서 바이트를 읽어 판정하고 채웁니다.
+   * 배너 저장(정지 이미지 규칙)에서 씁니다. 파일 행이나 저장소 객체가 없으면 404 `file_not_found`.
+   */
+  async isAnimated(db: Queryable, fileId: string): Promise<boolean> {
+    const notFound = apiError(HttpStatus.NOT_FOUND, 'file_not_found', '이미지를 찾을 수 없습니다. 다시 올려 주세요.');
+    if (!UUID_PATTERN.test(fileId)) throw notFound;
+    const file = await db.query<{ storage_key: string; content_type: string; animated: boolean | null }>(
+      'SELECT storage_key, content_type, animated FROM files WHERE id = $1',
+      [fileId],
+    );
+    const row = file.rows[0];
+    if (!row) throw notFound;
+    if (row.animated !== null) return row.animated;
+    const data = await this.storage.get(row.storage_key);
+    if (!data) throw notFound;
+    const animated = isAnimatedImage(row.content_type, data);
+    await db.query('UPDATE files SET animated = $2 WHERE id = $1 AND animated IS NULL', [fileId, animated]);
+    return animated;
   }
 
   async read(fileId: string): Promise<{ contentType: string; data: Buffer } | null> {

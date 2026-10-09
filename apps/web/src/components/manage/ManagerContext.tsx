@@ -15,7 +15,9 @@ import {
 import { browserApi } from '../../lib/api/browser';
 import { targetKey, type LandingEditTarget } from '../../lib/landing-edit';
 import {
+  bannerDraftOf,
   draftKey,
+  isBannerDraftDirty,
   isLinkDraftDirty,
   isPortfolioDraftDirty,
   isProfileDirty,
@@ -24,6 +26,7 @@ import {
   portfolioDraftOf,
   profileDraftOf,
   socialRowsOf,
+  type BannerDraft,
   type LinkDraft,
   type PortfolioDraft,
   type ProfileDraft,
@@ -31,12 +34,16 @@ import {
 } from '../../lib/landing-preview';
 import { useAction, type ActionState } from '../../lib/use-action';
 
-/** 영역별 `저장 안 함` 여부. 하나라도 참이면 주소 막대에 `저장하지 않은 변경 포함`을 붙입니다. 링크·포트폴리오는 초안 중 하나라도 바뀌었으면 참입니다. */
+/** 편집 중 배너 슬롯이 회수됐을 때의 안내(handoff `슬롯 회수됨(편집 중)`, 오류 코드 `banner_slot_not_granted`). */
+export const BANNER_SLOT_REVOKED_NOTICE = '배너 슬롯이 회수되어 이 자리에 다시 크리링 광고 블록이 나와요.';
+
+/** 영역별 `저장 안 함` 여부. 하나라도 참이면 주소 막대에 `저장하지 않은 변경 포함`을 붙입니다. 링크·포트폴리오·배너는 초안 중 하나라도 바뀌었으면 참입니다. */
 export interface ManagerDirty {
   profile: boolean;
   socials: boolean;
   link: boolean;
   portfolio: boolean;
+  banner: boolean;
 }
 
 export interface ManagerContextValue {
@@ -62,10 +69,23 @@ export interface ManagerContextValue {
   editPortfolioDraft: (key: string, patch: Partial<PortfolioDraft>) => void;
   discardPortfolioDraft: (key: string) => void;
   isPortfolioDirty: (key: string) => boolean;
+  /** 항목별 배너 초안(설계 `배너 초안 규칙`). 규칙은 링크와 같고, 배너 슬롯이 회수되면(`slot.kind`가 'ad'로 바뀜) 모두 버립니다. */
+  bannerDrafts: ReadonlyMap<string, BannerDraft>;
+  editBannerDraft: (key: string, patch: Partial<BannerDraft>) => void;
+  discardBannerDraft: (key: string) => void;
+  isBannerDirty: (key: string) => boolean;
+  /**
+   * 배너 요청이 `banner_slot_not_granted`(403)로 실패했을 때 부릅니다. 편집 상태를 다시 읽고, 회수가 확인되면(`slot.kind = 'ad'`)
+   * 배너 초안을 버리고 안내(`slotNotice`)를 띄웁니다. `페이지 편집`은 배너 패널이 사라진 것으로 보고 처음 패널로 돌아갑니다.
+   * 다시 읽은 상태가 아직 배너 슬롯이면 false를 돌려줍니다(부르는 쪽이 오류 줄을 보임).
+   */
+  bannerSlotRevoked: () => Promise<boolean>;
+  /** 배너 슬롯 회수 안내. 다른 대상을 고르면 지웁니다. */
+  slotNotice: string | null;
   /** `페이지 편집`에서 고른 대상. null이면 처음 패널(구역 목록)입니다. */
   selection: LandingEditTarget | null;
   /**
-   * 대상을 고릅니다. 링크·포트폴리오 항목이면 초안이 없을 때 저장값으로 만들고, 바뀌지 않은 초안은 떠날 때 지웁니다.
+   * 대상을 고릅니다. 링크·포트폴리오 항목·배너면 초안이 없을 때 저장값으로 만들고, 바뀌지 않은 초안은 떠날 때 지웁니다. 대상을 고르면 회수 안내(`slotNotice`)를 지웁니다.
    * 처음 패널에서 고를 때 넘긴 `trigger`는 처음 패널로 돌아올 때 초점을 돌려줄 곳입니다(`takeEntryTrigger`).
    */
   select: (target: LandingEditTarget | null, trigger?: HTMLElement | null) => void;
@@ -115,6 +135,17 @@ export function ManagerProvider({
   const [socials, setSocials] = useState(() => socialRowsOf(initial.socials));
   const [linkDrafts, setLinkDrafts] = useState<ReadonlyMap<string, LinkDraft>>(() => new Map());
   const [portfolioDrafts, setPortfolioDrafts] = useState<ReadonlyMap<string, PortfolioDraft>>(() => new Map());
+  const [bannerDrafts, setBannerDrafts] = useState<ReadonlyMap<string, BannerDraft>>(() => new Map());
+  const [slotNotice, setSlotNotice] = useState<string | null>(null);
+  // 배너 슬롯이 회수되어(다시 읽은 상태가 광고 블록) 종류가 바뀌면 배너 초안을 모두 버리고 안내합니다(설계 `편집 중 회수`).
+  const [seenSlotKind, setSeenSlotKind] = useState(initial.slot.kind);
+  if (seenSlotKind !== state.slot.kind) {
+    setSeenSlotKind(state.slot.kind);
+    if (state.slot.kind === 'ad') {
+      setBannerDrafts(new Map());
+      setSlotNotice(BANNER_SLOT_REVOKED_NOTICE);
+    }
+  }
   const [selection, setSelection] = useState<LandingEditTarget | null>(null);
   const [formPending, setFormPending] = useState(false);
   const entryTrigger = useRef<HTMLElement | null>(null);
@@ -127,6 +158,14 @@ export function ManagerProvider({
     const next = await browserApi<CreatorLandingState>(CRELINK_API_PATHS.meLanding);
     setState(next);
     return next;
+  }
+
+  async function bannerSlotRevoked() {
+    try {
+      return (await reload()).slot.kind === 'ad';
+    } catch {
+      return false;
+    }
   }
 
   async function toggleGuestbook(guestbookEnabled: boolean) {
@@ -162,6 +201,11 @@ export function ManagerProvider({
     if (!draft || (draft.id !== null && !state.portfolio.some((item) => item.id === draft.id))) return false;
     return isPortfolioDraftDirty(state.portfolio, draft);
   };
+  const isBannerDirty = (key: string) => {
+    const draft = bannerDrafts.get(key);
+    if (!draft || (draft.id !== null && !state.banners.some((banner) => banner.id === draft.id))) return false;
+    return isBannerDraftDirty(state.banners, draft);
+  };
 
   function editLinkDraft(key: string, patch: Partial<LinkDraft>) {
     setLinkDrafts((current) => {
@@ -191,14 +235,32 @@ export function ManagerProvider({
       return next;
     });
   }
+  function editBannerDraft(key: string, patch: Partial<BannerDraft>) {
+    setBannerDrafts((current) => {
+      const draft = current.get(key);
+      return draft ? new Map(current).set(key, { ...draft, ...patch }) : current;
+    });
+  }
+  function discardBannerDraft(key: string) {
+    setBannerDrafts((current) => {
+      if (!current.has(key)) return current;
+      const next = new Map(current);
+      next.delete(key);
+      return next;
+    });
+  }
 
   function select(target: LandingEditTarget | null, trigger?: HTMLElement | null) {
     if (selection === null && target !== null) entryTrigger.current = trigger ?? null;
+    if (target !== null) setSlotNotice(null);
     // 떠나는 항목의 초안이 저장값과 같으면 지웁니다(다시 고르면 그때의 저장값으로 새로 만듦).
     if (selection && (!target || targetKey(selection) !== targetKey(target))) {
       if (selection.kind === 'link' && !isLinkDirty(draftKey(selection.id))) discardLinkDraft(draftKey(selection.id));
       if (selection.kind === 'portfolio-item' && !isPortfolioDirty(draftKey(selection.id))) {
         discardPortfolioDraft(draftKey(selection.id));
+      }
+      if (selection.kind === 'banner' && !isBannerDirty(draftKey(selection.id))) {
+        discardBannerDraft(draftKey(selection.id));
       }
     }
     if (target?.kind === 'link') {
@@ -212,6 +274,11 @@ export function ManagerProvider({
       setPortfolioDrafts((current) =>
         current.has(key) ? current : new Map(current).set(key, portfolioDraftOf(saved)),
       );
+    }
+    if (target?.kind === 'banner') {
+      const key = draftKey(target.id);
+      const saved = target.id === null ? null : (state.banners.find((banner) => banner.id === target.id) ?? null);
+      setBannerDrafts((current) => (current.has(key) ? current : new Map(current).set(key, bannerDraftOf(saved))));
     }
     setSelection(target);
   }
@@ -258,6 +325,12 @@ export function ManagerProvider({
     editPortfolioDraft,
     discardPortfolioDraft,
     isPortfolioDirty,
+    bannerDrafts,
+    editBannerDraft,
+    discardBannerDraft,
+    isBannerDirty,
+    bannerSlotRevoked,
+    slotNotice,
     selection,
     select,
     takeEntryTrigger,
@@ -269,6 +342,7 @@ export function ManagerProvider({
       socials: isSocialsDirty(state.socials, socials),
       link: [...linkDrafts.keys()].some(isLinkDirty),
       portfolio: [...portfolioDrafts.keys()].some(isPortfolioDirty),
+      banner: [...bannerDrafts.keys()].some(isBannerDirty),
     },
     guestbookAction,
     toggleGuestbook,
