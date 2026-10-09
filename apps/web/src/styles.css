@@ -3132,6 +3132,193 @@ body:has(.sheet[open]) {
 .home-event > .secondary {
   margin-top: var(--ds-space-6);
 }
+
+/*
+ * 로그인 전 홈 소개(0154, design/home-intro/handoff.md). 기본은 1023px 이하 한 열이고,
+ * 701px 이상은 구획 사이 48·구획 제목 27, 1024px 이상은 첫 화면 두 열(글 · 예시 휴대폰 384)과 카드 3열.
+ * 로그인한 홈(`.landing`)에는 쓰지 않습니다.
+ */
+.home-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-40);
+  padding-bottom: var(--ds-space-48);
+}
+.home-intro :is(h1, h2, h3, p, ol, ul, figure) {
+  margin: 0;
+}
+.home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ds-space-32);
+}
+.home-hero-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+.home-hero-text > .brand-mark {
+  margin-bottom: var(--ds-space-16);
+}
+.home-hero-text > h1 {
+  margin-bottom: var(--ds-space-20);
+  font-size: clamp(var(--ds-font-size-38), 7vw, var(--ds-font-size-64));
+  line-height: 1.15;
+}
+.home-hero-lead {
+  max-width: 540px;
+  font-size: var(--ds-font-size-16);
+  color: var(--ds-color-text-secondary);
+}
+.home-hero-text > .home-event {
+  width: 100%;
+  margin-top: var(--ds-space-20);
+}
+.home-hero-text > .home-actions {
+  margin-top: var(--ds-space-24);
+}
+/* 예시 랜딩: 휴대폰 틀은 관리 화면 `.preview-device` 규칙을 쓰고, 안쪽은 높이 제한·스크롤 없이 내용대로. */
+.home-example {
+  display: grid;
+  justify-items: center;
+  gap: var(--ds-space-12);
+  min-width: 0;
+}
+.home-example-chip {
+  position: absolute;
+  top: calc(var(--ds-space-12) * -1);
+  left: var(--ds-space-20);
+  padding: var(--ds-space-2) var(--ds-space-10);
+  border: 1px solid var(--ds-color-border-strong);
+  border-radius: var(--ds-corner-sm);
+  background: var(--ds-color-surface-default);
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-12);
+  font-weight: var(--ds-font-weight-bold);
+  line-height: 1.65;
+}
+.home-example-screen {
+  overflow: hidden;
+  border-radius: var(--ds-corner-lg);
+  background: var(--ds-color-background-stage);
+}
+.home-example-screen .profile-main {
+  padding: var(--ds-space-24) var(--ds-space-16);
+}
+/* 공개 랜딩에서는 이름이 제목 요소라 굵게 보입니다. 예시 틀 안에는 제목 요소를 두지 않으므로 굵기만 맞춥니다. */
+.home-example-screen .profile-name {
+  font-weight: var(--ds-font-weight-extrabold);
+}
+.home-example-screen .link-card {
+  font-weight: var(--ds-font-weight-bold);
+}
+.home-example-screen .profile-footer {
+  padding: var(--ds-space-8) var(--ds-space-16);
+}
+.home-example figcaption {
+  font-size: var(--ds-font-size-13);
+  color: var(--ds-color-text-subtle);
+  text-align: center;
+}
+.home-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-20);
+}
+.home-section > h2,
+.home-final > h2 {
+  font-size: var(--ds-font-size-22);
+  line-height: 1.15;
+}
+.home-cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ds-space-12);
+  padding: 0;
+  list-style: none;
+}
+/* 누를 수 없는 카드라 가리킴 효과가 없습니다. */
+.home-card {
+  display: grid;
+  align-content: start;
+  gap: var(--ds-space-6);
+  min-width: 0;
+  padding: var(--ds-space-20);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-lg);
+  background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
+}
+.home-card h3 {
+  font-size: var(--ds-font-size-18);
+  line-height: 1.3;
+}
+.home-step {
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: var(--ds-space-12);
+}
+/* 번호 원은 고른 탭과 같은 짝(본문 글자색 면에 흰 글자). 강조색을 쓰지 않습니다. */
+.home-step-num {
+  display: grid;
+  grid-row: 1 / span 2;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--ds-color-text-primary);
+  color: var(--ds-color-surface-default);
+  font-size: var(--ds-font-size-15);
+  font-weight: var(--ds-font-weight-extrabold);
+  line-height: 1;
+}
+.home-more {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 44px;
+  font-size: var(--ds-font-size-14);
+}
+.home-free-note {
+  font-size: var(--ds-font-size-14);
+  color: var(--ds-color-text-subtle);
+}
+.home-final {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ds-space-8);
+  padding: var(--ds-space-32) var(--ds-space-20);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-lg);
+  background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
+  text-align: center;
+}
+.home-final > .primary {
+  margin-top: var(--ds-space-12);
+}
+@media (min-width: 701px) {
+  .home-intro {
+    gap: var(--ds-space-48);
+  }
+  .home-section > h2,
+  .home-final > h2 {
+    font-size: var(--ds-font-size-27);
+  }
+}
+@media (min-width: 1024px) {
+  .home-hero {
+    grid-template-columns: minmax(0, 1fr) 384px;
+    gap: var(--ds-space-48);
+    align-items: center;
+    padding-top: var(--ds-space-40);
+  }
+  .home-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--ds-space-16);
+  }
+}
 /* 운영자 `/admin/slot-event`. 상태 배지·기간 두 칸·표·쪽 넘김은 광고 배너·크리에이터 목록 규칙(`badge-positive`·`badge-warning`·`badge-muted`, `ad-status`, `ad-banner-period`, `data-table`, `pagination`)을 그대로 씁니다. */
 .slot-event-head .section-help {
   margin-bottom: var(--ds-space-16);
