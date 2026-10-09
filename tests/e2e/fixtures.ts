@@ -43,6 +43,12 @@ export const TINY_PNG = Buffer.from(
   'base64',
 );
 
+/** 1×1 두 장짜리 움직이는 GIF(apps/api/test/image-samples.ts `GIF_ANIMATED`와 같은 바이트). 움직이는 배너 업로드에 씁니다. */
+export const TINY_GIF_ANIMATED = Buffer.from(
+  'R0lGODlhAQABAIAAAP///wAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACwAAAAAAQABAAACAkQBACH5BAAKAAAALAAAAAABAAEAgAAAAP///wICRAEAOw==',
+  'base64',
+);
+
 export interface SeedLink {
   title: string;
   url: string;
@@ -293,10 +299,19 @@ export class E2EData {
   }
 }
 
-/** 사용자와 그 사용자의 업로드 파일(디스크)을 지웁니다. 나머지 행은 users의 ON DELETE CASCADE로 지워집니다. */
+/**
+ * 사용자와 그 사용자의 업로드 파일(디스크)을 지웁니다. 나머지 행은 users의 ON DELETE CASCADE로 지워집니다.
+ * 크리링 배너(`ad_banners`)는 운영자가 올린 이미지를 `ON DELETE RESTRICT`로 가리키므로 그 배너를 먼저 지웁니다
+ * (설계 docs/specs/crelink-ad-banner.md `데이터 모델`). 노출·클릭 집계(`ad_banner_daily_stats`)는 배너와 함께 CASCADE로 지워집니다.
+ */
 async function removeUsers(db: pg.Pool, where: string, values: unknown[]) {
   const { rows } = await db.query<{ storage_key: string }>(
     `SELECT f.storage_key FROM files f JOIN users u ON u.id = f.owner_user_id WHERE ${where}`,
+    values,
+  );
+  await db.query(
+    `DELETE FROM ad_banners WHERE image_file_id IN (SELECT f.id FROM files f JOIN users u ON u.id = f.owner_user_id WHERE ${where})
+        OR still_file_id IN (SELECT f.id FROM files f JOIN users u ON u.id = f.owner_user_id WHERE ${where})`,
     values,
   );
   await Promise.all(rows.map((row) => rm(join(UPLOAD_DIR, row.storage_key), { force: true })));

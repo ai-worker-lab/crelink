@@ -2026,6 +2026,14 @@ button.add-slot:hover,
   font-size: var(--ds-font-size-13);
   text-align: center;
 }
+/*
+ * 슬롯이 링크 목록 맨 앞이면 슬롯 구역 칩(오른쪽 위)이 바깥 `외부 링크` 구역 칩과 같은 자리에 겹쳐 그 칩을 누를 수 없다.
+ * 맨 앞일 때만 슬롯 칩을 왼쪽 위로 옮긴다.
+ */
+.banner-slot-item:first-child > .edit-region > .edit-tag {
+  right: auto;
+  left: var(--ds-space-4);
+}
 /* 외부 링크 패널의 광고 블록·배너 슬롯 행: 링크 행과 같은 모양이지만 카드 자체는 누를 수 없다. */
 .link-edit-row > .slot-edit-card,
 .link-edit-row > .slot-edit-card:hover {

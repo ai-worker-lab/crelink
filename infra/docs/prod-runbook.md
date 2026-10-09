@@ -189,7 +189,7 @@ SOPS_AGE_KEY_CMD='security find-generic-password -s crelink-sops-age -a operator
 4. 서버에서 edge와 첫 색을 띄웁니다: `ssh home-server` → `ls -t /opt/crelink/releases | head -n 1`로 방금 풀린 릴리스 SHA를 확인하고 `sudo /opt/crelink/releases/<SHA>/cutover.sh --dry-run <SHA> <API SHA> <웹 SHA>`(셋 다 그 커밋 SHA) → 점검이 모두 `ok`·`info`면 `--dry-run`을 빼고 실행합니다. 옛 스택이 없으므로 공백 단계는 건너뜁니다([14-3](#14-3-cutover-실행)과 같은 스크립트). 헬스 실패면 blue를 내리고 종료 1이므로 [6](#6-운영-확인)의 로그로 원인(대개 비밀값·DB 접속)을 고쳐 다시 실행합니다.
 5. 실패한 Deploy 실행을 **Re-run failed jobs**로 다시 돌립니다. 같은 릴리스가 green으로 한 번 더 배포되고(무중단) `운영 주소 검사`와 배포 기록 태그가 이어집니다. 이후에는 main 머지(push) 때 자동입니다.
 6. GeoIP를 넣습니다([8](#8-geoip)).
-7. 확인: 배포 job의 `운영 주소 검사` 단계 결과(운영 주소 6개), 구글 로그인, 단축 주소 생성·방문, 링크 클릭 기록의 IP가 내 공인 IP인지(Caddy·cloudflared 주소가 아닌지).
+7. 확인: 배포 job의 `운영 주소 검사` 단계 결과(검사 10개 ok, 0085부터 배너 클릭 `/b/`·`/a/` 포함), 구글 로그인, 단축 주소 생성·방문, 링크 클릭 기록의 IP가 내 공인 IP인지(Caddy·cloudflared 주소가 아닌지).
 
 ## 6. 운영 확인
 
@@ -541,7 +541,7 @@ sudo /opt/crelink/releases/$R/cutover.sh $R              # root면 deploy로 다
 
 ```bash
 ssh home-server
-sudo -u deploy /opt/crelink/current/verify.sh            # 운영 주소 6개 ok (Actions의 운영 주소 검사와 같음)
+sudo -u deploy /opt/crelink/current/verify.sh            # 검사 10개 ok (Actions의 운영 주소 검사와 같음)
 cat /opt/crelink/state/active-color                      # blue
 column -t -s $'\t' /opt/crelink/state/releases.log | tail -n 2   # 마지막 줄: deploy <L> <R> <같은 이미지>
 sudo docker ps -a --format '{{.Names}}\t{{.Status}}' | grep crelink-   # crelink-edge-caddy-1·crelink-blue-api-1·crelink-blue-web-1 Up, crelink-prod-* 없음

@@ -4,6 +4,7 @@
 
 ## 2026-10-09
 
+- 운영 주소 검사 `prod/verify.sh`에 배너 클릭 경로 `{SHORT}/b/zzzzzzzzzz`·`/a/zzzzzzzzzz/zzzzzzzzzz`가 302 `{WEB}/notice?reason=link_unavailable`인지 확인하는 검사 4개를 더함(검사 10개). `prod/README.md`·`docs/prod-runbook.md`의 검사 수. 근거 `docs/work/orchestrator/0085-ad-banner-integration.md`.
 - 배너 클릭 경로(에픽 0063 T8): `prod/Caddyfile` 단축 호스트의 클릭 matcher를 정규식 하나(`^/(c/[a-z0-9]{10}|a/[a-z0-9]{10}/[a-z0-9]{10}|b/[a-z0-9]{10})$`, GET만)로 넓혀 광고 클릭 `/a/{크리링 배너}/{랜딩}`·크리에이터 배너 클릭 `/b/{배너}`를 api로 넘김(reverse_proxy 블록 수 그대로, 주석·머리말 갱신). `prod/tests/caddy-routing.sh`에 통과(경로·쿼리 유지)·404(세그먼트별 대문자·9자·11자, 세그먼트 수, 끝 슬래시, POST·HEAD, `--path-as-is` 상위 경로)·웹 호스트 web·색 전환 뒤 `/b/` api 경우 추가, `prod/README.md` Caddyfile 줄. API에 경로가 생기기 전(T7)에 머지돼도 `/a/`·`/b/`는 API 404일 뿐이라 main에 먼저 머지. 근거 `docs/work/infra/0074-caddy-banner-routes.md`, `docs/specs/crelink-ad-banner.md` "통합과 배포 순서".
 
 ## 2026-10-08
