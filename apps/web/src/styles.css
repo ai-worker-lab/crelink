@@ -394,6 +394,13 @@ textarea.input {
   font-size: var(--ds-font-size-12);
   color: var(--ds-color-text-subtle);
 }
+/* 배너 이미지(3:1, 설계 docs/specs/crelink-ad-banner.md `BANNER_ASPECT_RATIO`) */
+.image-preview.image-preview-banner {
+  width: 240px;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 1;
+}
 /* 기본 프로필(프로필 사진이 없을 때, PRD R17). 크기·테두리는 함께 붙는 .profile-avatar·.image-preview가 정한다. */
 .default-avatar {
   display: block;
@@ -670,6 +677,12 @@ textarea.input {
   object-fit: cover;
   border: 1px solid var(--ds-color-border-default);
   border-radius: var(--ds-corner-sm);
+}
+/* 크리에이터 배너 썸네일(3:1, 운영자 크리에이터 상세 `배너` 카드) */
+.item-thumb.item-thumb-banner {
+  width: 120px;
+  height: 40px;
+  max-width: 100%;
 }
 .item-actions {
   display: flex;

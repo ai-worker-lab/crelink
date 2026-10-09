@@ -3,8 +3,9 @@
 import {
   CRELINK_API_PATHS,
   CRELINK_LIMITS,
-  type LinkView,
+  type BannerLimits,
   type OperatorCreatorDetail,
+  type SetBannerSlotRequest,
   type SetExtraSlotsRequest,
   type SetLinkBlockRequest,
   type SetSuspensionRequest,
@@ -12,6 +13,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useId, useState, type FormEvent } from 'react';
 import { browserApi } from '../../lib/api/browser';
+import { formatDate } from '../../lib/format';
 import { useAction } from '../../lib/use-action';
 import { ActionStatus } from '../ActionStatus';
 
@@ -105,33 +107,112 @@ export function SuspensionToggle({ userId, suspended }: { userId: string; suspen
   );
 }
 
-/** 링크별 차단·해제와 사유(R14). */
-export function LinkBlockControl({ link }: { link: LinkView }) {
+/**
+ * 배너 슬롯 부여·회수(R21 ①⑤). 회수해도 크리에이터 배너는 지우지 않고 보관하며, 다시 부여하면 그대로 보입니다.
+ * 문구: design/ad-banner-block/handoff.md `크리에이터 상세`.
+ */
+export function BannerSlotControl({
+  userId,
+  grantedAt,
+  limits,
+  bannerCount,
+}: {
+  userId: string;
+  grantedAt: string | null;
+  limits: BannerLimits;
+  /** 보관 중 포함 크리에이터 배너 수. */
+  bannerCount: number;
+}) {
   const router = useRouter();
-  const inputId = useId();
-  const [reason, setReason] = useState(link.blockedReason ?? '');
+  const headingId = useId();
   const { pending, error, notice, run } = useAction();
+  const granted = grantedAt !== null;
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const blocked = !link.blocked;
-    const payload: SetLinkBlockRequest = { blocked, reason: blocked ? reason.trim() || null : null };
+  async function toggle() {
+    const next = !granted;
+    const question = next
+      ? '이 계정의 모든 랜딩에서 광고 블록 자리가 크리에이터 배너 슬롯으로 바뀌어요. 부여할까요?'
+      : `회수하면 같은 자리에 다시 크리링 광고가 나와요. 크리에이터가 만든 배너 ${bannerCount}장은 지우지 않고 보관해요.`;
+    if (!window.confirm(question)) return;
+    const payload: SetBannerSlotRequest = { granted: next };
     await run(
       async () => {
-        await browserApi<LinkView>(CRELINK_API_PATHS.adminLinkBlock(link.id), {
+        await browserApi<OperatorCreatorDetail>(CRELINK_API_PATHS.adminCreatorBannerSlot(userId), {
           method: 'PUT',
           body: JSON.stringify(payload),
         });
         router.refresh();
       },
-      blocked ? '링크를 차단했어요.' : '차단을 풀었어요.',
+      next ? '배너 슬롯을 부여했어요.' : '배너 슬롯을 회수했어요.',
+    );
+  }
+
+  return (
+    <div className="subform" role="group" aria-labelledby={headingId}>
+      <h3 id={headingId}>배너 슬롯</h3>
+      {granted ? (
+        <p className="section-help">
+          현재: <strong>부여됨({formatDate(grantedAt)}부터)</strong> — 보이는 배너 {limits.visibleUsed}장 · 전체{' '}
+          {limits.totalUsed}장
+        </p>
+      ) : bannerCount > 0 ? (
+        <p className="section-help">
+          현재: <strong>없음</strong> — 보관 중인 배너 {bannerCount}장(다시 부여하면 그대로 보여요).
+        </p>
+      ) : (
+        <>
+          <p className="section-help">
+            현재: <strong>없음</strong> — 랜딩에 크리링 광고 블록이 나와요.
+          </p>
+          <p className="field-help">배너는 {limits.visibleMax}장까지 둘 수 있어요(설정값).</p>
+        </>
+      )}
+      <button type="button" className={granted ? 'secondary danger' : 'secondary'} onClick={toggle} disabled={pending}>
+        {pending ? '처리 중…' : granted ? '배너 슬롯 회수' : '배너 슬롯 부여'}
+      </button>
+      <ActionStatus error={error} notice={notice} />
+    </div>
+  );
+}
+
+/**
+ * 링크·크리에이터 배너 공용 차단·해제와 사유(R14, R21 ④). `path`는 `PUT` 차단 경로
+ * (`CRELINK_API_PATHS.adminLinkBlock`·`adminBannerBlock`), 요청은 둘 다 `SetLinkBlockRequest`입니다.
+ */
+export function BlockControl({
+  blocked,
+  blockedReason,
+  path,
+  noun,
+}: {
+  blocked: boolean;
+  blockedReason: string | null;
+  path: string;
+  /** 결과 안내 문구의 대상 이름. */
+  noun: '링크' | '배너';
+}) {
+  const router = useRouter();
+  const inputId = useId();
+  const [reason, setReason] = useState(blockedReason ?? '');
+  const { pending, error, notice, run } = useAction();
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const next = !blocked;
+    const payload: SetLinkBlockRequest = { blocked: next, reason: next ? reason.trim() || null : null };
+    await run(
+      async () => {
+        await browserApi<unknown>(path, { method: 'PUT', body: JSON.stringify(payload) });
+        router.refresh();
+      },
+      next ? `${noun}를 차단했어요.` : '차단을 풀었어요.',
     );
   }
 
   return (
     <form className="block-control" onSubmit={submit}>
-      {link.blocked ? (
-        <p className="blocked-reason">사유: {link.blockedReason ?? '없음'}</p>
+      {blocked ? (
+        <p className="blocked-reason">사유: {blockedReason ?? '없음'}</p>
       ) : (
         <div className="field">
           <label htmlFor={inputId}>차단 사유 (선택)</label>
@@ -145,8 +226,8 @@ export function LinkBlockControl({ link }: { link: LinkView }) {
           />
         </div>
       )}
-      <button type="submit" className={link.blocked ? 'secondary' : 'secondary danger'} disabled={pending}>
-        {pending ? '처리 중…' : link.blocked ? '차단 풀기' : '차단'}
+      <button type="submit" className={blocked ? 'secondary' : 'secondary danger'} disabled={pending}>
+        {pending ? '처리 중…' : blocked ? '차단 풀기' : '차단'}
       </button>
       <ActionStatus error={error} notice={notice} />
     </form>

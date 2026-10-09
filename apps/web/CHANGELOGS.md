@@ -4,6 +4,8 @@
 
 ## 2026-10-09
 
+- 운영자 크리에이터 상세 배너 슬롯·배너·배너 클릭(0082, 설계 T14, PRD R21 ①④⑤·R10): `계정 관리` 카드에 `배너 슬롯` 부여·회수 묶음(`BannerSlotControl`, 없음·부여됨·회수 뒤 문구와 확인 대화), `링크` 카드 아래 `배너` 카드(보관 포함, `숨김`·`차단됨` 배지, 배너마다 차단·풀기), 통계 카드 `배너별 클릭` 표. `LinkBlockControl`을 링크·배너 공용 `BlockControl`로 넓힘. BFF 허용 `PUT api/admin/creators/{ID}/banner-slot`·`PUT api/admin/banners/{ID}/block`. 근거 `docs/work/web/0082-admin-creator-banners-web.md`.
+- `ImageField` 배너 모드(0080, 설계 T12): `banner` prop이면 3:1 미리보기·배너 도움말·`지우기`이고, 업로드 응답이 `animated`이면 `makeStillImage`로 첫 장면 3:1 정지 PNG를 만들어 함께 올려 `BannerImage { image, stillImage }` 쌍으로 넘김(`src/lib/banner-image.ts`, 실패하면 쌍 전체 실패, 웹 오류 코드 `still_image_failed`). `help` prop으로 안내 문구를 바꿈. 단위 테스트 `banner-image.spec.ts` 5건. 근거 `docs/work/web/0080-still-image-helper.md`.
 - 움직이는 배너 정지 이미지 도우미 `src/lib/still-image.ts`(스파이크 0075, 설계 S1): 로컬 `File`의 첫 장면을 `createImageBitmap(file)`로 얻어 가운데 기준 비율로 자르고 최대 크기 안 PNG `File`로 만드는 `makeStillImage`, 자르기 계산 `stillCrop`, `stillFileName`. 아직 화면에서 쓰지 않음(T12가 `ImageField`에 연결). 단위 테스트 `still-image.spec.ts` 9건. Chromium·Firefox·WebKit·iOS 26.5 시뮬레이터 Safari에서 GIF·움직이는 WebP·APNG 첫 장면·투명도 확인, `ImageDecoder`는 iOS에 없고 WebKit에서 자르기·투명도가 깨져 쓰지 않음.
 - 광고 블록·배너 슬롯 공유 계약(0067)에 맞춘 최소 연결. 화면 변화 없음. `src/lib/api/errors.ts`에 새 오류 코드 6개의 고정 문구(설계 `docs/specs/crelink-ad-banner.md` 문구 표), `toLandingPreview`가 `blocks[0].slot: null`을 냄(미리보기 슬롯은 0079), `landing-preview.spec.ts` 상태 fixture에 `slot`·`adBanners`·`banners`·`bannerLimits`. 근거 `docs/work/api/0067-ad-banner-contract.md`.
 

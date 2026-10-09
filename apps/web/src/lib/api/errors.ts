@@ -51,6 +51,8 @@ const WEB_ERROR_MESSAGES: Record<string, string> = {
   upstream_unavailable: 'API 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.',
   api_not_configured: 'API 서버 주소가 설정되지 않았어요.',
   route_not_allowed: '허용되지 않은 API 요청이에요.',
+  /** 배너 이미지의 첫 장면 정지 이미지를 만들지 못함(`ImageField` 배너 모드, `lib/banner-image.ts`). */
+  still_image_failed: '움직이는 이미지의 첫 장면을 만들지 못했어요. 다른 이미지를 골라 주세요.',
 };
 
 /**
