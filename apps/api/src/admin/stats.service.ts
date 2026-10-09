@@ -167,6 +167,8 @@ export class StatsService {
       linkClicks: [...clicksByLink]
         .map(([linkId, clicks]) => ({ linkId, title: titleByLink.get(linkId) ?? null, clicks }))
         .sort((a, b) => b.clicks - a.clicks),
+      // 배너별 클릭(creator_banner_clicks·집계 합계)은 0073(클릭 경로·보존)이 채웁니다.
+      bannerClicks: [],
     };
   }
 }

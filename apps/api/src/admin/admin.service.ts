@@ -109,7 +109,16 @@ export class AdminService {
       this.creator.limits(db, userId),
       this.creator.links(db, userId),
     ]);
-    return { ...this.summary(row), extraLinkSlots, limits, links };
+    return {
+      ...this.summary(row),
+      extraLinkSlots,
+      limits,
+      links,
+      // 부여 시각·배너 목록·사용 수는 0072(부여·차단)가 채웁니다.
+      bannerSlot: { grantedAt: null },
+      banners: [],
+      bannerLimits: { ...this.config.bannerSlotLimits, visibleUsed: 0, totalUsed: 0 },
+    };
   }
 
   async creatorStats(userId: string, from: unknown, to: unknown): Promise<OperatorCreatorStats> {

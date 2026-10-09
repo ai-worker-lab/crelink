@@ -258,6 +258,8 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
               clickUrl: `${SHORT_URL}/c/${visiblePublicId}`,
             },
           ],
+          // 게시 중 크리링 배너가 없으면 광고 블록은 숨김(no_banners)입니다.
+          slot: null,
         },
       ],
       guestbookEnabled: true,

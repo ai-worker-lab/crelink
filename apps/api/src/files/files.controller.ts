@@ -41,11 +41,12 @@ export class FilesController {
   @UseGuards(SessionGuard)
   @UseFilters(FileTooLargeFilter)
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: CRELINK_LIMITS.imageMaxBytes, files: 1 } }))
-  upload(
+  async upload(
     @CurrentUser() user: SessionUser,
     @UploadedFile() file: Express.Multer.File | undefined,
   ): Promise<UploadFileResponse> {
-    return this.files.upload(user.id, file);
+    // 움직임 판정(GIF·WebP·APNG, files.animated)은 0069가 채웁니다.
+    return { ...(await this.files.upload(user.id, file)), animated: false };
   }
 
   /** 공개 이미지. id는 추측하기 어려운 UUID이며 내용이 바뀌지 않으므로 오래 캐시합니다. */

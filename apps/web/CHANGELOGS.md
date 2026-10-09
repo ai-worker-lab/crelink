@@ -5,6 +5,7 @@
 ## 2026-10-09
 
 - 움직이는 배너 정지 이미지 도우미 `src/lib/still-image.ts`(스파이크 0075, 설계 S1): 로컬 `File`의 첫 장면을 `createImageBitmap(file)`로 얻어 가운데 기준 비율로 자르고 최대 크기 안 PNG `File`로 만드는 `makeStillImage`, 자르기 계산 `stillCrop`, `stillFileName`. 아직 화면에서 쓰지 않음(T12가 `ImageField`에 연결). 단위 테스트 `still-image.spec.ts` 9건. Chromium·Firefox·WebKit·iOS 26.5 시뮬레이터 Safari에서 GIF·움직이는 WebP·APNG 첫 장면·투명도 확인, `ImageDecoder`는 iOS에 없고 WebKit에서 자르기·투명도가 깨져 쓰지 않음.
+- 광고 블록·배너 슬롯 공유 계약(0067)에 맞춘 최소 연결. 화면 변화 없음. `src/lib/api/errors.ts`에 새 오류 코드 6개의 고정 문구(설계 `docs/specs/crelink-ad-banner.md` 문구 표), `toLandingPreview`가 `blocks[0].slot: null`을 냄(미리보기 슬롯은 0079), `landing-preview.spec.ts` 상태 fixture에 `slot`·`adBanners`·`banners`·`bannerLimits`. 근거 `docs/work/api/0067-ad-banner-contract.md`.
 
 ## 2026-10-08
 

@@ -240,6 +240,11 @@ export class CreatorService {
       socials,
       portfolio,
       limits: { visibleMax, visibleUsed, totalMax, totalUsed },
+      // 슬롯 위치·부여·배너(slot_position, banner_slot_granted_at, ad_banners, creator_banners)는 0068(위치·편집 상태)이 채웁니다.
+      slot: { kind: 'ad', slotIndex: null, grantedAt: null },
+      adBanners: [],
+      banners: [],
+      bannerLimits: { ...this.config.bannerSlotLimits, visibleUsed: 0, totalUsed: 0 },
     };
   }
 }

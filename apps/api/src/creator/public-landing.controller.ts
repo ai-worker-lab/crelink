@@ -70,6 +70,8 @@ export class PublicLandingController {
             faviconUrl: `https://${link.host}/favicon.ico`,
             clickUrl: `${this.config.shortLinkBaseUrl}/c/${link.public_id}`,
           })),
+        // 광고 블록·배너 슬롯(resolveBannerSlot, 첫 list 구역)은 0068(위치·공개 랜딩)이 채웁니다. 웹은 null이면 그리지 않습니다.
+        slot: null,
       })),
       guestbookEnabled: landing.guestbook_enabled,
       passAccepted: this.landingPass.verify(publicId, pass),

@@ -49,6 +49,10 @@ function state(patch: Partial<CreatorLandingState> = {}): CreatorLandingState {
     socials: [{ platform: 'youtube', url: 'https://youtube.com/@haru' }],
     portfolio: [item('p1'), item('p2')],
     limits: { visibleMax: 5, visibleUsed: 2, totalMax: 50, totalUsed: 4 },
+    slot: { kind: 'ad', slotIndex: null, grantedAt: null },
+    adBanners: [],
+    banners: [],
+    bannerLimits: { visibleMax: 5, visibleUsed: 0, totalMax: 20, totalUsed: 0 },
     ...patch,
   };
 }

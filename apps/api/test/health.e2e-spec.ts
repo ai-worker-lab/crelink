@@ -70,7 +70,12 @@ describe('API 기동과 health', () => {
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'",
       );
       expect(tables.rows.map((row) => row.table_name).sort()).toEqual([
+        'ad_banner_daily_stats',
+        'ad_banners',
         'blocked_domains',
+        'creator_banner_click_rollups',
+        'creator_banner_clicks',
+        'creator_banners',
         'files',
         'guestbook_entries',
         'landing_blocks',
@@ -91,7 +96,11 @@ describe('API 기동과 health', () => {
         'visits',
       ]);
       const applied = await client.query('SELECT version FROM schema_migrations ORDER BY version');
-      expect(applied.rows).toEqual([{ version: '0001_crelink_mvp' }, { version: '0002_guestbook' }]);
+      expect(applied.rows).toEqual([
+        { version: '0001_crelink_mvp' },
+        { version: '0002_guestbook' },
+        { version: '0003_ad_banner' },
+      ]);
     } finally {
       await client.end();
     }

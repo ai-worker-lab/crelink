@@ -2,6 +2,14 @@
 
 내부 참고용으로 백엔드 API의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-10-09
+
+- 광고 블록·배너 슬롯 계약·스키마(설계 `docs/specs/crelink-ad-banner.md` T1, 결정 1 C·2 A). 근거 `docs/work/api/0067-ad-banner-contract.md`.
+  - migration `0003_ad_banner`(첫 줄 `SET LOCAL lock_timeout = '5s'`, 머리 주석에 되돌리기): `users.banner_slot_granted_at`, `landing_blocks.slot_position`(NULL = 맨 뒤, `>= 0`), `files.animated`(NULL = 0003 전 파일), 새 테이블 `ad_banners`(이미지·정지 이미지 FK `RESTRICT`, `ends_at >= starts_at`), `creator_banners`(`landing_id` 랜딩 단위, `still_file_id` `SET NULL`, url·host 짝 CHECK), `ad_banner_daily_stats`, `creator_banner_clicks`, `creator_banner_click_rollups`와 인덱스. NULL 허용 컬럼·새 테이블만 더하는 expand.
+  - `AppConfig.bannerSlotLimits`·`parseBannerSlotLimits`: `BANNER_SLOT_MAX`(기본 5, 1 이상 정수)·`BANNER_SLOT_TOTAL_MAX`(기본 20, `BANNER_SLOT_MAX` 이상 정수), `onModuleInit`에서 검사해 틀리면 기동 거부. `.env.example`·`docs/README.md#환경변수`.
+  - 계약 변경에 맞춘 최소 연결(다음 티켓이 채움): `GET /api/me/landing`의 `slot`(`ad`·맨 뒤·미부여)·`adBanners`·`banners` 빈 값과 설정값 `bannerLimits`(0068), 공개 랜딩 `blocks[].slot: null`(0068), `POST /api/me/files`의 `animated: false`(0069), `GET /api/admin/creators/{userId}`의 `bannerSlot.grantedAt: null`·`banners: []`·`bannerLimits`(0072), 통계 `bannerClicks: []`(0073). 응답에 필드만 더해지고 동작 변화 없음.
+  - 시험: `test/migrations.e2e-spec.ts` 0003 5건(기존 행 NULL 유지·`lock_timeout` 파일 안 한정, 크리에이터 삭제 시 배너·파일·클릭 연쇄, 정지 이미지 삭제 `SET NULL`·클릭 사본 유지, 운영자 삭제 23503, CHECK), `src/config.service.spec.ts` 한도 파싱 4건.
+
 ## 2026-10-08
 
 - 시험 `test/short-link.e2e-spec.ts` 통과 표시 만료 검사의 경계 흔들림 수정: 만료 시각을 초 단위로 내림하므로 59초 전 발급 표시는 남은 시간이 1~1000ms뿐이라 CI(Node 24)에서 요청 중에 만료돼 실패함(0061 PR #58 첫 실행) → "아직 유효" 쪽을 50초 전 발급으로. 서비스 코드 변경 없음. 근거 `docs/work/orchestrator/0061-main-branch-protection.md`.

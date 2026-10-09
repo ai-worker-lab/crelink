@@ -212,7 +212,8 @@ export function toLandingPreview(state: CreatorLandingState, drafts: LandingDraf
     avatarUrl: profile ? (profile.avatar?.url ?? null) : (state.landing.avatar?.url ?? null),
     socials: socials ? socialItems(socials) : state.socials,
     portfolio,
-    blocks: [{ type: 'list', links }],
+    // 광고 블록·배너 슬롯 미리보기(resolveBannerSlot)는 0079(미리보기·광고 블록 패널)가 채웁니다.
+    blocks: [{ type: 'list', links, slot: null }],
     guestbookEnabled: state.landing.guestbookEnabled,
   };
 }

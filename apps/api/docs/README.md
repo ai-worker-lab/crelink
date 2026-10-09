@@ -35,6 +35,8 @@
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | `s3`면 필수(비밀) | 버킷 범위 읽기·쓰기 자격 증명. 운영 값은 SeaweedFS `s3.json`의 identity `crelink`이고 대상별 SOPS 암호문에만 둡니다. |
 | `GEOIP_MMDB_PATH` | 아니오 | mmdb(DB-IP Lite City 등, CC BY 4.0이라 웹 `/privacy`에 출처 표시) 경로. 비면 국가·도시를 null로 두고 기동 시 경고를 한 번 남김. 파일을 열지 못해도 같은 동작에 오류 로그. 컨테이너는 볼륨 `/data/geoip`. |
 | `TRUSTED_PROXY_HOPS` | 아니오 | 앞단의 신뢰할 리버스 프록시 수(기본 0). 0이면 소켓 주소, N이면 `X-Forwarded-For`의 오른쪽에서 N번째 값을 방문·클릭 IP로 씁니다([방문자 IP](#방문자-ip)). 운영(Caddy 1단)은 `1`. 0 이상의 정수가 아니면 기동 거부. |
+| `BANNER_SLOT_MAX` | 아니오 | 크리에이터 배너 슬롯에서 보이게(숨김·차단 아님) 둘 수 있는 배너 수 n, 랜딩마다(기본 5, `[임시값]`). 1 이상의 정수가 아니면 기동 거부. 지금 장수보다 낮추면 있는 배너는 그대로 두고 추가·숨김 해제만 막습니다. 응답 `bannerLimits.visibleMax`. |
+| `BANNER_SLOT_TOTAL_MAX` | 아니오 | 숨김·차단 포함 크리에이터 배너 보관 상한, 랜딩마다(기본 20, `[임시값]`). `BANNER_SLOT_MAX` 이상의 정수가 아니면 기동 거부. 응답 `bannerLimits.totalMax`. 운영 값을 바꿀 때는 비밀이 아니므로 `.sops.yaml` `unencrypted_regex`에 키를 먼저 더합니다(`DATABASE_POOL_MAX`와 같은 절차, [설계](../../../docs/specs/crelink-ad-banner.md#설정값)). |
 | `SENTRY_DSN` | 아니오(운영 선택) | Sentry DSN. 비면 Sentry를 초기화하지 않습니다(로컬·시험·PR CI). 운영 값은 대상별 SOPS 암호문의 평문 키(이벤트 전송만 허용하는 공개 값). [오류 모니터링](#오류-모니터링). |
 | `SENTRY_ENVIRONMENT` | 아니오 | 이벤트 환경 이름. 비면 `NODE_ENV=production`이면 `production`, 아니면 `development`. |
 | `SENTRY_RELEASE` | 아니오 | release. 운영 이미지는 빌드 인자로 배포 커밋 SHA가 이미지 ENV에 들어가 소스맵 업로드 release와 같습니다. 비면 release 없이 보냅니다. |

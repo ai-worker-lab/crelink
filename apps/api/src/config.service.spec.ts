@@ -1,5 +1,6 @@
 import {
   assertProductionConfig,
+  parseBannerSlotLimits,
   parseDatabasePoolMax,
   parseFileStorageConfig,
   parseTrustedProxyHops,
@@ -91,6 +92,45 @@ describe('TRUSTED_PROXY_HOPS', () => {
     for (const value of ['-1', '1.5', 'one', '1e2']) {
       expect(() => parseTrustedProxyHops(value)).toThrow('TRUSTED_PROXY_HOPS');
     }
+  });
+});
+
+describe('BANNER_SLOT_MAX·BANNER_SLOT_TOTAL_MAX', () => {
+  it('비면 5·20, 정수 값은 앞뒤 공백을 빼고 그대로 쓴다', () => {
+    expect(parseBannerSlotLimits({})).toEqual({ visibleMax: 5, totalMax: 20 });
+    expect(parseBannerSlotLimits({ BANNER_SLOT_MAX: ' ', BANNER_SLOT_TOTAL_MAX: '' })).toEqual({
+      visibleMax: 5,
+      totalMax: 20,
+    });
+    expect(parseBannerSlotLimits({ BANNER_SLOT_MAX: ' 3 ', BANNER_SLOT_TOTAL_MAX: '8' })).toEqual({
+      visibleMax: 3,
+      totalMax: 8,
+    });
+  });
+
+  it('보관 상한은 보이는 배너 상한과 같아도 된다', () => {
+    expect(parseBannerSlotLimits({ BANNER_SLOT_MAX: '7', BANNER_SLOT_TOTAL_MAX: '7' })).toEqual({
+      visibleMax: 7,
+      totalMax: 7,
+    });
+    expect(parseBannerSlotLimits({ BANNER_SLOT_MAX: '20' })).toEqual({ visibleMax: 20, totalMax: 20 });
+  });
+
+  it('BANNER_SLOT_MAX가 1 이상의 정수가 아니면 값 없이 키 이름만 넣은 오류로 기동을 거부한다', () => {
+    for (const value of ['0', '-1', '1.5', 'five', '1e2', '99999999999999999999']) {
+      expect(() => parseBannerSlotLimits({ BANNER_SLOT_MAX: value })).toThrow(
+        new Error('BANNER_SLOT_MAX는 1 이상의 정수여야 합니다(기본 5).'),
+      );
+    }
+  });
+
+  it('BANNER_SLOT_TOTAL_MAX가 정수가 아니거나 BANNER_SLOT_MAX보다 작으면 기동을 거부한다', () => {
+    const error = new Error('BANNER_SLOT_TOTAL_MAX는 BANNER_SLOT_MAX 이상의 정수여야 합니다(기본 20).');
+    for (const value of ['0', '-1', '2.5', 'twenty', '4']) {
+      expect(() => parseBannerSlotLimits({ BANNER_SLOT_MAX: '5', BANNER_SLOT_TOTAL_MAX: value })).toThrow(error);
+    }
+    // 보이는 상한만 기본 보관 상한(20)보다 크게 올리면 보관 상한도 함께 올려야 합니다.
+    expect(() => parseBannerSlotLimits({ BANNER_SLOT_MAX: '21' })).toThrow(error);
   });
 });
 

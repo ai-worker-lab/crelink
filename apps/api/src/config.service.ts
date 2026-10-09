@@ -118,6 +118,44 @@ export function parseDatabasePoolMax(value: string | undefined): number {
   return max;
 }
 
+/** 크리에이터 배너 한도(R21 ②, 랜딩마다). 키가 비었을 때 값은 설계 `[임시값]`입니다. */
+export const DEFAULT_BANNER_SLOT_MAX = 5;
+export const DEFAULT_BANNER_SLOT_TOTAL_MAX = 20;
+
+export interface BannerSlotLimits {
+  /** `BANNER_SLOT_MAX`: 보이는(숨김·차단 아님) 배너 상한 n. */
+  visibleMax: number;
+  /** `BANNER_SLOT_TOTAL_MAX`: 숨김·차단 포함 보관 상한. */
+  totalMax: number;
+}
+
+/**
+ * `BANNER_SLOT_MAX`(비면 5, 1 이상 정수)와 `BANNER_SLOT_TOTAL_MAX`(비면 20, `BANNER_SLOT_MAX` 이상 정수).
+ * 어기면 오류(기동 거부). 오류에는 키 이름과 규칙만 넣습니다.
+ */
+export function parseBannerSlotLimits(env: NodeJS.ProcessEnv): BannerSlotLimits {
+  const [visibleMax, totalMax] = (
+    [
+      ['BANNER_SLOT_MAX', DEFAULT_BANNER_SLOT_MAX],
+      ['BANNER_SLOT_TOTAL_MAX', DEFAULT_BANNER_SLOT_TOTAL_MAX],
+    ] as const
+  ).map(([key, fallback]) => {
+    const text = env[key]?.trim();
+    if (!text) return fallback;
+    const value = Number(text);
+    return /^\d+$/.test(text) && Number.isSafeInteger(value) && value >= 1 ? value : NaN;
+  });
+  if (Number.isNaN(visibleMax)) {
+    throw new Error(`BANNER_SLOT_MAX는 1 이상의 정수여야 합니다(기본 ${DEFAULT_BANNER_SLOT_MAX}).`);
+  }
+  if (Number.isNaN(totalMax) || totalMax < visibleMax) {
+    throw new Error(
+      `BANNER_SLOT_TOTAL_MAX는 BANNER_SLOT_MAX 이상의 정수여야 합니다(기본 ${DEFAULT_BANNER_SLOT_TOTAL_MAX}).`,
+    );
+  }
+  return { visibleMax, totalMax };
+}
+
 /** `TRUSTED_PROXY_HOPS`: 비면 0, 0 이상의 정수가 아니면 오류. */
 export function parseTrustedProxyHops(value: string | undefined): number {
   const text = value?.trim() || '0';
@@ -151,6 +189,12 @@ export class AppConfig implements OnModuleInit {
     }
     parseTrustedProxyHops(process.env.TRUSTED_PROXY_HOPS);
     parseFileStorageConfig(process.env);
+    parseBannerSlotLimits(process.env);
+  }
+
+  /** 크리에이터 배너 한도(`BANNER_SLOT_MAX`·`BANNER_SLOT_TOTAL_MAX`). 웹은 응답의 `bannerLimits`로만 봅니다. */
+  get bannerSlotLimits(): BannerSlotLimits {
+    return parseBannerSlotLimits(process.env);
   }
 
   /** 앞단의 신뢰할 리버스 프록시 수. 방문·클릭 IP를 `X-Forwarded-For`에서 고르는 기준(`clientIp`). */
