@@ -6,6 +6,7 @@
 
 ## 2026-10-10
 
+- 0145 모집 채널 실행 문안과 사람 요청 목록 완료(AI 운영자 실행, 사용자 위임에 따른 AI 승인, 우선순위 P1 확정). 새 문서 `docs/product/acquisition-playbook.md`: 문안 근거 사실표, 공통 규칙 확인표 C1~C8, 지인 초대·디스콰이엇·커뮤니티 홍보 게시판·크리링 공식 인스타그램 문안, 보류 채널, 사람 요청 목록 H1~H5, 결과 재기·멈출 조건. 초기 사용자 모집 조사에서 연결했습니다. 사람 실행은 분류 대기 `docs/work/product/0153-acquisition-human-requests.md`로 등록했습니다. 0146을 `완료`로 바꿨습니다(PR #78, Deploy 37984965990). 근거 `docs/work/product/0145-acquisition-channel-playbook.md`.
 - 0146 검색 유입용 활용 가이드 글을 `검증`으로 올렸습니다(AI 운영자 실행, 우선순위 P1 확정, 웹 변경 내용은 `apps/web/CHANGELOGS.md`). 0151을 `완료`로 바꿨습니다(PR #77, Deploy 37982111307).
 - 0151 공개 랜딩 바닥글 가입 유도 문구 구현을 `검증`으로 올렸습니다(AI 운영자 실행, 웹 변경 내용은 `apps/web/CHANGELOGS.md`). E2E 단언도 함께 바꾸므로 역할을 `web`에서 `orchestrator`로 재분류해 `docs/work/orchestrator/0151-landing-footer-cta-web.md`로 옮겼습니다. 검증 근거는 그 진행 기록에 있습니다.
 - 0144 공개 랜딩 하단 가입 유도 문구 디자인 완료(사용자 위임에 따른 AI 승인). 디자인 `design/landing-footer-cta/`(바닥글 첫 링크 `크리링` → `나도 크리링 만들기`, 배너 슬롯 계정도 같은 줄, 랜딩 오류 화면은 그대로, 관리 화면 미리보기도 같은 문구, 링크는 `/` 그대로이고 0087 이후 제안 규칙 `/?from=landing-footer`, 390·1280px, 새 토큰·API 없음). `design/system/DESIGN.md` 공개 랜딩 장식 규칙에 크리링 표시 줄 내용을 더했습니다. 구현 티켓 `docs/work/web/0151-landing-footer-cta-web.md`를 `준비`로 등록했습니다. 0150을 `완료`로 바꾸고(PR #75, Deploy 37976002570), 0150 인계 미결정 1(처리방침 로컬 저장 고지)을 사람 결정이 필요한 분류 대기 `docs/work/web/0152-privacy-local-progress-notice.md`로 등록했습니다. 근거 `docs/work/designer/0144-landing-footer-signup-cta.md`.
