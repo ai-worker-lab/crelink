@@ -4,6 +4,15 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-10-09
+
+- 광고 블록과 크리에이터 배너 슬롯 요구(사용자 결정: 무료는 지울 수 없는 크리링 광고 블록, 유료는 같은 자리의 크리에이터 배너 슬롯, 링크 사이 어디든 끌어서 위치 변경, 스와이프 배너, 리틀리 광고 블록처럼 수익 배분, 운영자 등록 광고로 시작, 배너 슬롯은 운영자 수동 부여). PRD `docs/product/crelink.md`: R20~R22(수용 기준은 `[AI 제안]`), 대상 사용자(운영자)·범위·참고 사실·미정 질문 6개·위험 5개. 벤치마킹 `docs/product/research/link-in-bio-benchmark.md`: `광고 블록과 광고 제거` 절(리틀리AD 수익 구조·정산·세금·이용 조건, 인포크 Pro `광고 없음`, Google 게시자 정책). 코드·디자인 변경은 없음. `design/system/DESIGN.md`의 공개 랜딩 장식 금지 규칙과 부딪치는 점은 디자인 work item에서 다룸. 근거 `docs/work/product/0062-ad-banner-block-prd.md`.
+- 광고 블록 요구 두 번째 결정과 추가 조사. 사용자 결정은 광고 블록 최소 1개(지금은 1개 고정), 위법이 아니면 광고를 실을지는 크리에이터가 정함, 배너 슬롯 계정 단위 부여, 배분 방식과 수익 보기는 추가 조사입니다. PRD R20·R21 요구 문장과 수용 기준, R22 참고 사실, 미정 질문을 고쳤습니다. 새 조사 문서는 `docs/product/research/ad-revenue-share.md`와 `docs/product/research/creator-ad-revenue-reporting.md`입니다. 앞 문서는 배분 기준·비율, 정산 주기·최소 지급액, 개인 지급 세무와 주민등록번호 근거, 지급 대행을 다룹니다. 뒤 문서는 예상·확정 보고 관행, 무효 트래픽 처리, R10·개인정보 영향을 다룹니다. 근거 `docs/work/product/0062-ad-banner-block-prd.md`.
+- 크리에이터 광고 수익 배분 철회(사용자 결정: "처음부터 복잡해진다. 크리링 플랫폼이 노출할 수 있는 광고 구좌만 생각하자"). PRD `docs/product/crelink.md`의 R22를 `철회` 행으로 바꾸고, 범위·참고 사실·미정 질문·위험을 고쳤습니다. 미정 질문에는 광고 구좌 판매 방식과 "크리에이터가 모든 광고를 빼는 경우"를 넣었습니다. 조사 문서 `docs/product/research/ad-revenue-share.md`·`creator-ad-revenue-reporting.md`에는 철회 상태를 적어 사실 기록으로 남겼습니다(광고주 과금 모델 비교만 계속 씀). 근거 `docs/work/product/0062-ad-banner-block-prd.md`.
+- 광고 배너를 쓸 수 있는 주체를 크리링 플랫폼으로 한정했습니다(사용자 결정: 지금 당장은 크리링 플랫폼만). PRD R20 요구 문장과 수용 기준 ④~⑥(크리링 배너만 등록, 크리에이터의 광고 고르기는 외부 광고를 받을 때)을 고쳤습니다. 범위와 위험도 고쳤고, 판매 방식·광고주 보고·업종 기준은 "외부 광고주를 받을 때 정할 것"으로 옮겼습니다. 근거 `docs/work/product/0062-ad-banner-block-prd.md`.
+- 광고 블록 요구 확정과 작업 분해(사용자 결정: 배너는 n장, R20·R21 수용 기준은 추천대로 채택). PRD R21 요구 문장과 수용 기준 ②(n은 설정값, 한도 안내), 수용 기준 표기, 미정 질문을 고쳤습니다. 에픽 `docs/work/epics/0063-ad-banner-block.md`, 디자인 티켓 `docs/work/designer/0064-ad-banner-block-design.md`, 기술 설계 티켓 `docs/work/orchestrator/0065-ad-banner-block-design-spec.md`(선행 0064)를 만들었습니다. 0062는 `검증`입니다. 근거 `docs/work/product/0062-ad-banner-block-prd.md`.
+- 광고 블록 디자인 승인 때 정한 것을 PRD에 반영했습니다. R20 ④·⑧과 R21 ②·④를 고쳤습니다. 크리링 배너 순서는 운영자가 정하고, 움직이는 이미지(GIF)를 받습니다. 배너 슬롯 한도는 보이는 배너만 세며 보관 상한을 따로 둡니다. 크리에이터 배너는 배너마다 차단하고, 운영자 화면에서 노출·클릭 수를 봅니다. 근거 `docs/work/product/0062-ad-banner-block-prd.md`.
+
 ## 2026-10-08
 
 - main 브랜치 보호(저장소 공개 전환 뒤, 여러 사람이 씀): `.github/workflows/ci.yml`에 모든 job 결과를 모으는 필수 검사 job `CI 통과`(실패·취소면 실패, 건너뜀은 통과), GitHub ruleset `main 보호`(직접·force push·삭제 금지, 선형 이력, PR 필수·squash만·승인 0, 필수 검사 `CI 통과`·최신 main 기준, admin은 PR 머지만 우회), 저장소 설정(squash만, 브랜치 갱신 제안, 머지 뒤 브랜치 삭제, 외부 기여자 fork PR 워크플로 승인, secret scanning·push protection). 검증 루프 CI 절에 머지 규칙과 Actions가 돌지 않을 때의 admin 우회 머지. 근거 `docs/work/orchestrator/0061-main-branch-protection.md`.
