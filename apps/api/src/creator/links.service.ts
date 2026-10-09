@@ -18,7 +18,7 @@ import { CreatorService, LINK_COLUMNS, LinkRow, SLOT_INDEX_SQL } from './creator
 /** 공개 링크 ID 길이. 클릭 주소 `{SHORT}/c/{publicId}`에 씁니다. */
 const LINK_PUBLIC_ID_LENGTH = 10;
 
-function linkUrl(value: unknown): { url: string; host: string } {
+export function linkUrl(value: unknown): { url: string; host: string } {
   const url = typeof value === 'string' ? parseHttpUrl(value.trim()) : null;
   if (!url) {
     throw apiError(
