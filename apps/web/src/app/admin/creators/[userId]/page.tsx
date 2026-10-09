@@ -99,6 +99,19 @@ function CreatorDetail({
           <dt>상태</dt>
           <dd>{creator.suspended ? <span className="badge badge-danger">정지</span> : '이용 중'}</dd>
         </div>
+        <div>
+          <dt>이벤트 신청일</dt>
+          <dd>
+            {creator.slotEvent ? (
+              <>
+                <time dateTime={creator.slotEvent.appliedAt}>{formatDate(creator.slotEvent.appliedAt)}</time> · 보이는
+                링크 +{creator.slotEvent.bonusLinks}
+              </>
+            ) : (
+              '신청 안 함'
+            )}
+          </dd>
+        </div>
       </dl>
 
       <section className="card" aria-labelledby="account-title">
@@ -108,7 +121,11 @@ function CreatorDetail({
           {creator.limits.totalMax}
         </p>
         <div className="control-grid">
-          <ExtraSlotsForm userId={creator.userId} extraSlots={creator.extraLinkSlots} />
+          <ExtraSlotsForm
+            userId={creator.userId}
+            extraSlots={creator.extraLinkSlots}
+            eventBonus={creator.slotEvent?.bonusLinks ?? null}
+          />
           <SuspensionToggle userId={creator.userId} suspended={creator.suspended} />
           <BannerSlotControl
             userId={creator.userId}

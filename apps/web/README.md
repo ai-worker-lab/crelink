@@ -6,7 +6,7 @@ Next.js App Router와 TypeScript 기반 크리링(CreLink) 웹 클라이언트�
 
 | 경로 | 내용 |
 | --- | --- |
-| `/` | 소개, 로그인 전 `구글로 시작하기`, 로그인 후 `내 크리링 편집`(`/me`, 운영자는 `/admin`도) 링크 |
+| `/` | 소개, 로그인 전 `구글로 시작하기`, 로그인 후 `내 크리링 편집`(`/me`, 운영자는 `/admin`도) 링크. 링크 슬롯 이벤트(R24)가 진행 중(`GET /api/public/slot-event`의 `status = 'open'`)이면 설명 아래 이벤트 안내 카드(`HomeSlotEvent`, 로그인 후는 보조 버튼 `내 크리링에서 신청하기` → `/me`). 없음·시작 전·끝남·조회 실패면 카드만 빠짐 |
 | `/auth/google`, `/auth/google/callback` | 구글 로그인 route handler. API의 `cl_oauth_state`·`cl_session` `Set-Cookie`를 그대로 붙여 302. 시작의 `?returnTo=`가 `LOGIN_RETURN_TO_PATTERN`(`/p/{publicId}`와 선택 `#guestbook`)에 맞으면 `cl_return_to` 쿠키(HttpOnly·SameSite=Lax·10분, Secure는 API 쿠키를 따름)를 붙이고, 없거나 형식 밖이면 남은 쿠키를 지움. 콜백은 성공 시 쿠키 값이 맞으면 쿠키를 그대로 두고 `/auth/return`으로, 아니면 쿠키를 지우고 `/me`로 보냄. 실패하면 쿠키를 지우고 `/notice` |
 | `/auth/return`, `/auth/return/go` | 로그인 뒤 랜딩 복귀(PRD R19). 돌아갈 주소는 쿼리 없이 `cl_return_to` 쿠키로만 넘김. `/auth/return`(화면)이 `location.replace('/auth/return/go')`로 새 이동을 시작하고, `/auth/return/go`(route handler)가 쿠키를 지우며 허용 형식이면 그 랜딩으로, 아니면 `/me`로 302. 콜백 302 체인은 구글에서 시작해 `Sec-Fetch-Site: cross-site`라 랜딩으로 바로 보내면 단축 주소를 다시 거치므로(방문 중복 기록) 같은 출처 이동을 새로 시작함. 쿠키가 없으면 `/me`라 이 주소를 외부에 공유해도 단축 주소(R7)를 우회하지 못함 |
 | `/me` | 로그인 뒤 도착지. 내 랜딩(MVP는 1개)의 관리 화면 `페이지 편집`으로 307. 401(로그아웃·정지로 끊긴 세션)이면 `/`, 그 밖의 API 오류는 다시 시도 안내. Suspense 경계(`loading.tsx`)를 두지 않아 이동이 HTTP 307로 나감 |
@@ -15,7 +15,7 @@ Next.js App Router와 TypeScript 기반 크리링(CreLink) 웹 클라이언트�
 | `/notice?reason=` | 단축 주소·로그인 오류 안내 |
 | `/privacy` | 개인정보 수집·보관·쿠키 고지(법률 검토 전 문구) |
 | `/docs`, `/docs/guide`, `/docs/releases`, `/docs/brand` | 공개 문서(목록 `src/lib/docs.ts`): 크리에이터 사용 안내, 릴리스 노트(빌드 때 루트 `RELEASES.md`의 첫 `## `부터 끝까지, 없으면 빈 상태), 브랜드와 디자인(`@crelink/design-tokens` 값으로 만든 색·글꼴·간격·모서리 견본), `/privacy` 링크. 모두 정적 화면 |
-| `/admin`, `/admin/creators/[userId]`, `/admin/blocked-domains`, `/admin/ad-banners` | 운영자 화면. 401이면 `/`, 403이면 권한 없음 안내. `/admin/ad-banners`는 크리링 광고 배너 목록·걸러보기·순서·등록·수정·내리기 |
+| `/admin`, `/admin/creators/[userId]`, `/admin/blocked-domains`, `/admin/ad-banners`, `/admin/slot-event` | 운영자 화면. 401이면 `/`, 403이면 권한 없음 안내. `/admin/ad-banners`는 크리링 광고 배너 목록·걸러보기·순서·등록·수정·내리기. `/admin/slot-event`는 링크 슬롯 이벤트 기간(`SlotEventPeriodForm`, 한국 시간 `datetime-local`)·신청 수·신청자(최신순 20명씩, `?page=`가 1 이상 정수가 아니면 1쪽) |
 
 SNS 채널 아이콘 자산의 출처·상표 사용 규칙은 [SNS 채널 아이콘](docs/sns-icons.md)에 있습니다.
 

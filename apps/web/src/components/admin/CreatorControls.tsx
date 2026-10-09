@@ -17,12 +17,27 @@ import { formatDate } from '../../lib/format';
 import { useAction } from '../../lib/use-action';
 import { ActionStatus } from '../ActionStatus';
 
-/** 운영자가 부여하는 추가 링크 슬롯 수(R13). */
-export function ExtraSlotsForm({ userId, extraSlots }: { userId: string; extraSlots: number }) {
+/**
+ * 운영자가 부여하는 추가 링크 슬롯 수(R13). 도움말은 입력 중인 값으로 한도를 나눠 보이고, 링크 슬롯 이벤트(R24)를 신청한 계정은
+ * 이벤트 몫(`eventBonus`, 신청 때 받은 보너스)을 더합니다. 합이 전체 링크 상한을 넘으면 상한을 함께 보입니다
+ * (design/slot-event/handoff.md `운영자 크리에이터 상세` E1~E3).
+ */
+export function ExtraSlotsForm({
+  userId,
+  extraSlots,
+  eventBonus,
+}: {
+  userId: string;
+  extraSlots: number;
+  /** 이벤트를 신청하지 않았으면 null. */
+  eventBonus: number | null;
+}) {
   const router = useRouter();
   const inputId = useId();
   const [value, setValue] = useState(String(extraSlots));
   const { pending, error, notice, run } = useAction();
+  const extra = Number(value) || 0;
+  const total = CRELINK_LIMITS.freeVisibleLinks + extra + (eventBonus ?? 0);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,14 +65,19 @@ export function ExtraSlotsForm({ userId, extraSlots }: { userId: string; extraSl
             required
             value={value}
             onChange={(event) => setValue(event.target.value)}
+            aria-describedby={`${inputId}-help`}
             disabled={pending}
           />
           <button type="submit" className="primary" disabled={pending}>
             {pending ? '저장 중…' : '슬롯 저장'}
           </button>
         </div>
-        <p className="field-help">
-          보이는 링크 한도 = 무료 {CRELINK_LIMITS.freeVisibleLinks}개 + 추가 슬롯 {Number(value) || 0}개
+        <p className="field-help" id={`${inputId}-help`}>
+          보이는 링크 한도 = 무료 {CRELINK_LIMITS.freeVisibleLinks}개 + 추가 슬롯 {extra}개
+          {eventBonus === null ? null : ` + 이벤트 ${eventBonus}개`}
+          {eventBonus !== null && total > CRELINK_LIMITS.totalLinks
+            ? ` → 전체 링크 상한 ${CRELINK_LIMITS.totalLinks}개`
+            : null}
         </p>
       </div>
       <ActionStatus error={error} notice={notice} />

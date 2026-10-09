@@ -1,6 +1,11 @@
 'use client';
 
-import { CRELINK_API_PATHS, type CreatorLandingState, type UpdateLandingRequest } from '@crelink/shared';
+import {
+  CRELINK_API_PATHS,
+  type CreatorLandingState,
+  type CreatorSlotEventState,
+  type UpdateLandingRequest,
+} from '@crelink/shared';
 import {
   createContext,
   useCallback,
@@ -12,7 +17,7 @@ import {
   type ReactNode,
   type SetStateAction,
 } from 'react';
-import { browserApi } from '../../lib/api/browser';
+import { browserApi, BrowserApiError } from '../../lib/api/browser';
 import { targetKey, type LandingEditTarget } from '../../lib/landing-edit';
 import {
   bannerDraftOf,
@@ -36,6 +41,15 @@ import { useAction, type ActionState } from '../../lib/use-action';
 
 /** 편집 중 배너 슬롯이 회수됐을 때의 안내(handoff `슬롯 회수됨(편집 중)`, 오류 코드 `banner_slot_not_granted`). */
 export const BANNER_SLOT_REVOKED_NOTICE = '배너 슬롯이 회수되어 이 자리에 다시 크리링 광고 블록이 나와요.';
+
+/** 신청 404(`slot_event_not_found`)의 관리 화면 문구(handoff `문구 원문` `404 slot_event_not_found(신청)`). 409는 `errors.ts` 고정 문구. */
+const SLOT_EVENT_NOT_FOUND_APPLY = '진행 중인 이벤트가 없어 신청하지 못했어요.';
+
+/** 링크 슬롯 이벤트 신청 결과 줄: 완료(`ok`) 또는 신청 기간 아님·이벤트 없음(409·404). 네트워크·그 밖 오류는 `slotEventAction.error`. */
+export interface SlotEventResult {
+  ok: boolean;
+  text: string;
+}
 
 /** 영역별 `저장 안 함` 여부. 하나라도 참이면 주소 막대에 `저장하지 않은 변경 포함`을 붙입니다. 링크·포트폴리오·배너는 초안 중 하나라도 바뀌었으면 참입니다. */
 export interface ManagerDirty {
@@ -107,6 +121,19 @@ export interface ManagerContextValue {
   requestSlugFocus: () => void;
   /** 초점 요청이 남아 있으면 true를 돌려주고 지웁니다(메뉴를 다시 열 때 또 옮기지 않도록). */
   takeSlugFocus: () => boolean;
+  /**
+   * 링크 슬롯 이벤트 신청(design/slot-event/handoff.md). `페이지 편집` 띠와 외부 링크 패널 신청 카드가 같은 요청·진행 상태를 씁니다.
+   * `pending`이면 두 `신청하기`가 함께 잠기고, 네트워크·그 밖 오류는 `error`로 카드 안에 보이며 버튼이 `다시 시도`가 됩니다.
+   */
+  slotEventAction: ActionState;
+  /** 신청 결과 줄. 띠·카드가 사라져도(`reload()` 뒤 조건이 풀림) 남고, `페이지 편집`을 떠나면 `resetSlotEvent`가 지웁니다. */
+  slotEventResult: SlotEventResult | null;
+  /**
+   * `POST /api/me/slot-event/entry` 뒤 `reload()`. 201·200은 완료 줄, 409·404는 고정 문구 + `reload()`(다시 시도 없음).
+   * 남긴 결과 줄을 돌려줍니다(네트워크·그 밖 오류면 null). 누른 쪽이 초점을 옮길 때 씁니다.
+   */
+  applySlotEvent: () => Promise<SlotEventResult | null>;
+  resetSlotEvent: () => void;
 }
 
 const ManagerContext = createContext<ManagerContextValue | null>(null);
@@ -153,6 +180,9 @@ export function ManagerProvider({
   const [slugFocusRequest, setSlugFocusRequest] = useState(0);
   const slugFocusPending = useRef(false);
   const guestbookAction = useAction();
+  const slotEventAction = useAction();
+  const [slotEventResult, setSlotEventResult] = useState<SlotEventResult | null>(null);
+  const { setError: setSlotEventError } = slotEventAction;
 
   async function reload() {
     const next = await browserApi<CreatorLandingState>(CRELINK_API_PATHS.meLanding);
@@ -166,6 +196,44 @@ export function ManagerProvider({
     } catch {
       return false;
     }
+  }
+
+  async function applySlotEvent(): Promise<SlotEventResult | null> {
+    let result: SlotEventResult | null = null;
+    setSlotEventResult(null);
+    await slotEventAction.run(async () => {
+      let applied: CreatorSlotEventState;
+      try {
+        applied = await browserApi<CreatorSlotEventState>(CRELINK_API_PATHS.meSlotEventEntry, { method: 'POST' });
+      } catch (caught) {
+        // 기간 아님·이벤트 없음: 다시 눌러도 같으므로 결과 줄을 남기고 상태를 다시 읽어 띠·카드를 거둡니다(설계 `디자인 검토 의견` 2).
+        if (
+          caught instanceof BrowserApiError &&
+          (caught.code === 'slot_event_closed' || caught.code === 'slot_event_not_found')
+        ) {
+          result = {
+            ok: false,
+            text: caught.code === 'slot_event_closed' ? caught.message : SLOT_EVENT_NOT_FOUND_APPLY,
+          };
+          setSlotEventResult(result);
+          await reload().catch(() => undefined);
+          return;
+        }
+        throw caught;
+      }
+      // 201(새로)·200(이미)은 같은 결과입니다. 새 한도는 다시 읽은 `limits.visibleMax`, 다시 읽기가 실패하면 대체 문구(설계 `디자인 검토 의견` 4).
+      let text: string;
+      try {
+        const next = await reload();
+        text = `이벤트를 신청했어요. 이제 보이는 외부 링크를 ${next.limits.visibleMax}개까지 둘 수 있어요.`;
+      } catch {
+        setState((current) => ({ ...current, slotEvent: applied }));
+        text = `이벤트를 신청했어요. 보이는 외부 링크가 ${applied.entry?.bonusLinks ?? applied.event?.bonusLinks ?? 0}개 늘었어요.`;
+      }
+      result = { ok: true, text };
+      setSlotEventResult(result);
+    });
+    return result;
   }
 
   async function toggleGuestbook(guestbookEnabled: boolean) {
@@ -307,6 +375,10 @@ export function ManagerProvider({
     slugFocusPending.current = false;
     return pending;
   }, []);
+  const resetSlotEvent = useCallback(() => {
+    setSlotEventResult(null);
+    setSlotEventError(null);
+  }, [setSlotEventError]);
 
   const value: ManagerContextValue = {
     state,
@@ -351,6 +423,10 @@ export function ManagerProvider({
     slugFocusRequest,
     requestSlugFocus,
     takeSlugFocus,
+    slotEventAction,
+    slotEventResult,
+    applySlotEvent,
+    resetSlotEvent,
   };
   return <ManagerContext value={value}>{children}</ManagerContext>;
 }

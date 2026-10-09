@@ -1,6 +1,14 @@
-import { COOKIE_NAMES, CRELINK_API_PATHS, CRELINK_WEB_PATHS, type MeResponse } from '@crelink/shared';
+import {
+  COOKIE_NAMES,
+  CRELINK_API_PATHS,
+  CRELINK_WEB_PATHS,
+  type MeResponse,
+  type PublicSlotEventResponse,
+  type SlotEventView,
+} from '@crelink/shared';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
+import { HomeSlotEvent } from '../../components/HomeSlotEvent';
 import { LogoutButton } from '../../components/LogoutButton';
 import { serverApi, ServerApiError } from '../../lib/api/server';
 
@@ -22,14 +30,30 @@ async function readSession(): Promise<SessionState> {
   }
 }
 
+/**
+ * 진행 중인 링크 슬롯 이벤트(R24 ④). 없음·시작 전·끝남이면 null이고, 조회가 실패해도 홈에 오류를 보이지 않고 안내만 뺍니다
+ * (설계 docs/specs/crelink-slot-event.md `구성과 흐름`).
+ */
+async function readOpenSlotEvent(): Promise<SlotEventView | null> {
+  try {
+    const { event } = await serverApi<PublicSlotEventResponse>(CRELINK_API_PATHS.publicSlotEvent);
+    return event?.status === 'open' ? event : null;
+  } catch (error) {
+    if (!(error instanceof ServerApiError)) throw error;
+    return null;
+  }
+}
+
 export default async function HomePage() {
-  const session = await readSession();
+  const [session, slotEvent] = await Promise.all([readSession(), readOpenSlotEvent()]);
   return (
     <main className="public-page">
       <section className="landing" aria-labelledby="home-title">
         <p className="brand-mark">크리링</p>
         <h1 id="home-title">인스타그램 프로필 링크 하나로 나를 소개하세요.</h1>
         <p>크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.</p>
+        {/* 로그인 확인 오류는 로그인 전 카드(C1)와 같게 그립니다. */}
+        {slotEvent ? <HomeSlotEvent event={slotEvent} signedIn={session.kind === 'signed-in'} /> : null}
         {session.kind === 'signed-in' ? (
           <div className="home-actions">
             <p className="home-account">{session.user.email}으로 로그인했어요.</p>

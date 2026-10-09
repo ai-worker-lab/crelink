@@ -43,6 +43,9 @@ const rules: ReadonlyArray<{ methods: readonly string[]; pattern: RegExp; upload
   { methods: ['PUT'], pattern: /^api\/admin\/ad-banners\/order$/ },
   { methods: ['PATCH'], pattern: new RegExp(`^api/admin/ad-banners/${ID}$`) },
   { methods: ['PUT'], pattern: new RegExp(`^api/admin/ad-banners/${ID}/end$`) },
+  // 링크 슬롯 이벤트(R24, 설계 docs/specs/crelink-slot-event.md `API 계약 초안`). 운영자 `GET`의 `?page=`는 다른 경로처럼 그대로 넘깁니다.
+  { methods: ['POST'], pattern: /^api\/me\/slot-event\/entry$/ },
+  { methods: ['GET', 'PUT'], pattern: /^api\/admin\/slot-event$/ },
   { methods: ['GET', 'POST'], pattern: new RegExp(`^api/landings/${ID}/guestbook$`) },
   { methods: ['DELETE'], pattern: new RegExp(`^api/guestbook/${ID}$`) },
   { methods: ['PUT'], pattern: new RegExp(`^api/guestbook/${ID}/hidden$`) },

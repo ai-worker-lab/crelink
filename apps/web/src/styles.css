@@ -2846,3 +2846,219 @@ body:has(.sheet[open]) {
     margin-top: var(--ds-space-6);
   }
 }
+
+/* 링크 슬롯 이벤트 — 관리 화면 (0122) */
+/*
+ * 이벤트 신청 묶음(design/slot-event/slot-event.css 2부): `페이지 편집` 띠와 외부 링크 패널 신청 카드가 같은 마크업을 씁니다.
+ * 글(배지 `이벤트` · 제목 · 설명) 오른쪽에 버튼, 폭이 모자라면(글 최소 폭 220) 버튼이 아래 줄로 내려갑니다. 오류 줄은 맨 아래 한 줄 전체.
+ * 띠는 흰 카드(그림자 있음), 패널 안 카드(`.is-compact`)는 흰 패널 위라 그림자 없이 테두리만 둡니다.
+ */
+.event-offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-12) var(--ds-space-16);
+  padding: var(--ds-space-16);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-lg);
+  background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
+}
+.event-offer-text {
+  display: flex;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+  min-width: 0;
+}
+.event-offer-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-4) var(--ds-space-8);
+  margin: 0;
+  color: var(--ds-color-text-primary);
+  font-size: var(--ds-font-size-16);
+  font-weight: var(--ds-font-weight-extrabold);
+  line-height: 1.3;
+}
+.event-offer-body {
+  margin: 0;
+  font-size: var(--ds-font-size-14);
+}
+.event-offer-body time {
+  white-space: nowrap;
+}
+.event-offer > :is(.primary, .secondary) {
+  flex: none;
+}
+/* 카드 안 오류 줄은 한 줄 전체이고, 카드 gap이 간격을 둡니다(`.manager-panel .action-status`의 아래 여백을 쓰지 않음). */
+.event-offer > .action-status {
+  flex: 1 1 100%;
+  margin: 0;
+}
+.event-offer.is-compact {
+  padding: var(--ds-space-12) var(--ds-space-16);
+  box-shadow: none;
+}
+.event-offer.is-compact .event-offer-title {
+  font-size: var(--ds-font-size-15);
+}
+/* 좁은 화면 띠: `BannerSlotNotice`와 같은 자리(sticky 줄 아래, 미리보기 위). */
+.manager-panel > .event-offer,
+.manager-panel > .event-result {
+  margin-top: var(--ds-space-12);
+}
+/* 신청 결과(완료 알림·기간 오류)는 띠·카드가 있던 자리에 남는 한 줄입니다. */
+.event-result {
+  margin: 0;
+}
+/* 신청함 줄(외부 링크 패널): 성공 색 배지 + 신청일. */
+.event-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-6) var(--ds-space-8);
+  margin: 0;
+  font-size: var(--ds-font-size-14);
+  color: var(--ds-color-text-secondary);
+}
+/* 하단 시트 안은 블록 흐름이라 새 요소가 위아래 간격을 직접 둡니다. 넓은 패널은 `.panel-section`의 gap 16을 씁니다. */
+.sheet-body > :is(.event-offer, .event-status, .event-result) {
+  margin: var(--ds-space-12) 0;
+}
+.badge-positive {
+  border-color: var(--ds-color-status-positive);
+  background: var(--ds-color-status-positive-subtle);
+  color: var(--ds-color-status-positive);
+}
+
+/* 링크 슬롯 이벤트 — 홈·운영자 (0123·0124) */
+/* 홈 이벤트 안내(대표 설명 아래, 시작 버튼 위). 설명 문단과 같은 최대 폭 540. design/slot-event/handoff.md `홈 /`. */
+.home-event {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ds-space-6);
+  max-width: 540px;
+  padding: var(--ds-space-16) var(--ds-space-20);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-lg);
+  background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
+}
+.home-event-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-4) var(--ds-space-8);
+  margin: 0;
+  font-size: var(--ds-font-size-18);
+  line-height: 1.3;
+}
+.home-event p {
+  margin: 0;
+  font-size: var(--ds-font-size-15);
+}
+.home-event .home-event-period {
+  font-size: var(--ds-font-size-14);
+  color: var(--ds-color-text-subtle);
+}
+.home-event time {
+  white-space: nowrap;
+}
+.home-event > .secondary {
+  margin-top: var(--ds-space-6);
+}
+/* 운영자 `/admin/slot-event`. 상태 배지·기간 두 칸·표·쪽 넘김은 광고 배너·크리에이터 목록 규칙(`ad-status-*`, `ad-banner-period`, `data-table`, `pagination`)을 그대로 씁니다. */
+.slot-event-head .section-help {
+  margin-bottom: var(--ds-space-16);
+}
+.slot-event-state {
+  margin: 0 0 var(--ds-space-16);
+  font-size: var(--ds-font-size-14);
+}
+.slot-event-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-16);
+}
+.slot-event-form .form-actions {
+  justify-content: flex-start;
+}
+.slot-event-count {
+  max-width: 240px;
+  margin-bottom: var(--ds-space-16);
+}
+.slot-event-table td:first-child {
+  white-space: nowrap;
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-font-size-13);
+}
+.slot-event-skeleton-card {
+  height: 220px;
+}
+.slot-event-skeleton-row {
+  height: 44px;
+}
+/* 700px 이하: 광고 배너 표처럼 행을 카드로(신청일시 / 이메일 / 이름 · 단축 주소). 카드 안 카드라 그림자는 없습니다. */
+@media (max-width: 700px) {
+  .slot-event-count {
+    max-width: none;
+  }
+  .slot-event-table-wrap {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+  .slot-event-table,
+  .slot-event-table tbody,
+  .slot-event-table tr,
+  .slot-event-table :is(th, td) {
+    display: block;
+  }
+  .slot-event-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+  }
+  .slot-event-table tbody {
+    display: grid;
+    gap: var(--ds-space-8);
+  }
+  .slot-event-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ds-space-2) var(--ds-space-8);
+    padding: var(--ds-space-12) var(--ds-space-16);
+    border: 1px solid var(--ds-color-border-default);
+    border-radius: var(--ds-corner-md);
+    background: var(--ds-color-surface-default);
+  }
+  .slot-event-table :is(th, td) {
+    flex: 1 1 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+  .slot-event-table td:first-child {
+    color: var(--ds-color-text-subtle);
+    white-space: normal;
+  }
+  .slot-event-table td:nth-child(2) {
+    font-weight: var(--ds-font-weight-bold);
+  }
+  .slot-event-table td:nth-child(3),
+  .slot-event-table td:nth-child(4) {
+    flex: 0 1 auto;
+    color: var(--ds-color-text-secondary);
+  }
+  .slot-event-table td:nth-child(4)::before {
+    content: '·';
+    margin-right: var(--ds-space-8);
+    color: var(--ds-color-text-subtle);
+  }
+}

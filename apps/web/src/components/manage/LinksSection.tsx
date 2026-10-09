@@ -26,6 +26,7 @@ import { useAction } from '../../lib/use-action';
 import { ActionStatus } from '../ActionStatus';
 import { EditableLinkCard } from './EditableLinkCard';
 import { useManager } from './ManagerContext';
+import { SlotEventPanelRow } from './SlotEventOffer';
 import { SlotOrderRow } from './SlotOrderRow';
 import { linkLimitNotice } from './limits';
 
@@ -39,7 +40,8 @@ const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
  * 링크를 옮기든 슬롯 행을 옮기든 늘 `PUT /api/me/links/order { ids, slotIndex }`를 보내 화면 순서와 저장 순서를 맞추고, 보낸 `slotIndex`
  * (링크 수 이상이면 null)를 편집 상태에 그대로 둡니다(설계 docs/specs/crelink-ad-banner.md `위치 모델`).
  * 숨기기는 스위치(`PATCH hidden`)로 바로 저장하고 실패하면 되돌립니다. 저장 뒤에는 편집 상태를 다시 읽어 한도·순서를 서버 값과 맞춥니다.
- * 한도 배지는 슬롯 행을 세지 않습니다(R20 ⑦). `notice`는 폼에서 돌아올 때 보여 줄 결과 안내이고,
+ * 한도 배지는 슬롯 행을 세지 않습니다(R20 ⑦). 배지 바로 아래에는 링크 슬롯 이벤트 줄(신청 카드·`신청함` 줄, design/slot-event/handoff.md)이 옵니다.
+ * `notice`는 폼에서 돌아올 때 보여 줄 결과 안내이고,
  * `focusSlotHandle`이면 하단 시트가 슬롯 행 손잡이에 처음 초점을 둡니다(광고 블록 패널의 `외부 링크 목록에서 끌어 옮기기`).
  */
 export function LinksSection({
@@ -50,7 +52,7 @@ export function LinksSection({
   focusSlotHandle?: boolean;
 }) {
   const { state, setState, reload, select, isLinkDirty } = useManager();
-  const { pending, error, notice, run } = useAction();
+  const { pending, error, notice, run, setNotice } = useAction();
   const dndId = useId();
   /** 이번 끌기에서 한 번이라도 다른 자리로 옮겼는지(스크린리더 안내용). */
   const movedSinceStart = useRef(false);
@@ -61,7 +63,7 @@ export function LinksSection({
 
   const { links, limits, slot } = state;
   const visibleFull = limits.visibleUsed >= limits.visibleMax;
-  const limitNotice = linkLimitNotice(limits);
+  const limitNotice = linkLimitNotice(limits, state.slotEvent);
   const slotName = slotRowName(slot.kind);
   const mixed = mixedOrder(
     links.map((link) => link.id),
@@ -156,6 +158,7 @@ export function LinksSection({
           보이는 링크 {limits.visibleUsed}/{limits.visibleMax}
         </p>
       </div>
+      <SlotEventPanelRow onApplied={setNotice} />
       <p className="section-help">
         카드를 누르면 고칠 수 있고, 손잡이를 끌면 순서가 바뀌어요. {slotName} 행도 같은 손잡이로 옮겨요. 숨긴 링크와
         차단된 링크는 방문자에게 보이지 않고 한도에도 들어가지 않아요. 숨긴 링크 포함 전체 {limits.totalUsed}/

@@ -99,6 +99,12 @@ export default function GuidePage() {
             않지만, 숨긴 링크를 포함해 전체는 {CRELINK_LIMITS.totalLinks}개까지예요. 보이는 링크를 더 늘리려면 크리링
             운영자에게 문의해 주세요.
           </li>
+          <li>
+            <strong>외부 링크 +5 이벤트</strong>가 진행 중이면 홈과 <strong>페이지 편집</strong>에 안내가 보여요.{' '}
+            <strong>신청하기</strong>를 누른 계정만 보이는 링크를 5개 더 둘 수 있고, 신청은 계정마다 한 번, 이벤트 기간
+            안에만 할 수 있어요. 기간이 끝나도 받은 보너스는 그대로예요. 보너스를 더해도 숨긴 링크를 포함한 전체는{' '}
+            {CRELINK_LIMITS.totalLinks}개까지예요.
+          </li>
         </ul>
       </section>
 
