@@ -27,7 +27,9 @@ export function PauseControl({ paused, hasRunningRun }: { paused: boolean; hasRu
     const next = !paused;
     const question = next
       ? `AI 운영자를 멈출까요? 다음 실행부터 시작하지 않아요.${
-          hasRunningRun ? ' 진행 중 실행의 쓰기는 바로 막히고 기록 닫기만 됩니다.' : ''
+          hasRunningRun
+            ? ' 진행 중 실행의 크리링 쓰기는 바로 막혀요. main 머지·배포까지 확실히 막으려면 Orca 자동화도 꺼 주세요.'
+            : ''
         }`
       : 'AI 운영자 멈춤을 풀까요? 다음 주기부터 다시 실행돼요.';
     if (!window.confirm(question)) return;

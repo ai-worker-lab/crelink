@@ -16,12 +16,12 @@ export const dynamic = 'force-dynamic';
  * 이 경로는 CORS 허용 헤더를 내지 않으므로 교차 출처 브라우저는 `Authorization`을 붙여 부를 수 없고, `Origin`이 있는 요청도 거절합니다.
  */
 async function forward(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
-  const path = agentProxyPath((await context.params).path);
+  const path = agentProxyPath(request.method, (await context.params).path);
   if (!path) return proxyErrorResponse('route_not_allowed');
   const rejection = agentRequestRejection(request.headers);
   if (rejection) return proxyErrorResponse(rejection);
   if (!apiOrigin) return proxyErrorResponse('api_not_configured');
-  const target = agentTargetUrl(apiOrigin, path, request.nextUrl.searchParams);
+  const target = agentTargetUrl(apiOrigin, request.method, path, request.nextUrl.searchParams);
   if (!target) return proxyErrorResponse('route_not_allowed');
 
   const headers = agentForwardHeaders(

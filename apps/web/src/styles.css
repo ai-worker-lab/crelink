@@ -3075,11 +3075,6 @@ body:has(.sheet[open]) {
 .sheet-body > :is(.event-offer, .event-status, .event-result) {
   margin: var(--ds-space-12) 0;
 }
-.badge-positive {
-  border-color: var(--ds-color-status-positive);
-  background: var(--ds-color-status-positive-subtle);
-  color: var(--ds-color-status-positive);
-}
 
 /* 링크 슬롯 이벤트 — 홈·운영자 (0123·0124) */
 /* 홈 이벤트 안내(대표 설명 아래, 시작 버튼 위). 설명 문단과 같은 최대 폭 540. design/slot-event/handoff.md `홈 /`. */
@@ -3118,7 +3113,7 @@ body:has(.sheet[open]) {
 .home-event > .secondary {
   margin-top: var(--ds-space-6);
 }
-/* 운영자 `/admin/slot-event`. 상태 배지·기간 두 칸·표·쪽 넘김은 광고 배너·크리에이터 목록 규칙(`ad-status-*`, `ad-banner-period`, `data-table`, `pagination`)을 그대로 씁니다. */
+/* 운영자 `/admin/slot-event`. 상태 배지·기간 두 칸·표·쪽 넘김은 광고 배너·크리에이터 목록 규칙(`badge-positive`·`badge-warning`·`badge-muted`, `ad-status`, `ad-banner-period`, `data-table`, `pagination`)을 그대로 씁니다. */
 .slot-event-head .section-help {
   margin-bottom: var(--ds-space-16);
 }

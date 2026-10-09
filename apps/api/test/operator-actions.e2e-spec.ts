@@ -293,6 +293,80 @@ describe('운영자 행동 기록 (R23 ③⑧)', () => {
     expect(await actionCount()).toBe(before);
   });
 
+  it('AI는 운영자·AI 계정이 소유한 링크·배너를 차단할 수 없고(403) 변경·기록이 남지 않는다', async () => {
+    const ownLink = async (owner: { cookie?: string; token?: string; runId?: string }) =>
+      (
+        await api<LinkView>(t.baseUrl, 'POST', '/api/me/links', {
+          ...owner,
+          body: { title: '운영 링크', url: 'https://owner.example/' },
+        })
+      ).body.id;
+    const operatorLink = await ownLink({ cookie: operator });
+    const aiLink = await ownLink(asAi());
+    await api(t.baseUrl, 'PUT', `/api/admin/creators/${operatorId}/banner-slot`, {
+      cookie: operator,
+      body: { granted: true },
+    });
+    const image = await upload({ cookie: operator });
+    const operatorBanner = await api<CreatorBannerView>(t.baseUrl, 'POST', '/api/me/banners', {
+      cookie: operator,
+      body: { imageFileId: image, alt: '운영 배너', url: 'https://owner.example/b' },
+    });
+    expect(operatorBanner.status).toBe(201);
+
+    const before = await actionCount();
+    for (const path of [
+      `/api/admin/links/${operatorLink}/block`,
+      `/api/admin/links/${aiLink}/block`,
+      `/api/admin/banners/${operatorBanner.body.id}/block`,
+    ]) {
+      const response = await api(t.baseUrl, 'PUT', path, { ...asAi(), body: { blocked: true } });
+      expect([path, response.status, response.body.code]).toEqual([path, 403, 'forbidden']);
+    }
+    expect(await actionCount()).toBe(before);
+    const blocked = await t.pool.query(
+      `SELECT (SELECT count(*)::int FROM links WHERE id = ANY($1) AND blocked_at IS NOT NULL) AS links,
+              (SELECT count(*)::int FROM creator_banners WHERE id = $2 AND blocked_at IS NOT NULL) AS banners`,
+      [[operatorLink, aiLink], operatorBanner.body.id],
+    );
+    expect(blocked.rows[0]).toEqual({ links: 0, banners: 0 });
+    // 사람 운영자는 그대로 차단할 수 있습니다.
+    expect(
+      (await api(t.baseUrl, 'PUT', `/api/admin/links/${aiLink}/block`, { cookie: operator, body: { blocked: true } }))
+        .status,
+    ).toBe(200);
+  });
+
+  it('링크 슬롯 이벤트 기간 저장(PUT /api/admin/slot-event)은 바뀐 기간을 사람·AI 행위자로 남긴다', async () => {
+    const startsAt = '2026-10-01T00:00:00.000Z';
+    const saved = await api(t.baseUrl, 'PUT', '/api/admin/slot-event', {
+      ...asAi(),
+      body: { startsAt, endsAt: '2999-01-01T00:00:00Z' },
+    });
+    expect(saved.status).toBe(200);
+    const last = await lastAction();
+    expect(last).toMatchObject({
+      ...byAi(),
+      action: 'slot_event.period_update',
+      target_type: 'slot_event',
+      target_id: 'link-slots-plus-5',
+      subject_user_id: null,
+      after: { startsAt, endsAt: '2999-01-01T00:00:00.000Z' },
+    });
+    expect(Object.keys(last.before as object).sort()).toEqual(['endsAt', 'startsAt']);
+
+    expect(
+      (await api(t.baseUrl, 'PUT', '/api/admin/slot-event', { cookie: operator, body: { startsAt, endsAt: null } }))
+        .status,
+    ).toBe(200);
+    expect(await lastAction()).toMatchObject({
+      ...human(),
+      action: 'slot_event.period_update',
+      before: { endsAt: '2999-01-01T00:00:00.000Z' },
+      after: { endsAt: null },
+    });
+  });
+
   it('크리링 배너 등록·수정(바뀐 필드만)·순서·내리기(멱등 포함)를 남긴다', async () => {
     const image = await upload({ authorization: `Bearer ${ai.token}`, 'X-Crelink-Agent-Run': runId });
     const startsAt = iso(-DAY);

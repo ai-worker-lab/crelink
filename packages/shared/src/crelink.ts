@@ -873,10 +873,12 @@ export type OperatorActionType =
   | 'ad_banner.end'
   | 'ai_operator.pause'
   | 'ai_operator.token_issue'
-  | 'ai_operator.token_revoke';
+  | 'ai_operator.token_revoke'
+  // 링크 슬롯 이벤트(R24 ⑤) 기간 저장
+  | 'slot_event.period_update';
 
 export type OperatorActionTargetType =
-  'user' | 'link' | 'creator_banner' | 'blocked_domain' | 'ad_banner' | 'ai_operator' | 'api_token';
+  'user' | 'link' | 'creator_banner' | 'blocked_domain' | 'ad_banner' | 'ai_operator' | 'api_token' | 'slot_event';
 
 export interface OperatorActionView {
   id: string;

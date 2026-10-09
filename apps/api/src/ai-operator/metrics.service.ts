@@ -21,6 +21,7 @@ interface MetricsRow {
   ad_live: number;
   ad_impressions_7d: number;
   ad_clicks_7d: number;
+  slot_event_applications: number;
 }
 
 /**
@@ -67,7 +68,8 @@ export class MetricsService {
          (SELECT coalesce(sum(impressions), 0)::int FROM ad_banner_daily_stats
           WHERE day > (now() AT TIME ZONE 'Asia/Seoul')::date - 7) AS ad_impressions_7d,
          (SELECT coalesce(sum(clicks), 0)::int FROM ad_banner_daily_stats
-          WHERE day > (now() AT TIME ZONE 'Asia/Seoul')::date - 7) AS ad_clicks_7d`,
+          WHERE day > (now() AT TIME ZONE 'Asia/Seoul')::date - 7) AS ad_clicks_7d,
+         (SELECT count(*)::int FROM slot_event_entries) AS slot_event_applications`,
     );
     const row = result.rows[0];
     return {
@@ -79,8 +81,8 @@ export class MetricsService {
       visits: { last7Days: row.visits_7d, last30Days: row.visits_30d },
       linkClicks: { last7Days: row.clicks_7d, last30Days: row.clicks_30d },
       adBanners: { live: row.ad_live, impressionsLast7Days: row.ad_impressions_7d, clicksLast7Days: row.ad_clicks_7d },
-      // R24 이벤트 수치(0089)가 `{ key, label, value }`를 더하는 확장 지점입니다.
-      events: [],
+      // R24 이벤트 수치. 링크 슬롯 이벤트 신청 수는 모든 신청 행(0089와 합의, 설계 `지표 정의`).
+      events: [{ key: 'slot_event_applications', label: '링크 슬롯 이벤트 신청', value: row.slot_event_applications }],
     };
   }
 }

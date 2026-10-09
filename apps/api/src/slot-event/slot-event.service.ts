@@ -11,6 +11,7 @@ import {
 import { Database, Queryable } from '../database';
 import { apiError } from '../common/http';
 import { bodyObject, pageNumber, zonedTime } from '../common/input';
+import { changedFields, OperatorActor, recordOperatorAction } from '../ai-operator/audit';
 
 /** API가 다루는 이벤트 행의 코드. migration `0005_slot_event`가 시드합니다(설계 핵심 결정 5). */
 export const SLOT_EVENT_CODE = 'link-slots-plus-5';
@@ -187,8 +188,10 @@ export class SlotEventService {
   /**
    * `PUT /api/admin/slot-event` `SetSlotEventPeriodRequest`: 시작 필수·끝 선택(null·생략 = 끝 없음), 시간대가 붙은 ISO 8601(아니면 400
    * `validation_failed`), 끝 ≤ 시작이면 400 `slot_event_period_invalid`. 받은 보너스는 바뀌지 않습니다. 응답은 1쪽.
+   * 같은 트랜잭션에서 이전 기간을 `FOR UPDATE`로 읽고 행동 기록 `slot_event.period_update`(바뀐 필드만, 값이 같아도 기록)를 남깁니다
+   * (AI 운영자 설계 `행동 기록 규칙`).
    */
-  async setPeriod(body: unknown): Promise<OperatorSlotEventResponse> {
+  async setPeriod(actor: OperatorActor, body: unknown): Promise<OperatorSlotEventResponse> {
     const input = bodyObject(body);
     const startsAt = zonedTime(input.startsAt, '이벤트 시작');
     const endsAt = input.endsAt === undefined || input.endsAt === null ? null : zonedTime(input.endsAt, '이벤트 끝');
@@ -196,11 +199,25 @@ export class SlotEventService {
       throw apiError(HttpStatus.BAD_REQUEST, 'slot_event_period_invalid', '이벤트 끝은 시작보다 뒤여야 합니다.');
     }
     return this.database.transaction(async (client) => {
-      const updated = await client.query(
-        'UPDATE slot_events SET starts_at = $2, ends_at = $3, updated_at = now() WHERE code = $1',
-        [SLOT_EVENT_CODE, startsAt.text, endsAt?.text ?? null],
+      const previous = await client.query<{ id: string; starts_at: Date; ends_at: Date | null }>(
+        'SELECT id, starts_at, ends_at FROM slot_events WHERE code = $1 FOR UPDATE',
+        [SLOT_EVENT_CODE],
       );
-      if (!updated.rowCount) throw slotEventNotFound();
+      if (!previous.rowCount) throw slotEventNotFound();
+      const updated = await client.query<{ starts_at: Date; ends_at: Date | null }>(
+        'UPDATE slot_events SET starts_at = $2, ends_at = $3, updated_at = now() WHERE id = $1 RETURNING starts_at, ends_at',
+        [previous.rows[0].id, startsAt.text, endsAt?.text ?? null],
+      );
+      const period = (row: { starts_at: Date; ends_at: Date | null }) => ({
+        startsAt: row.starts_at.toISOString(),
+        endsAt: row.ends_at?.toISOString() ?? null,
+      });
+      await recordOperatorAction(client, actor, {
+        action: 'slot_event.period_update',
+        targetType: 'slot_event',
+        targetId: SLOT_EVENT_CODE,
+        ...changedFields(period(previous.rows[0]), period(updated.rows[0])),
+      });
       return this.operatorPage(client, 1);
     });
   }

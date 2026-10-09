@@ -15,6 +15,8 @@ const USAGE = `사용법: node scripts/ai-operator.mjs <명령> [옵션]
   precheck                      실행해도 되는지 확인(Orca --precheck). 진행 가능 0, 멈춤·진행 중·설정·연결 오류 1.
                                 멈춤이면 'paused' 실행 기록을 남깁니다.
   start [--trigger manual]      실행 기록을 열고 실행 id를 저장·출력. 멈춤·진행 중이면 1.
+  guard                         지금 일을 계속해도 되는지 다시 확인. main 머지·외부 공개·운영 쓰기 묶음 직전에 반드시 부릅니다.
+                                멈춤이 켜졌거나 이번 실행 기록이 닫혔으면(포기 포함) 1, 계속해도 되면 0.
   context                       멈춤 상태, 직전 실행 5개(요약·다음 할 일·링크), 지표를 출력.
   api <METHOD> <경로> [JSON|@파일|file=@이미지]
                                 운영자·크리에이터 API 호출(예: api GET /api/admin/creators). 쓰기는 실행 헤더가 자동으로 붙습니다.
@@ -209,6 +211,26 @@ async function precheck() {
   console.log(
     running ? `오래된 진행 중 실행 ${running.id}는 시작 때 abandoned로 닫힙니다. 진행합니다.` : '진행 가능합니다.',
   );
+  return 0;
+}
+
+/**
+ * 멈춤 스위치는 크리링 API 쓰기만 즉시 거절합니다. main 머지(=배포)·외부 공개처럼 API를 거치지 않는 일은 이 확인으로 막습니다
+ * (헌장 `한 실행의 순서`, 보안 검토 F2). 확인에 실패해도(연결 오류 등) 종료 1이라 계속하지 않습니다.
+ */
+async function guard() {
+  const config = loadConfig();
+  const status = await expectOk(config, 'GET', '/api/admin/ai-operator', { timeoutMs: 15000 });
+  if (status.paused) {
+    console.log(`멈춤: 계속하지 않습니다(사유: ${status.pausedReason ?? '없음'}). finish로 기록만 닫으세요.`);
+    return 1;
+  }
+  const current = readCurrentRun();
+  if (!current || status.runningRun?.id !== current) {
+    console.log(`이번 실행 기록(${current ?? '없음'})이 진행 중이 아닙니다. 계속하지 않습니다.`);
+    return 1;
+  }
+  console.log('계속해도 됩니다.');
   return 0;
 }
 
@@ -424,6 +446,7 @@ function automationCommand(args) {
 const COMMANDS = {
   precheck: () => precheck(),
   start,
+  guard: () => guard(),
   context: () => context(),
   api,
   finish,

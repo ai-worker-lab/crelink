@@ -14,7 +14,7 @@
 2. **토큰 요청 경로**: 운영 API는 외부에 공개되지 않습니다(웹 BFF 뒤, [운영 배포 설계](crelink-prod-deploy.md)). 토큰 요청은 웹의 새 route handler `/api/agent/[...path]`를 지납니다. 이 경로는 쿠키를 넘기지도 돌려주지도 않고 `Authorization: Bearer`·`X-Crelink-Agent-Run`만 넘깁니다. 브라우저 BFF(`/api/backend`)와 그 Origin 검사는 바꾸지 않습니다. 쿠키를 쓰지 않으므로 CSRF 대상이 아니고, 교차 출처 브라우저는 `Authorization` 헤더를 붙인 요청을 CORS preflight 없이 보낼 수 없으며 이 경로는 CORS 허용 헤더를 내지 않습니다. 다층 방어로 `Origin` 헤더가 있는 요청(브라우저)은 거절합니다. `[AI 결정]`
 3. **운영자 행동 기록**: 모든 `/api/admin/*` 쓰기와 토큰 발급·폐기는 같은 트랜잭션에서 `operator_actions`에 행위자(사람·AI·시스템), 행동, 대상, 관련 크리에이터, 전후 값, 실행 id, 시각을 남깁니다.
 4. **AI 실행 기록**: `agent_runs`에 실행마다 시작·끝·상태·요약·한 일·다음 할 일·관련 PR/work item·모델/비용을 남깁니다. 실행 중 AI 쓰기는 `X-Crelink-Agent-Run` 헤더(진행 중인 자기 실행 id)가 있어야 합니다. 다음 실행은 직전 실행 기록을 읽어 이어 갑니다.
-5. **멈춤 스위치**: `ai_operator_settings.paused`. 사람 운영자만 바꿉니다. 켜져 있으면 실행 시작이 `paused` 기록만 남기고 끝나며, 진행 중인 실행의 AI 쓰기도 즉시 409 `ai_operator_paused`입니다(실행 닫기만 허용).
+5. **멈춤 스위치**: `ai_operator_settings.paused`. 사람 운영자만 바꿉니다. 켜져 있으면 실행 시작이 `paused` 기록만 남기고 끝나며, 진행 중인 실행의 크리링 API 쓰기도 즉시 409 `ai_operator_paused`입니다(실행 닫기만 허용). API를 거치지 않는 main 머지·외부 공개는 실행이 그 직전에 `guard`로 다시 확인해 멈춥니다(헌장 지시). 확실히 막으려면 Orca 자동화를 끕니다.
 6. **겹침 금지**: 실행 시작이 DB에서 원자적으로 확인합니다(진행 중 실행은 부분 유니크 인덱스로 최대 1개). 진행 중 실행이 있으면 409 `agent_run_in_progress`, 시작 뒤 90분이 지난 진행 중 실행은 `abandoned`로 닫습니다. 실행 호스트의 프리체크도 같은 상태를 먼저 봅니다.
 7. **30분 트리거**: 운영자 Mac의 Orca 자동화가 `*/30 * * * *`(`Asia/Seoul`)에 프리체크(`scripts/ai-operator.mjs precheck`)를 돌리고, 통과하면 omp 에이전트를 `origin/main` 기준 새 worktree에서 실행합니다. 프롬프트는 [AI 운영자 헌장](../ops/ai-operator.md)을 읽게 합니다. 자동화 생성 명령은 스크립트가 출력합니다(`automation-command`). 기존 작업 실행기(`pnpm work:run`)는 work item을 하나씩 맡기는 도구이고, AI 운영자는 그 위에서 무엇을 할지 고르는 주기 실행입니다. AI 운영자가 실행기를 부를 필요는 없습니다. `[AI 결정]`
 8. **지표**: `GET /api/admin/metrics`가 실사용자 수(PRD `목표` 정의)와 가입·방문·클릭·광고 배너 성과를 돌려줍니다. 이벤트 수치(0089)는 `events` 배열에 붙입니다.
@@ -59,8 +59,8 @@ Orca(운영자 Mac, */30, Asia/Seoul)
 
 ### 웹 토큰 경로 `/api/agent/[...path]`
 
-- 허용 경로(조각 경계 고정): `api/health`, `api/me`(정확 일치), `api/me/…`, `api/files/…`, `api/admin/…`. 그 밖은 404 `route_not_allowed`(웹 전용 코드, `CrelinkErrorCode`에 넣지 않음).
-- 경로 조각이 비었거나 `.`·`..`(디코드 뒤)이면 404. 대상 URL을 만든 뒤 `target.pathname`을 허용 정규식 `^/api/(health|me)$|^/api/(me|files|admin)/`로 다시 검사합니다(점 조각 우회 방지).
+- 허용 경로(메서드와 함께, 조각 경계 고정, `AGENT_ROUTES`): 운영자 API 전체(`api/admin/…`, 모든 메서드), 계정 확인 `GET api/me`, 크리링 배너 이미지 올리기 `POST api/me/files`(크리링 배너 등록에 필요)와 확인 `GET api/files/{id}`, 연결 확인 `GET api/health`. 크리에이터 편집(`api/me/…` 그 밖: 링크·프로필·배너·이벤트 신청 등)은 AI 업무(헌장)에 필요 없고, 쓰면 AI 계정의 공개 페이지가 바뀌면서 행동 기록에도 남지 않으므로 막습니다(보안 검토 F5). 그 밖은 404 `route_not_allowed`(웹 전용 코드, `CrelinkErrorCode`에 넣지 않음).
+- 경로 조각이 비었거나 `.`·`..`(디코드 뒤)이면 404. 대상 URL을 만든 뒤 `target.pathname`을 같은 `AGENT_ROUTES`로 다시 검사합니다(점 조각 우회 방지).
 - `Authorization`이 `Bearer ` 스킴이 아니면 401 `unauthenticated`로 API에 보내지 않습니다(`api/health` 포함). `Origin` 헤더가 있으면 403 `forbidden`.
 - 요청 헤더는 `apiRequestHeaders({ Accept })`로 새로 만들고 `Authorization`·`X-Crelink-Agent-Run`만 복사합니다. 쿠키는 넘기지 않습니다. 상태 변경 요청 본문은 `arrayBuffer()`와 원래 `Content-Type`을 그대로 넘깁니다(multipart 포함).
 - 응답은 상태·본문과 `content-type`·`cache-control`·`etag`·`last-modified`만 넘기고 `Set-Cookie`는 넘기지 않습니다. 오류 응답·헤더 고르기·upstream fetch는 기존 BFF와 공용 모듈로 뺍니다.
@@ -165,9 +165,9 @@ INSERT INTO ai_operator_settings DEFAULT VALUES;
 - **메타데이터**: 예외는 Reflector 데코레이터로 표시하고 검사는 인증 직후 가드에서 합니다(파이프·업로드 전에 거절). `@ActorKinds('human')`·`@ActorKinds('ai')`, `@AgentRunExempt()`, `@AllowWhilePaused()`. 이 검사에 쓰는 provider는 `AuthModule`에서 export합니다.
 - **오류 우선순위**: 401 `unauthenticated` → 403 `forbidden`(운영자 아님) → 403 `forbidden`(사람·AI 전용) → 409 `ai_operator_paused` → 409 `agent_run_required`.
 - **실행 헤더**: AI의 상태 변경 요청(GET·HEAD 밖)은 `X-Crelink-Agent-Run: <uuid>`가 있어야 하고, 그 실행이 이 계정의 `running`이며 시작 뒤 90분 안이어야 합니다. 아니면 409 `agent_run_required`. 운영자 API와 크리에이터 API(`/api/me/*`) 모두 적용합니다. 예외(`@AgentRunExempt`): `POST /api/admin/agent-runs`, `PATCH /api/admin/agent-runs/{id}`(서비스가 소유자·running을 확인).
-- **멈춤**: 멈춤이 켜져 있으면 AI의 상태 변경 요청은 409 `ai_operator_paused`. 예외(`@AllowWhilePaused`): `POST·PATCH /api/admin/agent-runs`. 가드 검사 뒤 쓰기까지의 짧은 경쟁은 행동 기록에서 막습니다: 행위자가 AI이면 `recordOperatorAction`이 같은 트랜잭션에서 `SELECT paused FROM ai_operator_settings FOR SHARE`로 다시 확인하고, `PUT pause`는 `FOR UPDATE`로 잡습니다. 그래서 운영자 쓰기는 원자적으로 막히고, `/api/me/*` 쓰기는 가드 검사로 막습니다.
+- **멈춤**: 멈춤이 켜져 있으면 AI의 상태 변경 요청은 409 `ai_operator_paused`. 예외(`@AllowWhilePaused`): `POST·PATCH /api/admin/agent-runs`. 가드 검사 뒤 쓰기까지의 짧은 경쟁은 행동 기록에서 막습니다: 행위자가 AI이면 `recordOperatorAction`이 같은 트랜잭션에서 `SELECT paused FROM ai_operator_settings FOR SHARE`로 다시 확인하고, `PUT pause`는 `FOR UPDATE`로 잡습니다. 그래서 운영자 쓰기는 원자적으로 막히고, 토큰 경로로 열린 `POST /api/me/files`는 가드 검사로 막습니다.
 - **사람 전용**(`@ActorKinds('human')`, AI면 403): 멈춤 스위치, 토큰 폐기, 지표 제외. AI가 스스로 멈춤을 풀거나 시험 계정 표시로 지표를 바꾸지 못하게 합니다.
-- **AI가 운영자·AI 계정을 건드리지 못함**: 행위자가 AI이고 대상 계정이 `role='operator'` 또는 `kind='ai'`면 `creator.*` 쓰기(추가 슬롯, 정지, 배너 슬롯)는 403 `forbidden`. AI가 사람 운영자를 정지해 멈춤·토큰 폐기를 못 쓰게 만드는 일을 막습니다.
+- **AI가 운영자·AI 계정을 건드리지 못함**: 행위자가 AI이고 대상 계정(링크·배너 차단은 그 소유자)이 `role='operator'` 또는 `kind='ai'`면 `creator.*` 쓰기(추가 슬롯, 정지, 배너 슬롯)와 링크·크리에이터 배너 차단은 403 `forbidden`(`assertAiMayChange`). AI가 사람 운영자를 정지해 멈춤·토큰 폐기를 못 쓰게 만들거나 운영자 계정의 공개 페이지를 바꾸는 일을 막습니다.
 - **AI 전용**(`@ActorKinds('ai')`, 사람이면 403): 실행 시작·갱신.
 
 ### 경로
@@ -197,7 +197,7 @@ INSERT INTO ai_operator_settings DEFAULT VALUES;
   - **가입**: 지표 대상 계정의 `created_at`이 지금부터 24시간·7일·30일 안.
   - **방문·링크 클릭**: 지표 대상 계정 단축 주소의 `visits`·링크 클릭, 지금부터 7일·30일. 기간으로 먼저 거른 뒤 계정 조건을 join합니다.
   - **광고 배너**: 게시 중 수는 `starts_at <= now() AND (ends_at IS NULL OR ends_at > now())`. 노출·클릭은 `ad_banner_daily_stats`가 서울 날짜 단위라 "서울 날짜 오늘 포함 7일"(`day > (now() AT TIME ZONE 'Asia/Seoul')::date - 7`)입니다.
-  - **이벤트**: `events: []`. 0089가 `{ key: 'slot_event_applications', label, value }`를 더합니다.
+  - **이벤트**: `[{ key: 'slot_event_applications', label: '링크 슬롯 이벤트 신청', value }]`. value는 `slot_event_entries` 전체 행 수(0089와 합의).
 
 ### 공유 타입 초안
 
@@ -232,10 +232,10 @@ export interface UpdateAgentRunRequest { status?: 'succeeded' | 'failed'; summar
 
 export type OperatorActionType = 'creator.extra_slots' | 'creator.suspension' | 'creator.banner_slot'
   | 'creator.metrics_exclusion' | 'link.block' | 'banner.block' | 'blocked_domain.add' | 'blocked_domain.remove'
-  | 'ad_banner.create' | 'ad_banner.update' | 'ad_banner.reorder' | 'ad_banner.end'
+  | 'ad_banner.create' | 'ad_banner.update' | 'ad_banner.reorder' | 'ad_banner.end' | 'slot_event.period_update'
   | 'ai_operator.pause' | 'ai_operator.token_issue' | 'ai_operator.token_revoke';
 export type OperatorActionTargetType = 'user' | 'link' | 'creator_banner' | 'blocked_domain' | 'ad_banner'
-  | 'ai_operator' | 'api_token';
+  | 'ai_operator' | 'api_token' | 'slot_event';
 export interface OperatorActionView { id; createdAt; actor: { kind: OperatorActorKind; userId: string | null; email: string | null };
   /** OperatorActionType. 다른 에픽이 더한 행동도 오므로 string으로 받고, 모르는 값은 원래 키로 보여 줍니다. */
   action: string; targetType: string; targetId: string | null; subjectUserId: string | null;
@@ -301,6 +301,7 @@ Node 내장 모듈만 쓰는 단일 파일입니다(프리체크가 `git show or
 | --- | --- | --- |
 | `precheck` | 설정·권한 확인 → `GET ai-operator`. 멈춤이면 `POST agent-runs`(paused 기록), 90분 안의 진행 중 실행이면 그대로 | 진행 가능 0, 그 밖 1 |
 | `start [--trigger manual]` | `POST agent-runs` → 실행 id 저장·출력(커밋 트레일러 포함). paused·409면 1 | 0·1 |
+| `guard` | 지금 계속해도 되는지 다시 확인: 멈춤이 아니고 이번 실행 기록이 아직 `running`인지. main 머지·외부 공개·운영 쓰기 묶음 직전에 부름 | 계속 0, 멈춤·실행 닫힘·연결 오류 1 |
 | `context` | 멈춤 상태, 지표, 직전 실행 5개(요약·다음 할 일·링크)를 글로 출력 | 0·1 |
 | `api <METHOD> <경로> [JSON\|@파일\|file=@이미지]` | 토큰·실행 헤더를 붙여 호출하고 응답 JSON 출력. `file=@`은 `POST /api/me/files` multipart | 2xx 0, 그 밖 1 |
 | `finish --status succeeded\|failed --summary … [--action …]… [--next …]… [--ref kind=이름=URL]… [--cost …]` | `PATCH agent-runs/{id}` 후 실행 id 파일 삭제 | 0·1 |
@@ -321,7 +322,7 @@ Node 내장 모듈만 쓰는 단일 파일입니다(프리체크가 `git show or
 | | 빈 상태 | `items` 0개 | "아직 AI 실행 기록이 없어요" + 헌장 설치 안내 |
 | | 오류 | 상태·목록 실패 | `AdminShell` 오류(`retryHref='/admin/agent-runs'`). 잘못된 커서(400)도 커서 없는 주소로 |
 | | 부분 오류 | 지표만 실패 | 지표 카드 자리에 `form-error role=alert`, 나머지는 그림 |
-| | 멈춤 켜기·끄기 | `PUT pause` | `BlockControl` 방식(선택 사유 입력란, `maxLength = pausedReasonMax`, 확인). 진행 중 실행이 있을 때 켜면 확인 문구에 "진행 중 실행의 쓰기는 바로 막히고 기록 닫기만 됩니다". 실패는 오류 문구 |
+| | 멈춤 켜기·끄기 | `PUT pause` | `BlockControl` 방식(선택 사유 입력란, `maxLength = pausedReasonMax`, 확인). 진행 중 실행이 있을 때 켜면 확인 문구에 "진행 중 실행의 크리링 쓰기는 바로 막혀요. main 머지·배포까지 확실히 막으려면 Orca 자동화도 꺼 주세요". 실패는 오류 문구 |
 | | AI 계정 없음 | `accounts` 0개 | "아직 AI 계정이 없어요" + 런북 17 안내 |
 | | 유효 토큰 없음 | 계정의 `revokedAt` 없는 토큰 0개 | "쓸 수 있는 토큰이 없어요. 다음 실행부터 멈춥니다" |
 | | 토큰 폐기 | `PUT revoke` | 유효 토큰마다 `폐기` 버튼(`window.confirm`). 마지막 유효 토큰이면 확인 문구에 "다음 실행부터 멈춥니다". 폐기된 토큰은 폐기 시각만. 404 `api_token_not_found`면 오류 문구와 `router.refresh()` |
@@ -340,7 +341,9 @@ Node 내장 모듈만 쓰는 단일 파일입니다(프리체크가 `git show or
 - 토큰: 256비트 무작위, 원문은 발급 때 한 번만 출력. DB에는 SHA-256 해시. 폐기 즉시 401. 유출 의심 시 런북 17의 폐기 → 재발급. 토큰은 로그·Sentry·응답에 쓰지 않습니다(API·웹 Sentry가 `authorization` 헤더를 이미 지움, ADR 0014).
 - 비밀값 위치: 토큰 원문은 운영자 Mac `~/.config/crelink/ai-operator.env`(600)에만 둡니다. SOPS 암호문·CI·GitHub secret에 넣지 않습니다([환경과 비밀값 관리](../development/environment-secrets.md)에 적음).
 - 웹 `/api/agent`: 위 [웹 토큰 경로](#웹-토큰-경로-apiagentpath). 요청 본문 한도는 edge Caddy 6MB(기존). Caddy 변경은 없습니다.
-- AI 권한 범위: 운영자와 같은 API 권한(위임)에서 멈춤·토큰·지표 제외, 운영자·AI 계정 대상 `creator.*` 쓰기를 뺀 것. 계정 삭제·데이터 파기 API는 원래 없습니다.
+- AI 권한 범위: 운영자와 같은 API 권한(위임)에서 멈춤·토큰·지표 제외, 운영자·AI 계정과 그 소유 링크·배너 대상 쓰기를 뺀 것. 토큰 경로로는 위 허용 경로만. 계정 삭제·데이터 파기 API는 원래 없습니다.
+- 행동 기록 범위 강제: `apps/api/test/operator-audit-coverage.e2e-spec.ts`가 Nest 라우트 메타데이터에서 `OperatorGuard` 아래 POST·PUT·PATCH·DELETE 경로를 모두 찾아, 각각이 행동 기록 대상(부르면 기록 1건)이거나 이유가 적힌 예외(`agent-runs` 시작·갱신)인지, `/api/admin` 아래가 모두 `OperatorGuard`인지 확인합니다. 새 운영자 쓰기는 이 목록에 넣어야 CI가 통과합니다.
+- 실행 호스트 자격(위험 수용, [ADR 0015](../adr/0015-ai-operator.md#결과와-트레이드오프)): 사람 전용 통제(토큰 발급·멈춤·토큰 폐기)는 API 수준에서만 보장되고, 운영자 Mac의 사람 셸 자격(`ssh`·`sudo`·사람 `gh`)으로는 우회할 수 있습니다. 헌장 지킬 규칙 10이 금지하고, 사람이 할 선행 조건으로 실행 계정 분리(SSH·`sudo`·관리자 `gh` 없는 별도 macOS 사용자)와 AI 전용 GitHub 계정·CODEOWNERS(인증·AI 운영자·migration·토큰 경로 변경에 사람 승인)를 권합니다.
 - 행동 기록 열람은 운영자만. 전후 값은 바뀐 필드만.
 - `/privacy`: 새 개인정보 수집 항목이 없어 고치지 않습니다(운영자 행동 기록은 운영자 계정의 서비스 운영 기록이고 크리에이터 정보는 이미 처리 중인 값의 변경 이력). `[AI 결정]`
 
@@ -363,6 +366,8 @@ Node 내장 모듈만 쓰는 단일 파일입니다(프리체크가 `git show or
 | 배포 중 두 색 공존·롤백 뒤 옛 API의 운영자 쓰기에 행동 기록 없음 | — | 그 구간에는 AI 실행이 쓰기 전에 Deploy 완료를 확인(헌장 배포 절) | — |
 | 운영자 Mac이 꺼지거나 네트워크가 바뀌면 실행이 빠짐 | — | 헌장에 적음. 빠진 실행은 다음 주기에 이어 감 | — |
 | AI가 운영 쓰기를 잘못함 | — | 행동 기록·멈춤·토큰 폐기·자동화 끄기로 되돌림(ADR 0015) | — |
+| 실행 호스트의 사람 자격으로 사람 전용 통제 우회(보안 검토 F1) | — | 위험 수용(ADR 0015). 헌장 지킬 규칙 10. 사람 선행 조건: 실행 계정 분리, AI 전용 GitHub 계정, CODEOWNERS | 사람이 실행 계정 분리를 마침 |
+| 멈춤이 머지·배포를 서버에서 막지 못함(보안 검토 F2) | — | 머지·외부 공개·운영 쓰기 묶음 직전 `guard`(헌장·프롬프트), 확실히 막으려면 Orca 자동화 끄기 | — |
 
 ## 디자인 검토 의견
 
@@ -412,3 +417,4 @@ Node 내장 모듈만 쓰는 단일 파일입니다(프리체크가 `git show or
 ## 변경 기록
 
 - 2026-10-10: 구현 중 세부 결정(형태 변경 없음, 근거 각 티켓 진행 기록). `AiOperatorStatus.runningRun`은 status `running` 실행(90분이 지나도 다음 시작 전까지 남음), `lastRun`은 `running` 밖에서 가장 최근에 시작한 실행. `PUT pause`는 값이 그대로면 `updated_at`·`updated_by`를 바꾸지 않고(같은 멈춤의 paused 합치기 유지) 행동 기록만 남기며, 멈춤을 끌 때 사유는 저장하지 않음. `ad_banner.reorder`는 `targetId: null`, 전후 값 `{ order }`. CLI는 0004 전 DB(42P01·42703)를 같은 안내로 끝내고, `list-tokens` 첫 줄은 머리글. 경로 상수 `adminAgentRuns`는 `cursor`를 받는 함수. 영향 티켓: 0100, 0101, 0103(모두 완료).
+- 2026-10-10: 0089(PR #69) 통합과 보안 검토 반영. `PUT /api/admin/slot-event`가 행동 기록 `slot_event.period_update`(targetType `slot_event`, `FOR UPDATE` 이전 값)를 남기고 지표 `events`에 `slot_event_applications`를 더함. 행동 기록 범위 시험(`operator-audit-coverage.e2e-spec.ts`). AI의 운영자·AI 계정 소유 링크·배너 차단 403. 토큰 경로 허용을 메서드별 `AGENT_ROUTES`로 좁힘(`api/me/…`는 `GET api/me`·`POST api/me/files`만). 실행 도구 `guard`와 헌장·프롬프트 규칙, 멈춤 범위 문구를 사실대로 고침, 실행 호스트 자격 위험 수용과 사람 선행 조건. 영향 티켓: 0102, 0103, 0104, 0108(진행 기록).

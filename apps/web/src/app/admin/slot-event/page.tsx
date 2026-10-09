@@ -11,21 +11,21 @@ export const metadata: Metadata = { title: '이벤트 · 운영자', robots: { i
 
 const BASE = '/admin/slot-event';
 
-/** 상태 배지는 광고 배너와 같은 모양(`ad-status-*`)을 씁니다(설계 `디자인 검토 의견` 7). */
+/** 상태 배지는 광고 배너와 같은 공용 색 배지(`badge-positive`·`badge-warning`·`badge-muted`)를 씁니다(설계 `디자인 검토 의견` 7). */
 const STATUS: Record<SlotEventStatus, { label: string; badge: string; description: string }> = {
   open: {
     label: '진행 중',
-    badge: 'ad-status-live',
+    badge: 'badge-positive',
     description: '지금 신청을 받고 있어요. 홈과 관리 화면에 안내가 보여요.',
   },
   scheduled: {
     label: '시작 전',
-    badge: 'ad-status-scheduled',
+    badge: 'badge-warning',
     description: '시작 시각부터 신청을 받아요. 그 전에는 홈과 관리 화면에 안내가 보이지 않아요.',
   },
   ended: {
     label: '끝남',
-    badge: 'ad-status-ended',
+    badge: 'badge-muted',
     description: '새 신청을 받지 않아요. 받은 보너스는 그대로이고, 홈과 관리 화면 안내는 숨었어요.',
   },
 };

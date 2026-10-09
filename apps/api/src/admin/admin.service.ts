@@ -75,6 +75,25 @@ function creatorNotFound() {
   return apiError(HttpStatus.NOT_FOUND, 'creator_not_found', '크리에이터를 찾을 수 없습니다.');
 }
 
+/** 링크·크리에이터 배너 차단의 대상 행과 소유 계정 종류. */
+interface OwnedRow {
+  user_id: string;
+  blocked: boolean;
+  blocked_reason: string | null;
+  role: UserRole;
+  kind: AccountKind;
+}
+
+/**
+ * 행위자가 AI이고 대상 계정(또는 대상 링크·배너의 소유자)이 운영자·AI 계정이면 403 `forbidden`.
+ * AI가 사람 운영자를 정지해 멈춤·토큰 폐기를 막거나 운영자 계정의 공개 페이지를 바꾸는 일을 막습니다(설계 `인증·권한 규칙`).
+ */
+function assertAiMayChange(actor: OperatorActor, owner: { role: UserRole; kind: AccountKind }): void {
+  if (actor.kind === 'ai' && (owner.role === 'operator' || owner.kind === 'ai')) {
+    throw apiError(HttpStatus.FORBIDDEN, 'forbidden', 'AI 운영자는 운영자·AI 계정과 그 콘텐츠를 바꿀 수 없습니다.');
+  }
+}
+
 /** 링크·배너 차단 요청 `SetLinkBlockRequest`. 사유는 차단할 때만 저장합니다. */
 function blockInput(body: unknown): { blocked: boolean; reason: string | null } {
   const input = bodyObject(body);
@@ -134,7 +153,7 @@ export class AdminService {
 
   /**
    * `creator.*` 쓰기의 대상 계정을 잠그고 이전 값을 읽습니다. 없으면 404 `creator_not_found`.
-   * 행위자가 AI이고 대상이 운영자·AI 계정이면 403 `forbidden`(AI가 사람 운영자를 정지해 멈춤·토큰 폐기를 막는 일 방지).
+   * 행위자가 AI이고 대상이 운영자·AI 계정이면 403 `forbidden`(`assertAiMayChange`).
    * 이 잠금이 users 행을 먼저 잡으므로 크리에이터 배너 쓰기(사용자 잠금 → 부여 확인)와 순서가 맞습니다.
    */
   private async lockCreator(client: PoolClient, actor: OperatorActor, userId: string): Promise<LockedUser> {
@@ -149,9 +168,7 @@ export class AdminService {
       : null;
     const user = result?.rows[0];
     if (!user) throw creatorNotFound();
-    if (actor.kind === 'ai' && (user.role === 'operator' || user.kind === 'ai')) {
-      throw apiError(HttpStatus.FORBIDDEN, 'forbidden', 'AI 운영자는 운영자·AI 계정을 바꿀 수 없습니다.');
-    }
+    assertAiMayChange(actor, user);
     return user;
   }
 
@@ -304,13 +321,15 @@ export class AdminService {
     const { blocked, reason } = blockInput(body);
     const row = await this.database.transaction(async (client) => {
       const found = UUID_PATTERN.test(linkId)
-        ? await client.query<{ user_id: string; blocked: boolean; blocked_reason: string | null }>(
-            'SELECT user_id, blocked_at IS NOT NULL AS blocked, blocked_reason FROM links WHERE id = $1 FOR UPDATE',
+        ? await client.query<OwnedRow>(
+            `SELECT l.user_id, l.blocked_at IS NOT NULL AS blocked, l.blocked_reason, u.role, u.kind
+             FROM links l JOIN users u ON u.id = l.user_id WHERE l.id = $1 FOR UPDATE OF l`,
             [linkId],
           )
         : null;
       const before = found?.rows[0];
       if (!before) throw apiError(HttpStatus.NOT_FOUND, 'link_not_found', '링크를 찾을 수 없습니다.');
+      assertAiMayChange(actor, before);
       const updated = await client.query<LinkRow>(
         `UPDATE links SET blocked_at = CASE WHEN $2 THEN coalesce(blocked_at, now()) END,
                           blocked_reason = CASE WHEN $2 THEN $3 END, updated_at = now()
@@ -336,14 +355,15 @@ export class AdminService {
     const { blocked, reason } = blockInput(body);
     const row = await this.database.transaction(async (client) => {
       const found = UUID_PATTERN.test(bannerId)
-        ? await client.query<{ user_id: string; blocked: boolean; blocked_reason: string | null }>(
-            `SELECT user_id, blocked_at IS NOT NULL AS blocked, blocked_reason FROM creator_banners
-             WHERE id = $1 FOR UPDATE`,
+        ? await client.query<OwnedRow>(
+            `SELECT b.user_id, b.blocked_at IS NOT NULL AS blocked, b.blocked_reason, u.role, u.kind
+             FROM creator_banners b JOIN users u ON u.id = b.user_id WHERE b.id = $1 FOR UPDATE OF b`,
             [bannerId],
           )
         : null;
       const before = found?.rows[0];
       if (!before) throw apiError(HttpStatus.NOT_FOUND, 'banner_not_found', '배너를 찾을 수 없습니다.');
+      assertAiMayChange(actor, before);
       const updated = await client.query<CreatorBannerRow>(
         `UPDATE creator_banners SET blocked_at = CASE WHEN $2 THEN coalesce(blocked_at, now()) END,
                                     blocked_reason = CASE WHEN $2 THEN $3 END, updated_at = now()

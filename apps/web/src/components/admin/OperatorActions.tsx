@@ -32,6 +32,7 @@ const ACTION_LABELS: Record<OperatorActionType, string> = {
   'ai_operator.pause': 'AI 멈춤 변경',
   'ai_operator.token_issue': 'AI 토큰 발급',
   'ai_operator.token_revoke': 'AI 토큰 폐기',
+  'slot_event.period_update': '링크 슬롯 이벤트 기간 변경',
 };
 
 const TARGET_LABELS: Record<OperatorActionTargetType, string> = {
@@ -42,6 +43,7 @@ const TARGET_LABELS: Record<OperatorActionTargetType, string> = {
   ad_banner: '광고 배너',
   ai_operator: 'AI 운영자',
   api_token: 'AI 토큰',
+  slot_event: '링크 슬롯 이벤트',
 };
 
 const ACTOR_BADGES: Record<OperatorActorKind, string> = {

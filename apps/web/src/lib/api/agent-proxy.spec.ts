@@ -5,24 +5,44 @@ import { createServer, type IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { describe, it } from 'node:test';
 import {
-  AGENT_TARGET_PATTERN,
   agentForwardHeaders,
   agentProxyPath,
   agentRequestRejection,
+  agentRouteAllowed,
   agentTargetUrl,
 } from './agent-proxy.ts';
 import { forwardToApi, pickResponseHeaders, proxyErrorResponse } from './proxy.ts';
 
 const API = 'http://api.test:3000';
 
-describe('허용 경로(조각 경계 고정)', () => {
-  it('api/health·api/me는 정확히, api/me/…·api/files/…·api/admin/…는 아래 경로를 받는다', () => {
-    assert.equal(agentProxyPath(['api', 'health']), 'api/health');
-    assert.equal(agentProxyPath(['api', 'me']), 'api/me');
-    assert.equal(agentProxyPath(['api', 'me', 'landing']), 'api/me/landing');
-    assert.equal(agentProxyPath(['api', 'files', 'f1']), 'api/files/f1');
-    assert.equal(agentProxyPath(['api', 'admin', 'ai-operator']), 'api/admin/ai-operator');
-    assert.equal(agentProxyPath(['api', 'admin', 'agent-runs', 'r1']), 'api/admin/agent-runs/r1');
+describe('허용 경로(메서드·조각 경계 고정)', () => {
+  it('운영자 API 전체, GET api/me·api/health·api/files/{id}, POST api/me/files만 받는다', () => {
+    assert.equal(agentProxyPath('GET', ['api', 'health']), 'api/health');
+    assert.equal(agentProxyPath('GET', ['api', 'me']), 'api/me');
+    assert.equal(agentProxyPath('POST', ['api', 'me', 'files']), 'api/me/files');
+    assert.equal(agentProxyPath('GET', ['api', 'files', 'f1']), 'api/files/f1');
+    assert.equal(agentProxyPath('GET', ['api', 'admin', 'ai-operator']), 'api/admin/ai-operator');
+    assert.equal(agentProxyPath('PATCH', ['api', 'admin', 'agent-runs', 'r1']), 'api/admin/agent-runs/r1');
+    assert.equal(
+      agentProxyPath('DELETE', ['api', 'admin', 'blocked-domains', 'x.example']),
+      'api/admin/blocked-domains/x.example',
+    );
+  });
+
+  it('크리에이터 편집(api/me/… 그 밖)과 허용 경로의 다른 메서드는 거절한다', () => {
+    for (const [method, segments] of [
+      ['POST', ['api', 'me', 'links']],
+      ['PATCH', ['api', 'me', 'landing']],
+      ['GET', ['api', 'me', 'landing']],
+      ['PUT', ['api', 'me', 'banners', 'order']],
+      ['POST', ['api', 'me', 'slot-event', 'entry']],
+      ['GET', ['api', 'me', 'files']],
+      ['POST', ['api', 'me']],
+      ['POST', ['api', 'health']],
+      ['DELETE', ['api', 'files', 'f1']],
+    ] as const) {
+      assert.equal(agentProxyPath(method, segments), null, `${method} ${segments.join('/')}`);
+    }
   });
 
   it('조각 경계를 넘거나 목록 밖 경로는 거절한다', () => {
@@ -31,6 +51,7 @@ describe('허용 경로(조각 경계 고정)', () => {
       ['api', 'health', 'x'],
       ['api', 'mex'],
       ['api', 'files'],
+      ['api', 'files', 'f1', 'x'],
       ['api', 'admin'],
       ['api', 'administrator', 'x'],
       ['api', 'auth', 'logout'],
@@ -39,34 +60,34 @@ describe('허용 경로(조각 경계 고정)', () => {
       ['health'],
       [],
     ]) {
-      assert.equal(agentProxyPath(segments), null, segments.join('/'));
+      assert.equal(agentProxyPath('GET', segments), null, segments.join('/'));
     }
   });
 
   it('빈 조각·`.`·`..`(디코드 뒤)은 거절한다', () => {
-    assert.equal(agentProxyPath(['api', 'admin', '', 'x']), null);
-    assert.equal(agentProxyPath(['api', 'admin', '.', 'x']), null);
-    assert.equal(agentProxyPath(['api', 'admin', '..', 'auth']), null);
-    assert.equal(agentProxyPath(['api', 'me', '..']), null);
+    assert.equal(agentProxyPath('GET', ['api', 'admin', '', 'x']), null);
+    assert.equal(agentProxyPath('GET', ['api', 'admin', '.', 'x']), null);
+    assert.equal(agentProxyPath('GET', ['api', 'admin', '..', 'auth']), null);
+    assert.equal(agentProxyPath('POST', ['api', 'me', 'files', '..']), null);
   });
 
   it('조각 안의 `/`·`?`는 인코딩해 한 조각으로 넘긴다', () => {
-    assert.equal(agentProxyPath(['api', 'admin', 'a/b?c']), 'api/admin/a%2Fb%3Fc');
+    assert.equal(agentProxyPath('GET', ['api', 'admin', 'a/b?c']), 'api/admin/a%2Fb%3Fc');
   });
 });
 
 describe('대상 URL pathname 재검사', () => {
   it('허용 경로는 쿼리를 그대로 붙인다', () => {
-    const target = agentTargetUrl(API, 'api/admin/actions', new URLSearchParams('actor=ai&cursor=abc'));
+    const target = agentTargetUrl(API, 'GET', 'api/admin/actions', new URLSearchParams('actor=ai&cursor=abc'));
     assert.equal(target?.toString(), `${API}/api/admin/actions?actor=ai&cursor=abc`);
   });
 
   it('URL 정규화로 허용 경로를 벗어나면(퍼센트 인코딩 점 조각) 거절한다', () => {
-    assert.equal(agentTargetUrl(API, 'api/admin/%2e%2e/%2e%2e/internal', new URLSearchParams()), null);
-    assert.equal(agentTargetUrl(API, 'api/me/%2E%2E', new URLSearchParams()), null);
-    assert.equal(AGENT_TARGET_PATTERN.test('/api/me/'), true);
-    assert.equal(AGENT_TARGET_PATTERN.test('/api/me'), true);
-    assert.equal(AGENT_TARGET_PATTERN.test('/api/mex'), false);
+    assert.equal(agentTargetUrl(API, 'GET', 'api/admin/%2e%2e/%2e%2e/internal', new URLSearchParams()), null);
+    assert.equal(agentTargetUrl(API, 'POST', 'api/admin/%2E%2E/me/links', new URLSearchParams()), null);
+    assert.equal(agentRouteAllowed('GET', '/api/me'), true);
+    assert.equal(agentRouteAllowed('GET', '/api/me/'), false);
+    assert.equal(agentRouteAllowed('GET', '/api/mex'), false);
   });
 });
 

@@ -33,7 +33,7 @@ SNS 채널 아이콘 자산의 출처·상표 사용 규칙은 [SNS 채널 아�
 
 AI 운영자 실행 호스트가 `Authorization: Bearer <토큰>`으로 운영 API를 부르는 경로입니다(`AI_AGENT_PROXY_PATH`, 설계 `docs/specs/crelink-ai-operator.md` `웹 토큰 경로`). 판정은 `next`·`server-only`를 부르지 않는 `src/lib/api/agent-proxy.ts`이고 `agent-proxy.spec.ts`가 규칙마다 시험합니다.
 
-- 허용 경로(조각 경계 고정): `api/health`·`api/me`(정확 일치), `api/me/…`, `api/files/…`, `api/admin/…`. 그 밖, 빈 조각·`.`·`..`(디코드 뒤)는 404 `route_not_allowed`. 대상 URL을 만든 뒤 `pathname`을 같은 규칙으로 다시 검사합니다.
+- 허용 경로(메서드와 함께, 조각 경계 고정, `AGENT_ROUTES`): 운영자 API 전체(`api/admin/…`), `GET api/me`, `POST api/me/files`(크리링 배너 이미지), `GET api/files/{id}`, `GET api/health`. 크리에이터 편집(`api/me/…` 그 밖)은 AI 업무에 필요 없고 행동 기록에 남지 않아 막습니다. 그 밖, 빈 조각·`.`·`..`(디코드 뒤)는 404 `route_not_allowed`. 대상 URL을 만든 뒤 `pathname`을 같은 규칙으로 다시 검사합니다.
 - `Authorization`이 `Bearer ` 스킴이 아니면 401 `unauthenticated`로 API에 보내지 않습니다(`api/health` 포함). `Origin` 헤더가 있으면(브라우저) 403 `forbidden`. CORS 허용 헤더는 내지 않습니다.
 - API로는 `apiRequestHeaders({ Accept })`에 `Authorization`·`X-Crelink-Agent-Run`만 더해 보내고 쿠키는 넘기지 않습니다. 상태 변경 본문은 바이트 그대로 원래 `Content-Type`(multipart 포함)과 함께 넘깁니다.
 - 응답은 상태·본문과 `Content-Type`·`Cache-Control`·`ETag`·`Last-Modified`만 돌려주고 `Set-Cookie`는 넘기지 않습니다. 권한은 API가 확인합니다.

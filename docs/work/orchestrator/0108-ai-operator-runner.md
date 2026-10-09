@@ -41,3 +41,4 @@ AI 운영자가 30분마다 겹치지 않게 실행되고, 실행마다 같은 �
   - 로컬 실제 실행: CLI `issue-token`으로 발급한 토큰을 권한 600 임시 env 파일에 넣고 `CRELINK_AI_BASE_URL=http://127.0.0.1:5693/api/agent`로 `precheck` 0 → `start` 0(실행 id·트레일러 출력) → 두 번째 `start` 1(`409 agent_run_in_progress`) → `precheck` 1(진행 중) → `context` 0(멈춤·지표·직전 실행) → `api GET /api/admin/metrics` 0 → `finish` 0 → `precheck` 0. 멈춤(DB에서 켬): `precheck` 1(멈춤 기록 남김) → `start` 1 → 같은 멈춤의 `paused` 한 행 `paused_count` 2 → 끄면 `precheck` 0. 권한 644 설정 파일은 `precheck` 1과 `chmod 600` 안내. `automation-command`는 Orca 생성 명령을 출력.
   - 고친 결함: 두 번째 `start`가 409인데 "이전 실행 id 파일을 바꿉니다"라고 먼저 알리던 문구, 멈춤 응답 때 진행 중 실행 id 파일을 지우던 동작(멈춤 중에도 진행 중 실행은 `finish`로 닫아야 함).
   - E2E `tests/e2e/ai-operator.spec.ts`가 이 도구를 실제로 실행합니다(0091 진행 기록). 상태 `완료`.
+- 2026-10-10: 보안 검토 F1·F2 반영(0091 진행 기록). `guard` 명령(멈춤·실행 닫힘이면 1), 헌장 지킬 규칙 8·10과 `한 실행의 순서`·`배포와 롤백`의 `guard`, 사람 선행 조건 6·7, 프롬프트 3·4번. 로컬에서 `guard` 실행 없음 1·실행 중 0·멈춤 1·닫은 뒤 1 확인.
