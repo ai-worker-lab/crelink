@@ -126,11 +126,13 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 
 ## 단축 도메인
 
-- 같은 프로세스가 `/api` 접두사 밖의 `GET /{slug}`와 `GET /c/{linkPublicId}`를 처리합니다(`src/short-link/`). `app.setup.ts`의 `setGlobalPrefix` exclude는 요청 URL이 아니라 라우트 정의 경로에 맞춰 보기 때문에, `:`를 이스케이프한 `\:slug`·`c/\:linkPublicId`로 두 정의만 제외합니다. 그냥 `:slug`를 쓰면 `/api/me`·`/api/health` 같은 한 단계 경로가 접두사를 잃습니다. 이 매칭은 Nest 11.2와 12.1이 같습니다: `test/health.e2e-spec.ts`가 등록된 Express 라우트 표에서 `/api` 밖 라우트가 정확히 `GET /:slug`·`GET /c/:linkPublicId`뿐인지 확인하며, 두 버전에서 모두 통과했습니다.
+- 같은 프로세스가 `/api` 접두사 밖의 `GET /{slug}`, `GET /c/{linkPublicId}`, `GET /a/{bannerPublicId}/{landingPublicId}`, `GET /b/{bannerPublicId}`를 처리합니다(`src/short-link/`). `app.setup.ts`의 `setGlobalPrefix` exclude(`SHORT_DOMAIN_ROUTES`)는 요청 URL이 아니라 라우트 정의 경로에 맞춰 보기 때문에, `:`를 이스케이프한 `\:slug`·`c/\:linkPublicId`·`a/\:bannerPublicId/\:landingPublicId`·`b/\:bannerPublicId`로 네 정의만 제외합니다. 그냥 `:slug`를 쓰면 `/api/me`·`/api/health` 같은 한 단계 경로가 접두사를 잃습니다. 이 매칭은 Nest 11.2와 12.1이 같습니다: `test/health.e2e-spec.ts`가 등록된 Express 라우트 표에서 `/api` 밖 라우트가 정확히 이 네 정의뿐이고 `/api/health/ready` 같은 두 단계 경로가 접두사를 유지하는지 확인합니다. 운영 edge(Caddy 단축 호스트)는 단축 주소와 `^/(c/[a-z0-9]{10}|a/[a-z0-9]{10}/[a-z0-9]{10}|b/[a-z0-9]{10})$`만 API로 넘기고, API도 배너·랜딩 공개 ID가 `[a-z0-9]{10}`이 아니면 DB를 보지 않고 안내로 보냅니다.
 - 그래서 접두사 없는 `/health`, `/me`, `/api` 같은 요청은 단축 주소로 해석되고, 예약어라 없는 주소 안내로 302 합니다. 예약어 목록은 `RESERVED_SLUGS`(공유 계약).
 - `GET /{slug}`: 대소문자를 무시하고 현재 주소 또는 `retired_at + 90일` 안의 옛 주소를 찾습니다. 찾으면 방문을 기록(응답을 기다리지 않음)하고 302 `{WEB_URL}/p/{publicId}?pass={통과 표시}`. 없으면 302 `…/notice?reason=link_not_found`, 정지 크리에이터면 `…reason=creator_suspended`.
 - `GET /c/{linkPublicId}`: 클릭을 기록하고 DB에 저장된 URL(저장 시 http·https만 허용)로 302. 숨김·차단·삭제·정지면 302 `…/notice?reason=link_unavailable`. 열린 리디렉트를 막기 위해 요청 값으로 대상 URL을 만들지 않습니다.
-- 두 리디렉트 모두 `Cache-Control: no-store`이고, 방문자 쿠키 `cl_vid`(UUID, HttpOnly, SameSite=Lax, 1년)는 없거나 형식이 틀릴 때만 새로 발급합니다.
+- `GET /a/{bannerPublicId}/{landingPublicId}`(크리링 배너 클릭, R20 ⑧): 배너가 지금 게시 중(`starts_at <= now() < ends_at`)이고 랜딩이 있고 크리에이터가 정지가 아니면 `TrackingService.recordAdStat('click')`로 날짜(Asia/Seoul)·배너·랜딩 카운터(`ad_banner_daily_stats.clicks`)를 올리고(응답을 기다리지 않음) 저장된 URL로 302. 끝남·예약·없음·정지면 302 `…/notice?reason=link_unavailable`. 개인 식별 정보를 남기지 않으므로 방문자 쿠키를 읽거나 발급하지 않습니다. 공개 랜딩 API가 `passAccepted`일 때만 이 주소를 주므로 서비스 화면에서 연 랜딩의 클릭은 세지 않습니다. 누구나 주소를 만들어 수를 늘릴 수 있다는 점은 `/c/`와 같은 수준으로 받아들였습니다([기술 설계](../../../docs/specs/crelink-ad-banner.md) `노출·클릭 기록` 절).
+- `GET /b/{bannerPublicId}`(크리에이터 배너 클릭, R21 ④): 연결 URL이 있고 숨김·차단이 아니고 계정이 배너 슬롯 부여됨·정지 아님이면 `creator_banner_clicks`에 링크 클릭과 같은 항목(방문자 쿠키·IP·국가·도시·유입 호스트·UA·기기·브라우저·OS)을 남기고 저장된 URL로 302. 단축 URL은 `short_links.landing_id = creator_banners.landing_id`로 찾습니다. URL 없음·숨김·차단·회수·정지·삭제면 `link_unavailable`. 배너를 지워도 기록은 `banner_public_id` 사본으로 남습니다.
+- 리디렉트는 모두 `Cache-Control: no-store`이고, 방문자 쿠키 `cl_vid`(UUID, HttpOnly, SameSite=Lax, 1년)는 `/{slug}`·`/c/`·`/b/`에서 없거나 형식이 틀릴 때만 새로 발급합니다. `/a/`는 쿠키를 다루지 않습니다.
 
 ### 랜딩 통과 표시
 
@@ -185,6 +187,7 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 | `crelink.link.click` | `ShortLinkController.click`(`GET /c/{linkPublicId}`)이 외부 URL로 302 할 때(클릭 기록 시작) | 없음 |
 | `crelink.ad_banner.impression` | `TrackingService.recordAdStat('impression')`: 공개 랜딩 API가 `passAccepted`이고 광고 블록이 보일 때 첫 장 1건(기록 시작) | 없음 |
 | `crelink.ad_banner.click` | `TrackingService.recordAdStat('click')`: 광고 클릭 경로(기록 시작) | 없음 |
+| `crelink.creator_banner.click` | `ShortLinkController.creatorBannerClick`(`GET /b/{bannerPublicId}`)이 외부 URL로 302 할 때(클릭 기록 시작) | 없음 |
 
 ### 소스맵
 
@@ -247,6 +250,7 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 ## 통계와 보존 작업
 
 - 날짜 기준 시간대는 `Asia/Seoul`입니다(`STATS_TIME_ZONE`). 통계 기간은 `from`·`to` 양 끝 포함 최대 366일이고, 둘 다 없으면 오늘까지 30일입니다.
-- 보존 작업(R11, `src/retention/retention.service.ts`): 기동 시와 24시간마다 실행합니다. 트랜잭션 advisory lock(`pg_advisory_xact_lock`)으로 여러 인스턴스가 동시에 돌지 않게 하고, 늦게 온 인스턴스는 기다렸다가 남은 것만 처리합니다. 오늘(Asia/Seoul)에서 365일 전 0시보다 이전의 `visits`·`link_clicks`를 날짜·단축 URL 단위로 `visit_daily_rollups`, 값별로 `visit_dimension_rollups`(유입 호스트·기기·브라우저·OS·국가, 값이 없으면 `unknown`), 링크별로 `link_click_rollups`에 더하고 같은 트랜잭션에서 원본을 지웁니다. 집계에는 IP를 넣지 않습니다. 결과 건수는 로그로 남깁니다.
+- 보존 작업(R11, `src/retention/retention.service.ts`): 기동 시와 24시간마다 실행합니다. 트랜잭션 advisory lock(`pg_advisory_xact_lock`)으로 여러 인스턴스가 동시에 돌지 않게 하고, 늦게 온 인스턴스는 기다렸다가 남은 것만 처리합니다. 오늘(Asia/Seoul)에서 365일 전 0시보다 이전의 `visits`·`link_clicks`를 날짜·단축 URL 단위로 `visit_daily_rollups`, 값별로 `visit_dimension_rollups`(유입 호스트·기기·브라우저·OS·국가, 값이 없으면 `unknown`), 링크별로 `link_click_rollups`에 더하고, `creator_banner_clicks`는 배너별로 `creator_banner_click_rollups`에만 더한 뒤(`visit_daily_rollups.link_clicks`에 섞지 않음) 같은 트랜잭션에서 원본을 지웁니다. 집계에는 IP를 넣지 않습니다. 결과 건수는 로그로 남깁니다. `ad_banner_daily_stats`는 개인 식별 정보가 없는 집계라 계속 보관합니다.
 - 통계 API는 원본과 집계를 합칩니다. 집계된 날짜의 순 방문자는 날짜별 순 방문자 합이라, 원본 기간의 순 방문자(기간 전체에서 중복 제거)와 계산 방식이 다릅니다.
 - 링크별 클릭의 `linkId`는 링크 공개 ID(`{SHORT}/c/{linkPublicId}`의 값)입니다. 지운 링크도 기록이 남아 있으면 `title: null`로 나옵니다.
+- 배너별 클릭(`bannerClicks`, R21 ④·미정 4 A)은 `creator_banner_clicks` 원본과 `creator_banner_click_rollups`를 합친 기간 합계입니다. `bannerId`는 배너 공개 ID(`{SHORT}/b/{bannerPublicId}`의 값)이고, 지운 배너는 `alt: null`입니다. `totals.linkClicks`·`daily`에는 넣지 않습니다.

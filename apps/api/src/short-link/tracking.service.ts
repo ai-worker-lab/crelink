@@ -85,7 +85,7 @@ export function requestFacts(request: Request, trustedProxyHops: number): Reques
   };
 }
 
-/** 방문(R2·R9)과 외부 링크 클릭 기록. 리디렉트는 이 저장을 기다리지 않습니다. */
+/** 방문(R2·R9), 외부 링크·크리에이터 배너 클릭, 크리링 배너 노출·클릭 기록. 리디렉트는 이 저장을 기다리지 않습니다. */
 @Injectable()
 export class TrackingService {
   private readonly logger = new Logger(TrackingService.name);
@@ -140,6 +140,33 @@ export class TrackingService {
         link.id,
         link.publicId,
         link.shortLinkId,
+        visitorId,
+        facts.ip,
+        country,
+        city,
+        facts.referrerHost,
+        facts.userAgent,
+        deviceType,
+        browser,
+        os,
+      ],
+    );
+  }
+
+  /** 크리에이터 배너 클릭 원본(R21 ④, `link_clicks`와 같은 항목). 1년 뒤 보존 작업이 `creator_banner_click_rollups`로 옮깁니다. */
+  async recordBannerClick(
+    banner: { id: string; publicId: string; shortLinkId: string },
+    visitorId: string,
+    facts: RequestFacts,
+  ): Promise<void> {
+    const { country, city, deviceType, browser, os } = this.describe(facts);
+    await this.database.query(
+      `INSERT INTO creator_banner_clicks (banner_id, banner_public_id, short_link_id, visitor_id, ip, country, city, referrer_host, user_agent, device_type, browser, os)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        banner.id,
+        banner.publicId,
+        banner.shortLinkId,
         visitorId,
         facts.ip,
         country,
