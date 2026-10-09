@@ -6,6 +6,7 @@
 
 ## 2026-10-10
 
+- 0143 첫 사용 안내 디자인(실사용자 전환) 완료(사용자 위임에 따른 AI 승인). 디자인 `design/first-run-guide/`(빈 랜딩 관리 화면 3단계 시작 안내 카드: 링크·포트폴리오 1개 추가 → 내 크리링 링크 복사 → 인스타그램 프로필에 붙여 넣기, 상태 A~E, 390·1280px, 새 토큰·API 없음). 구현 티켓 `docs/work/web/0150-first-run-guide-web.md`를 `준비`로 등록했습니다. 근거 `docs/work/designer/0143-first-run-guide-design.md`.
 - 0141(검색·링크 미리보기 기본기)을 `완료`로 바꾸고 배포·운영 확인 근거를 남겼습니다(PR #71, Deploy 37965904574). 분류 대기 work item 2개 등록: 검색엔진 소유 확인·sitemap 제출(사람 계정 필요) `docs/work/orchestrator/0148-search-console-registration.md`, Dependabot 취약점 8건(개발·빌드 도구 간접 의존성) `docs/work/orchestrator/0149-dev-dependency-vulnerabilities.md`. 근거 `docs/work/web/0141-search-and-link-preview-basics.md`.
 - AI 운영자 운영 적용과 30분 실행 시작, 링크 슬롯 +5 이벤트 운영 개시. PR #68·#69·#70을 머지·배포했습니다(Deploy 모두 success). 운영 토큰을 발급했고(런북 17-2), Orca 자동화 `crelink-ai-operator`(`*/30 * * * *`)를 첫 수동 실행을 확인한 뒤 켰습니다. 첫 실행은 0141을 구현해 PR #71로 배포했습니다. 0090·0091·0092·0125와 에픽 0088·0089를 `완료`로 바꿨습니다. 근거 `docs/work/epics/0088-ai-operator.md`·`docs/work/epics/0089-slot-event.md`.
 - AI 운영자 보안 검토 반영과 링크 슬롯 이벤트(PR #69) 통합. 헌장 `docs/ops/ai-operator.md`: 지킬 규칙 10(실행 호스트 자격으로 토큰 발급·멈춤 해제·DB 직접 쓰기·사람 전용 통제 우회 금지), 머지·외부 공개·운영 쓰기 묶음 직전 `guard`, 멈춤 범위를 사실대로(API 쓰기만 즉시 거절, 머지·배포는 `guard`·자동화 끄기), 사람 선행 조건(실행 계정 분리·CODEOWNERS). 프롬프트에 같은 규칙. ADR 0015: 멈춤 결정 문구 수정, AI 권한 한계, 실행 호스트 자격 위험 수용. 설계 `docs/specs/crelink-ai-operator.md`: 토큰 경로 허용 근거, 소유 콘텐츠 403, 행동 기록 범위 시험, 위험 2줄, 변경 기록. 실행 도구 `scripts/ai-operator.mjs guard`. 세부는 영역 로그. 근거 `docs/work/orchestrator/0091-ai-operator-design.md`.
