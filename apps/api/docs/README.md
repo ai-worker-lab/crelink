@@ -183,6 +183,8 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 | `crelink.auth.login` | `AuthController.callback`(`POST /api/auth/google/callback`) | `result`: `success`, `failure`(state·code 오류, 구글 검증 실패, 정지 계정, 로그인 설정 없음, 예상 못 한 오류) |
 | `crelink.short_link.visit` | `ShortLinkController.visit`(`GET /{slug}`)이 랜딩으로 302 할 때(방문 기록 시작) | 없음 |
 | `crelink.link.click` | `ShortLinkController.click`(`GET /c/{linkPublicId}`)이 외부 URL로 302 할 때(클릭 기록 시작) | 없음 |
+| `crelink.ad_banner.impression` | `TrackingService.recordAdStat('impression')`: 공개 랜딩 API가 `passAccepted`이고 광고 블록이 보일 때 첫 장 1건(기록 시작) | 없음 |
+| `crelink.ad_banner.click` | `TrackingService.recordAdStat('click')`: 광고 클릭 경로(기록 시작) | 없음 |
 
 ### 소스맵
 
@@ -195,7 +197,10 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 - 단축 주소(R8, `src/creator/slug.service.ts`): 입력은 앞뒤 공백을 빼고 소문자로 바꾼 뒤 `SLUG_PATTERN`·3~30자·예약어를 봅니다. 다른 단축 URL의 현재 주소나 90일 안의 옛 주소면 409 `slug_taken`. 자기 옛 주소는 되돌릴 수 있습니다. 첫 변경(`slug_changed_at`이 없음)은 바로, 그 뒤에는 마지막 변경에서 30일 뒤부터(429 `slug_change_too_soon`). 자동 주소로 되돌려도 30일 제한은 마지막 변경 시각 기준이라 우회할 수 없습니다. 같은 주소로 바꾸는 요청은 아무것도 바꾸지 않고 200입니다. 예약 기간이 끝난 남의 옛 주소는 행을 지우고 새로 만듭니다.
 - 링크 한도(R13): 보이는(숨기지 않고 차단되지 않은) 링크 ≤ 5 + `extra_link_slots`(409 `link_limit_reached`), 숨긴 링크 포함 ≤ 50(409 `link_total_limit_reached`). 추가와 숨김 해제에서 확인하며, 같은 사용자의 링크 변경은 사용자 행 잠금으로 줄 세웁니다. 운영자 추가 슬롯은 0~45.
 - 차단 도메인(R14): 링크 호스트가 차단 도메인이거나 그 하위 도메인이면 추가·URL 수정이 422 `link_domain_blocked`. 운영자가 도메인을 추가하면 같은 트랜잭션에서 기존 링크의 `blocked_at`을 채웁니다. 목록에서 빼도 이미 차단된 링크는 운영자가 링크별로 풉니다.
+- 광고 블록·배너 슬롯 위치(R20 ①②, R21 ①, [기술 설계](../../../docs/specs/crelink-ad-banner.md#위치-모델)): 위치는 첫 list 구역의 `landing_blocks.slot_position`(NULL = 맨 뒤, k = `position < k`인 링크들 다음) 하나이고 링크 한도에 들지 않습니다. `PUT /api/me/links/order`가 링크를 0..n-1로 다시 매기며 같은 트랜잭션에서 저장합니다: `slotIndex`(0 이상 정수, 아니면 400 `validation_failed`)가 n 이상이면 NULL, 아니면 그 값. 생략하면(옛 웹) 다시 매기기 전의 슬롯 앞 링크 수(`SLOT_INDEX_SQL`)를 새 위치로 둬 상대 위치를 유지합니다. 편집 상태 `slot.slotIndex`도 같은 식(빈 번호와 무관)이고, `slot.kind`는 `users.banner_slot_granted_at`이 있으면 `creator`입니다.
+- 공개 랜딩 슬롯(`src/creator/public-landing.controller.ts`): 첫 list 구역에만 `resolveBannerSlot`(공유 계약)을 적용하고 숨김이면 `slot: null`입니다. 링크는 숨김·차단 포함 전체를 읽어 위치를 계산하고 보이는 링크만 내려 줍니다. 배너 질의는 1개(부여됨: 그 랜딩의 숨김·차단 아닌 크리에이터 배너, 아니면 게시 중 `starts_at <= now() < ends_at` 크리링 배너 `sort_order, created_at`)입니다. `clickUrl`: 광고는 `passAccepted`일 때만 `{SHORT}/a/{배너}/{랜딩}`, 아니면 저장된 URL(R20 ⑧ 서비스 화면 제외). 크리에이터 배너는 늘 `{SHORT}/b/{배너}`이고 연결 URL이 없으면 null. `passAccepted`이고 광고 블록이 보이면 첫 장 노출을 `TrackingService.recordAdStat`로 `ad_banner_daily_stats`(Asia/Seoul 날짜·배너·랜딩 공개 ID, 개인 식별 정보 없음)에 더합니다(응답을 기다리지 않음). 관리 미리보기(`GET /api/me/landing`의 `adBanners`)는 저장된 URL이고 세지 않습니다(R7 ⑥).
 - 이미지(`src/files/`): multipart 필드 `file`, `CRELINK_LIMITS.imageMaxBytes`(4MB, MVP 임시값. 운영 edge Caddy의 웹 호스트 본문 한도는 6MB) 이하. 형식은 클라이언트 Content-Type이 아니라 파일 앞부분(매직 바이트)으로 JPEG·PNG·WebP·GIF만 받습니다. 저장은 `FileStorage` 경계 뒤의 로컬 디스크 또는 S3 호환 저장소([이미지 저장소](#이미지-저장소))이고, `GET /api/files/{id}`는 누구나 받을 수 있으며 1년 캐시합니다(id는 UUID, 내용 불변).
+- 움직임 판정(`src/files/animated-image.ts`, 배너 정지 이미지 규칙의 근거): 업로드 때 GIF(이미지 서술자 2개 이상)·WebP(`VP8X` 애니메이션 플래그 또는 `ANIM` 청크)·PNG(`IDAT` 앞 `acTL`)를 판정해 `files.animated`에 저장하고 `UploadFileResponse.animated`로 돌려줍니다. 0003 전에 올린 파일은 NULL이며 `FilesService.isAnimated`가 쓸 때 저장소 바이트로 판정해 채웁니다.
 
 ## 방명록
 

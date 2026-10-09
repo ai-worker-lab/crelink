@@ -4,6 +4,17 @@
 
 ## 2026-10-09
 
+- 광고 블록·배너 슬롯 위치·공개 응답·노출 기록·편집 상태(설계 T2). 근거 `docs/work/api/0068-ad-banner-slot-public.md`.
+  - `PUT /api/me/links/order`: 같은 트랜잭션(사용자 잠금)에서 `landing_blocks.slot_position` 저장. `slotIndex`(0 이상 정수, 아니면 400 `validation_failed`)가 링크 수 이상이면 NULL(맨 뒤). 생략하면 다시 매기기 전의 슬롯 앞 링크 수를 새 위치로 둬 상대 위치 유지(NULL은 NULL). 응답은 그대로 `LinkView[]`.
+  - `GET /api/public/landings/{publicId}`: 첫 list 구역 `blocks[].slot`을 `resolveBannerSlot`으로 채움(숨김이면 null). 링크 질의는 숨김·차단 포함 전체를 읽어 서버에서 거름(공개 링크 목록은 그대로), 배너 질의 1개(부여됨이면 그 랜딩의 보이는 크리에이터 배너, 아니면 게시 중 크리링 배너 `sort_order, created_at`). `clickUrl`: 광고는 `passAccepted`일 때만 `{SHORT}/a/{배너}/{랜딩}`(아니면 저장된 URL), 크리에이터 배너는 `{SHORT}/b/{배너}`(연결 URL 없으면 null). `passAccepted`이고 광고 블록이 보이면 첫 장 노출 +1(백그라운드).
+  - `TrackingService.recordAdStat(kind, adBannerId, landingPublicId)`: `ad_banner_daily_stats` upsert(Asia/Seoul 날짜, `impressions`·`clicks`), 지표 `crelink.ad_banner.impression`·`crelink.ad_banner.click`. `ShortLinkModule`이 `TrackingService`를 내보내고 `CreatorModule`이 가져옴.
+  - `GET /api/me/landing`: `slot`(종류·`slotIndex`·`grantedAt`), `adBanners`(게시 중, `clickUrl` = 저장된 URL), `banners`(이 랜딩 전체, 숨김·차단·보관 포함), `bannerLimits`(설정값 + 사용 수)를 실제 데이터로. 공용 도우미 `CreatorService.bannerSlot`·`liveAdBanners`·`visibleCreatorBanners`·`publicBannerView`·`creatorBannerView`·`creatorBanners`·`bannerLimits`, `SLOT_INDEX_SQL`·`CREATOR_BANNER_COLUMNS`.
+  - 시험: `test/ad-banner-slot.e2e-spec.ts` 9건(위치 3가지와 n 이상, slotIndex 검증·order_mismatch, 생략 시 유지·빈 번호, 게시 중만·앞 링크 숨김, 광고 숨김 조건, 배너 슬롯·회수, `passAccepted` 유무별 노출 수·`clickUrl`, 숨김·배너 슬롯은 노출 없음, 편집 상태).
+- 업로드 움직임 판정(설계 T3, 결정 1 C). 근거 `docs/work/api/0069-upload-animated.md`.
+  - `src/files/animated-image.ts` `isAnimatedImage(contentType, data)`: GIF 이미지 서술자 2개 이상(블록 구조를 따라 읽음), WebP `VP8X` 애니메이션 플래그 또는 `ANIM` 청크, PNG `IDAT` 앞 `acTL`. 새 의존성 없음.
+  - `POST /api/me/files`: `files.animated`에 저장하고 `UploadFileResponse.animated`로 응답(그동안 늘 false).
+  - `FilesService.isAnimated(db, fileId)`: `files.animated`가 NULL(0003 전 파일)이면 저장소 바이트로 판정해 채움. 행·객체가 없으면 404 `file_not_found`. 배너 저장(0070·0071)이 씀.
+  - 시험: `src/files/animated-image.spec.ts` 6건(세 형식 움직임·정지 표본, `ANIM`만 있는 WebP, IDAT 뒤 acTL, 잘린 파일), `test/upload-animated.e2e-spec.ts` 3건. 표본은 `test/image-samples.ts`.
 - 광고 블록·배너 슬롯 계약·스키마(설계 `docs/specs/crelink-ad-banner.md` T1, 결정 1 C·2 A). 근거 `docs/work/api/0067-ad-banner-contract.md`.
   - migration `0003_ad_banner`(첫 줄 `SET LOCAL lock_timeout = '5s'`, 머리 주석에 되돌리기): `users.banner_slot_granted_at`, `landing_blocks.slot_position`(NULL = 맨 뒤, `>= 0`), `files.animated`(NULL = 0003 전 파일), 새 테이블 `ad_banners`(이미지·정지 이미지 FK `RESTRICT`, `ends_at >= starts_at`), `creator_banners`(`landing_id` 랜딩 단위, `still_file_id` `SET NULL`, url·host 짝 CHECK), `ad_banner_daily_stats`, `creator_banner_clicks`, `creator_banner_click_rollups`와 인덱스. NULL 허용 컬럼·새 테이블만 더하는 expand.
   - `AppConfig.bannerSlotLimits`·`parseBannerSlotLimits`: `BANNER_SLOT_MAX`(기본 5, 1 이상 정수)·`BANNER_SLOT_TOTAL_MAX`(기본 20, `BANNER_SLOT_MAX` 이상 정수), `onModuleInit`에서 검사해 틀리면 기동 거부. `.env.example`·`docs/README.md#환경변수`.

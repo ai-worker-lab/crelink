@@ -5,6 +5,8 @@ import maxmind, { CityResponse, Reader } from 'maxmind';
 import { isIP } from 'node:net';
 import { AppConfig } from '../config.service';
 import { Database } from '../database';
+import { countBusinessMetric } from '../monitoring/metrics';
+import { STATS_TIME_ZONE } from '../retention/retention.service';
 
 const REFERRER_MAX = 2048;
 const USER_AGENT_MAX = 512;
@@ -148,6 +150,23 @@ export class TrackingService {
         browser,
         os,
       ],
+    );
+  }
+
+  /**
+   * 크리링 배너 노출·클릭 카운터(R20 ⑧). 개인 식별 정보 없이 날짜(Asia/Seoul)·배너·랜딩별 행에 1을 더합니다.
+   * 노출은 공개 랜딩 API(`passAccepted`일 때 첫 장), 클릭은 `GET {SHORT}/a/{배너}/{랜딩}`이 부릅니다. 둘 다 `inBackground`로 감쌉니다.
+   * 지표 `crelink.ad_banner.impression`·`crelink.ad_banner.click`은 기록 시작 때 셉니다(저장 실패와 무관, 방문·클릭 지표와 같음).
+   */
+  async recordAdStat(kind: 'impression' | 'click', adBannerId: string, landingPublicId: string): Promise<void> {
+    countBusinessMetric(kind === 'impression' ? 'crelink.ad_banner.impression' : 'crelink.ad_banner.click');
+    const column = kind === 'impression' ? 'impressions' : 'clicks';
+    await this.database.query(
+      `INSERT INTO ad_banner_daily_stats (day, ad_banner_id, landing_public_id, ${column})
+       VALUES ((now() AT TIME ZONE $1)::date, $2, $3, 1)
+       ON CONFLICT (ad_banner_id, day, landing_public_id)
+       DO UPDATE SET ${column} = ad_banner_daily_stats.${column} + 1`,
+      [STATS_TIME_ZONE, adBannerId, landingPublicId],
     );
   }
 

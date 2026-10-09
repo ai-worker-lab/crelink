@@ -42,6 +42,15 @@ export function optionalBoolean(value: unknown, label: string): boolean | undefi
   return value;
 }
 
+/** 선택 0 이상 정수. 아니면 400 `validation_failed`. */
+export function optionalNonNegativeInteger(value: unknown, label: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', `${label}은(는) 0 이상의 정수여야 합니다.`);
+  }
+  return value;
+}
+
 /** http·https 절대 URL만 받습니다. 맞지 않으면 null. */
 export function parseHttpUrl(value: string): URL | null {
   if (value.length > CRELINK_LIMITS.urlMax || !URL.canParse(value)) return null;

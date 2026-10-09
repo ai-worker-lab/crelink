@@ -3,9 +3,17 @@ import { CRELINK_LIMITS, LinkView } from '@crelink/shared';
 import type { PoolClient } from 'pg';
 import { Database } from '../database';
 import { apiError, insertWithRandomId, UUID_PATTERN } from '../common/http';
-import { bodyObject, optionalBoolean, optionalText, orderedIds, parseHttpUrl, requiredText } from '../common/input';
+import {
+  bodyObject,
+  optionalBoolean,
+  optionalNonNegativeInteger,
+  optionalText,
+  orderedIds,
+  parseHttpUrl,
+  requiredText,
+} from '../common/input';
 import { FilesService } from '../files/files.service';
-import { CreatorService, LINK_COLUMNS, LinkRow } from './creator.service';
+import { CreatorService, LINK_COLUMNS, LinkRow, SLOT_INDEX_SQL } from './creator.service';
 
 /** 공개 링크 ID 길이. 클릭 주소 `{SHORT}/c/{publicId}`에 씁니다. */
 const LINK_PUBLIC_ID_LENGTH = 10;
@@ -136,7 +144,12 @@ export class LinksService {
     if (!deleted?.rowCount) throw apiError(HttpStatus.NOT_FOUND, 'link_not_found', '링크를 찾을 수 없습니다.');
   }
 
+  /**
+   * 링크를 0..n-1로 다시 매기고 같은 트랜잭션에서 광고 블록·배너 슬롯 위치(`landing_blocks.slot_position`)를 저장합니다(R20 ②).
+   * slotIndex가 오면 n 이상은 맨 뒤(NULL), 아니면 그 값. 생략하면(옛 웹) 다시 매기기 전의 슬롯 앞 링크 수를 새 위치로 둬 상대 위치를 유지합니다.
+   */
   async reorder(userId: string, body: unknown): Promise<LinkView[]> {
+    const slotIndex = optionalNonNegativeInteger(bodyObject(body).slotIndex, 'slotIndex');
     return this.database.transaction(async (client) => {
       await this.lockUser(client, userId);
       const current = await client.query<{ id: string }>('SELECT id FROM links WHERE user_id = $1', [userId]);
@@ -144,12 +157,24 @@ export class LinksService {
         body,
         current.rows.map((row) => row.id),
       );
+      const { blockId } = await this.creator.context(client, userId);
+      let slotPosition: number | null;
+      if (slotIndex === undefined) {
+        const kept = await client.query<{ slot_index: number | null }>(
+          `SELECT ${SLOT_INDEX_SQL} AS slot_index FROM landing_blocks b WHERE b.id = $1`,
+          [blockId],
+        );
+        slotPosition = kept.rows[0].slot_index;
+      } else {
+        slotPosition = slotIndex >= ids.length ? null : slotIndex;
+      }
       await client.query(
         `UPDATE links SET position = o.ord - 1, updated_at = now()
          FROM unnest($2::uuid[]) WITH ORDINALITY AS o(id, ord)
          WHERE links.id = o.id AND links.user_id = $1`,
         [userId, ids],
       );
+      await client.query('UPDATE landing_blocks SET slot_position = $2 WHERE id = $1', [blockId, slotPosition]);
       return this.creator.links(client, userId);
     });
   }

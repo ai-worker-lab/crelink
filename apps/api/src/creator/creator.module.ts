@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { FilesModule } from '../files/files.module';
 import { LandingPassModule } from '../short-link/landing-pass.module';
+import { ShortLinkModule } from '../short-link/short-link.module';
 import { CreatorController, LinksController, PortfolioController } from './creator.controller';
 import { CreatorService } from './creator.service';
 import { LinksService } from './links.service';
@@ -10,7 +11,7 @@ import { PublicLandingController } from './public-landing.controller';
 import { SlugService } from './slug.service';
 
 @Module({
-  imports: [AuthModule, FilesModule, LandingPassModule],
+  imports: [AuthModule, FilesModule, LandingPassModule, ShortLinkModule],
   controllers: [CreatorController, LinksController, PortfolioController, PublicLandingController],
   providers: [CreatorService, LinksService, ProfileService, SlugService],
   exports: [CreatorService],
