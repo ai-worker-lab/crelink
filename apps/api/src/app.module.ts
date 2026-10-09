@@ -7,6 +7,7 @@ import { FilesModule } from './files/files.module';
 import { CreatorModule } from './creator/creator.module';
 import { GuestbookModule } from './guestbook/guestbook.module';
 import { AdminModule } from './admin/admin.module';
+import { AiOperatorModule } from './ai-operator/ai-operator.module';
 import { RetentionModule } from './retention/retention.module';
 import { ShortLinkModule } from './short-link/short-link.module';
 import { SlotEventModule } from './slot-event/slot-event.module';
@@ -24,6 +25,7 @@ import { SlotEventModule } from './slot-event/slot-event.module';
     GuestbookModule,
     AdminModule,
     SlotEventModule,
+    AiOperatorModule,
     RetentionModule,
     ShortLinkModule,
   ],

@@ -134,18 +134,23 @@ export class Database implements OnModuleInit, OnModuleDestroy {
   query<T extends QueryResultRow = QueryResultRow>(sql: string, values: unknown[] = []) {
     return this.pool.query<T>(sql, values);
   }
-  async transaction<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-      const value = await run(client);
-      await client.query('COMMIT');
-      return value;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+  transaction<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {
+    return withTransaction(this.pool, run);
+  }
+}
+
+/** pool에서 연결 하나를 빌려 BEGIN … COMMIT(실패하면 ROLLBACK)으로 감쌉니다. API(`Database.transaction`)와 CLI가 함께 씁니다. */
+export async function withTransaction<T>(pool: Pool, run: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const value = await run(client);
+    await client.query('COMMIT');
+    return value;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 }

@@ -77,6 +77,9 @@ describe('API 기동과 health', () => {
       expect(tables.rows.map((row) => row.table_name).sort()).toEqual([
         'ad_banner_daily_stats',
         'ad_banners',
+        'agent_runs',
+        'ai_operator_settings',
+        'api_tokens',
         'blocked_domains',
         'creator_banner_click_rollups',
         'creator_banner_clicks',
@@ -88,6 +91,7 @@ describe('API 기동과 health', () => {
         'link_click_rollups',
         'link_clicks',
         'links',
+        'operator_actions',
         'portfolio_items',
         'schema_migrations',
         'sessions',
@@ -107,6 +111,7 @@ describe('API 기동과 health', () => {
         { version: '0001_crelink_mvp' },
         { version: '0002_guestbook' },
         { version: '0003_ad_banner' },
+        { version: '0004_ai_operator' },
         { version: '0005_slot_event' },
       ]);
     } finally {

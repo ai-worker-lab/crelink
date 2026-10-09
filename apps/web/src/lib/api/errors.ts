@@ -48,6 +48,12 @@ const API_ERROR_MESSAGES: Record<CrelinkErrorCode, string> = {
   slot_event_not_found: '이벤트를 찾을 수 없어요. 새로고침해 주세요.',
   slot_event_closed: '이벤트 신청 기간이 아니어서 신청하지 못했어요.',
   slot_event_period_invalid: '끝은 시작보다 뒤여야 해요.',
+  agent_run_not_found: '실행 기록을 찾을 수 없어요.',
+  agent_run_in_progress: '다른 AI 실행이 진행 중이에요.',
+  agent_run_closed: '이미 끝난 실행 기록이에요.',
+  agent_run_required: '진행 중인 AI 실행 기록이 필요해요.',
+  ai_operator_paused: 'AI 운영자가 멈춤 상태예요.',
+  api_token_not_found: '토큰을 찾을 수 없어요. 화면을 새로 고쳐 주세요.',
 };
 
 /** 웹(BFF·클라이언트)에서만 생기는 오류 코드. */

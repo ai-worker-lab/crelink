@@ -11,8 +11,10 @@ import {
   BannerSlotControl,
   BlockControl,
   ExtraSlotsForm,
+  MetricsExclusionToggle,
   SuspensionToggle,
 } from '../../../../components/admin/CreatorControls';
+import { CreatorStatusBadges } from '../../../../components/admin/CreatorStatusBadges';
 import { RemoteImage } from '../../../../components/RemoteImage';
 import { loadSignedIn, type ServerApiResult } from '../../../../lib/api/server';
 import { formatDate, formatNumber, recentRange } from '../../../../lib/format';
@@ -97,7 +99,9 @@ function CreatorDetail({
         </div>
         <div>
           <dt>상태</dt>
-          <dd>{creator.suspended ? <span className="badge badge-danger">정지</span> : '이용 중'}</dd>
+          <dd>
+            <CreatorStatusBadges creator={creator} aiLabel="AI 계정" />
+          </dd>
         </div>
         <div>
           <dt>이벤트 신청일</dt>
@@ -126,12 +130,17 @@ function CreatorDetail({
             extraSlots={creator.extraLinkSlots}
             eventBonus={creator.slotEvent?.bonusLinks ?? null}
           />
-          <SuspensionToggle userId={creator.userId} suspended={creator.suspended} />
+          <SuspensionToggle userId={creator.userId} suspended={creator.suspended} accountKind={creator.accountKind} />
           <BannerSlotControl
             userId={creator.userId}
             grantedAt={creator.bannerSlot.grantedAt}
             limits={creator.bannerLimits}
             bannerCount={creator.banners.length}
+          />
+          <MetricsExclusionToggle
+            userId={creator.userId}
+            accountKind={creator.accountKind}
+            metricsExcluded={creator.metricsExcluded}
           />
         </div>
       </section>

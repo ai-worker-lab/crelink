@@ -88,6 +88,8 @@ describe('운영자 API (R10, R13, R14)와 보존 작업 (R11)', () => {
         visitsLast30Days: 1,
         suspended: false,
         createdAt: expect.any(String),
+        accountKind: 'human',
+        metricsExcluded: false,
       });
     }
     const all = await api<OperatorCreatorListResponse>(t.baseUrl, 'GET', '/api/admin/creators?page=1', {

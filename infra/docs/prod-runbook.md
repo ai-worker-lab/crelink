@@ -26,6 +26,7 @@
 | DB pool 상한 | 암호문 평문 `DATABASE_POOL_MAX=6`(API pg Pool `max`, 비면 15). 산정·확인은 [12](#12-supabase-주의사항) |
 | GitHub | variables `TS_OIDC_CLIENT_ID`·`TS_OIDC_AUDIENCE`, Sentry `SENTRY_ORG`·`SENTRY_PROJECT_API`·`SENTRY_PROJECT_WEB`·`SENTRY_WEB_DSN`, secret `DEPLOY_SSH_KEY`·`SENTRY_AUTH_TOKEN`(소스맵 업로드 전용, [15](#15-sentry-오류성능-모니터링)). 그 밖의 배포 secret 없음 |
 | Sentry | 조직 `crelink`(제안, 미국 데이터 저장 위치), 프로젝트 `crelink-api`·`crelink-web`. API DSN은 암호문 평문 키 `SENTRY_DSN`·`SENTRY_ENVIRONMENT`, 웹 DSN은 이미지 빌드 인자. 비어 있으면 꺼짐. [15](#15-sentry-오류성능-모니터링) |
+| AI 운영자 토큰 | 운영자 Mac `~/.config/crelink/ai-operator.env`(권한 600: `CRELINK_AI_BASE_URL`·`CRELINK_AI_TOKEN`·`CRELINK_AI_HOST`)에만 원문. DB(`api_tokens`)에는 SHA-256 해시만. 발급·목록·폐기는 활성 색 API 컨테이너의 CLI(`apps/api/dist/cli/ai-operator.js`), 폐기는 운영자 화면 `/admin/agent-runs`에서도. SOPS 암호문·CI·GitHub secret에 넣지 않음. [17](#17-ai-운영자-토큰) |
 
 ## 1. 서버 준비 (bootstrap)
 
@@ -178,6 +179,7 @@ SOPS_AGE_KEY_CMD='security find-generic-password -s crelink-sops-age -a operator
 | GHCR | 장기 토큰 없음(job마다 `GITHUB_TOKEN`). 교체할 것 없음 |
 | `SENTRY_AUTH_TOKEN`(Sentry 조직 토큰) | [15-5](#15-5-끄기장애회전) |
 | Sentry DSN | [15-5](#15-5-끄기장애회전) |
+| AI 운영자 토큰 | [17-5](#17-5-회전) |
 
 ## 5. 최초 배포
 
@@ -189,7 +191,7 @@ SOPS_AGE_KEY_CMD='security find-generic-password -s crelink-sops-age -a operator
 4. 서버에서 edge와 첫 색을 띄웁니다: `ssh home-server` → `ls -t /opt/crelink/releases | head -n 1`로 방금 풀린 릴리스 SHA를 확인하고 `sudo /opt/crelink/releases/<SHA>/cutover.sh --dry-run <SHA> <API SHA> <웹 SHA>`(셋 다 그 커밋 SHA) → 점검이 모두 `ok`·`info`면 `--dry-run`을 빼고 실행합니다. 옛 스택이 없으므로 공백 단계는 건너뜁니다([14-3](#14-3-cutover-실행)과 같은 스크립트). 헬스 실패면 blue를 내리고 종료 1이므로 [6](#6-운영-확인)의 로그로 원인(대개 비밀값·DB 접속)을 고쳐 다시 실행합니다.
 5. 실패한 Deploy 실행을 **Re-run failed jobs**로 다시 돌립니다. 같은 릴리스가 green으로 한 번 더 배포되고(무중단) `운영 주소 검사`와 배포 기록 태그가 이어집니다. 이후에는 main 머지(push) 때 자동입니다.
 6. GeoIP를 넣습니다([8](#8-geoip)).
-7. 확인: 배포 job의 `운영 주소 검사` 단계 결과(검사 10개 ok, 0085부터 배너 클릭 `/b/`·`/a/` 포함), 구글 로그인, 단축 주소 생성·방문, 링크 클릭 기록의 IP가 내 공인 IP인지(Caddy·cloudflared 주소가 아닌지).
+7. 확인: 배포 job의 `운영 주소 검사` 단계 결과(검사 11개 ok, 0085부터 배너 클릭 `/b/`·`/a/`, 0107부터 AI 토큰 경로 `/api/agent` 401 포함), 구글 로그인, 단축 주소 생성·방문, 링크 클릭 기록의 IP가 내 공인 IP인지(Caddy·cloudflared 주소가 아닌지).
 
 ## 6. 운영 확인
 
@@ -541,7 +543,7 @@ sudo /opt/crelink/releases/$R/cutover.sh $R              # root면 deploy로 다
 
 ```bash
 ssh home-server
-sudo -u deploy /opt/crelink/current/verify.sh            # 검사 10개 ok (Actions의 운영 주소 검사와 같음)
+sudo -u deploy /opt/crelink/current/verify.sh            # 검사 11개 ok (Actions의 운영 주소 검사와 같음)
 cat /opt/crelink/state/active-color                      # blue
 column -t -s $'\t' /opt/crelink/state/releases.log | tail -n 2   # 마지막 줄: deploy <L> <R> <같은 이미지>
 sudo docker ps -a --format '{{.Names}}\t{{.Status}}' | grep crelink-   # crelink-edge-caddy-1·crelink-blue-api-1·crelink-blue-web-1 Up, crelink-prod-* 없음
@@ -686,6 +688,76 @@ GitHub Actions 사용량 한도 초과·장애로 `.github/workflows/deploy.yml`
 4. 확인: 스크립트 출력의 `완료` 줄, `ssh home-server 'sudo -u deploy env SSH_ORIGINAL_COMMAND=status /usr/local/lib/crelink/ssh-entry.sh'`.
 
 주의: 이렇게 만든 이미지는 그 서버에만 있습니다. GitHub Actions의 롤백(`rollback.yml`, GHCR pull)이나 다른 대상 배포는 이 이미지를 받을 수 없으니, Actions가 돌아오면 `deploy.yml`을 `force`로 한 번 실행해 GHCR 이미지를 다시 만듭니다. 서버 롤백(`rollback.sh`)은 서버에 남은 이미지로 됩니다(이미지는 지우지 않음).
+
+## 17. AI 운영자 토큰
+
+AI 운영자([헌장](../../docs/ops/ai-operator.md), [ADR 0015](../../docs/adr/0015-ai-operator.md))가 운영 API를 부를 때 쓰는 토큰입니다. 사람 로그인이나 HTTP 발급 경로는 없고, 활성 색 API 컨테이너 안의 CLI로만 발급합니다. 명령·출력 형식의 원본은 [AI 운영자 설계 `CLI(토큰 발급)`](../../docs/specs/crelink-ai-operator.md#cli토큰-발급)와 `apps/api/src/cli/ai-operator.ts`입니다.
+
+- 토큰 원문은 발급 때 CLI 표준 출력에 한 줄로 한 번만 나옵니다. 아래 명령은 그 출력을 SSH 파이프로 받아 운영자 Mac 파일에 바로 쓰므로 **화면·셸 기록·서버 디스크에 남지 않습니다**(`docker exec`에 `-t`가 없어 출력이 컨테이너 로그에도 가지 않음). DB에는 SHA-256 해시와 앞 12자(`prefix`, 화면에서 구별용)만 저장됩니다.
+- 토큰을 이 문서·저장소·채팅·작업 로그·AI 실행 기록에 붙여 넣지 않습니다. 샜다고 의심되면 [17-6](#17-6-실패유출-처리)으로 바로 폐기합니다.
+- 토큰 위치는 운영자 Mac `~/.config/crelink/ai-operator.env`(권한 600) 하나뿐입니다. SOPS 암호문·CI·GitHub secret·비밀번호 관리자에 넣지 않습니다(잃어버리면 새로 발급). 근거는 [환경과 비밀값 관리](../../docs/development/environment-secrets.md#ai-운영자-토큰).
+- CLI는 DB 연결 1개(`max: 1`)만 쓰므로 [12](#12-supabase-주의사항)의 pool 여유(관리 접속 몫) 안입니다. 행동은 `operator_actions`에 행위자 `system`으로 남습니다(`ai_operator.token_issue`·`ai_operator.token_revoke`, 원문·해시 없음).
+
+### 17-1. 선행
+
+- migration `0004_ai_operator`와 CLI가 들어간 릴리스가 활성 색에 배포돼 있어야 합니다(Deploy 성공, [6](#6-운영-확인)). 테이블이 없으면 CLI가 "0004가 적용된 API를 먼저 배포" 안내와 함께 종료 1이고 아무것도 만들지 않습니다.
+- 운영자 Mac에서 `ssh home-server`가 되고 그 계정이 비밀번호 없이 `sudo`를 쓸 수 있어야 합니다(`sudo -n`은 비밀번호가 필요하면 기다리지 않고 실패합니다).
+- 아래 명령은 모두 운영자 Mac에서 실행합니다(zsh·bash). 서버의 활성 색은 `state/active-color`에서 그때 읽습니다.
+- 이 SSH·`sudo` 자격은 사람 운영자의 것입니다. AI 운영자(Orca 자동화)가 같은 macOS 사용자로 돌면 그 세션도 이 자격을 쓸 수 있으므로(ADR 0015 위험 수용), AI 세션은 이 절의 명령을 실행하지 않습니다(헌장 지킬 규칙 10). 권장: Orca 자동화를 SSH 키·`sudo`가 없는 별도 macOS 사용자로 돌리고 토큰 파일은 그 사용자 홈에 둡니다([헌장 `실행 환경 설치`](../../docs/ops/ai-operator.md#실행-환경-설치사람이-한-번) 6).
+
+### 17-2. 발급
+
+```bash
+(umask 077 && mkdir -p ~/.config/crelink && f=~/.config/crelink/ai-operator.env &&
+  t=$(ssh home-server 'sudo -n docker exec "crelink-$(cat /opt/crelink/state/active-color)-api-1" node apps/api/dist/cli/ai-operator.js issue-token --label operator-mac-2026-10') &&
+  printf '%s' "$t" | grep -Eqx 'crl_ai_[A-Za-z0-9_-]{43}' &&
+  printf 'CRELINK_AI_BASE_URL=https://links.shaul.kr/api/agent\nCRELINK_AI_TOKEN=%s\nCRELINK_AI_HOST=operator-mac\n' "$t" >"$f.new" &&
+  mv "$f.new" "$f" && echo "저장함: $f" || { rm -f "$f.new"; echo '실패: 17-6으로 남은 토큰을 확인합니다' >&2; false; })
+```
+
+- `--label`은 1~60자이고 화면·목록에서 토큰을 구별하는 이름입니다. 발급 연월을 붙여 회전 때 옛 토큰과 헷갈리지 않게 합니다(예: `operator-mac-2026-11`). AI 계정(`ai-operator@crelink.invalid`, `kind='ai'`·`role='operator'`)이 없으면 이 명령이 함께 만듭니다.
+- 출력이 토큰 형식(`^crl_ai_[A-Za-z0-9_-]{43}$`) 한 줄이 아니면 파일을 쓰지 않고 실패합니다. 파일은 `umask 077`로 600이 되고, 같은 폴더의 `.new`에 다 쓴 뒤 `mv`로 바꾸므로 중간에 실패해도 기존 파일은 그대로입니다. 토큰은 괄호 안 subshell 변수에만 있다가 사라지고 `printf`는 셸 내장이라 프로세스 목록에도 나오지 않습니다.
+- CLI 진단(계정 생성 여부 등)은 표준 오류로 화면에 나옵니다. 여기에는 토큰이 없습니다.
+
+### 17-3. 확인
+
+```bash
+ls -l ~/.config/crelink/ai-operator.env                 # -rw------- (600이 아니면 스크립트가 거부)
+node scripts/ai-operator.mjs precheck; echo "종료 $?"   # 저장소 checkout에서. 종료 0이면 준비 완료
+```
+
+- `precheck`는 토큰으로 `GET /api/agent/api/admin/ai-operator`를 부릅니다. 종료 1이면 출력 이유를 봅니다: 401은 토큰 문제(17-6), "Cloudflare에 차단"은 VPN·exit node를 끄고 집 회선으로, 멈춤·진행 중 실행은 토큰 문제가 아닙니다(멈춤이면 `paused` 실행 기록을 하나 남김).
+- 운영자 화면 `/admin/agent-runs`의 `AI 계정` 절에 새 토큰(label·prefix)이 보이고, `precheck` 뒤 마지막 사용 시각이 찹니다.
+
+### 17-4. 계정·목록·폐기
+
+같은 형식으로 명령만 바꿉니다. 출력에 토큰 원문은 없습니다.
+
+```bash
+cli() { ssh home-server "sudo -n docker exec \"crelink-\$(cat /opt/crelink/state/active-color)-api-1\" node apps/api/dist/cli/ai-operator.js $*"; }
+cli ensure-account                          # AI 계정(없을 때만 만듦)의 userId
+cli list-tokens | column -t -s $'\t'        # id·label·prefix·생성·마지막 사용·폐기(탭 구분)
+cli revoke-token <토큰 id>                   # 폐기(멱등). 그 토큰은 바로 401
+```
+
+- 폐기는 운영자 화면 `/admin/agent-runs` `AI 계정` 절의 `폐기` 버튼(사람 운영자만)으로도 됩니다. 행동 기록에는 화면은 사람, CLI는 `system`으로 남습니다.
+- 유효 토큰이 하나도 없으면 다음 30분 실행부터 `precheck`가 401로 종료 1이라 AI 운영자는 돌지 않습니다.
+
+### 17-5. 회전
+
+정기 회전이나 운영자 Mac 교체 때 새 토큰을 먼저 쓰고 옛 토큰을 나중에 폐기해 실행이 끊기지 않게 합니다.
+
+1. `cli list-tokens`로 지금 토큰의 id를 적어 둡니다.
+2. [17-2](#17-2-발급)를 새 `--label`(예: `operator-mac-2026-11`)로 실행합니다. 파일이 새 토큰으로 바뀝니다(옛 토큰은 아직 유효).
+3. [17-3](#17-3-확인)의 `precheck`가 종료 0인지 봅니다.
+4. 1의 옛 id를 `cli revoke-token <옛 id>` 또는 운영자 화면에서 폐기하고, `cli list-tokens`로 옛 토큰에 폐기 시각이 찍혔는지 봅니다.
+
+### 17-6. 실패·유출 처리
+
+- **발급 명령이 실패함**: 서버에서 토큰이 만들어진 뒤 실패했을 수 있습니다(SSH가 끊김, 형식 검사 실패 등). `cli list-tokens`로 방금 만든 label의 폐기되지 않은 토큰이 있으면 `cli revoke-token <id>`로 폐기하고 17-2를 다시 합니다. 파일은 바뀌지 않았으므로 기존 토큰은 그대로 씁니다.
+- **`sudo: a password is required`**: 17-1의 sudo 조건을 맞추거나 `ssh home-server`로 들어가 같은 `docker exec` 명령을 `sudo`로 실행하되, 그때는 토큰이 서버 터미널 화면에 나오므로 17-2 방식이 될 때까지 발급하지 않습니다.
+- **`precheck`가 401**: 파일의 토큰이 폐기됐거나 다른 환경 것입니다. `cli list-tokens`로 확인하고 17-2로 새로 발급합니다. 0004 이전 릴리스로 롤백한 동안에도 옛 API가 Bearer를 몰라 401이며, 이때는 토큰을 바꾸지 않고 다시 배포되기를 기다립니다.
+- **유출 의심**(파일이 다른 곳에 복사됨, 화면·채팅·로그에 나옴): 운영자 화면 또는 `cli revoke-token <id>`로 바로 폐기 → 17-2로 새로 발급 → `/admin/actions`(행위자 `AI`)에서 의심 시각 뒤 행동을 확인합니다. 먼저 멈춤 스위치를 켜 두면 진행 중 실행의 쓰기도 막힙니다([헌장 "멈추기와 복구"](../../docs/ops/ai-operator.md#멈추기와-복구)).
 
 ## 로컬 시험
 

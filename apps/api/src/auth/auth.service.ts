@@ -1,16 +1,16 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { CRELINK_LIMITS, RESERVED_SLUGS, SessionUser, UserRole } from '@crelink/shared';
-import type { PoolClient } from 'pg';
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { AccountKind, AI_TOKEN_PATTERN, COOKIE_NAMES, CRELINK_LIMITS, SessionUser, UserRole } from '@crelink/shared';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { AppConfig } from '../config.service';
 import { Database, isUniqueViolation } from '../database';
-import { apiError, insertWithRandomId } from '../common/http';
+import { apiError, readCookie } from '../common/http';
+import { setUserId } from '../monitoring/sentry';
+import type { AuthenticatedRequest, RequestActor } from './actor';
 import { GoogleClientConfig, GoogleOAuth, googleVerifyFailureReason, GoogleProfile } from './google-oauth';
+import { provisionAccount } from './provision';
+import { hashToken } from './token-hash';
 
-/** 세션 쿠키 원문 토큰을 DB에 저장할 값(SHA-256 hex)으로 바꿉니다. */
-export function hashSessionToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
-}
+type AccountRow = SessionUser & { kind: AccountKind };
 
 @Injectable()
 export class AuthService {
@@ -97,7 +97,12 @@ export class AuthService {
         );
         await client.query('UPDATE users SET email = $2, role = $3 WHERE id = $1', [userId, profile.email, role]);
       } else {
-        userId = await this.provision(client, profile, role);
+        // 첫 로그인: 계정(랜딩·단축 주소 포함) → 구글 신원. 한 트랜잭션입니다.
+        userId = await provisionAccount(client, { email: profile.email, role, kind: 'human' });
+        await client.query(
+          "INSERT INTO user_identities (user_id, provider, provider_subject, email) VALUES ($1, 'google', $2, $3)",
+          [userId, profile.subject, profile.email],
+        );
       }
       const user = await client.query<{ id: string; email: string; role: UserRole; suspended: boolean }>(
         'SELECT id, email, role, suspended_at IS NOT NULL AS suspended FROM users WHERE id = $1',
@@ -114,57 +119,69 @@ export class AuthService {
       const token = randomBytes(32).toString('base64url');
       await client.query(
         `INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + make_interval(days => $3))`,
-        [userId, hashSessionToken(token), CRELINK_LIMITS.sessionDays],
+        [userId, hashToken(token), CRELINK_LIMITS.sessionDays],
       );
       return { user: sessionUser, token };
     });
   }
 
-  /** 첫 로그인: users → user_identities → landings → landing_blocks(list) → short_links → short_slugs(자동). 한 트랜잭션입니다. */
-  private async provision(client: PoolClient, profile: GoogleProfile, role: UserRole): Promise<string> {
-    const user = await client.query<{ id: string }>('INSERT INTO users (email, role) VALUES ($1, $2) RETURNING id', [
-      profile.email,
-      role,
-    ]);
-    const userId = user.rows[0].id;
-    await client.query(
-      "INSERT INTO user_identities (user_id, provider, provider_subject, email) VALUES ($1, 'google', $2, $3)",
-      [userId, profile.subject, profile.email],
-    );
-    const landingId = await insertWithRandomId(CRELINK_LIMITS.landingPublicIdLength, async (publicId) => {
-      const landing = await client.query<{ id: string }>(
-        'INSERT INTO landings (user_id, public_id) VALUES ($1, $2) ON CONFLICT (public_id) DO NOTHING RETURNING id',
-        [userId, publicId],
-      );
-      return landing.rows[0]?.id;
-    });
-    await client.query("INSERT INTO landing_blocks (landing_id, type, position) VALUES ($1, 'list', 0)", [landingId]);
-    const shortLink = await client.query<{ id: string }>(
-      'INSERT INTO short_links (user_id, landing_id) VALUES ($1, $2) RETURNING id',
-      [userId, landingId],
-    );
-    await insertWithRandomId(CRELINK_LIMITS.autoSlugLength, async (slug) => {
-      if (RESERVED_SLUGS.includes(slug)) return undefined;
-      const inserted = await client.query(
-        'INSERT INTO short_slugs (slug, short_link_id, is_auto) VALUES ($1, $2, true) ON CONFLICT (slug) DO NOTHING',
-        [slug, shortLink.rows[0].id],
-      );
-      return inserted.rowCount ? slug : undefined;
-    });
-    return userId;
+  /**
+   * 세 가드(`SessionGuard`·`OperatorGuard`·`OptionalSessionGuard`)의 공용 인증. `request.sessionUser`·`request.actor`를 채우고
+   * Sentry 요청 user에 내부 ID를 넣습니다. 로그인 정보가 없거나 쿠키 세션이 무효면 null(가드가 401 또는 비회원으로 판단)입니다.
+   * `Authorization: Bearer`가 있으면 쿠키를 보지 않고 토큰으로만 인증하며, 형식 오류·없음·폐기·정지·AI 아닌 계정은 바로 401입니다.
+   */
+  async authenticateRequest(request: AuthenticatedRequest): Promise<RequestActor | null> {
+    const authorization = request.headers.authorization;
+    let account: AccountRow | null;
+    if (authorization && /^bearer(?:\s|$)/i.test(authorization)) {
+      const token = authorization.slice('bearer'.length).trim();
+      account = AI_TOKEN_PATTERN.test(token) ? await this.apiTokenAccount(token) : null;
+      if (!account) {
+        throw apiError(HttpStatus.UNAUTHORIZED, 'unauthenticated', 'API 토큰이 올바르지 않거나 폐기되었습니다.');
+      }
+    } else {
+      const token = readCookie(request, COOKIE_NAMES.session);
+      account = token ? await this.sessionAccount(token) : null;
+      if (!account) return null;
+    }
+    const { kind, ...user } = account;
+    request.sessionUser = user;
+    request.actor = { userId: user.id, email: user.email, kind, runId: null };
+    setUserId(user.id);
+    return request.actor;
   }
 
   /** 유효한 세션의 사용자. 만료·없는 세션이나 정지 사용자는 null입니다. */
-  async sessionUser(token: string): Promise<SessionUser | null> {
-    const result = await this.database.query<SessionUser>(
-      `SELECT u.id, u.email, u.role FROM sessions s JOIN users u ON u.id = s.user_id
+  private async sessionAccount(token: string): Promise<AccountRow | null> {
+    const result = await this.database.query<AccountRow>(
+      `SELECT u.id, u.email, u.role, u.kind FROM sessions s JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = $1 AND s.expires_at > now() AND u.suspended_at IS NULL`,
-      [hashSessionToken(token)],
+      [hashToken(token)],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  /**
+   * 폐기되지 않은 토큰의 정지되지 않은 AI 계정. 같은 문장에서 `last_used_at`을 1분에 한 번만 갱신합니다
+   * (`token_hash` UNIQUE 인덱스 조회 1회, 설계 `비기능 요구`).
+   */
+  private async apiTokenAccount(token: string): Promise<AccountRow | null> {
+    const result = await this.database.query<AccountRow>(
+      `WITH found AS (
+         SELECT t.id AS token_id, u.id, u.email, u.role, u.kind
+         FROM api_tokens t JOIN users u ON u.id = t.user_id
+         WHERE t.token_hash = $1 AND t.revoked_at IS NULL AND u.kind = 'ai' AND u.suspended_at IS NULL
+       ), touched AS (
+         UPDATE api_tokens t SET last_used_at = now() FROM found f
+         WHERE t.id = f.token_id AND (t.last_used_at IS NULL OR t.last_used_at < now() - interval '1 minute')
+       )
+       SELECT id, email, role, kind FROM found`,
+      [hashToken(token)],
     );
     return result.rows[0] ?? null;
   }
 
   async logout(token: string | null): Promise<void> {
-    if (token) await this.database.query('DELETE FROM sessions WHERE token_hash = $1', [hashSessionToken(token)]);
+    if (token) await this.database.query('DELETE FROM sessions WHERE token_hash = $1', [hashToken(token)]);
   }
 }

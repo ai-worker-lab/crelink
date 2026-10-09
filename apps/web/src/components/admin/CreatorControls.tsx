@@ -3,11 +3,13 @@
 import {
   CRELINK_API_PATHS,
   CRELINK_LIMITS,
+  type AccountKind,
   type BannerLimits,
   type OperatorCreatorDetail,
   type SetBannerSlotRequest,
   type SetExtraSlotsRequest,
   type SetLinkBlockRequest,
+  type SetMetricsExclusionRequest,
   type SetSuspensionRequest,
 } from '@crelink/shared';
 import { useRouter } from 'next/navigation';
@@ -86,14 +88,24 @@ export function ExtraSlotsForm({
 }
 
 /** 크리에이터 이용 정지·해제. 정지하면 로그인·편집이 막히고 랜딩·단축 주소가 안내로 바뀝니다. */
-export function SuspensionToggle({ userId, suspended }: { userId: string; suspended: boolean }) {
+export function SuspensionToggle({
+  userId,
+  suspended,
+  accountKind,
+}: {
+  userId: string;
+  suspended: boolean;
+  accountKind: AccountKind;
+}) {
   const router = useRouter();
   const { pending, error, notice, run } = useAction();
 
   async function toggle() {
     const next = !suspended;
     const question = next
-      ? '이 크리에이터를 정지할까요? 로그인·편집이 막히고 랜딩페이지와 단축 주소는 안내 화면으로 바뀌어요.'
+      ? accountKind === 'ai'
+        ? '이 AI 계정을 정지할까요? AI 토큰 인증도 막힙니다. 다음 실행부터 운영 API를 쓸 수 없어요.'
+        : '이 크리에이터를 정지할까요? 로그인·편집이 막히고 랜딩페이지와 단축 주소는 안내 화면으로 바뀌어요.'
       : '이 크리에이터의 정지를 풀까요?';
     if (!window.confirm(question)) return;
     const payload: SetSuspensionRequest = { suspended: next };
@@ -123,6 +135,63 @@ export function SuspensionToggle({ userId, suspended }: { userId: string; suspen
         {pending ? '처리 중…' : suspended ? '정지 풀기' : '이용 정지'}
       </button>
       <ActionStatus error={error} notice={notice} />
+    </div>
+  );
+}
+
+/**
+ * 지표 제외 켜기·끄기(PRD `목표`, R23 ⑧, 사람 운영자만). 시험 계정을 실사용자 지표에서 뺍니다.
+ * AI 계정은 원래 지표에 들지 않아 조작 대신 안내만 둡니다.
+ */
+export function MetricsExclusionToggle({
+  userId,
+  accountKind,
+  metricsExcluded,
+}: {
+  userId: string;
+  accountKind: AccountKind;
+  metricsExcluded: boolean;
+}) {
+  const router = useRouter();
+  const headingId = useId();
+  const { pending, error, notice, run } = useAction();
+
+  async function toggle() {
+    const next = !metricsExcluded;
+    const question = next
+      ? '이 계정을 지표에서 뺄까요? 실사용자·가입·방문·클릭 지표에 들지 않아요.'
+      : '이 계정을 다시 지표에 넣을까요?';
+    if (!window.confirm(question)) return;
+    const payload: SetMetricsExclusionRequest = { excluded: next };
+    await run(
+      async () => {
+        await browserApi<OperatorCreatorDetail>(CRELINK_API_PATHS.adminCreatorMetricsExclusion(userId), {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        });
+        router.refresh();
+      },
+      next ? '지표에서 뺐어요.' : '지표에 다시 넣었어요.',
+    );
+  }
+
+  return (
+    <div className="subform" role="group" aria-labelledby={headingId}>
+      <h3 id={headingId}>지표 제외</h3>
+      {accountKind === 'ai' ? (
+        <p className="section-help">AI 계정은 지표에 들어가지 않아요.</p>
+      ) : (
+        <>
+          <p className="section-help">
+            현재: <strong>{metricsExcluded ? '지표에서 뺌' : '지표에 넣음'}</strong> — 시험 계정은 빼 두면 실사용자
+            지표가 정확해요.
+          </p>
+          <button type="button" className="secondary" onClick={toggle} disabled={pending}>
+            {pending ? '처리 중…' : metricsExcluded ? '지표에 다시 넣기' : '지표에서 빼기'}
+          </button>
+          <ActionStatus error={error} notice={notice} />
+        </>
+      )}
     </div>
   );
 }

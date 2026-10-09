@@ -35,6 +35,12 @@ export interface LinkRow {
 export const LINK_COLUMNS =
   'id, title, url, host, description, thumbnail_file_id, hidden, blocked_at IS NOT NULL AS blocked, blocked_reason, position';
 
+/**
+ * 방문자에게 보이는 링크(숨기지 않았고 운영자가 차단하지 않음). links 별칭은 `l`이어야 합니다.
+ * 공개 랜딩·관리 상태(한도)·단축 주소 클릭·운영자 지표(실사용자)가 함께 씁니다. 차단 도메인은 쓸 때 `blocked_at`에 반영됩니다.
+ */
+export const VISIBLE_LINK_CONDITION = 'NOT l.hidden AND l.blocked_at IS NULL';
+
 export interface PortfolioRow {
   id: string;
   title: string;
@@ -178,7 +184,7 @@ export class CreatorService {
     const result = await db.query<{ extra_link_slots: number; event_bonus: number; visible: number; total: number }>(
       `SELECT u.extra_link_slots,
               (SELECT coalesce(sum(e.bonus_links), 0)::int FROM slot_event_entries e WHERE e.user_id = u.id) AS event_bonus,
-              count(l.id) FILTER (WHERE NOT l.hidden AND l.blocked_at IS NULL)::int AS visible,
+              count(l.id) FILTER (WHERE ${VISIBLE_LINK_CONDITION})::int AS visible,
               count(l.id)::int AS total
        FROM users u LEFT JOIN links l ON l.user_id = u.id
        WHERE u.id = $1 GROUP BY u.id`,

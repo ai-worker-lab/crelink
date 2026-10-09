@@ -12,7 +12,7 @@ import { Database } from '../database';
 import { FilesService } from '../files/files.service';
 import { LandingPassService } from '../short-link/landing-pass.service';
 import { TrackingService } from '../short-link/tracking.service';
-import { BannerImageRow, CreatorService } from './creator.service';
+import { BannerImageRow, CreatorService, VISIBLE_LINK_CONDITION } from './creator.service';
 
 /**
  * 방문자가 보는 공개 랜딩(R3, R5, R7, R12, R20, R21). 숨긴 링크와 차단된 링크는 빼고 내려 줍니다.
@@ -54,9 +54,9 @@ export class PublicLandingController {
         position: number;
         visible: boolean;
       }>(
-        `SELECT block_id, public_id, title, description, thumbnail_file_id, host, position,
-                NOT hidden AND blocked_at IS NULL AS visible
-         FROM links WHERE user_id = $1 ORDER BY position, created_at`,
+        `SELECT l.block_id, l.public_id, l.title, l.description, l.thumbnail_file_id, l.host, l.position,
+                ${VISIBLE_LINK_CONDITION} AS visible
+         FROM links l WHERE l.user_id = $1 ORDER BY l.position, l.created_at`,
         [landing.user_id],
       ),
       this.creator.socials(db, landing.id),

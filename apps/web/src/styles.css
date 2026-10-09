@@ -345,6 +345,20 @@ textarea.input {
   background: var(--ds-color-status-danger-subtle);
   color: var(--ds-color-status-danger);
 }
+.badge-positive {
+  border-color: var(--ds-color-status-positive);
+  background: var(--ds-color-status-positive-subtle);
+  color: var(--ds-color-status-positive);
+}
+.badge-warning {
+  border-color: var(--ds-color-status-warning);
+  background: var(--ds-color-status-warning-subtle);
+  color: var(--ds-color-status-warning);
+}
+.badge-muted {
+  border-color: var(--ds-color-border-default);
+  color: var(--ds-color-text-subtle);
+}
 .url-text {
   font-family: var(--ds-font-mono);
   font-size: var(--ds-font-size-14);
@@ -742,6 +756,91 @@ textarea.input {
 .data-table.compact :is(th, td) {
   padding: var(--ds-space-4) var(--ds-space-8);
 }
+/*
+ * 쌓는 표: 넓은 화면은 표, 700px 이하는 행마다 카드(머리줄은 화면 낭독기에만, 칸은 한 줄씩). 운영자 광고 배너 표와 운영 기록 표가 함께 쓴다.
+ * 표에 `data-table is-stacked`, 감싸는 `table-scroll is-stacked`를 둔다. 칸 규칙은 `:where`로 낮춰 화면별 칸 클래스가 덮어쓸 수 있게 한다.
+ * `.stacked-label`은 카드에서만 보이는 칸 이름표(넓은 화면은 머리줄이 있어 숨김).
+ */
+.stacked-label {
+  display: none;
+}
+@media (max-width: 700px) {
+  .table-scroll.is-stacked {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+  .data-table.is-stacked,
+  .data-table.is-stacked tbody,
+  .data-table.is-stacked tr,
+  .data-table.is-stacked :where(th, td) {
+    display: block;
+  }
+  .data-table.is-stacked thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+  }
+  .data-table.is-stacked tbody {
+    display: grid;
+    gap: var(--ds-space-12);
+  }
+  .data-table.is-stacked tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ds-space-6) var(--ds-space-8);
+    padding: var(--ds-space-16);
+    border: 1px solid var(--ds-color-border-default);
+    border-radius: var(--ds-corner-lg);
+    background: var(--ds-color-surface-default);
+    box-shadow: var(--card-shadow);
+  }
+  .data-table.is-stacked :where(th, td) {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: none;
+    padding: 0;
+    border: 0;
+  }
+  .stacked-label {
+    display: inline;
+  }
+}
+/* 걸러보기 칩(운영자 광고 배너 상태 버튼, 운영 기록 행위자 링크). 고른 칩은 `aria-pressed="true"`. */
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-8);
+  margin-bottom: var(--ds-space-12);
+}
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-6);
+  min-height: 44px;
+  padding: var(--ds-space-8) var(--ds-space-16);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-full);
+  background: var(--ds-color-surface-default);
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-14);
+  font-weight: var(--ds-font-weight-bold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.filter-chip:hover {
+  border-color: var(--ds-color-text-primary);
+  text-decoration: none;
+}
+.filter-chip[aria-pressed='true'] {
+  border-color: var(--ds-color-action-primary);
+  background: var(--ds-color-action-primary);
+  color: var(--ds-color-text-on-action);
+}
 .pagination {
   display: flex;
   align-items: center;
@@ -820,6 +919,145 @@ textarea.input {
 }
 .block-control > button {
   align-self: flex-start;
+}
+
+/*
+ * AI 운영자 화면(`/admin/agent-runs`·`/admin/agent-runs/[runId]`·`/admin/actions`, 설계 docs/specs/crelink-ai-operator.md `화면 상태와 API 대응`).
+ * 실행 목록은 모든 폭에서 `<details>` 카드, 운영 기록은 공용 쌓는 표(`.data-table.is-stacked`)다.
+ */
+.run-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.run-card {
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-md);
+  background: var(--ds-color-background-screen);
+}
+.run-card > summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-6);
+  min-height: 44px;
+  padding: var(--ds-space-12) var(--ds-space-16);
+  cursor: pointer;
+}
+.run-card[open] > summary {
+  border-bottom: 1px solid var(--ds-color-border-default);
+}
+.run-card > :not(summary) {
+  margin: var(--ds-space-12) var(--ds-space-16);
+}
+.run-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-6) var(--ds-space-12);
+  margin: 0;
+  font-size: var(--ds-font-size-14);
+}
+.run-card-duration {
+  color: var(--ds-color-text-subtle);
+}
+.run-card-summary,
+.run-summary-text {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+.run-card-link {
+  font-size: var(--ds-font-size-14);
+}
+.run-body h3 {
+  margin: var(--ds-space-16) 0 var(--ds-space-6);
+}
+.run-body h3:first-child {
+  margin-top: 0;
+}
+.run-summary-text + .run-body {
+  margin-top: var(--ds-space-16);
+}
+.run-text-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+  margin: 0;
+  padding-left: var(--ds-space-20);
+  font-size: var(--ds-font-size-14);
+  overflow-wrap: anywhere;
+}
+.run-current-title {
+  margin: var(--ds-space-20) 0 var(--ds-space-8);
+}
+.run-current {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-6);
+  padding: var(--ds-space-12) var(--ds-space-16);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-md);
+}
+.run-current.is-stale {
+  border-color: var(--ds-color-status-warning);
+}
+.run-current > p {
+  margin: 0;
+}
+.metric-time {
+  margin-top: var(--ds-space-12);
+}
+.ai-account {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-8);
+}
+.ai-account + .ai-account {
+  margin-top: var(--ds-space-24);
+}
+.token-revoke {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ds-space-8);
+}
+.action-table .action-col-time {
+  white-space: nowrap;
+}
+.action-table tbody th.action-col-name {
+  font-weight: var(--ds-font-weight-bold);
+}
+.action-target-id {
+  font-size: var(--ds-font-size-13);
+}
+.action-values {
+  display: grid;
+  gap: var(--ds-space-4);
+  min-width: 160px;
+  margin: 0;
+}
+.action-values > div {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--ds-space-8);
+}
+.action-values dt {
+  color: var(--ds-color-text-subtle);
+}
+.action-values dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .action-table .action-col-time {
+    color: var(--ds-color-text-subtle);
+  }
+  .action-values {
+    min-width: 0;
+  }
 }
 
 /* ---------- 공개 화면 ---------- */
@@ -2606,8 +2844,8 @@ body:has(.sheet[open]) {
 
 /*
  * 운영자 광고 배너(`/admin/ad-banners`, `AdBanners.tsx`·`AdBannerDialog.tsx`, 디자인 design/ad-banner-block/handoff.md `광고 배너`).
- * 넓은 화면은 표(손잡이 · 썸네일 120×40 · 대체 문구 · URL · 기간 · 상태 · 노출 · 클릭 · 행동)이고, 700px 이하는 같은 표를 카드로 그린다
- * (노출·클릭은 `노출 n · 클릭 n` 한 줄). 대화상자는 넓은 화면에서 가운데 최대 560, 700px 이하는 하단 시트(`.sheet`).
+ * 넓은 화면은 표(손잡이 · 썸네일 120×40 · 대체 문구 · URL · 기간 · 상태 · 노출 · 클릭 · 행동)이고, 700px 이하는 같은 표를 공용 쌓는 표
+ * (`.data-table.is-stacked`) 카드로 그린다(노출·클릭은 `노출 n · 클릭 n` 한 줄). 대화상자는 넓은 화면에서 가운데 최대 560, 700px 이하는 하단 시트(`.sheet`).
  */
 .ad-banners-head {
   display: flex;
@@ -2629,34 +2867,6 @@ body:has(.sheet[open]) {
 }
 .ad-banners-warning {
   margin-bottom: var(--ds-space-16);
-}
-.ad-banners-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ds-space-8);
-  margin-bottom: var(--ds-space-12);
-}
-.ad-banners-filter {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ds-space-6);
-  min-height: 44px;
-  padding: var(--ds-space-8) var(--ds-space-16);
-  border: 1px solid var(--ds-color-border-default);
-  border-radius: var(--ds-corner-full);
-  background: var(--ds-color-surface-default);
-  color: var(--ds-color-text-secondary);
-  font-size: var(--ds-font-size-14);
-  font-weight: var(--ds-font-weight-bold);
-  white-space: nowrap;
-}
-.ad-banners-filter:hover {
-  border-color: var(--ds-color-text-primary);
-}
-.ad-banners-filter[aria-pressed='true'] {
-  border-color: var(--ds-color-action-primary);
-  background: var(--ds-color-action-primary);
-  color: var(--ds-color-text-on-action);
 }
 .ad-banners-count {
   font-family: var(--ds-font-mono);
@@ -2693,23 +2903,6 @@ body:has(.sheet[open]) {
 }
 .ad-status {
   white-space: nowrap;
-}
-.ad-status-live {
-  border-color: var(--ds-color-status-positive);
-  background: var(--ds-color-status-positive-subtle);
-  color: var(--ds-color-status-positive);
-}
-.ad-status-scheduled {
-  border-color: var(--ds-color-status-warning);
-  background: var(--ds-color-status-warning-subtle);
-  color: var(--ds-color-status-warning);
-}
-.ad-status-ended {
-  border-color: var(--ds-color-border-default);
-  color: var(--ds-color-text-subtle);
-}
-.ad-stat-label {
-  display: none;
 }
 .ad-banner-actions {
   display: flex;
@@ -2770,48 +2963,6 @@ body:has(.sheet[open]) {
   }
 }
 @media (max-width: 700px) {
-  .ad-banners-table-wrap {
-    overflow: visible;
-    border: 0;
-    background: transparent;
-  }
-  .ad-banners-table,
-  .ad-banners-table tbody,
-  .ad-banners-table tr,
-  .ad-banners-table :is(th, td) {
-    display: block;
-  }
-  .ad-banners-table thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    clip-path: inset(50%);
-  }
-  .ad-banners-table tbody {
-    display: grid;
-    gap: var(--ds-space-12);
-  }
-  /* 카드: 첫 줄은 손잡이(전체 걸러보기) · 썸네일, 그 아래 칸은 한 줄씩. 노출·클릭 두 칸만 같은 줄(`노출 1,240 · 클릭 38`). */
-  .ad-banners-table tr {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--ds-space-6) var(--ds-space-8);
-    padding: var(--ds-space-16);
-    border: 1px solid var(--ds-color-border-default);
-    border-radius: var(--ds-corner-lg);
-    background: var(--ds-color-surface-default);
-    box-shadow: var(--card-shadow);
-  }
-  .ad-banners-table :is(th, td) {
-    flex: 1 1 100%;
-    min-width: 0;
-    max-width: none;
-    padding: 0;
-    border: 0;
-  }
   .ad-banners-table .ad-col-handle {
     flex: none;
     width: auto;
@@ -2837,9 +2988,6 @@ body:has(.sheet[open]) {
   .ad-banners-table .ad-col-clicks::before {
     content: '·';
     margin-right: var(--ds-space-8);
-  }
-  .ad-stat-label {
-    display: inline;
   }
   .ad-banner-actions {
     justify-content: flex-start;
@@ -2927,11 +3075,6 @@ body:has(.sheet[open]) {
 .sheet-body > :is(.event-offer, .event-status, .event-result) {
   margin: var(--ds-space-12) 0;
 }
-.badge-positive {
-  border-color: var(--ds-color-status-positive);
-  background: var(--ds-color-status-positive-subtle);
-  color: var(--ds-color-status-positive);
-}
 
 /* 링크 슬롯 이벤트 — 홈·운영자 (0123·0124) */
 /* 홈 이벤트 안내(대표 설명 아래, 시작 버튼 위). 설명 문단과 같은 최대 폭 540. design/slot-event/handoff.md `홈 /`. */
@@ -2970,7 +3113,7 @@ body:has(.sheet[open]) {
 .home-event > .secondary {
   margin-top: var(--ds-space-6);
 }
-/* 운영자 `/admin/slot-event`. 상태 배지·기간 두 칸·표·쪽 넘김은 광고 배너·크리에이터 목록 규칙(`ad-status-*`, `ad-banner-period`, `data-table`, `pagination`)을 그대로 씁니다. */
+/* 운영자 `/admin/slot-event`. 상태 배지·기간 두 칸·표·쪽 넘김은 광고 배너·크리에이터 목록 규칙(`badge-positive`·`badge-warning`·`badge-muted`, `ad-status`, `ad-banner-period`, `data-table`, `pagination`)을 그대로 씁니다. */
 .slot-event-head .section-help {
   margin-bottom: var(--ds-space-16);
 }

@@ -4,6 +4,7 @@ import type { PoolClient } from 'pg';
 import { Database, Queryable } from '../database';
 import { apiError, insertWithRandomId, UUID_PATTERN } from '../common/http';
 import { bodyObject, orderedIds, parseHttpUrl, requiredText, zonedTime } from '../common/input';
+import { changedFields, OperatorActor, recordOperatorAction } from '../ai-operator/audit';
 import { CreatorService } from '../creator/creator.service';
 import { FilesService } from '../files/files.service';
 
@@ -48,10 +49,44 @@ interface AdBannerRow {
 interface StoredBanner {
   image_file_id: string;
   still_file_id: string | null;
+  alt: string;
+  url: string;
   host: string;
   starts_at: Date;
   ends_at: Date | null;
   ended: boolean;
+}
+
+/** 행동 기록 `ad_banner.*`의 전후 값에 쓰는 필드(이미지 id·대체 문구·URL·기간). 순서는 `ad_banner.reorder`가 따로 남깁니다. */
+interface AdBannerFields extends Record<string, unknown> {
+  imageFileId: string;
+  stillImageFileId: string | null;
+  alt: string;
+  url: string;
+  startsAt: string;
+  endsAt: string | null;
+}
+
+function storedFields(row: StoredBanner): AdBannerFields {
+  return {
+    imageFileId: row.image_file_id,
+    stillImageFileId: row.still_file_id,
+    alt: row.alt,
+    url: row.url,
+    startsAt: row.starts_at.toISOString(),
+    endsAt: row.ends_at?.toISOString() ?? null,
+  };
+}
+
+function viewFields(view: AdBannerView): AdBannerFields {
+  return {
+    imageFileId: view.image.fileId,
+    stillImageFileId: view.stillImage?.fileId ?? null,
+    alt: view.alt,
+    url: view.url,
+    startsAt: view.startsAt,
+    endsAt: view.endsAt,
+  };
 }
 
 function bannerUrl(value: unknown): { url: string; host: string } {
@@ -110,7 +145,7 @@ export class AdBannersService {
   private async stored(client: PoolClient, id: string): Promise<StoredBanner> {
     const found = UUID_PATTERN.test(id)
       ? await client.query<StoredBanner>(
-          `SELECT image_file_id, still_file_id, host, starts_at, ends_at,
+          `SELECT image_file_id, still_file_id, alt, url, host, starts_at, ends_at,
                   ends_at IS NOT NULL AND ends_at <= now() AS ended
            FROM ad_banners WHERE id = $1 FOR UPDATE`,
           [id],
@@ -186,7 +221,7 @@ export class AdBannersService {
   }
 
   /** `POST /api/admin/ad-banners`: 맨 뒤 순서(`coalesce(max(sort_order) + 1, 0)`)로 등록합니다. */
-  async create(operatorId: string, body: unknown): Promise<AdBannerView> {
+  async create(actor: OperatorActor, body: unknown): Promise<AdBannerView> {
     const input = bodyObject(body);
     const alt = requiredText(input.alt, '대체 문구', CRELINK_LIMITS.bannerAltMax);
     const { url, host } = bannerUrl(input.url);
@@ -205,11 +240,18 @@ export class AdBannersService {
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, (SELECT coalesce(max(sort_order) + 1, 0) FROM ad_banners), $9)
            ON CONFLICT (public_id) DO NOTHING
            RETURNING id`,
-          [publicId, imageId, stillId, alt, url, host, startsAt.text, endsAt?.text ?? null, operatorId],
+          [publicId, imageId, stillId, alt, url, host, startsAt.text, endsAt?.text ?? null, actor.userId],
         );
         return inserted.rows[0]?.id;
       });
-      return this.one(client, id);
+      const view = await this.one(client, id);
+      await recordOperatorAction(client, actor, {
+        action: 'ad_banner.create',
+        targetType: 'ad_banner',
+        targetId: id,
+        after: viewFields(view),
+      });
+      return view;
     });
   }
 
@@ -217,7 +259,7 @@ export class AdBannersService {
    * `PATCH /api/admin/ad-banners/{id}`: 바뀐 필드만. 다른 운영자가 등록한 배너도 고칠 수 있습니다.
    * 결과가 게시 중·예약이면 저장된(또는 새) 호스트를 차단 도메인으로 다시 검사합니다(차단으로 내려간 배너를 기간만 고쳐 다시 여는 길을 막음).
    */
-  async update(id: string, body: unknown): Promise<AdBannerView> {
+  async update(actor: OperatorActor, id: string, body: unknown): Promise<AdBannerView> {
     const input = bodyObject(body);
     const changes: Record<string, unknown> = {};
     if (input.alt !== undefined) changes.alt = requiredText(input.alt, '대체 문구', CRELINK_LIMITS.bannerAltMax);
@@ -259,29 +301,37 @@ export class AdBannersService {
       }
 
       const columns = Object.keys(changes);
-      if (!columns.length) return this.one(client, id);
-      // 결과가 게시 중·예약(끝이 없거나 지금보다 뒤)이면 최종 호스트를 다시 검사합니다.
-      const host = typeof changes.host === 'string' ? changes.host : existing.host;
-      const finalEnds = 'ends_at' in changes ? changes.ends_at : existing.ends_at;
-      const open = await client.query<{ open: boolean }>(
-        'SELECT $1::timestamptz IS NULL OR $1::timestamptz > now() AS open',
-        [finalEnds],
-      );
-      if (open.rows[0].open) await this.assertDomainAllowed(client, host);
-      await client.query(
-        `UPDATE ad_banners SET ${[...columns.map((column, index) => `${column} = $${index + 2}`), 'updated_at = now()'].join(', ')}
-         WHERE id = $1`,
-        [id, ...columns.map((column) => changes[column])],
-      );
-      return this.one(client, id);
+      if (columns.length) {
+        // 결과가 게시 중·예약(끝이 없거나 지금보다 뒤)이면 최종 호스트를 다시 검사합니다.
+        const host = typeof changes.host === 'string' ? changes.host : existing.host;
+        const finalEnds = 'ends_at' in changes ? changes.ends_at : existing.ends_at;
+        const open = await client.query<{ open: boolean }>(
+          'SELECT $1::timestamptz IS NULL OR $1::timestamptz > now() AS open',
+          [finalEnds],
+        );
+        if (open.rows[0].open) await this.assertDomainAllowed(client, host);
+        await client.query(
+          `UPDATE ad_banners SET ${[...columns.map((column, index) => `${column} = $${index + 2}`), 'updated_at = now()'].join(', ')}
+           WHERE id = $1`,
+          [id, ...columns.map((column) => changes[column])],
+        );
+      }
+      const view = await this.one(client, id);
+      await recordOperatorAction(client, actor, {
+        action: 'ad_banner.update',
+        targetType: 'ad_banner',
+        targetId: id,
+        ...changedFields(storedFields(existing), viewFields(view)),
+      });
+      return view;
     });
   }
 
   /**
    * `PUT /api/admin/ad-banners/{id}/end`: 게시 끝을 지금으로(이미 더 이르면 그대로), 예약 배너는 시작도 지금으로 당겨 CHECK를 지킵니다.
-   * 이미 끝난 배너는 바꾸지 않고 그대로 돌려줍니다(멱등).
+   * 이미 끝난 배너는 바꾸지 않고 그대로 돌려줍니다(멱등, 행동 기록은 남김).
    */
-  async end(id: string): Promise<AdBannerView> {
+  async end(actor: OperatorActor, id: string): Promise<AdBannerView> {
     return this.database.transaction(async (client) => {
       await this.lock(client);
       const existing = await this.stored(client, id);
@@ -293,25 +343,38 @@ export class AdBannersService {
           [id],
         );
       }
-      return this.one(client, id);
+      const view = await this.one(client, id);
+      await recordOperatorAction(client, actor, {
+        action: 'ad_banner.end',
+        targetType: 'ad_banner',
+        targetId: id,
+        before: { startsAt: existing.starts_at.toISOString(), endsAt: existing.ends_at?.toISOString() ?? null },
+        after: { startsAt: view.startsAt, endsAt: view.endsAt },
+      });
+      return view;
     });
   }
 
   /** `PUT /api/admin/ad-banners/order`: 잠금 뒤 전체 id를 검사(400 `order_mismatch`)하고 0..n-1로 다시 매깁니다. */
-  async reorder(body: unknown): Promise<AdBannerView[]> {
+  async reorder(actor: OperatorActor, body: unknown): Promise<AdBannerView[]> {
     return this.database.transaction(async (client) => {
       await this.lock(client);
-      const current = await client.query<{ id: string }>('SELECT id FROM ad_banners');
-      const ids = orderedIds(
-        body,
-        current.rows.map((row) => row.id),
-      );
+      const current = await client.query<{ id: string }>(`SELECT b.id FROM ad_banners b ${AD_BANNER_ORDER}`);
+      const before = current.rows.map((row) => row.id);
+      const ids = orderedIds(body, before);
       await client.query(
         `UPDATE ad_banners b SET sort_order = o.ordinality - 1, updated_at = now()
          FROM unnest($1::uuid[]) WITH ORDINALITY AS o(id, ordinality)
          WHERE b.id = o.id AND b.sort_order IS DISTINCT FROM o.ordinality - 1`,
         [ids],
       );
+      await recordOperatorAction(client, actor, {
+        action: 'ad_banner.reorder',
+        targetType: 'ad_banner',
+        targetId: null,
+        before: { order: before },
+        after: { order: ids },
+      });
       return (await this.list(client)).items;
     });
   }

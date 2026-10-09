@@ -30,6 +30,8 @@ for _ in $(seq 12); do [[ "$(code "$web/")" == 200 ]] && break; sleep 5; done
 check "웹 /" 200 "$(code "$web/")"
 check "웹 /privacy" 200 "$(code "$web/privacy")"
 check "웹 BFF health" 200 "$(code "$web/api/backend/api/health")"
+# AI 운영자 토큰 경로(docs/specs/crelink-ai-operator.md `웹 토큰 경로`): Bearer 없으면 웹이 API에 넘기지 않고 401.
+check "웹 AI 토큰 경로 토큰 없음 401" 401 "$(code "$web/api/agent/api/health")"
 check "단축 없는 주소 302" 302 "$(code "$short/zzz-e2e-none")"
 check "단축 → notice" "$web/notice?reason=link_not_found" "$(curl -s -o /dev/null --max-time 20 -w '%{redirect_url}' "$short/zzz-e2e-none")"
 # 광고·크리에이터 배너 클릭 경로(docs/specs/crelink-ad-banner.md `클릭`): Caddy가 API로 넘기고 없는 배너는 link_unavailable 안내로 302.

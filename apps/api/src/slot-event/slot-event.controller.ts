@@ -6,6 +6,7 @@ import {
   SessionUser,
 } from '@crelink/shared';
 import type { Response } from 'express';
+import { CurrentActor, RequestActor } from '../auth/actor';
 import { CurrentUser, OperatorGuard, SessionGuard } from '../auth/session.guard';
 import { SlotEventService } from './slot-event.service';
 
@@ -51,7 +52,7 @@ export class AdminSlotEventController {
   }
 
   @Put()
-  setPeriod(@Body() body: unknown): Promise<OperatorSlotEventResponse> {
-    return this.slotEvents.setPeriod(body);
+  setPeriod(@CurrentActor() actor: RequestActor, @Body() body: unknown): Promise<OperatorSlotEventResponse> {
+    return this.slotEvents.setPeriod(actor, body);
   }
 }

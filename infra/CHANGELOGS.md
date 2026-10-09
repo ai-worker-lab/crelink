@@ -2,6 +2,11 @@
 
 내부 참고용으로 인프라의 모든 변경을 적용 여부와 관계없이 기록합니다. 환경별 적용 시각·결과·복구 정보는 운영 work item이나 배포 플랫폼에 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-10-10
+
+- 런북 17-1에 실행 호스트 자격 주의: SSH·`sudo` 자격은 사람 것이며 같은 macOS 사용자로 도는 AI 세션도 쓸 수 있으므로(ADR 0015 위험 수용) AI 세션은 17절 명령을 실행하지 않고, Orca 자동화를 SSH·`sudo` 없는 별도 사용자로 돌리기를 권함. 근거 `docs/work/orchestrator/0091-ai-operator-design.md`.
+- AI 운영자 토큰(에픽 0088): 런북 `docs/prod-runbook.md`에 "17. AI 운영자 토큰"(선행, 운영자 Mac에서 활성 색 API 컨테이너 CLI `issue-token` 출력을 SSH 파이프로 받아 형식 검사 뒤 `~/.config/crelink/ai-operator.env`(600)에 `.new` → `mv`로 쓰는 한 줄 명령, `precheck` 확인, `ensure-account`·`list-tokens`·`revoke-token`, 회전, 실패·유출 처리)과 값 표·4-5 회전 표 줄, 검사 수 11개. 운영 주소 검사 `prod/verify.sh`에 토큰 없는 `{WEB}/api/agent/api/health` 401 검사(검사 11개), `prod/README.md` 검사 수·런북 17 연결. `prod/tests/caddy-routing.sh` 스텁이 `Authorization`·`X-Crelink-Agent-Run`을 응답 헤더로 되돌리고, 웹 호스트 POST `/api/agent/api/admin/agent-runs`가 web으로 가며 두 헤더가 그대로 전달되는지 확인(통과 80). Caddyfile·compose 변경 없음. 웹 `/api/agent`가 없는 릴리스에서는 새 검사가 실패하므로 0104가 함께 들어간 통합 PR로만 머지. 근거 `docs/work/infra/0107-ai-operator-token-runbook.md`.
+
 ## 2026-10-09
 
 - 운영 주소 검사 `prod/verify.sh`에 배너 클릭 경로 `{SHORT}/b/zzzzzzzzzz`·`/a/zzzzzzzzzz/zzzzzzzzzz`가 302 `{WEB}/notice?reason=link_unavailable`인지 확인하는 검사 4개를 더함(검사 10개). `prod/README.md`·`docs/prod-runbook.md`의 검사 수. 근거 `docs/work/orchestrator/0085-ad-banner-integration.md`.

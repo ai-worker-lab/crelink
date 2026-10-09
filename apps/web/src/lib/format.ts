@@ -23,6 +23,16 @@ export function formatNumber(value: number): string {
   return numberFormat.format(value);
 }
 
+/** 걸린 시간(밀리초)을 분 단위로 버려 `n분`·`n시간 m분`으로 씁니다. 1분이 안 되면 `1분 미만`. 음수(시계 차이)는 0으로 봅니다. */
+export function formatDuration(milliseconds: number): string {
+  const minutes = Math.floor(Math.max(0, milliseconds) / 60_000);
+  if (minutes < 1) return '1분 미만';
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${rest}분`;
+  return rest === 0 ? `${formatNumber(hours)}시간` : `${formatNumber(hours)}시간 ${rest}분`;
+}
+
 /** 오늘(한국 시간)로 끝나는 `days`일 기간. 값은 `YYYY-MM-DD`이며 양 끝을 포함합니다. */
 export function recentRange(days: number): { from: string; to: string } {
   const now = Date.now();
