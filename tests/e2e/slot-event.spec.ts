@@ -69,7 +69,8 @@ test('홈 안내 → 신청 → 한도 +5, 재신청 멱등, 추가 슬롯과 �
     await expect(
       homeEvent.getByText(/가입하고 이벤트를 신청하면 보이는 외부 링크를 5개 더 둘 수 있어요/),
     ).toBeVisible();
-    await expect(visitor.page.getByRole('link', { name: '구글로 시작하기' })).toBeVisible();
+    // 홈 소개에는 같은 `구글로 시작하기`가 첫 화면과 마지막 구획에 둘 있어, 이벤트 카드 바로 아래 첫 버튼을 봅니다(design/home-intro/handoff.md).
+    await expect(visitor.page.getByRole('link', { name: '구글로 시작하기' }).first()).toBeVisible();
     await expectMobileFits(visitor.page, '홈(이벤트 열림)');
 
     // 2. 신청: 보이는 링크 5개(한도 참)인 크리에이터
