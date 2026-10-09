@@ -6,6 +6,7 @@
 
 ## 2026-10-10
 
+- 0150 관리 화면 첫 사용 안내 카드 구현을 `검증`으로 올렸습니다(AI 운영자 실행, 웹 변경 내용은 `apps/web/CHANGELOGS.md`). 검증 근거는 `docs/work/web/0150-first-run-guide-web.md` 진행 기록에 있습니다.
 - 0143 첫 사용 안내 디자인(실사용자 전환) 완료(사용자 위임에 따른 AI 승인). 디자인 `design/first-run-guide/`(빈 랜딩 관리 화면 3단계 시작 안내 카드: 링크·포트폴리오 1개 추가 → 내 크리링 링크 복사 → 인스타그램 프로필에 붙여 넣기, 상태 A~E, 390·1280px, 새 토큰·API 없음). 구현 티켓 `docs/work/web/0150-first-run-guide-web.md`를 `준비`로 등록했습니다. 근거 `docs/work/designer/0143-first-run-guide-design.md`.
 - 0141(검색·링크 미리보기 기본기)을 `완료`로 바꾸고 배포·운영 확인 근거를 남겼습니다(PR #71, Deploy 37965904574). 분류 대기 work item 2개 등록: 검색엔진 소유 확인·sitemap 제출(사람 계정 필요) `docs/work/orchestrator/0148-search-console-registration.md`, Dependabot 취약점 8건(개발·빌드 도구 간접 의존성) `docs/work/orchestrator/0149-dev-dependency-vulnerabilities.md`. 근거 `docs/work/web/0141-search-and-link-preview-basics.md`.
 - AI 운영자 운영 적용과 30분 실행 시작, 링크 슬롯 +5 이벤트 운영 개시. PR #68·#69·#70을 머지·배포했습니다(Deploy 모두 success). 운영 토큰을 발급했고(런북 17-2), Orca 자동화 `crelink-ai-operator`(`*/30 * * * *`)를 첫 수동 실행을 확인한 뒤 켰습니다. 첫 실행은 0141을 구현해 PR #71로 배포했습니다. 0090·0091·0092·0125와 에픽 0088·0089를 `완료`로 바꿨습니다. 근거 `docs/work/epics/0088-ai-operator.md`·`docs/work/epics/0089-slot-event.md`.

@@ -15,6 +15,7 @@ import { PortfolioForm, PortfolioSection } from '../me/PortfolioSection';
 import { BannerForm } from './BannerForm';
 import { BannerSlotNotice, BannerSlotSection } from './BannerSlotSection';
 import { EditSheet } from './EditSheet';
+import { FirstRunGuide } from './FirstRunGuide';
 import { GuestbookSwitch } from './GuestbookSwitch';
 import { LinkForm } from './LinkForm';
 import { LinksSection } from './LinksSection';
@@ -46,6 +47,7 @@ export function PageEditor() {
     resetSelection,
     resetSlotEvent,
     setFormPending,
+    firstRunGuide,
   } = useManager();
   const formAction = useAction();
   /** 폼 저장·삭제 결과 안내. 결과가 나온 구역 패널(열쇠가 같을 때)에서만 보여 줍니다. */
@@ -65,6 +67,9 @@ export function PageEditor() {
   useEffect(() => resetSelection, [resetSelection]);
   // 링크 슬롯 이벤트 결과 줄은 `페이지 편집`을 떠날 때까지만 남습니다(design/slot-event/handoff.md `관리 화면 페이지 편집 띠`).
   useEffect(() => resetSlotEvent, [resetSlotEvent]);
+  // 시작 안내 카드의 상태 줄·완료 카드도 `페이지 편집`을 떠나면 지웁니다(세 단계를 마친 채 다시 들어오면 카드 없음).
+  const resetFirstRunGuide = firstRunGuide.reset;
+  useEffect(() => resetFirstRunGuide, [resetFirstRunGuide]);
   // 폼 저장 중에는 미리보기 고르기를 막습니다(ManagerPreview가 봄).
   useEffect(() => setFormPending(formAction.pending), [formAction.pending, setFormPending]);
   // 저장이 끝났을 때 그 폼이 아직 고른 대상인지(메뉴를 떠났거나 다른 대상을 골랐으면 패널을 바꾸지 않음).
@@ -318,11 +323,11 @@ function AdSlotPanel({ onMove }: { onMove: () => void }) {
 }
 
 /**
- * 처음 패널: 구역 목록(키보드·스크린리더로 구역을 고르는 길)과 프로필 메뉴 안내. 1023px 이하에서는 쓰지 않고, 서버가 넓은 배치로
- * 그린 첫 화면에서도 CSS(`.page-overview`)로 숨겨 하이드레이션 전에 눌리지 않는 목록이 보이지 않게 합니다.
+ * 처음 패널: 시작 안내 카드(있으면 제목 아래, 처음 패널 설명 문장 대신), 구역 목록(키보드·스크린리더로 구역을 고르는 길)과 프로필 메뉴 안내.
+ * 1023px 이하에서는 쓰지 않고, 서버가 넓은 배치로 그린 첫 화면에서도 CSS(`.page-overview`)로 숨겨 하이드레이션 전에 눌리지 않는 목록이 보이지 않게 합니다.
  */
 function PageOverview({ headingRef }: { headingRef: React.RefObject<HTMLHeadingElement | null> }) {
-  const { state, select, dirty } = useManager();
+  const { state, select, dirty, firstRunGuide } = useManager();
   const { limits, slot, bannerLimits } = state;
   const rows: Array<{ target: LandingEditTarget; title: string; meta: string; dirty: boolean }> = [
     {
@@ -363,8 +368,9 @@ function PageOverview({ headingRef }: { headingRef: React.RefObject<HTMLHeadingE
         <h1 id="page-overview-title" ref={headingRef} tabIndex={-1} className="panel-title">
           {managerMenuLabel('')}
         </h1>
-        <p className="panel-help">방문자 화면에서 구역이나 항목을 선택해 편집해요.</p>
+        {firstRunGuide.view ? null : <p className="panel-help">방문자 화면에서 구역이나 항목을 선택해 편집해요.</p>}
       </div>
+      <FirstRunGuide onClosed={() => headingRef.current?.focus()} />
       <BannerSlotNotice />
       <SlotEventBand />
       <h2 className="panel-subtitle">구역 선택</h2>

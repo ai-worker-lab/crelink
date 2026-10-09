@@ -41,7 +41,7 @@ const openIcon = (
  * `저장하지 않은 변경 포함`) 아래 휴대폰 프레임 미리보기. 무대는 sticky이고 프레임 안만 스크롤합니다.
  */
 export function ManagerStage({ mode }: { mode: PreviewMode }) {
-  const { state, requestSlugFocus } = useManager();
+  const { state, requestSlugFocus, firstRunGuide } = useManager();
   const hasDraft = useHasDraft();
   const { landing, shortLink } = state;
   return (
@@ -49,7 +49,7 @@ export function ManagerStage({ mode }: { mode: PreviewMode }) {
       <div className="address-bar">
         <code className="url-text">{shortLink.url.replace(/^https?:\/\//, '')}</code>
         <div className="address-actions">
-          <CopyButton text={shortLink.url} label="내 크리링 링크 복사" />
+          <CopyButton text={shortLink.url} label="내 크리링 링크 복사" onCopied={firstRunGuide.recordCopy} />
           <Link className="secondary" href={managerHref(landing.publicId, 'settings')} onClick={requestSlugFocus}>
             주소 변경
           </Link>
@@ -77,12 +77,12 @@ export function NarrowBar({
   view: 'edit' | 'preview';
   onViewChange: (view: 'edit' | 'preview') => void;
 }) {
-  const { state } = useManager();
+  const { state, firstRunGuide } = useManager();
   const { landing, shortLink } = state;
   return (
     <div className="narrow-bar">
       <code className="url-text">{shortLink.url.replace(/^https?:\/\//, '')}</code>
-      <CopyButton text={shortLink.url} label="내 크리링 링크 복사" />
+      <CopyButton text={shortLink.url} label="내 크리링 링크 복사" onCopied={firstRunGuide.recordCopy} />
       <a
         className="secondary icon-only"
         href={landing.url}

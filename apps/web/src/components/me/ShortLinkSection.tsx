@@ -38,14 +38,15 @@ const CHECK_DELAY_MS = 400;
 /** `주소 설정`의 내 크리링 링크(단축 주소)와 복사. 공유용 주소는 단축 주소만 보여 줍니다(PRD R7). */
 export function ShortLinkSection() {
   const headingId = useId();
-  const { shortLink } = useManager().state;
+  const { state, firstRunGuide } = useManager();
+  const { shortLink } = state;
   return (
     <section className="card" aria-labelledby={headingId}>
       <h2 id={headingId}>내 크리링 링크</h2>
       <p className="section-help">인스타그램 프로필 편집 &gt; 링크에 이 주소를 붙여 넣으세요.</p>
       <div className="copy-row">
         <code className="url-text">{shortLink.url}</code>
-        <CopyButton text={shortLink.url} label="내 크리링 링크 복사" />
+        <CopyButton text={shortLink.url} label="내 크리링 링크 복사" onCopied={firstRunGuide.recordCopy} />
       </div>
     </section>
   );

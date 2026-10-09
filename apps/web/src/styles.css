@@ -3205,3 +3205,233 @@ body:has(.sheet[open]) {
     color: var(--ds-color-text-subtle);
   }
 }
+
+/*
+ * `페이지 편집` 시작 안내 카드(design/first-run-guide/handoff.md `컴포넌트와 토큰`). 1024px 이상은 처음 패널 안쪽 폭 가득,
+ * 1023px 이하는 sticky 줄 아래 내용 폭 가득. 버튼·주소는 넘치면 줄을 바꾸고, 주소는 한 줄 말줄임(320px에서도 가로 넘침 없음).
+ */
+.first-run-guide {
+  display: grid;
+  gap: var(--ds-space-16);
+  min-width: 0;
+  padding: var(--ds-space-20);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-lg);
+  background: var(--ds-color-surface-default);
+  box-shadow: var(--card-shadow);
+}
+.first-run-guide p {
+  margin: 0;
+}
+.first-run-guide.is-finished {
+  border-color: var(--ds-color-status-positive);
+}
+.manager-panel > .first-run-guide {
+  margin-top: var(--ds-space-12);
+}
+.guide-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ds-space-8);
+  margin: calc(var(--ds-space-8) * -1) calc(var(--ds-space-8) * -1) 0 0;
+}
+.guide-head-text {
+  display: grid;
+  flex: 1;
+  gap: var(--ds-space-4);
+  min-width: 0;
+  padding-top: var(--ds-space-8);
+}
+.guide-title {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-8);
+  margin: 0;
+  font-size: var(--ds-font-size-18);
+  line-height: 1.15;
+}
+.guide-head-text > p {
+  font-size: var(--ds-font-size-13);
+}
+.guide-close {
+  border-color: transparent;
+  color: var(--ds-color-text-secondary);
+}
+.guide-close:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--ds-color-surface-raised);
+  color: var(--ds-color-text-primary);
+}
+.guide-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-8);
+  color: var(--ds-color-text-subtle);
+  font-size: var(--ds-font-size-12);
+  font-weight: var(--ds-font-weight-bold);
+}
+.guide-bar {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--ds-space-4);
+}
+.guide-bar i {
+  height: 4px;
+  border-radius: var(--ds-corner-full);
+  background: var(--ds-color-border-default);
+}
+.guide-bar i.is-on {
+  background: var(--ds-color-status-positive);
+}
+.guide-steps {
+  display: grid;
+  gap: var(--ds-space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.guide-step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: var(--ds-space-12);
+  padding: var(--ds-space-12);
+  border: 1px solid var(--ds-color-border-frame);
+  border-radius: var(--ds-corner-md);
+}
+.guide-step.is-current {
+  border-color: var(--ds-color-text-primary);
+}
+.guide-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--ds-color-border-strong);
+  border-radius: var(--ds-corner-full);
+  background: var(--ds-color-surface-default);
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-13);
+  font-weight: var(--ds-font-weight-extrabold);
+  line-height: 1;
+}
+.guide-step.is-current .guide-mark {
+  border-color: var(--ds-color-text-primary);
+  background: var(--ds-color-text-primary);
+  color: var(--ds-color-text-on-action);
+}
+.guide-step.is-done .guide-mark,
+.guide-mark.is-done {
+  border-color: var(--ds-color-status-positive);
+  background: var(--ds-color-status-positive);
+  color: var(--ds-color-text-on-positive);
+}
+.guide-step-body {
+  display: grid;
+  gap: var(--ds-space-6);
+  min-width: 0;
+}
+.guide-step-title {
+  color: var(--ds-color-text-primary);
+  font-size: var(--ds-font-size-15);
+  font-weight: var(--ds-font-weight-bold);
+  line-height: 1.4;
+}
+.guide-step.is-done .guide-step-title {
+  color: var(--ds-color-text-secondary);
+}
+.guide-step-desc {
+  font-size: var(--ds-font-size-13);
+}
+.guide-step-state,
+.guide-status {
+  color: var(--ds-color-status-positive);
+  font-weight: var(--ds-font-weight-bold);
+}
+.guide-step-state {
+  font-size: var(--ds-font-size-12);
+  overflow-wrap: anywhere;
+}
+.guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-8);
+  min-width: 0;
+  margin-top: var(--ds-space-4);
+}
+.guide-url {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--ds-space-8) var(--ds-space-12);
+  overflow: hidden;
+  border-radius: var(--ds-corner-sm);
+  background: var(--ds-color-surface-raised);
+  font-size: var(--ds-font-size-13);
+  line-height: 20px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+/* 복사 결과는 카드 상태 줄(`주소를 복사했어요.`)이 보이므로 버튼 옆 문장은 화면에서만 숨긴다(주소 막대와 같음, 낭독은 그대로). */
+.guide-actions .copy-feedback {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.guide-howto {
+  display: grid;
+  gap: var(--ds-space-2);
+  margin: var(--ds-space-4) 0 0;
+  padding-left: var(--ds-space-20);
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-13);
+}
+.guide-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ds-space-8);
+  padding: var(--ds-space-10) var(--ds-space-12);
+  border-radius: var(--ds-corner-sm);
+  background: var(--ds-color-surface-raised);
+  font-size: var(--ds-font-size-12);
+}
+.guide-notice svg {
+  flex: none;
+  margin-top: var(--ds-space-2);
+}
+.guide-status {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-6);
+  font-size: var(--ds-font-size-13);
+}
+.guide-status:empty {
+  display: none;
+}
+.guide-status svg {
+  flex: none;
+}
+.guide-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-8);
+  color: var(--ds-color-text-subtle);
+  font-size: var(--ds-font-size-12);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .guide-step,
+  .guide-mark,
+  .guide-bar i {
+    transition:
+      background-color 200ms cubic-bezier(0.23, 1, 0.32, 1),
+      border-color 200ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+}
