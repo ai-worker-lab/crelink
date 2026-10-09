@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>로그인 전 홈 소개 화면 시안 · 크리링</title>
+<link rel="stylesheet" href="../system/tokens.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ds-color-background-stage); color: var(--ds-color-text-primary); font-family: var(--ds-font-sans); font-size: var(--ds-font-size-15); line-height: 1.65; word-break: keep-all; }
+  h1, h2, h3, p, ol, ul, figure { margin: 0; }
+  button { font: inherit; }
+  :focus-visible { outline: 3px solid var(--ds-color-text-primary); outline-offset: 2px; }
+  a { color: var(--ds-color-text-primary); text-decoration-color: var(--ds-color-border-strong); text-underline-offset: 3px; }
+  a:hover { text-decoration-color: currentColor; }
+
+  /* 시안 문서 틀(구현 대상 아님) */
+  .doc { padding: var(--ds-space-32); display: grid; gap: var(--ds-space-48); }
+  .doc-head { max-width: 900px; display: grid; gap: var(--ds-space-8); }
+  .doc-head h1 { font-size: var(--ds-font-size-27); font-weight: var(--ds-font-weight-extrabold); line-height: 1.15; }
+  .doc-head p { color: var(--ds-color-text-secondary); }
+  .state { display: grid; gap: var(--ds-space-16); }
+  .state-head { display: grid; gap: var(--ds-space-4); max-width: 900px; }
+  .state-head h2 { font-size: var(--ds-font-size-22); font-weight: var(--ds-font-weight-extrabold); line-height: 1.15; }
+  .state-head p { color: var(--ds-color-text-secondary); font-size: var(--ds-font-size-13); }
+  .row { display: flex; gap: var(--ds-space-32); align-items: flex-start; overflow-x: auto; padding-bottom: var(--ds-space-8); }
+  .viewport { box-sizing: content-box; border: 1px solid var(--ds-color-border-default); border-radius: var(--ds-corner-md); overflow: hidden; background: var(--ds-color-background-stage); flex: none; }
+  .frame-label { font-size: var(--ds-font-size-12); color: var(--ds-color-text-subtle); font-weight: var(--ds-font-weight-bold); margin-bottom: var(--ds-space-8); }
+  .w1280 { width: 1280px; }
+  .w390 { width: 390px; }
+  .w320 { width: 320px; }
+  .cut-note { padding: var(--ds-space-8) var(--ds-space-16); font-size: var(--ds-font-size-12); color: var(--ds-color-text-subtle); text-align: center; border-top: 1px dashed var(--ds-color-border-strong); }
+  .zoom { display: flex; flex-wrap: wrap; gap: var(--ds-space-24); }
+  .zoom-item { display: grid; gap: var(--ds-space-4); }
+  .zoom-box { padding: var(--ds-space-24); border: 1px solid var(--ds-color-border-default); border-radius: var(--ds-corner-md); background: var(--ds-color-background-stage); }
+
+  /* ===== 지금 웹 공통 규칙 요약(apps/web/src/styles.css, 바뀌지 않음) ===== */
+  .public-page { padding: var(--ds-space-16) var(--ds-space-16) 60px; background: var(--ds-color-background-stage); color: var(--ds-color-text-primary); }
+  .w1280 .public-page { max-width: 1060px; margin: 0 auto; padding: var(--ds-space-32) var(--ds-space-24) 80px; }
+  .brand-mark { font-weight: var(--ds-font-weight-extrabold); font-size: var(--ds-font-size-18); color: var(--ds-color-action-primary); }
+  .primary { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: var(--ds-space-12) var(--ds-space-20); border-radius: var(--ds-corner-full); background: var(--ds-color-action-primary); color: var(--ds-color-text-on-action); font-weight: var(--ds-font-weight-extrabold); text-decoration: none; white-space: nowrap; }
+  .primary:hover, .primary.is-hover { background: var(--ds-color-action-primary-pressed); }
+  .primary.is-focus { outline: 3px solid var(--ds-color-text-primary); outline-offset: 2px; }
+  .secondary { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: var(--ds-space-8) var(--ds-space-16); border: 1px solid var(--ds-color-border-default); border-radius: var(--ds-corner-full); background: var(--ds-color-surface-default); color: var(--ds-color-text-primary); font-size: var(--ds-font-size-14); font-weight: var(--ds-font-weight-bold); text-decoration: none; white-space: nowrap; }
+  .button-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-8); }
+  .home-actions { display: flex; flex-direction: column; gap: var(--ds-space-12); margin-top: var(--ds-space-16); }
+  .home-account { overflow-wrap: anywhere; }
+  .form-error { padding: var(--ds-space-12); border: 1px solid var(--ds-color-border-danger); border-radius: var(--ds-corner-md); background: var(--ds-color-status-danger-subtle); color: var(--ds-color-status-danger); font-size: var(--ds-font-size-14); }
+  .badge { display: inline-block; padding: var(--ds-space-2) var(--ds-space-8); border: 1px solid var(--ds-color-border-strong); border-radius: var(--ds-corner-sm); font-size: var(--ds-font-size-12); font-weight: var(--ds-font-weight-bold); color: var(--ds-color-text-secondary); line-height: 1.65; }
+  .site-footer { padding-top: var(--ds-space-24); border-top: 1px solid var(--ds-color-border-default); font-size: var(--ds-font-size-14); display: flex; flex-wrap: wrap; gap: var(--ds-space-16); }
+  /* 홈 이벤트 안내(R24 ④, design/slot-event/handoff.md `홈 /`, 지금 구현 그대로) */
+  .home-event { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ds-space-6); max-width: 540px; padding: var(--ds-space-16) var(--ds-space-20); border: 1px solid var(--ds-color-border-default); border-radius: var(--ds-corner-lg); background: var(--ds-color-surface-default); box-shadow: var(--elev-raised); }
+  .home-event-title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-4) var(--ds-space-8); font-size: var(--ds-font-size-18); line-height: 1.3; font-weight: var(--ds-font-weight-extrabold); }
+  .home-event .home-event-period { font-size: var(--ds-font-size-14); color: var(--ds-color-text-subtle); }
+  .home-event time { white-space: nowrap; }
+  .home-event > .secondary { margin-top: var(--ds-space-6); }
+  /* 로그인한 홈(지금 .landing 그대로, 바뀌지 않음) */
+  .landing { display: flex; flex-direction: column; justify-content: center; min-height: 520px; }
+  .landing h1 { margin-bottom: var(--ds-space-20); font-size: var(--ds-font-size-38); line-height: 1.15; font-weight: var(--ds-font-weight-extrabold); }
+  .w1280 .landing h1 { font-size: var(--ds-font-size-64); }
+  .landing > p { max-width: 540px; font-size: var(--ds-font-size-16); color: var(--ds-color-text-secondary); }
+  .landing > .brand-mark { margin-bottom: var(--ds-space-16); color: var(--ds-color-action-primary); }
+
+  /* 공개 랜딩 모양(예시 안에서만 씀, 지금 .profile-* · .link-card · .profile-footer 요약) */
+  .profile-main { padding: var(--ds-space-24) var(--ds-space-16); }
+  .profile { display: grid; gap: var(--ds-space-24); }
+  .profile-head { display: grid; justify-items: center; gap: var(--ds-space-8); text-align: center; }
+  .avatar { width: 96px; height: 96px; border-radius: 50%; border: 1px solid var(--ds-color-border-default); background: var(--ds-color-surface-raised); display: grid; place-items: center; color: var(--ds-color-decoration-subtle); }
+  .avatar svg { width: 48px; height: 48px; }
+  .profile-name { font-size: var(--ds-font-size-22); font-weight: var(--ds-font-weight-extrabold); line-height: 1.3; }
+  .profile-bio { color: var(--ds-color-text-secondary); }
+  .link-list { list-style: none; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--ds-space-12); }
+  .link-card { display: flex; align-items: center; min-height: 56px; padding: var(--ds-space-12) var(--ds-space-16); border: 1px solid var(--ds-color-border-default); border-radius: var(--ds-corner-lg); background: var(--ds-color-surface-default); box-shadow: var(--elev-raised); font-weight: var(--ds-font-weight-bold); }
+  .profile-footer { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; column-gap: var(--ds-space-8); padding: var(--ds-space-8) var(--ds-space-16); border-top: 1px solid var(--ds-color-border-default); font-size: var(--ds-font-size-14); color: var(--ds-color-text-subtle); }
+  .profile-footer .footer-cta, .profile-footer .footer-link { display: inline-flex; align-items: center; min-height: 44px; white-space: nowrap; color: var(--ds-color-text-primary); text-decoration: underline; text-decoration-color: var(--ds-color-border-strong); text-underline-offset: 3px; }
+  .profile-footer .brand { font-size: var(--ds-font-size-16); font-weight: var(--ds-font-weight-extrabold); }
+
+  /* ================= 로그인 전 홈 소개(구현 대상) =================
+     기본은 1023px 이하. `.w1280` 아래 규칙은 실제 구현에서 미디어 쿼리입니다:
+     - 701px 이상: 구획 사이 48, 구획 제목 27(지금 .public-page 여백 전환과 같은 경계)
+     - 1024px 이상: 첫 화면 두 열(글 · 예시 휴대폰 384), 단계·무료 카드 3열 */
+  .home-intro { display: flex; flex-direction: column; gap: var(--ds-space-40); padding-bottom: var(--ds-space-48); }
+  .w1280 .home-intro { gap: var(--ds-space-48); }
+
+  .home-hero { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--ds-space-32); }
+  .w1280 .home-hero { grid-template-columns: minmax(0, 1fr) 384px; gap: var(--ds-space-48); align-items: center; padding-top: var(--ds-space-40); }
+  .home-hero-text { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+  .home-hero-text > .brand-mark { margin-bottom: var(--ds-space-16); }
+  .home-hero-text h1 { margin-bottom: var(--ds-space-20); font-size: var(--ds-font-size-38); line-height: 1.15; font-weight: var(--ds-font-weight-extrabold); }
+  .w1280 .home-hero-text h1 { font-size: var(--ds-font-size-64); }
+  .home-hero-lead { max-width: 540px; font-size: var(--ds-font-size-16); color: var(--ds-color-text-secondary); }
+  .home-hero-text > .home-event { width: 100%; margin-top: var(--ds-space-20); }
+  .home-hero-text > .home-actions { margin-top: var(--ds-space-24); }
+
+  .home-example { display: grid; justify-items: center; gap: var(--ds-space-12); min-width: 0; }
+  .home-example-device { position: relative; width: min(100%, 384px); padding: var(--ds-space-12); border-radius: calc(var(--ds-corner-lg) * 2); background: var(--ds-color-background-device); }
+  .home-example-chip { position: absolute; top: calc(var(--ds-space-12) * -1); left: var(--ds-space-20); padding: var(--ds-space-2) var(--ds-space-10); border: 1px solid var(--ds-color-border-strong); border-radius: var(--ds-corner-sm); background: var(--ds-color-surface-default); color: var(--ds-color-text-secondary); font-size: var(--ds-font-size-12); font-weight: var(--ds-font-weight-bold); line-height: 1.65; }
+  .home-example-screen { border-radius: var(--ds-corner-lg); overflow: hidden; background: var(--ds-color-background-stage); }
+  .home-example figcaption { font-size: var(--ds-font-size-13); color: var(--ds-color-text-subtle); text-align: center; }
+  /* 시안 전용: 상태 B 390px에서 예시 아래쪽을 잘라 보임 */
+  .home-example-device.is-cut .home-example-screen { max-height: 206px; }
+
+  .home-section { display: flex; flex-direction: column; gap: var(--ds-space-20); }
+  .home-section > h2 { font-size: var(--ds-font-size-22); font-weight: var(--ds-font-weight-extrabold); line-height: 1.15; }
+  .w1280 .home-section > h2 { font-size: var(--ds-font-size-27); }
+  .home-cards { list-style: none; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--ds-space-12); }
+  .w1280 .home-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ds-space-16); }
+  .home-card { display: grid; align-content: start; gap: var(--ds-space-6); padding: var(--ds-space-20); border: 1px solid var(--ds-color-border-default); border-radius: var(--ds-corner-lg); background: var(--ds-color-surface-default); box-shadow: var(--elev-raised); min-width: 0; }
+  .home-card h3 { font-size: var(--ds-font-size-18); font-weight: var(--ds-font-weight-extrabold); line-height: 1.3; }
+  .home-card p { color: var(--ds-color-text-secondary); }
+  .home-step { grid-template-columns: 32px minmax(0, 1fr); column-gap: var(--ds-space-12); }
+  .home-step-num { grid-row: 1 / span 2; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--ds-color-text-primary); color: var(--ds-color-surface-default); font-size: var(--ds-font-size-15); font-weight: var(--ds-font-weight-extrabold); line-height: 1; }
+  .home-more { display: inline-flex; align-items: center; align-self: flex-start; min-height: 44px; font-size: var(--ds-font-size-14); }
+  .home-free-note { font-size: var(--ds-font-size-14); color: var(--ds-color-text-subtle); }
+
+  .home-final { display: flex; flex-direction: column; align-items: center; gap: var(--ds-space-8); padding: var(--ds-space-32) var(--ds-space-20); border: 1px solid var(--ds-color-border-default); border-radius: var(--ds-corner-lg); background: var(--ds-color-surface-default); box-shadow: var(--elev-raised); text-align: center; }
+  .home-final h2 { font-size: var(--ds-font-size-22); font-weight: var(--ds-font-weight-extrabold); line-height: 1.15; }
+  .w1280 .home-final h2 { font-size: var(--ds-font-size-27); }
+  .home-final p { color: var(--ds-color-text-secondary); }
+  .home-final .primary { margin-top: var(--ds-space-12); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="9" r="4" fill="currentColor"/><path d="M4 21c1-4.5 4.5-6.5 8-6.5s7 2 8 6.5" fill="currentColor"/></symbol>
+</svg>
+
+<main class="doc">
+  <header class="doc-head" id="doc-head" data-od-id="doc-head">
+    <h1>로그인 전 홈 · 소개 화면</h1>
+    <p>로그인 전 홈 <code>/</code>를 처음 온 사람이 "무엇을 받는지" 알 수 있는 소개 화면으로 늘립니다. 순서는 첫 화면(제목·설명·<strong>구글로 시작하기</strong>) → 예시 랜딩(가상의 크리에이터, <strong>예시 화면</strong> 표시) → 사용 3단계 → 무료로 쓸 수 있는 것 → 마지막 <strong>구글로 시작하기</strong> → 지금 바닥글입니다. 링크 슬롯 이벤트(R24) 안내는 지금 자리(설명 아래·첫 버튼 위) 그대로 함께 놓입니다. 로그인한 홈은 바꾸지 않습니다. 문구·숫자 근거·배치 규칙은 <a href="handoff.md">handoff.md</a>가 기준입니다.</p>
+  </header>
+
+  <!-- ============ 상태 A: 이벤트 없음 ============ -->
+  <section class="state" id="state-a" data-od-id="state-a" aria-labelledby="sa-title">
+    <div class="state-head">
+      <h2 id="sa-title">상태 A · 로그인 전, 이벤트 없음</h2>
+      <p>1024px 이상은 첫 화면이 두 열(왼쪽 글·버튼, 오른쪽 예시 휴대폰 384px)이고 단계·무료 카드가 3열입니다. 1023px 이하는 한 열로 글·버튼 다음에 예시가 오고 카드도 1열입니다. 주요 버튼은 첫 화면과 맨 끝 두 곳이며 같은 행동(구글 로그인)이고, 한 화면 높이에 함께 보이지 않습니다.</p>
+    </div>
+    <div class="row">
+      <div>
+        <p class="frame-label">1280px · 로그인 전 홈 전체</p>
+        <div class="viewport w1280">
+          <main class="public-page">
+            <div class="home-intro">
+              <section class="home-hero" data-od-id="a1280-hero">
+                <div class="home-hero-text">
+                  <p class="brand-mark">크리링</p>
+                  <h1>인스타그램 프로필 링크 하나로 나를 소개하세요.</h1>
+                  <p class="home-hero-lead">크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.</p>
+                  <div class="home-actions"><div class="button-row"><a class="primary" href="#state-a">구글로 시작하기</a></div></div>
+                </div>
+                <figure class="home-example">
+                  <div class="home-example-device" aria-hidden="true" inert>
+                    <span class="home-example-chip">예시 화면</span>
+                    <div class="home-example-screen">
+                      <div class="profile-main"><div class="profile">
+                        <div class="profile-head"><div class="avatar"><svg><use href="#i-person"/></svg></div><p class="profile-name">예시 크리에이터</p><p class="profile-bio">그림과 짧은 영상을 올려요.</p></div>
+                        <ul class="link-list"><li class="link-card">작업물 모음</li><li class="link-card">유튜브 채널</li><li class="link-card">굿즈 판매</li><li class="link-card">작업 문의</li></ul>
+                      </div></div>
+                      <p class="profile-footer"><span class="footer-cta"><span>나도 <span class="brand">크리링</span> 만들기</span></span><span>·</span><span class="footer-link">개인정보 처리방침</span></p>
+                    </div>
+                  </div>
+                  <figcaption>가상의 크리에이터로 만든 예시 화면이에요.</figcaption>
+                </figure>
+              </section>
+              <section class="home-section" data-od-id="a1280-steps">
+                <h2>이렇게 시작해요</h2>
+                <ol class="home-cards" role="list">
+                  <li class="home-card home-step"><span class="home-step-num" aria-hidden="true">1</span><h3>구글로 가입하기</h3><p>구글 계정으로 가입하면 내 페이지와 짧은 크리링 링크가 바로 만들어져요.</p></li>
+                  <li class="home-card home-step"><span class="home-step-num" aria-hidden="true">2</span><h3>링크 추가하기</h3><p>페이지 편집에서 표시 이름과 주소를 넣어 링크를 추가해요. 포트폴리오도 넣을 수 있어요.</p></li>
+                  <li class="home-card home-step"><span class="home-step-num" aria-hidden="true">3</span><h3>인스타그램 프로필에 넣기</h3><p>내 크리링 링크를 복사해 인스타그램 앱의 프로필 편집 &gt; 링크에 붙여 넣어요.</p></li>
+                </ol>
+                <a class="home-more" href="#state-a">사용 안내 자세히 보기</a>
+              </section>
+              <section class="home-section" data-od-id="a1280-free">
+                <h2>무료로 쓸 수 있어요</h2>
+                <ul class="home-cards" role="list">
+                  <li class="home-card"><h3>단축 주소 1개</h3><p>인스타그램 프로필에 넣을 짧은 주소예요. 가입하면 자동으로 만들어져요.</p></li>
+                  <li class="home-card"><h3>주소 바꾸기</h3><p>주소를 내 이름에 맞게 바꿀 수 있어요. 처음 한 번은 바로, 그 뒤로는 30일에 한 번이에요. 옛 주소는 90일 동안 새 주소로 연결돼요.</p></li>
+                  <li class="home-card"><h3>외부 링크 5개</h3><p>방문자에게 보이는 외부 링크를 5개까지 둘 수 있어요. 숨긴 링크는 이 수에 들어가지 않아요.</p></li>
+                </ul>
+                <p class="home-free-note">무료 랜딩에는 링크 사이에 크리링 광고가 한 칸 보일 수 있어요.</p>
+              </section>
+              <section class="home-final" data-od-id="a1280-final">
+                <h2>내 크리링을 만들어 보세요</h2>
+                <p>구글 계정으로 가입해요.</p>
+                <a class="primary" href="#state-a">구글로 시작하기</a>
+              </section>
+            </div>
+            <footer class="site-footer"><a href="#state-a">문서</a><a href="#state-a">개인정보 처리방침</a></footer>
+          </main>
+        </div>
+      </div>
+      <div>
+        <p class="frame-label">390px · 로그인 전 홈 전체</p>
+        <div class="viewport w390">
+          <main class="public-page">
+            <div class="home-intro">
+              <section class="home-hero" data-od-id="a390-hero">
+                <div class="home-hero-text">
+                  <p class="brand-mark">크리링</p>
+                  <h1>인스타그램 프로필 링크 하나로 나를 소개하세요.</h1>
+                  <p class="home-hero-lead">크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.</p>
+                  <div class="home-actions"><div class="button-row"><a class="primary" href="#state-a">구글로 시작하기</a></div></div>
+                </div>
+                <figure class="home-example">
+                  <div class="home-example-device" aria-hidden="true" inert>
+                    <span class="home-example-chip">예시 화면</span>
+                    <div class="home-example-screen">
+                      <div class="profile-main"><div class="profile">
+                        <div class="profile-head"><div class="avatar"><svg><use href="#i-person"/></svg></div><p class="profile-name">예시 크리에이터</p><p class="profile-bio">그림과 짧은 영상을 올려요.</p></div>
+                        <ul class="link-list"><li class="link-card">작업물 모음</li><li class="link-card">유튜브 채널</li><li class="link-card">굿즈 판매</li><li class="link-card">작업 문의</li></ul>
+                      </div></div>
+                      <p class="profile-footer"><span class="footer-cta"><span>나도 <span class="brand">크리링</span> 만들기</span></span><span>·</span><span class="footer-link">개인정보 처리방침</span></p>
+                    </div>
+                  </div>
+                  <figcaption>가상의 크리에이터로 만든 예시 화면이에요.</figcaption>
+                </figure>
+              </section>
+              <section class="home-section" data-od-id="a390-steps">
+                <h2>이렇게 시작해요</h2>
+                <ol class="home-cards" role="list">
+                  <li class="home-card home-step"><span class="home-step-num" aria-hidden="true">1</span><h3>구글로 가입하기</h3><p>구글 계정으로 가입하면 내 페이지와 짧은 크리링 링크가 바로 만들어져요.</p></li>
+                  <li class="home-card home-step"><span class="home-step-num" aria-hidden="true">2</span><h3>링크 추가하기</h3><p>페이지 편집에서 표시 이름과 주소를 넣어 링크를 추가해요. 포트폴리오도 넣을 수 있어요.</p></li>
+                  <li class="home-card home-step"><span class="home-step-num" aria-hidden="true">3</span><h3>인스타그램 프로필에 넣기</h3><p>내 크리링 링크를 복사해 인스타그램 앱의 프로필 편집 &gt; 링크에 붙여 넣어요.</p></li>
+                </ol>
+                <a class="home-more" href="#state-a">사용 안내 자세히 보기</a>
+              </section>
+              <section class="home-section" data-od-id="a390-free">
+                <h2>무료로 쓸 수 있어요</h2>
+                <ul class="home-cards" role="list">
+                  <li class="home-card"><h3>단축 주소 1개</h3><p>인스타그램 프로필에 넣을 짧은 주소예요. 가입하면 자동으로 만들어져요.</p></li>
+                  <li class="home-card"><h3>주소 바꾸기</h3><p>주소를 내 이름에 맞게 바꿀 수 있어요. 처음 한 번은 바로, 그 뒤로는 30일에 한 번이에요. 옛 주소는 90일 동안 새 주소로 연결돼요.</p></li>
+                  <li class="home-card"><h3>외부 링크 5개</h3><p>방문자에게 보이는 외부 링크를 5개까지 둘 수 있어요. 숨긴 링크는 이 수에 들어가지 않아요.</p></li>
+                </ul>
+                <p class="home-free-note">무료 랜딩에는 링크 사이에 크리링 광고가 한 칸 보일 수 있어요.</p>
+              </section>
+              <section class="home-final" data-od-id="a390-final">
+                <h2>내 크리링을 만들어 보세요</h2>
+                <p>구글 계정으로 가입해요.</p>
+                <a class="primary" href="#state-a">구글로 시작하기</a>
+              </section>
+            </div>
+            <footer class="site-footer"><a href="#state-a">문서</a><a href="#state-a">개인정보 처리방침</a></footer>
+          </main>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 상태 B: 이벤트 안내 있음 ============ -->
+  <section class="state" id="state-b" data-od-id="state-b" aria-labelledby="sb-title">
+    <div class="state-head">
+      <h2 id="sb-title">상태 B · 로그인 전, 링크 슬롯 이벤트 진행 중(R24)</h2>
+      <p>이벤트 안내 카드는 지금 자리 그대로 <strong>설명 문단 아래 · 첫 구글로 시작하기 위</strong>입니다(카드 안에 버튼이 없고 바로 아래 버튼이 그 행동). 카드 위 간격 20, 버튼 위 간격 24. 예시·단계·무료·마지막 버튼은 A와 같고, 무료 카드의 <strong>외부 링크 5개</strong> 문구도 바꾸지 않습니다(이벤트 보너스는 신청한 계정만 받으므로 기본 한도를 그대로 적음). 1280px은 왼쪽 열이 길어지고 예시 휴대폰은 세로 가운데에 맞춰집니다.</p>
+    </div>
+    <div class="row">
+      <div>
+        <p class="frame-label">1280px · 첫 화면(아래는 상태 A와 같음)</p>
+        <div class="viewport w1280">
+          <main class="public-page">
+            <div class="home-intro">
+              <section class="home-hero" data-od-id="b1280-hero">
+                <div class="home-hero-text">
+                  <p class="brand-mark">크리링</p>
+                  <h1>인스타그램 프로필 링크 하나로 나를 소개하세요.</h1>
+                  <p class="home-hero-lead">크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.</p>
+                  <section class="home-event" data-od-id="b1280-event" aria-label="이벤트 안내 예시">
+                    <h2 class="home-event-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></h2>
+                    <p>가입하고 이벤트를 신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번 신청할 수 있어요.</p>
+                    <p class="home-event-period">신청 기간 <time datetime="2026-10-10T10:00:00+09:00">2026. 10. 10. 오전 10:00</time>부터</p>
+                  </section>
+                  <div class="home-actions"><div class="button-row"><a class="primary" href="#state-b">구글로 시작하기</a></div></div>
+                </div>
+                <figure class="home-example">
+                  <div class="home-example-device" aria-hidden="true" inert>
+                    <span class="home-example-chip">예시 화면</span>
+                    <div class="home-example-screen">
+                      <div class="profile-main"><div class="profile">
+                        <div class="profile-head"><div class="avatar"><svg><use href="#i-person"/></svg></div><p class="profile-name">예시 크리에이터</p><p class="profile-bio">그림과 짧은 영상을 올려요.</p></div>
+                        <ul class="link-list"><li class="link-card">작업물 모음</li><li class="link-card">유튜브 채널</li><li class="link-card">굿즈 판매</li><li class="link-card">작업 문의</li></ul>
+                      </div></div>
+                      <p class="profile-footer"><span class="footer-cta"><span>나도 <span class="brand">크리링</span> 만들기</span></span><span>·</span><span class="footer-link">개인정보 처리방침</span></p>
+                    </div>
+                  </div>
+                  <figcaption>가상의 크리에이터로 만든 예시 화면이에요.</figcaption>
+                </figure>
+              </section>
+            </div>
+          </main>
+          <p class="cut-note">… 이렇게 시작해요 · 무료로 쓸 수 있어요 · 마지막 버튼 · 바닥글(상태 A와 같음) …</p>
+        </div>
+      </div>
+      <div>
+        <p class="frame-label">390px · 첫 화면(아래는 상태 A와 같음)</p>
+        <div class="viewport w390">
+          <main class="public-page">
+            <div class="home-intro">
+              <section class="home-hero" data-od-id="b390-hero">
+                <div class="home-hero-text">
+                  <p class="brand-mark">크리링</p>
+                  <h1>인스타그램 프로필 링크 하나로 나를 소개하세요.</h1>
+                  <p class="home-hero-lead">크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.</p>
+                  <section class="home-event" data-od-id="b390-event" aria-label="이벤트 안내 예시">
+                    <h2 class="home-event-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></h2>
+                    <p>가입하고 이벤트를 신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번 신청할 수 있어요.</p>
+                    <p class="home-event-period">신청 기간 <time datetime="2026-10-10T10:00:00+09:00">2026. 10. 10. 오전 10:00</time>부터</p>
+                  </section>
+                  <div class="home-actions"><div class="button-row"><a class="primary" href="#state-b">구글로 시작하기</a></div></div>
+                </div>
+                <figure class="home-example">
+                  <div class="home-example-device is-cut" aria-hidden="true" inert>
+                    <span class="home-example-chip">예시 화면</span>
+                    <div class="home-example-screen">
+                      <div class="profile-main"><div class="profile">
+                        <div class="profile-head"><div class="avatar"><svg><use href="#i-person"/></svg></div><p class="profile-name">예시 크리에이터</p><p class="profile-bio">그림과 짧은 영상을 올려요.</p></div>
+                      </div></div>
+                    </div>
+                  </div>
+                </figure>
+              </section>
+            </div>
+          </main>
+          <p class="cut-note">… 예시 나머지 · 3단계 · 무료 · 마지막 버튼 · 바닥글(상태 A와 같음) …</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 상태 C: 320px 최소 폭 ============ -->
+  <section class="state" id="state-c" data-od-id="state-c" aria-labelledby="sc-title">
+    <div class="state-head">
+      <h2 id="sc-title">상태 C · 320px 최소 폭(이벤트 있음, 가장 긴 경우)</h2>
+      <p>가로 넘침 확인용입니다. 내용 폭 288px에서 제목 38px은 어절 단위로 줄바꿈되고(가장 긴 어절 `인스타그램` 190px), 예시 휴대폰은 폭에 맞춰 288px로 줄어듭니다. 카드·버튼·이벤트 카드 모두 288px 안입니다. 예시 안 바닥글은 넘치면 `개인정보 처리방침`이 다음 줄로 내려갑니다.</p>
+    </div>
+    <div class="row">
+      <div>
+        <p class="frame-label">320px · 로그인 전 홈 전체(이벤트 있음)</p>
+        <div class="viewport w320">
+          <main class="public-page">
+            <div class="home-intro">
+              <section class="home-hero" data-od-id="c320-hero">
+                <div class="home-hero-text">
+                  <p class="brand-mark">크리링</p>
+                  <h1>인스타그램 프로필 링크 하나로 나를 소개하세요.</h1>
+                  <p class="home-hero-lead">크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.</p>
+                  <section class="home-event" data-od-id="c320-event" aria-label="이벤트 안내 예시">
+                    <h2 class="home-event-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></h2>
+                    <p>가입하고 이벤트를 신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번 신청할 수 있어요.</p>
+                    <p class="home-event-period">신청 기간 <time datetime="2026-10-10T10:00:00+09:00">2026. 10. 10. 오전 10:00</time>부터</p>
+                  </section>
+                  <div class="home-actions"><div class="button-row"><a class="primary" href="#state-c">구글로 시작하기</a></div></div>
+                </div>
+                <figure class="home-example">
+                  <div class="home-example-device" aria-hidden="true" inert>
+                    <span class="home-example-chip">예시 화면</span>
+                    <div class="home-example-screen">
+                      <div class="profile-main"><div class="profile">
+                        <div class="profile-head"><div class="avatar"><svg><use href="#i-person"/></svg></div><p class="profile-name">예시 크리에이터</p><p class="profile-bio">그림과 짧은 영상을 올려요.</p></div>
+                        <ul class="link-list"><li class="link-card">작업물 모음</li><li class="link-card">유튜브 채널</li><li class="link-card">굿즈 판매</li><li class="link-card">작업 문의</li></ul>
+                      </div></div>
+                      <p class="profile-footer"><span class="footer-cta"><span>나도 <span class="brand">크리링</span> 만들기</span></span><span>·</span><span class="footer-link">개인정보 처리방침</span></p>
+                    </div>
+                  </div>
+                  <figcaption>가상의 크리에이터로 만든 예시 화면이에요.</figcaption>
+                </figure>
+              </section>
+              <section class="home-section" data-od-id="c320-steps">
+                <h2>이렇게 시작해요</h2>
+                <ol class="home-cards" role="list">
+                  <li class="home-card home-step"><span class="home-step-num" aria-hidden="true">1</span><h3>구글로 가입하기</h3><p>구글 계정으로 가입하면 내 페이지와 짧은 크리링 링크가 바로 만들어져요.</p></li>
+                  <li class="home-card home-step"><span class="home-step-num" aria-hidden="true">2</span><h3>링크 추가하기</h3><p>페이지 편집에서 표시 이름과 주소를 넣어 링크를 추가해요. 포트폴리오도 넣을 수 있어요.</p></li>
+                  <li class="home-card home-step"><span class="home-step-num" aria-hidden="true">3</span><h3>인스타그램 프로필에 넣기</h3><p>내 크리링 링크를 복사해 인스타그램 앱의 프로필 편집 &gt; 링크에 붙여 넣어요.</p></li>
+                </ol>
+                <a class="home-more" href="#state-c">사용 안내 자세히 보기</a>
+              </section>
+              <section class="home-section" data-od-id="c320-free">
+                <h2>무료로 쓸 수 있어요</h2>
+                <ul class="home-cards" role="list">
+                  <li class="home-card"><h3>단축 주소 1개</h3><p>인스타그램 프로필에 넣을 짧은 주소예요. 가입하면 자동으로 만들어져요.</p></li>
+                  <li class="home-card"><h3>주소 바꾸기</h3><p>주소를 내 이름에 맞게 바꿀 수 있어요. 처음 한 번은 바로, 그 뒤로는 30일에 한 번이에요. 옛 주소는 90일 동안 새 주소로 연결돼요.</p></li>
+                  <li class="home-card"><h3>외부 링크 5개</h3><p>방문자에게 보이는 외부 링크를 5개까지 둘 수 있어요. 숨긴 링크는 이 수에 들어가지 않아요.</p></li>
+                </ul>
+                <p class="home-free-note">무료 랜딩에는 링크 사이에 크리링 광고가 한 칸 보일 수 있어요.</p>
+              </section>
+              <section class="home-final" data-od-id="c320-final">
+                <h2>내 크리링을 만들어 보세요</h2>
+                <p>구글 계정으로 가입해요.</p>
+                <a class="primary" href="#state-c">구글로 시작하기</a>
+              </section>
+            </div>
+            <footer class="site-footer"><a href="#state-c">문서</a><a href="#state-c">개인정보 처리방침</a></footer>
+          </main>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 상호작용 ============ -->
+  <section class="state" id="state-interaction" data-od-id="state-interaction" aria-labelledby="si-title">
+    <div class="state-head">
+      <h2 id="si-title">상호작용 · 구글로 시작하기 기본 / 가리킴(hover) / 키보드 초점</h2>
+      <p>지금 `.primary` 그대로입니다. 가리키거나 누르면 배경이 `--ds-color-action-primary-pressed`(150ms), 키보드 초점은 바깥 3px `--ds-color-text-primary` 링·간격 2px. 두 버튼 모두 `/auth/google`로 가는 전체 이동이고 모양이 같습니다. 예시 휴대폰 안은 누를 수 없고 초점이 가지 않습니다.</p>
+    </div>
+    <div class="zoom">
+      <div class="zoom-item"><p class="frame-label">기본</p><div class="zoom-box"><a class="primary" href="#state-interaction">구글로 시작하기</a></div></div>
+      <div class="zoom-item"><p class="frame-label">가리킴(hover)·누름</p><div class="zoom-box"><a class="primary is-hover" href="#state-interaction">구글로 시작하기</a></div></div>
+      <div class="zoom-item"><p class="frame-label">키보드 초점</p><div class="zoom-box"><a class="primary is-focus" href="#state-interaction">구글로 시작하기</a></div></div>
+      <div class="zoom-item"><p class="frame-label">사용 안내 링크(가리킴 시 밑줄 짙어짐)</p><div class="zoom-box"><a class="home-more" href="#state-interaction">사용 안내 자세히 보기</a></div></div>
+    </div>
+  </section>
+
+  <!-- ============ 상태 D: 로그인한 홈(바뀌지 않음) ============ -->
+  <section class="state" id="state-d" data-od-id="state-d" aria-labelledby="sd-title">
+    <div class="state-head">
+      <h2 id="sd-title">상태 D · 로그인한 홈(참고, 바뀌지 않음)</h2>
+      <p>로그인한 사람에게는 소개 구획(예시·3단계·무료·마지막 버튼)을 그리지 않고 지금 화면(`.landing` 한 열, 세로 가운데) 그대로입니다. 이벤트가 진행 중이면 지금처럼 카드 안 `내 크리링에서 신청하기`가 보입니다. 아래는 이벤트 진행 중 모습입니다.</p>
+    </div>
+    <div class="row">
+      <div>
+        <p class="frame-label">1280px · 로그인한 홈(지금 그대로)</p>
+        <div class="viewport w1280">
+          <main class="public-page">
+            <section class="landing" data-od-id="d1280-landing">
+              <p class="brand-mark">크리링</p>
+              <h1>인스타그램 프로필 링크 하나로 나를 소개하세요.</h1>
+              <p>크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.</p>
+              <section class="home-event" data-od-id="d1280-event" aria-label="이벤트 안내 예시">
+                <h2 class="home-event-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></h2>
+                <p>이벤트를 신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번 신청할 수 있어요.</p>
+                <p class="home-event-period">신청 기간 <time datetime="2026-10-10T10:00:00+09:00">2026. 10. 10. 오전 10:00</time>부터</p>
+                <a class="secondary" href="#state-d">내 크리링에서 신청하기</a>
+              </section>
+              <div class="home-actions">
+                <p class="home-account">creator@example.com으로 로그인했어요.</p>
+                <div class="button-row"><a class="primary" href="#state-d">내 크리링 편집</a><button class="secondary" type="button">로그아웃</button></div>
+              </div>
+            </section>
+            <footer class="site-footer"><a href="#state-d">문서</a><a href="#state-d">개인정보 처리방침</a></footer>
+          </main>
+        </div>
+      </div>
+      <div>
+        <p class="frame-label">390px · 로그인한 홈(지금 그대로)</p>
+        <div class="viewport w390">
+          <main class="public-page">
+            <section class="landing" data-od-id="d390-landing">
+              <p class="brand-mark">크리링</p>
+              <h1>인스타그램 프로필 링크 하나로 나를 소개하세요.</h1>
+              <p>크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.</p>
+              <section class="home-event" data-od-id="d390-event" aria-label="이벤트 안내 예시">
+                <h2 class="home-event-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></h2>
+                <p>이벤트를 신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번 신청할 수 있어요.</p>
+                <p class="home-event-period">신청 기간 <time datetime="2026-10-10T10:00:00+09:00">2026. 10. 10. 오전 10:00</time>부터</p>
+                <a class="secondary" href="#state-d">내 크리링에서 신청하기</a>
+              </section>
+              <div class="home-actions">
+                <p class="home-account">creator@example.com으로 로그인했어요.</p>
+                <div class="button-row"><a class="primary" href="#state-d">내 크리링 편집</a><button class="secondary" type="button">로그아웃</button></div>
+              </div>
+            </section>
+            <footer class="site-footer"><a href="#state-d">문서</a><a href="#state-d">개인정보 처리방침</a></footer>
+          </main>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 상태 E: 로그인 확인 오류 ============ -->
+  <section class="state" id="state-e" data-od-id="state-e" aria-labelledby="se-title">
+    <div class="state-head">
+      <h2 id="se-title">상태 E · 로그인 확인 오류(`session.kind = 'error'`)</h2>
+      <p>지금처럼 로그인 전 화면으로 그리고, 첫 버튼 줄 바로 위에 지금 오류 줄(`role="alert"`)을 둡니다. 소개 구획은 로그인 전과 같이 모두 보입니다. 마지막 버튼 위에는 오류 줄을 되풀이하지 않습니다.</p>
+    </div>
+    <div class="row">
+      <div>
+        <p class="frame-label">390px · 첫 화면(아래는 상태 A와 같음)</p>
+        <div class="viewport w390">
+          <main class="public-page">
+            <div class="home-intro">
+              <section class="home-hero" data-od-id="e390-hero">
+                <div class="home-hero-text">
+                  <p class="brand-mark">크리링</p>
+                  <h1>인스타그램 프로필 링크 하나로 나를 소개하세요.</h1>
+                  <p class="home-hero-lead">크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.</p>
+                  <div class="home-actions">
+                    <p class="form-error">로그인 상태를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.</p>
+                    <div class="button-row"><a class="primary" href="#state-e">구글로 시작하기</a></div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </main>
+          <p class="cut-note">… 예시 · 3단계 · 무료 · 마지막 버튼 · 바닥글(상태 A와 같음) …</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+</body>
+</html>

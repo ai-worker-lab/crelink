@@ -52,7 +52,7 @@ crelink 웹·앱이 함께 쓰는 시각 규칙입니다. 이 패키지는 OpenD
 ## 컴포넌트
 
 - 모서리: 카드·링크 카드·빈 상태는 `--ds-corner-lg`, 입력·선택 상자·하단 시트 안 요소는 `--ds-corner-md`, 배지·작은 칩은 `--ds-corner-sm`, 주요 버튼·보조 버튼·모드 전환은 알약형 `--ds-corner-full`입니다. 프로필 사진은 원형입니다.
-- 주요 버튼: 배경 `--ds-color-action-primary`, 글자 `--ds-color-text-on-action`, 굵기 extrabold, 높이 44~48, 안쪽 여백 12·20. 눌림·hover는 배경을 `--ds-color-action-primary-pressed`로 바꿉니다. 화면당 하나만 둡니다.
+- 주요 버튼: 배경 `--ds-color-action-primary`, 글자 `--ds-color-text-on-action`, 굵기 extrabold, 높이 44~48, 안쪽 여백 12·20. 눌림·hover는 배경을 `--ds-color-action-primary-pressed`로 바꿉니다. 화면당 하나만 둡니다(예외는 아래 로그인 전 홈 소개의 같은 행동 반복뿐).
 - 보조 버튼: 배경 `--ds-color-surface-default`, 1px 테두리 `--ds-color-border-default`, 글자 `--ds-color-text-primary`. hover는 테두리를 `--ds-color-text-primary`로 바꿉니다.
 - 카드·링크 카드: 배경 `--ds-color-surface-default`, 1px 테두리 `--ds-color-border-default`, 옅은 그림자(`--ds-color-overlay-shadow`, OpenDesign `--elev-raised`), 안쪽 여백 12·14(링크 카드)·20(일반 카드). hover는 테두리를 `--ds-color-text-primary`로 바꾸고 글자색은 바꾸지 않습니다.
 - 링크 관리 편집 행: 카드와 같은 면에 끌기 손잡이(`--ds-color-text-subtle`), 제목·도메인, 숨기기 스위치를 둡니다. 숨긴 링크는 내용만 흐리게(불투명도 0.45) 하고 “숨김” 글자를 붙입니다. 켜진 스위치는 `--ds-color-text-primary` 면입니다(강조색을 쓰지 않음).
@@ -61,6 +61,7 @@ crelink 웹·앱이 함께 쓰는 시각 규칙입니다. 이 패키지는 OpenD
 - 모든 화면은 로딩·성공(데이터 있음)·빈 상태·오류 상태를 함께 설계합니다. 오류에는 다시 시도할 수 있는 행동을 둡니다.
 - SNS 브랜드 아이콘(인스타그램·유튜브 등)은 디자인 시스템 적용 제외입니다. 공식 파일을 원본 색·모양 그대로 쓰고 토큰·테마·모서리·필터를 걸지 않습니다(`apps/web/docs/sns-icons.md`).
 - 광고 블록(R20)·배너 슬롯(R21): 공개 랜딩 링크 목록 안의 한 항목으로, 링크 카드와 같은 폭·같은 간격의 흰 카드(`--ds-color-surface-default`, 1px `--ds-color-border-default`, `--ds-corner-lg`, 안쪽 여백 8) 안에 3:1 배너 이미지(`--ds-corner-md`, 가운데 기준 잘라 채움)를 둡니다. 배너가 여러 장이면 이미지 아래 44px 조작 줄에 위치 표시(`2 / 3`)와 이전·다음 44px 원형 버튼을 두고, 손가락 스와이프·버튼·←/→ 키로만 넘깁니다(자동 넘김 없음, 처음·끝에서 멈춤). 광고 블록은 조작 줄 왼쪽에 `광고` 배지(1px `--ds-color-border-strong`, `--ds-color-text-secondary` 글자, `--ds-corner-sm`)를 늘 보이고, 배너가 1장이어도 이 배지 줄은 남깁니다. 배너 슬롯은 같은 틀에서 `광고` 배지만 빼고, 1장이면 조작 줄도 없습니다.
+- 로그인 전 홈 소개(`/`): 첫 화면(제목·설명·`구글로 시작하기`) → 예시 랜딩 → 사용 3단계 → 무료로 쓸 수 있는 것 → 마지막 `구글로 시작하기` 순서의 한 화면입니다. 긴 소개 화면이라 같은 행동의 주요 버튼을 첫 화면과 맨 끝 두 곳에 둘 수 있고(한 화면 높이에 함께 보이지 않게), 다른 주요 버튼은 두지 않습니다. 예시 랜딩은 가상의 크리에이터로 휴대폰 틀(`--ds-color-background-device`) 안에 그리고 `예시 화면` 표시를 늘 보이며, 누를 수 없게 둡니다. 실제 크리에이터의 이름·사진·링크, 가짜 사용자 수·후기, 다른 서비스와의 비교는 넣지 않고, 무료 범위 숫자는 공유 상수에서 가져옵니다.
 
 ## 상태와 접근성
 
