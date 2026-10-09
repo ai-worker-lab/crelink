@@ -2,6 +2,15 @@
 
 내부 참고용으로 백엔드 API의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-10-10
+
+- 링크 슬롯 +5 이벤트(R24 ①②③⑤, R13). 근거 `docs/work/api/0121-slot-event-api.md`, 설계 `docs/specs/crelink-slot-event.md`. 계약(`packages/shared`)은 0120 그대로이고 바꾸지 않음.
+  - migration `0005_slot_event`(첫 줄 `SET LOCAL lock_timeout = '5s'`, 머리 주석에 되돌리기): `slot_events`(코드 형식·보너스 1~45·`ends_at > starts_at` CHECK), `slot_event_entries`(PK `(event_id, user_id)`, 이벤트 FK `RESTRICT`, 사용자 FK `CASCADE`, 보너스 사본 1~45), 인덱스 `(event_id, applied_at DESC)`·`(user_id)`, 시드 `link-slots-plus-5`(보너스 5, 시작 = 적용 시각, 끝 없음). 새 테이블·시드 행만 더하는 expand.
+  - 새 `src/slot-event/`(`SlotEventModule`, `CreatorModule`·`AdminModule`이 가져옴): `GET /api/public/slot-event`(`no-store`, 행이 없으면 `event: null`), `POST /api/me/slot-event/entry`(`INSERT … SELECT … WHERE 열림 ON CONFLICT DO NOTHING`, 새로 201·이미 신청 200, 404 `slot_event_not_found`, 409 `slot_event_closed` 시작 전·끝남 문구 구분), `GET /api/admin/slot-event?page=`(신청 수·최신순 20개, 400 `validation_failed`), `PUT /api/admin/slot-event`(400 `validation_failed`·`slot_event_period_invalid`, 응답 1쪽). 상태는 SQL 한 문장의 `now()`.
+  - `CreatorService.limits`: `visibleMax = min(5 + extra_link_slots + 신청 보너스 합, 50)`(링크 추가·숨김 해제 검사도 이 값). `GET /api/me/landing`의 `slotEvent`, `GET /api/admin/creators/{userId}`의 `slotEvent`(신청 행 또는 null).
+  - 공용 입력 도우미: 기간 시각 `zonedTime`(크리링 배너 `bannerTime`을 옮김, 문구 그대로)·쪽 번호 `pageNumber`(운영자 크리에이터 목록의 검사를 옮김)를 `src/common/input.ts`로.
+  - 시험: `test/slot-event.e2e-spec.ts` 12건(공개 no-store, 401, 신청 전 5·뒤 10·다시 200, 동시 10건 → 1행·201 하나, 6번째 링크·숨김 해제, 추가 슬롯 2 → 12·0 → 10·45 → 50, 보너스 사본, 시작 전·끝난 뒤 409·끝난 뒤 보너스 유지, 운영자 401·403, 쪽 나눔·최신순·page 400, 기간 400 두 종류, 이벤트 없음 404), `test/migrations.e2e-spec.ts` 0005 3건, `test/health.e2e-spec.ts`·`creator.e2e-spec.ts`·`admin.e2e-spec.ts` 기대값. API 시험 175 → 190개.
+
 ## 2026-10-09
 
 - 배너 슬롯 부여·배너 차단·차단 도메인 배너 처리(설계 T6, 미정 3 A). 근거 `docs/work/api/0072-banner-slot-grant-block.md`. `PUT /api/admin/creators/{userId}/banner-slot`(부여 시각 유지·회수해도 배너 보관, 400 `validation_failed`·404 `creator_not_found`), `PUT /api/admin/banners/{id}/block`(링크 차단과 같은 규칙, 404 `banner_not_found`), `GET /api/admin/creators/{userId}`의 `bannerSlot`·`banners`·`bannerLimits`를 실제 데이터로, `POST /api/admin/blocked-domains`가 같은 트랜잭션에서 걸리는 크리에이터 배너를 차단하고 게시 중·예약 크리링 배너를 내림(게시 끝 = 지금). 시험 `test/admin-banner-slot.e2e-spec.ts` 5건.

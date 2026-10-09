@@ -16,6 +16,7 @@ import { AppConfig } from '../config.service';
 import { Database, Queryable } from '../database';
 import { apiError } from '../common/http';
 import { FilesService } from '../files/files.service';
+import { SlotEventService } from '../slot-event/slot-event.service';
 
 export interface LinkRow {
   id: string;
@@ -109,6 +110,7 @@ export class CreatorService {
     private readonly database: Database,
     private readonly files: FilesService,
     private readonly config: AppConfig,
+    private readonly slotEvents: SlotEventService,
   ) {}
 
   /** 방문자가 여는 랜딩. 형식이 틀리거나 없으면 404 `landing_not_found`, 크리에이터가 정지되었으면 410 `creator_suspended`. */
@@ -168,10 +170,14 @@ export class CreatorService {
     return rows.rows.map((row) => this.linkView(row));
   }
 
-  /** 한도(R13): 보이는(숨기지 않고 차단되지 않은) 링크 ≤ 5 + 추가 슬롯, 전체 ≤ 50. */
+  /**
+   * 한도(R13, R24 ②): 보이는(숨기지 않고 차단되지 않은) 링크 ≤ min(5 + 추가 슬롯 + 링크 슬롯 이벤트 보너스 합, 50), 전체 ≤ 50.
+   * 보너스는 신청 행 `slot_event_entries.bonus_links`의 합이라 운영자 추가 슬롯을 바꿔도 그대로입니다.
+   */
   async limits(db: Queryable, userId: string): Promise<LinkLimits & { extraLinkSlots: number }> {
-    const result = await db.query<{ extra_link_slots: number; visible: number; total: number }>(
+    const result = await db.query<{ extra_link_slots: number; event_bonus: number; visible: number; total: number }>(
       `SELECT u.extra_link_slots,
+              (SELECT coalesce(sum(e.bonus_links), 0)::int FROM slot_event_entries e WHERE e.user_id = u.id) AS event_bonus,
               count(l.id) FILTER (WHERE NOT l.hidden AND l.blocked_at IS NULL)::int AS visible,
               count(l.id)::int AS total
        FROM users u LEFT JOIN links l ON l.user_id = u.id
@@ -181,7 +187,10 @@ export class CreatorService {
     const row = result.rows[0];
     return {
       extraLinkSlots: row.extra_link_slots,
-      visibleMax: CRELINK_LIMITS.freeVisibleLinks + row.extra_link_slots,
+      visibleMax: Math.min(
+        CRELINK_LIMITS.freeVisibleLinks + row.extra_link_slots + row.event_bonus,
+        CRELINK_LIMITS.totalLinks,
+      ),
       visibleUsed: row.visible,
       totalMax: CRELINK_LIMITS.totalLinks,
       totalUsed: row.total,
@@ -345,17 +354,19 @@ export class CreatorService {
       userId,
     ]);
     const row = landing.rows[0];
-    const [shortLink, links, socials, portfolio, limits, slot, adBanners, banners, bannerLimits] = await Promise.all([
-      this.shortLink(db, userId),
-      this.links(db, userId),
-      this.socials(db, row.id),
-      this.portfolio(db, row.id),
-      this.limits(db, userId),
-      this.bannerSlot(db, row.id),
-      this.liveAdBanners(db),
-      this.creatorBanners(db, row.id),
-      this.bannerLimits(db, row.id),
-    ]);
+    const [shortLink, links, socials, portfolio, limits, slot, adBanners, banners, bannerLimits, slotEvent] =
+      await Promise.all([
+        this.shortLink(db, userId),
+        this.links(db, userId),
+        this.socials(db, row.id),
+        this.portfolio(db, row.id),
+        this.limits(db, userId),
+        this.bannerSlot(db, row.id),
+        this.liveAdBanners(db),
+        this.creatorBanners(db, row.id),
+        this.bannerLimits(db, row.id),
+        this.slotEvents.state(db, userId),
+      ]);
     const { visibleMax, visibleUsed, totalMax, totalUsed } = limits;
     return {
       landing: {
@@ -376,6 +387,7 @@ export class CreatorService {
       adBanners: adBanners.map((banner) => this.publicBannerView(banner, banner.url)),
       banners,
       bannerLimits,
+      slotEvent,
     };
   }
 }

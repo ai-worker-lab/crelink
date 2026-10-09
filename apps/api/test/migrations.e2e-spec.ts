@@ -1,4 +1,4 @@
-import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Pool } from 'pg';
@@ -300,6 +300,97 @@ describe('runMigrations', () => {
           [landingId],
         ),
       ).rejects.toMatchObject(violates('landing_blocks_slot_position_check'));
+    });
+  });
+
+  describe('0005_slot_event', () => {
+    const source = join(__dirname, '../migrations');
+    // 0004(다른 에픽)가 함께 머지돼도 그대로 맞도록 0005 앞의 파일을 모두 먼저 적용합니다.
+    const earlier = readdirSync(source)
+      .filter((name) => name.endsWith('.sql') && name < '0005_slot_event.sql')
+      .sort();
+    const insertUser = async (email: string) =>
+      (await pool.query<{ id: string }>('INSERT INTO users (email) VALUES ($1) RETURNING id', [email])).rows[0].id;
+    const seedEventId = async () =>
+      (await pool.query<{ id: string }>("SELECT id FROM slot_events WHERE code = 'link-slots-plus-5'")).rows[0].id;
+    const insertEntry = (eventId: string, userId: string, bonusLinks = 5) =>
+      pool.query('INSERT INTO slot_event_entries (event_id, user_id, bonus_links) VALUES ($1, $2, $3)', [
+        eventId,
+        userId,
+        bonusLinks,
+      ]);
+    const violates = (constraint: string) => ({ code: '23514', constraint });
+
+    beforeEach(async () => {
+      for (const name of earlier) copyFileSync(join(source, name), join(directory, name));
+      await runMigrations(pool, directory);
+      copyFileSync(join(source, '0005_slot_event.sql'), join(directory, '0005_slot_event.sql'));
+      await runMigrations(pool, directory);
+    });
+
+    it('시드 이벤트 link-slots-plus-5(보너스 5, 시작 = 적용 시각, 끝 없음)를 넣고 lock_timeout은 그 파일 안에서만 쓴다', async () => {
+      expect(await versions()).toEqual([...earlier.map((name) => name.replace(/\.sql$/, '')), '0005_slot_event']);
+      const events = await pool.query(
+        `SELECT e.code, e.bonus_links, e.ends_at, e.starts_at = m.applied_at AS starts_at_applied, e.starts_at <= now() AS open
+         FROM slot_events e, schema_migrations m WHERE m.version = '0005_slot_event'`,
+      );
+      expect(events.rows).toEqual([
+        { code: 'link-slots-plus-5', bonus_links: 5, ends_at: null, starts_at_applied: true, open: true },
+      ]);
+      expect((await pool.query('SELECT 1 FROM slot_event_entries')).rowCount).toBe(0);
+      expect((await pool.query('SHOW lock_timeout')).rows[0].lock_timeout).toBe('0');
+    });
+
+    it('CHECK: 코드 형식, 보너스 1~45, 끝 > 시작(같은 시각 금지), 계정당 이벤트마다 신청 1행', async () => {
+      const insertEvent = (patch: Record<string, unknown>) => {
+        const row = { code: 'other-event', bonus_links: 5, starts_at: '2026-10-01T00:00:00Z', ends_at: null, ...patch };
+        const keys = Object.keys(row);
+        return pool.query(
+          `INSERT INTO slot_events (${keys.join(', ')}) VALUES (${keys.map((_, index) => `$${index + 1}`).join(', ')})`,
+          Object.values(row),
+        );
+      };
+      await expect(insertEvent({ code: 'Other' })).rejects.toMatchObject(violates('slot_events_code_check'));
+      await expect(insertEvent({ code: 'a'.repeat(41) })).rejects.toMatchObject(violates('slot_events_code_check'));
+      await expect(insertEvent({ bonus_links: 0 })).rejects.toMatchObject(violates('slot_events_bonus_links_check'));
+      await expect(insertEvent({ bonus_links: 46 })).rejects.toMatchObject(violates('slot_events_bonus_links_check'));
+      await expect(insertEvent({ ends_at: '2026-10-01T00:00:00Z' })).rejects.toMatchObject(
+        violates('slot_events_check'),
+      );
+      await expect(insertEvent({ code: 'link-slots-plus-5' })).rejects.toMatchObject({ code: '23505' });
+      await insertEvent({ bonus_links: 45, ends_at: '2026-10-01T00:00:01Z' });
+
+      const userId = await insertUser('creator@example.com');
+      const eventId = await seedEventId();
+      await expect(insertEntry(eventId, userId, 0)).rejects.toMatchObject(
+        violates('slot_event_entries_bonus_links_check'),
+      );
+      await expect(insertEntry(eventId, userId, 46)).rejects.toMatchObject(
+        violates('slot_event_entries_bonus_links_check'),
+      );
+      await insertEntry(eventId, userId);
+      await expect(insertEntry(eventId, userId)).rejects.toMatchObject({ code: '23505' });
+      const entry = await pool.query('SELECT bonus_links, applied_at FROM slot_event_entries');
+      expect(entry.rows).toEqual([{ bonus_links: 5, applied_at: expect.any(Date) }]);
+    });
+
+    it('계정을 지우면 신청 행이 함께 지워지고(CASCADE), 신청 행이 있는 이벤트는 지울 수 없다(RESTRICT)', async () => {
+      const eventId = await seedEventId();
+      const leaving = await insertUser('leaving@example.com');
+      const staying = await insertUser('staying@example.com');
+      await insertEntry(eventId, leaving);
+      await insertEntry(eventId, staying);
+
+      await pool.query('DELETE FROM users WHERE id = $1', [leaving]);
+      expect((await pool.query('SELECT user_id FROM slot_event_entries')).rows).toEqual([{ user_id: staying }]);
+
+      await expect(pool.query('DELETE FROM slot_events WHERE id = $1', [eventId])).rejects.toMatchObject({
+        code: '23503',
+      });
+      expect((await pool.query('SELECT 1 FROM slot_events')).rowCount).toBe(1);
+      await pool.query('DELETE FROM slot_event_entries');
+      await pool.query('DELETE FROM slot_events WHERE id = $1', [eventId]);
+      expect((await pool.query('SELECT 1 FROM slot_events')).rowCount).toBe(0);
     });
   });
 });

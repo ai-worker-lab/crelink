@@ -51,6 +51,34 @@ export function optionalNonNegativeInteger(value: unknown, label: string): numbe
   return value;
 }
 
+/** 목록 쪽 번호(1부터). 없으면 1, 1 이상 정수가 아니면 400 `validation_failed`. */
+export function pageNumber(value: unknown): number {
+  const page = value === undefined ? 1 : Number(value);
+  if (!Number.isInteger(page) || page < 1) {
+    throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', 'page는 1 이상의 정수여야 합니다.');
+  }
+  return page;
+}
+
+/** 시간대가 붙은 ISO 8601(초·밀리초 선택). 시간대가 없으면 받지 않습니다. */
+const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/i;
+
+/**
+ * 기간 입력 시각(크리링 배너 게시 기간, 링크 슬롯 이벤트 기간). 시간대가 붙은 ISO 8601만 받고(아니면 400 `validation_failed`),
+ * 그대로 DB에 넘길 문자열과 비교용 밀리초를 돌려줍니다. label은 오류 문구에 쓰는 항목 이름입니다.
+ */
+export function zonedTime(value: unknown, label: string): { text: string; ms: number } {
+  const ms = typeof value === 'string' && ISO_WITH_ZONE.test(value) ? Date.parse(value) : Number.NaN;
+  if (Number.isNaN(ms)) {
+    throw apiError(
+      HttpStatus.BAD_REQUEST,
+      'validation_failed',
+      `${label}은(는) 시간대가 붙은 날짜·시각이어야 합니다(예: 2026-10-09T09:00:00+09:00).`,
+    );
+  }
+  return { text: value as string, ms };
+}
+
 /** http·https 절대 URL만 받습니다. 맞지 않으면 null. */
 export function parseHttpUrl(value: string): URL | null {
   if (value.length > CRELINK_LIMITS.urlMax || !URL.canParse(value)) return null;
