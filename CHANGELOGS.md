@@ -7,6 +7,7 @@
 ## 2026-10-10
 
 - AI 운영자와 실사용자 100명 목표, 링크 슬롯 +5 이벤트 work item 등록(사용자 결정: 운영부터 기획·개발까지 모든 권한을 AI 전용 계정에 위임, 실행마다 기록, 30분 트리거, 1차 목표 사이트 보강과 실사용자 100명, 신청자 한정 슬롯 +5 이벤트). 에픽 `docs/work/epics/0088-ai-operator.md`·`docs/work/epics/0089-slot-event.md`, PRD·조사 `docs/work/product/0090-growth-goal-ai-operator-prd.md`, 설계·통합 `docs/work/orchestrator/0091-ai-operator-design.md`·`docs/work/orchestrator/0092-slot-event-design.md`. 병렬 작업용으로 후속 번호 범위와 migration 번호(0004·0005)를 나눴습니다.
+- 실사용자 100명 목표·AI 운영자·링크 슬롯 +5 이벤트 요구와 초기 사용자 모집 조사. PRD `docs/product/crelink.md`: `목표` 절(1차 목표, 실사용자 정의·측정 방법, 기준 시점 값 운영 크리에이터 5명), 대상 사용자 AI 운영자, 범위, R23(전용 계정·모든 권한 위임·행동 기록·실행 기록·30분 트리거와 겹침 금지·멈춤 스위치·법·약관 준수·실사용자 지표, ①~⑧)·R24(신청자 한정 +5·계정당 한 번·R13과 별도 합산·기간·보너스 유지·홈 안내·운영자 조회, ①~⑦) 행, 미정 기본값과 위험. 수용 기준과 실사용자 정의는 `[AI 제안]`이며 사용자 위임에 따른 AI 승인으로 채택했습니다. 조사 `docs/product/research/initial-user-acquisition.md`: Linktree·리틀리·인포크 초기 확보 방식, 국내 채널, 정보통신망법 제50조·제50조의7, Instagram 이용약관·Meta 스팸 정책, 추천·보증 심사지침, 단계별 가설·지표, AI 운영자가 혼자 할 수 있는 일. 후속 `분류 대기` work item 0140~0147(약관, 검색·링크 미리보기, 홈·첫 사용 안내·랜딩 하단 디자인, 모집 문안, 가이드 글, 친구 초대 검토)을 등록했습니다. `docs/README.md` 색인은 orchestrator 소유라 0091 쪽에서 넣습니다. 근거 `docs/work/product/0090-growth-goal-ai-operator-prd.md`.
 
 ## 2026-10-09
 
