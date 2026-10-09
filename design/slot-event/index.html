@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>크리링 · 외부 링크 +5 이벤트 시안</title>
+<link rel="stylesheet" href="../system/tokens.css">
+<link rel="stylesheet" href="slot-event.css">
+</head>
+<body>
+
+<!-- 시안 전용 막대(제품 UI 아님): 화면과 신청 결과를 고릅니다. 상태 모음은 states.html. -->
+<div class="spec-bar" data-od-id="spec-bar">
+  <label for="screen-pick">시안 화면</label>
+  <select id="screen-pick">
+    <option value="edit">1. 페이지 편집 · 이벤트 띠(미신청)</option>
+    <option value="links">2. 외부 링크 패널 · 한도 참(미신청)</option>
+    <option value="home-out">3. 홈 · 로그인 전</option>
+    <option value="home-in">4. 홈 · 로그인 후(미신청)</option>
+    <option value="admin-event">5. 운영자 · 이벤트</option>
+    <option value="admin-creator">6. 운영자 · 크리에이터 상세</option>
+  </select>
+  <label for="result-pick">신청 결과 흉내</label>
+  <select id="result-pick">
+    <option value="ok">성공</option>
+    <option value="closed">기간 아님(409 slot_event_closed)</option>
+    <option value="missing">이벤트 없음(404 slot_event_not_found)</option>
+    <option value="network">네트워크 오류</option>
+  </select>
+  <p class="spec-note">이 막대는 시안 전용이에요. 모든 상태는 states.html에 있어요.</p>
+</div>
+
+<!-- 1. 페이지 편집: 처음 패널(넓은 화면) / 미리보기 위(좁은 화면)에 이벤트 띠 -->
+<section class="screen" id="screen-edit" data-od-id="screen-edit">
+  <div class="app-page manager-page">
+    <header class="site-header">
+      <a class="brand" href="#screen-home-out">크리링</a>
+      <nav class="site-nav" aria-label="주요 메뉴"><span class="logout-control"><button type="button" class="secondary">로그아웃</button></span></nav>
+    </header>
+    <div class="manager">
+      <nav class="manager-menu" aria-label="관리 메뉴" data-slot="menu"></nav>
+      <div class="manager-stage">
+        <div class="address-bar"><code class="url-text">crl.ink/harufilm</code><button type="button" class="secondary">복사</button></div>
+        <div class="preview-device"><div class="preview-screen" data-slot="landing" data-links="3"></div></div>
+      </div>
+      <main class="manager-panel">
+        <div class="only-narrow narrow-stack">
+          <div class="narrow-bar" data-slot="narrow-bar"></div>
+          <!-- 좁은 화면 띠: BannerSlotNotice와 같은 자리(sticky 줄 아래, 미리보기 위) -->
+          <section class="event-offer" aria-labelledby="band-title-narrow" data-band data-od-id="band-narrow">
+            <div class="event-offer-text">
+              <p class="event-offer-title" id="band-title-narrow"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></p>
+              <p class="event-offer-body">신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번, <time datetime="2026-11-30T23:59:00+09:00">2026. 11. 30. 오후 11:59</time>까지 신청할 수 있어요.</p>
+            </div>
+            <button type="button" class="primary" data-apply aria-describedby="band-title-narrow">신청하기</button>
+            <div class="action-status" aria-live="polite"></div>
+          </section>
+          <div class="preview-screen is-bare" data-slot="landing" data-links="3"></div>
+        </div>
+        <div class="manager-content">
+          <section class="panel-section page-overview" aria-labelledby="overview-title" data-od-id="page-overview">
+            <div class="panel-head">
+              <h1 id="overview-title" class="panel-title" tabindex="-1">페이지 편집</h1>
+              <p class="panel-help">방문자 화면에서 구역이나 항목을 선택해 편집해요.</p>
+            </div>
+            <!-- 넓은 화면 띠: 처음 패널 머리 아래, 구역 선택 위(BannerSlotNotice 자리) -->
+            <section class="event-offer" aria-labelledby="band-title-wide" data-band data-od-id="band-wide">
+              <div class="event-offer-text">
+                <p class="event-offer-title" id="band-title-wide"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></p>
+                <p class="event-offer-body">신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번, <time datetime="2026-11-30T23:59:00+09:00">2026. 11. 30. 오후 11:59</time>까지 신청할 수 있어요.</p>
+              </div>
+              <button type="button" class="primary" data-apply aria-describedby="band-title-wide">신청하기</button>
+              <div class="action-status" aria-live="polite"></div>
+            </section>
+            <h2 class="panel-subtitle">구역 선택</h2>
+            <ul class="section-picker">
+              <li><button type="button" data-section="links"><span class="section-picker-title">외부 링크</span><span class="section-picker-meta" data-limit-meta>보이는 링크 3/5</span></button></li>
+              <li><button type="button"><span class="section-picker-title">광고 블록</span><span class="section-picker-meta">링크 목록 맨 뒤</span></button></li>
+              <li><button type="button"><span class="section-picker-title">포트폴리오</span><span class="section-picker-meta">2/20</span></button></li>
+              <li><button type="button"><span class="section-picker-title">방명록</span><span class="section-picker-meta">꺼짐</span></button></li>
+            </ul>
+            <p class="section-help">프로필 머리와 SNS 채널은 프로필 메뉴에서 수정할 수 있어요.</p>
+            <a class="secondary" href="#screen-edit">프로필에서 고치기</a>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+<!-- 2. 외부 링크 패널: 보이는 링크 5/5, 미신청, 이벤트 진행 중 -->
+<section class="screen" id="screen-links" data-od-id="screen-links" hidden>
+  <div class="app-page manager-page">
+    <header class="site-header">
+      <a class="brand" href="#screen-home-out">크리링</a>
+      <nav class="site-nav" aria-label="주요 메뉴"><span class="logout-control"><button type="button" class="secondary">로그아웃</button></span></nav>
+    </header>
+    <div class="manager">
+      <nav class="manager-menu" aria-label="관리 메뉴" data-slot="menu"></nav>
+      <div class="manager-stage">
+        <div class="address-bar"><code class="url-text">crl.ink/harufilm</code><button type="button" class="secondary">복사</button></div>
+        <div class="preview-device"><div class="preview-screen" data-slot="landing" data-links="5"></div></div>
+      </div>
+      <main class="manager-panel">
+        <div class="only-narrow narrow-stack">
+          <div class="narrow-bar" data-slot="narrow-bar"></div>
+          <div class="preview-screen is-bare" data-slot="landing" data-links="5"></div>
+        </div>
+        <div class="manager-content">
+          <section class="panel-section only-wide" aria-labelledby="links-title-wide" data-od-id="links-panel-wide">
+            <div class="panel-head">
+              <button type="button" class="back-button"><span aria-hidden="true">←</span> 전체</button>
+              <h2 id="links-title-wide" class="panel-title" tabindex="-1">외부 링크</h2>
+            </div>
+            <div class="slot-contents" data-slot="links-body"></div>
+          </section>
+        </div>
+      </main>
+    </div>
+    <!-- 좁은 화면: 같은 내용을 하단 시트(EditSheet)로 -->
+    <div class="sheet-scrim only-narrow" data-od-id="links-sheet">
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="links-title-sheet">
+        <div class="sheet-head">
+          <h2 id="links-title-sheet" class="sheet-title">외부 링크</h2>
+          <button type="button" class="icon-button" aria-label="닫기"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        </div>
+        <div class="sheet-body" data-slot="links-body"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. 홈 로그인 전 -->
+<section class="screen" id="screen-home-out" data-od-id="screen-home-out" hidden>
+  <main class="public-page">
+    <section class="landing" aria-labelledby="home-title-out" data-od-id="home-landing-out">
+      <p class="brand-mark">크리링</p>
+      <h1 id="home-title-out">인스타그램 프로필 링크 하나로 나를 소개하세요.</h1>
+      <p>크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.</p>
+      <section class="home-event" aria-labelledby="home-event-title-out" data-od-id="home-event-out">
+        <h2 id="home-event-title-out" class="home-event-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></h2>
+        <p>가입하고 이벤트를 신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번 신청할 수 있어요.</p>
+        <p class="home-event-period">신청 기간 <time datetime="2026-10-10T10:00:00+09:00">2026. 10. 10. 오전 10:00</time> ~ <time datetime="2026-11-30T23:59:00+09:00">2026. 11. 30. 오후 11:59</time></p>
+      </section>
+      <div class="home-actions">
+        <div class="button-row"><a class="primary" href="#screen-home-in">구글로 시작하기</a></div>
+      </div>
+    </section>
+    <footer class="site-footer"><a href="#screen-home-out">문서</a><a href="#screen-home-out">개인정보 처리방침</a></footer>
+  </main>
+</section>
+
+<!-- 4. 홈 로그인 후(미신청) -->
+<section class="screen" id="screen-home-in" data-od-id="screen-home-in" hidden>
+  <main class="public-page">
+    <section class="landing" aria-labelledby="home-title-in" data-od-id="home-landing-in">
+      <p class="brand-mark">크리링</p>
+      <h1 id="home-title-in">인스타그램 프로필 링크 하나로 나를 소개하세요.</h1>
+      <p>크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.</p>
+      <section class="home-event" aria-labelledby="home-event-title-in" data-od-id="home-event-in">
+        <h2 id="home-event-title-in" class="home-event-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></h2>
+        <p>이벤트를 신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번 신청할 수 있어요.</p>
+        <p class="home-event-period">신청 기간 <time datetime="2026-10-10T10:00:00+09:00">2026. 10. 10. 오전 10:00</time> ~ <time datetime="2026-11-30T23:59:00+09:00">2026. 11. 30. 오후 11:59</time></p>
+        <a class="secondary" href="#screen-edit">내 크리링에서 신청하기</a>
+      </section>
+      <div class="home-actions">
+        <p class="home-account">haru.film.official.creator@gmail.com으로 로그인했어요.</p>
+        <div class="button-row">
+          <a class="primary" href="#screen-edit">내 크리링 편집</a>
+          <span class="logout-control"><button type="button" class="secondary">로그아웃</button></span>
+        </div>
+      </div>
+    </section>
+    <footer class="site-footer"><a href="#screen-home-in">문서</a><a href="#screen-home-in">개인정보 처리방침</a></footer>
+  </main>
+</section>
+
+<!-- 5. 운영자 이벤트(/admin/slot-event): 진행 중, 신청 128명, 1/7쪽 -->
+<section class="screen" id="screen-admin-event" data-od-id="screen-admin-event" hidden>
+  <div class="app-page">
+    <header class="site-header" data-slot="admin-header"></header>
+    <main class="app-main wide">
+      <div class="slot-event-head">
+        <h1 class="page-title">외부 링크 +5 이벤트</h1>
+        <p class="section-help">신청한 크리에이터는 보이는 외부 링크를 5개 더 둘 수 있어요. 기간이 끝나면 새 신청만 막히고, 받은 보너스는 그대로예요.</p>
+      </div>
+      <section class="card" aria-labelledby="period-title" data-od-id="admin-period">
+        <div class="card-head">
+          <h2 id="period-title">이벤트 기간</h2>
+          <span class="badge ad-status ad-status-live">진행 중</span>
+        </div>
+        <p class="slot-event-state">지금 신청을 받고 있어요. 홈과 관리 화면에 안내가 보여요.</p>
+        <form class="slot-event-form" id="period-form" novalidate>
+          <div class="ad-banner-period">
+            <div class="field">
+              <label for="period-start">시작 (필수)</label>
+              <input id="period-start" class="input" type="datetime-local" required value="2026-10-10T10:00" aria-describedby="period-start-help">
+              <p class="field-help" id="period-start-help">한국 시간 기준이에요.</p>
+            </div>
+            <div class="field">
+              <label for="period-end">끝</label>
+              <input id="period-end" class="input" type="datetime-local" value="2026-11-30T23:59" aria-describedby="period-end-help">
+              <p class="field-help" id="period-end-help">비워 두면 끝을 정할 때까지 계속 신청을 받아요.</p>
+            </div>
+          </div>
+          <div class="action-status" aria-live="polite" id="period-status"></div>
+          <div class="form-actions"><button type="submit" class="primary" id="period-save">기간 저장</button></div>
+        </form>
+      </section>
+      <section class="card" aria-labelledby="entries-title" data-od-id="admin-entries">
+        <h2 id="entries-title">신청자</h2>
+        <dl class="stat-tiles slot-event-count"><div><dt>신청 수</dt><dd>128</dd></div></dl>
+        <p class="section-help">신청 시각이 최신인 순서예요. 전체 128명 · 1/7쪽</p>
+        <div class="table-scroll slot-event-table-wrap">
+          <table class="data-table slot-event-table">
+            <caption class="visually-hidden">이벤트 신청자 목록</caption>
+            <thead><tr><th scope="col">신청일시</th><th scope="col">이메일</th><th scope="col">이름</th><th scope="col">단축 주소</th></tr></thead>
+            <tbody data-slot="entries"></tbody>
+          </table>
+        </div>
+        <nav class="pagination" aria-label="쪽 이동"><span aria-hidden="true"></span><span>1 / 7</span><a href="#screen-admin-event">다음 쪽</a></nav>
+      </section>
+    </main>
+  </div>
+</section>
+
+<!-- 6. 운영자 크리에이터 상세: 한도 분해·이벤트 신청일 -->
+<section class="screen" id="screen-admin-creator" data-od-id="screen-admin-creator" hidden>
+  <div class="app-page">
+    <header class="site-header" data-slot="admin-header"></header>
+    <main class="app-main wide">
+      <p class="breadcrumb"><a href="#screen-admin-event">크리에이터 목록</a></p>
+      <h1 class="page-title">하루필름</h1>
+      <dl class="meta-list">
+        <div><dt>이메일</dt><dd>haru.film.official.creator@gmail.com</dd></div>
+        <div><dt>단축 주소</dt><dd><a class="url-text" href="#screen-admin-creator">https://crl.ink/harufilm</a></dd></div>
+        <div><dt>가입일</dt><dd>2026년 10월 10일</dd></div>
+        <div><dt>상태</dt><dd>이용 중</dd></div>
+        <div><dt>이벤트 신청일</dt><dd>2026년 10월 10일 · 보이는 링크 +5</dd></div>
+      </dl>
+      <section class="card" aria-labelledby="account-title" data-od-id="admin-account">
+        <h2 id="account-title">계정 관리</h2>
+        <p class="section-help">보이는 링크 9/12 · 전체 링크 11/50</p>
+        <div class="control-grid">
+          <form class="subform">
+            <div class="field">
+              <label for="extra-slots">추가 링크 슬롯</label>
+              <div class="inline-fields">
+                <input id="extra-slots" class="input input-number" type="number" min="0" step="1" value="2" aria-describedby="extra-help">
+                <button type="submit" class="primary">슬롯 저장</button>
+              </div>
+              <p class="field-help" id="extra-help">보이는 링크 한도 = 무료 5개 + 추가 슬롯 <span id="extra-n">2</span>개 + 이벤트 5개<span id="extra-cap"></span></p>
+            </div>
+          </form>
+          <div class="subform">
+            <h3>이용 정지</h3>
+            <p class="section-help">현재: 이용 중</p>
+            <button type="button" class="secondary">이용 정지</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</section>
+
+<template id="tpl-menu">
+  <ul>
+    <li><a href="#screen-edit" aria-current="page"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M4 20h4L19 9l-4-4L4 16z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>페이지 편집</span></a></li>
+    <li><a href="#screen-edit"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 20c1-4 4-6 8-6s7 2 8 6" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>프로필</span></a></li>
+    <li><a href="#screen-edit"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>방명록</span></a></li>
+    <li><a href="#screen-edit"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>주소 설정</span></a></li>
+  </ul>
+</template>
+
+<template id="tpl-narrow-bar">
+  <code class="url-text">crl.ink/harufilm</code>
+  <button type="button" class="secondary">복사</button>
+  <a class="secondary icon-only" href="#screen-edit" aria-label="공개 페이지 열기 (새 창)"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" fill="none" stroke="currentColor" stroke-width="2"/></svg></a>
+  <div class="view-toggle" role="group" aria-label="미리보기 모드"><button type="button" aria-pressed="true">편집</button><button type="button" aria-pressed="false">미리보기</button></div>
+</template>
+
+<template id="tpl-admin-header">
+  <a class="brand" href="#screen-home-in">크리링</a>
+  <nav class="site-nav" aria-label="운영자 메뉴">
+    <a href="#screen-admin-creator">크리에이터</a>
+    <a href="#screen-admin-event">차단 도메인</a>
+    <a href="#screen-admin-event">광고 배너</a>
+    <a href="#screen-admin-event">이벤트</a>
+    <a href="#screen-edit">내 크리링</a>
+    <span class="logout-control"><button type="button" class="secondary">로그아웃</button></span>
+  </nav>
+</template>
+
+<script>
+// 시안 데모 코드입니다. 구현은 이 코드를 옮기지 않고 handoff.md의 상태·문구를 기준으로 합니다.
+const LINKS = ['유튜브 채널 · 여행 브이로그', '협업 문의 메일', '2026 가을 촬영 장비 목록', '네이버 블로그 · 제주 한 달 살기', '스레드'];
+const avatar = '<span class="default-avatar profile-avatar"><svg viewBox="0 0 96 96" focusable="false" aria-hidden="true"><circle cx="48" cy="38" r="16" fill="currentColor"/><path d="M18 84c4-16 16-24 30-24s26 8 30 24z" fill="currentColor"/></svg></span>';
+const favicon = '<svg class="favicon favicon-default" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M8 12a3 3 0 0 0 4 0l3-3a3 3 0 0 0-4-4l-1 1M12 8a3 3 0 0 0-4 0l-3 3a3 3 0 0 0 4 4l1-1" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+const handle = '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M7 4h2v2H7zm4 0h2v2h-2zM7 9h2v2H7zm4 0h2v2h-2zm-4 5h2v2H7zm4 0h2v2h-2z" fill="currentColor"/></svg>';
+
+function landing(count) {
+  const items = LINKS.slice(0, count).map((t) => `<li><div class="link-card">${favicon}<span class="link-text"><span class="link-title">${t}</span></span></div></li>`).join('');
+  return `<div class="preview-main"><div class="profile"><header class="profile-head">${avatar}<h2 class="profile-name">하루필름</h2><p class="profile-bio">브이로그와 여행 숏폼을 만들어요.</p></header><ul class="link-list">${items}</ul></div></div><footer class="profile-footer"><span class="brand">크리링</span><span>개인정보 처리방침</span></footer>`;
+}
+
+function linksBody(scope) {
+  const rows = LINKS.map((t, i) => `<li class="link-edit-item"><div class="link-edit-row"><button type="button" class="drag-handle" aria-label="${t} 순서 바꾸기">${handle}</button><div class="link-card link-edit-card">${favicon}<span class="link-text"><span class="link-title">${t}</span></span></div><div class="link-edit-controls"><button type="button" role="switch" class="hide-switch" aria-checked="false" aria-label="${t} 숨기기"><span class="hide-switch-track" aria-hidden="true"><span class="hide-switch-thumb"></span></span><span aria-hidden="true">숨김</span></button><button type="button" class="secondary" aria-label="${t} 수정">수정</button></div></div></li>`).join('');
+  return `<div class="panel-badges"><p class="limit-badge limit-full" data-limit-badge>보이는 링크 5/5</p></div>
+<section class="event-offer is-compact" aria-labelledby="offer-title-${scope}" data-offer data-od-id="links-offer-${scope}">
+  <div class="event-offer-text">
+    <p class="event-offer-title" id="offer-title-${scope}"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></p>
+    <p class="event-offer-body">이벤트를 신청하면 보이는 링크를 5개 더 둘 수 있어요.</p>
+  </div>
+  <button type="button" class="secondary" data-apply aria-describedby="offer-title-${scope}">신청하기</button>
+  <div class="action-status" aria-live="polite"></div>
+</section>
+<p class="section-help">카드를 누르면 고칠 수 있고, 손잡이를 끌면 순서가 바뀌어요. 광고 블록 행도 같은 손잡이로 옮겨요. 숨긴 링크와 차단된 링크는 방문자에게 보이지 않고 한도에도 들어가지 않아요. 숨긴 링크 포함 전체 5/50개.</p>
+<div class="action-status" aria-live="polite" data-panel-status></div>
+<ul class="link-list link-edit-list">${rows}</ul>
+<p class="notice-box" data-limit-notice>보이는 링크 한도(5개)에 도달했어요. 이벤트를 신청하면 5개 더 둘 수 있어요. 다른 링크를 숨기거나 지워도 새 링크를 추가할 수 있어요.</p>`;
+}
+
+const ENTRIES = [
+  ['2026. 10. 12. 오후 9:41', 'haru.film.official.creator@gmail.com', '하루필름', 'harufilm', 'u1'],
+  ['2026. 10. 12. 오후 6:05', 'minji@studio.kr', '민지의 작업실', 'minji-studio', 'u2'],
+  ['2026. 10. 12. 오전 11:20', 'very.long.email.address.for.overflow.check.1234567890@example-creator-domain.co.kr', '이름이 아주 긴 크리에이터 채널 이름 확인용 표시 이름 예시', 'a-very-long-slug-for-checking-wrap-0012', 'u3'],
+  ['2026. 10. 11. 오후 2:02', 'jun.cooks@gmail.com', null, 'juncooks', 'u4'],
+  ['2026. 10. 10. 오전 10:03', 'seoyeon.draws@naver.com', '서연 드로잉', 'seoyeon', 'u5'],
+];
+
+function fill() {
+  document.querySelectorAll('[data-slot="menu"]').forEach((el) => el.append(document.getElementById('tpl-menu').content.cloneNode(true)));
+  document.querySelectorAll('[data-slot="narrow-bar"]').forEach((el) => el.append(document.getElementById('tpl-narrow-bar').content.cloneNode(true)));
+  document.querySelectorAll('[data-slot="admin-header"]').forEach((el) => el.append(document.getElementById('tpl-admin-header').content.cloneNode(true)));
+  document.querySelectorAll('[data-slot="landing"]').forEach((el) => { el.innerHTML = landing(Number(el.dataset.links)); });
+  document.querySelectorAll('[data-slot="links-body"]').forEach((el, i) => { el.innerHTML = linksBody(i ? 'sheet' : 'wide'); });
+  document.querySelector('[data-slot="entries"]').innerHTML = ENTRIES.map(([at, email, name, slug, id]) => `<tr><td>${at}</td><td><a href="#screen-admin-creator" data-user="${id}">${email}</a></td><td>${name ?? '—'}</td><td><code>${slug}</code></td></tr>`).join('');
+}
+
+const RESULT_TEXT = {
+  closed: '이벤트 신청 기간이 아니어서 신청하지 못했어요.',
+  missing: '진행 중인 이벤트가 없어 신청하지 못했어요.',
+  network: '서버에 연결할 수 없어요. 인터넷 연결을 확인해 주세요.',
+};
+
+function apply(button) {
+  const result = document.getElementById('result-pick').value;
+  const screen = button.closest('.screen');
+  const offers = [...screen.querySelectorAll('.event-offer')];
+  offers.forEach((o) => { o.setAttribute('aria-busy', 'true'); o.querySelector('[data-apply]').disabled = true; o.querySelector('[data-apply]').textContent = '신청 중…'; o.querySelector('.action-status').textContent = ''; });
+  setTimeout(() => {
+    if (result === 'network') {
+      offers.forEach((o) => {
+        o.removeAttribute('aria-busy');
+        const b = o.querySelector('[data-apply]');
+        b.disabled = false; b.textContent = '다시 시도';
+        o.querySelector('.action-status').innerHTML = `<p class="form-error" role="alert">${RESULT_TEXT.network}</p>`;
+      });
+      // 진행 중 비활성으로 빠진 초점을 누른 버튼(`다시 시도`)으로 되돌립니다.
+      button.focus();
+      return;
+    }
+    const ok = result === 'ok';
+    offers.forEach((o) => {
+      const p = document.createElement('p');
+      if (o.hasAttribute('data-band')) {
+        p.className = `${ok ? 'form-success' : 'form-error'} event-result`;
+        p.setAttribute('role', ok ? 'status' : 'alert');
+        p.tabIndex = -1;
+        p.textContent = ok ? '이벤트를 신청했어요. 이제 보이는 외부 링크를 10개까지 둘 수 있어요.' : RESULT_TEXT[result];
+        o.replaceWith(p);
+      } else if (ok) {
+        p.className = 'event-status';
+        p.tabIndex = -1;
+        p.innerHTML = '<span class="badge badge-positive">이벤트 보너스 +5 받음</span><span>2026년 10월 10일 신청</span>';
+        o.replaceWith(p);
+      } else {
+        p.className = 'form-error event-result';
+        p.setAttribute('role', 'alert');
+        p.tabIndex = -1;
+        p.textContent = RESULT_TEXT[result];
+        o.replaceWith(p);
+      }
+    });
+    screen.querySelectorAll('[data-limit-meta]').forEach((el) => { if (ok) el.textContent = '보이는 링크 3/10'; });
+    screen.querySelectorAll('[data-limit-badge]').forEach((el) => { if (ok) { el.textContent = '보이는 링크 5/10'; el.classList.remove('limit-full'); } });
+    screen.querySelectorAll('[data-limit-notice]').forEach((el) => {
+      if (ok) {
+        const add = document.createElement('button');
+        add.type = 'button'; add.className = 'secondary link-add'; add.textContent = '링크 추가';
+        el.replaceWith(add);
+      } else {
+        el.textContent = '보이는 링크 한도(5개)에 도달했어요. 다른 링크를 숨기거나 지우면 새 링크를 추가할 수 있어요. 한도를 늘리려면 크리링 운영자에게 문의해 주세요.';
+      }
+    });
+    screen.querySelectorAll('[data-panel-status]').forEach((el) => { if (ok) el.innerHTML = '<p class="form-success">이벤트를 신청했어요. 이제 보이는 외부 링크를 10개까지 둘 수 있어요.</p>'; });
+    // 누른 버튼이 사라지므로 그 자리에 남은 결과 줄(완료·오류·신청함)로 초점을 옮깁니다.
+    const visible = [...screen.querySelectorAll('.event-result, .event-status')].find((el) => el.offsetParent !== null);
+    if (visible) visible.focus();
+  }, 900);
+}
+
+function show(id) {
+  const target = document.getElementById(`screen-${id}`) ? id : 'edit';
+  document.querySelectorAll('.screen').forEach((s) => { s.hidden = s.id !== `screen-${target}`; });
+  document.getElementById('screen-pick').value = target;
+}
+
+fill();
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-apply]');
+  if (button) apply(button);
+  const link = event.target.closest('a[href^="#screen-"]');
+  if (link) { event.preventDefault(); const id = link.getAttribute('href').slice(8); history.replaceState(null, '', `#${id}`); show(id); }
+});
+document.getElementById('screen-pick').addEventListener('change', (event) => { history.replaceState(null, '', `#${event.target.value}`); show(event.target.value); });
+
+// 운영자 기간 저장 흉내: 끝 < 시작이면 400 slot_event_period_invalid 문구.
+document.getElementById('period-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const start = document.getElementById('period-start');
+  const end = document.getElementById('period-end');
+  const status = document.getElementById('period-status');
+  const save = document.getElementById('period-save');
+  start.removeAttribute('aria-invalid'); end.removeAttribute('aria-invalid');
+  if (!start.value) { start.setAttribute('aria-invalid', 'true'); status.innerHTML = '<p class="form-error" role="alert">시작 시각을 넣어 주세요.</p>'; start.focus(); return; }
+  if (end.value && end.value <= start.value) { end.setAttribute('aria-invalid', 'true'); status.innerHTML = '<p class="form-error" role="alert">끝은 시작보다 뒤여야 해요.</p>'; end.focus(); return; }
+  status.innerHTML = ''; save.disabled = true; save.textContent = '저장 중…'; start.disabled = true; end.disabled = true;
+  setTimeout(() => { save.disabled = false; save.textContent = '기간 저장'; start.disabled = false; end.disabled = false; status.innerHTML = '<p class="form-success">이벤트 기간을 저장했어요.</p>'; }, 900);
+});
+
+// 추가 슬롯 입력에 따라 한도 분해 도움말(전체 상한 50).
+document.getElementById('extra-slots').addEventListener('input', (event) => {
+  const n = Number(event.target.value) || 0;
+  document.getElementById('extra-n').textContent = n;
+  document.getElementById('extra-cap').textContent = 5 + n + 5 > 50 ? ' → 전체 링크 상한 50개' : '';
+});
+
+show(location.hash.slice(1) || 'edit');
+</script>
+</body>
+</html>
