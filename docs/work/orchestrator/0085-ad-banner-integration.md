@@ -4,7 +4,7 @@
 - 역할: orchestrator
 - 상위: 0063
 - 선행: 0070, 0071, 0072, 0073, 0074, 0081, 0082, 0084
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-09
@@ -15,7 +15,7 @@
 
 ## 수용 기준
 
-- [ ] 통합 브랜치를 main에 한 번 머지합니다. 그 전에: 전체 `pnpm verify`, 실제 API로 E2E `tests/e2e/ad-banner.spec.ts`(아래 검증 계획), mock 제거, E2E 정리 순서. 운영 주소 검사 `infra/prod/verify.sh`에 `{SHORT}/b/zzzzzzzzzz`(와 `/a/zzzzzzzzzz/zzzzzzzzzz`)가 302 `…/notice?reason=link_unavailable`인지 더합니다(T8이 main에 들어간 뒤). `docs/specs/crelink-prod-deploy.md`의 구성도·공개 경로 줄, 변경 기록, 릴리스 노트도 고칩니다.
+- [x] 통합 브랜치를 main에 한 번 머지합니다. 그 전에: 전체 `pnpm verify`, 실제 API로 E2E `tests/e2e/ad-banner.spec.ts`(아래 검증 계획), mock 제거, E2E 정리 순서. 운영 주소 검사 `infra/prod/verify.sh`에 `{SHORT}/b/zzzzzzzzzz`(와 `/a/zzzzzzzzzz/zzzzzzzzzz`)가 302 `…/notice?reason=link_unavailable`인지 더합니다(T8이 main에 들어간 뒤). `docs/specs/crelink-prod-deploy.md`의 구성도·공개 경로 줄, 변경 기록, 릴리스 노트도 고칩니다.
 
 ## 범위
 
@@ -54,3 +54,4 @@
     - 보존 작업(`creator_banner_clicks` → rollups)은 API 통합 테스트로만 확인했습니다.
     - 운영 첫 배포의 migration 0003은 expand 방식(`lock_timeout 5s`)이라 잠금을 못 잡으면 새 색만 실패하고 활성 색은 그대로입니다.
   - main 머지와 배포 뒤 확인(운영 주소 검사 결과)은 부모가 합니다. 그 전까지 수용 기준의 `main 한 번 머지`는 체크하지 않습니다.
+- 2026-10-09: PR #64를 squash 머지하고 배포했습니다. 2026-10-09 22:22(KST) 운영(home-server) 배포 성공: main `eeec2cb`(#64), Deploy run 37935831043 전 job success, `운영 주소 검사` 10/10 ok(새 `/b/zzzzzzzzzz`·`/a/zzzzzzzzzz/zzzzzzzzzz` 302 → `notice?reason=link_unavailable` 포함). migration 0003 운영 적용. 상태를 `완료`로 바꿉니다.
