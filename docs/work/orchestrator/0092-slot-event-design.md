@@ -38,3 +38,4 @@
 - 2026-10-10: 기술 설계 `docs/specs/crelink-slot-event.md` 작성·승인(사용자 위임(2026-10-10, 에픽 0088 진행 기록)에 따른 AI 승인, 근거는 설계 `검토 기록`). 주요 결정: 이벤트·신청 테이블(신청 행에 보너스 사본), 보이는 한도 = min(5 + 추가 슬롯 + 보너스 합, 50), 멱등 신청(PK + `ON CONFLICT DO NOTHING`, 201·200), 지금 이벤트는 migration 0005 시드로 배포 시각에 열림(끝 없음), 운영자 API는 기존 `OperatorGuard`(0088 Bearer는 머지 뒤 자동 적용). 0088과 나중 머지 쪽이 붙일 연결(행동 기록 `slot_event.period_update`, 지표 `slot_event_applications`)은 설계 `위험과 스파이크`에 적었습니다.
 - 2026-10-10: 티켓 분해 0120(api 계약)·0121(api)·0122·0123·0124(web)·0125(통합). 0120은 orchestrator가 바로 반영했고, `api` 1명(0121)과 `web` 2명(0122 / 0123·0124)이 같은 통합 worktree에서 소유 경로를 나눠 병렬로 구현했습니다. 범위 밖 발견: 0126(서버 렌더 날짜 표기), 0127(pm2 소켓 경로).
 - 2026-10-10: 통합 검증은 [0125](0125-slot-event-integration.md) 진행 기록에 있습니다(`pnpm verify` 통과, `pnpm e2e` 14/14, `pnpm smoke` 5/5).
+- 2026-10-10: PR [#69](https://github.com/ai-worker-lab/crelink/pull/69)을 열었습니다. main 머지·운영 배포는 부모 세션이 합니다(머지 뒤 적용 절차는 설계 `운영 적용 절차`).
