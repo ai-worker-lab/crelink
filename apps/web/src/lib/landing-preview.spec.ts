@@ -10,7 +10,9 @@ import type {
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  bannerDraftOf,
   DRAFT_ITEM_ID,
+  isBannerDraftDirty,
   isLinkDraftDirty,
   isProfileDirty,
   isSocialsDirty,
@@ -278,4 +280,74 @@ test('배너 슬롯은 숨김·차단 배너를 빼고 저장된 URL·정지 이
   });
   assert.equal(previewBannerSlot(allHidden).hidden, 'no_banners');
   assert.equal(previewBannerSlot(allHidden).kind, 'creator');
+});
+
+test('배너 초안: 고치는 배너는 제자리에서 바뀌고 숨김·차단 배너 초안은 나오지 않으며, 새 배너는 이미지가 있을 때만 맨 끝에 붙는다', () => {
+  const granted = state({
+    slot: { kind: 'creator', slotIndex: null, grantedAt: '2026-10-09T00:00:00.000Z' },
+    banners: [
+      creatorBanner('b1', { url: 'https://me.example.com/' }),
+      creatorBanner('b2', { hidden: true }),
+      creatorBanner('b3'),
+    ],
+  });
+  const edited = {
+    ...bannerDraftOf(granted.banners[0]),
+    image: { fileId: 'new', url: '/img/new' },
+    stillImage: { fileId: 'new-still', url: '/img/new-still' },
+    alt: '  새 문구 ',
+    url: '',
+  };
+  const hiddenDraft = { ...bannerDraftOf(granted.banners[1]), alt: '숨긴 배너 고침' };
+  const noImage = { ...bannerDraftOf(null), alt: '이미지 없음' };
+  assert.deepEqual(toLandingPreview(granted, { banners: [edited, hiddenDraft, noImage] }).blocks[0].slot?.banners, [
+    { id: 'b1', imageUrl: '/img/new', stillImageUrl: '/img/new-still', alt: '새 문구', clickUrl: null },
+    { id: 'b3', imageUrl: '/img/b3', stillImageUrl: null, alt: '배너 b3', clickUrl: null },
+  ]);
+  // 이미지를 지운 초안은 저장된 이미지를, 빈 대체 문구는 저장된 문구를 그립니다.
+  const cleared = { ...bannerDraftOf(granted.banners[2]), image: null, alt: ' ', url: 'https://x.example.com/' };
+  const withNew = { ...noImage, image: { fileId: 'n', url: '/img/n' }, url: ' https://n.example.com/ ' };
+  assert.deepEqual(toLandingPreview(granted, { banners: [cleared, withNew] }).blocks[0].slot?.banners.slice(1), [
+    { id: 'b3', imageUrl: '/img/b3', stillImageUrl: null, alt: '배너 b3', clickUrl: 'https://x.example.com/' },
+    {
+      id: DRAFT_ITEM_ID,
+      imageUrl: '/img/n',
+      stillImageUrl: null,
+      alt: '이미지 없음',
+      clickUrl: 'https://n.example.com/',
+    },
+  ]);
+});
+
+test('보이는 배너 0장인 슬롯도 이미지가 있는 새 배너 초안이면 미리보기에 나타나고, 광고 블록은 배너 초안을 쓰지 않는다', () => {
+  const empty = state({
+    slot: { kind: 'creator', slotIndex: 0, grantedAt: '2026-10-09T00:00:00.000Z' },
+    banners: [creatorBanner('b1', { hidden: true })],
+  });
+  const draft = { ...bannerDraftOf(null), image: { fileId: 'n', url: '/img/n' } };
+  assert.equal(previewBannerSlot(empty).hidden, 'no_banners');
+  const shown = previewBannerSlot(empty, { banners: [draft] });
+  assert.equal(shown.hidden, null);
+  assert.deepEqual(
+    shown.banners.map((banner) => [banner.id, banner.alt]),
+    [[DRAFT_ITEM_ID, '새 배너']],
+  );
+  const ad = state({ adBanners: [adBanner('x')] });
+  assert.deepEqual(
+    previewBannerSlot(ad, { banners: [draft] }).banners.map((banner) => banner.id),
+    ['x'],
+  );
+});
+
+test('배너 저장 안 함 판정: 이미지·정지 이미지·대체 문구·주소가 저장값과 다르면 바뀐 것', () => {
+  const banners = [creatorBanner('b1', { url: 'https://me.example.com/' })];
+  const base = bannerDraftOf(banners[0]);
+  assert.equal(base.url, 'https://me.example.com/');
+  assert.equal(isBannerDraftDirty(banners, base), false);
+  assert.equal(isBannerDraftDirty(banners, { ...base, alt: '다른 문구' }), true);
+  assert.equal(isBannerDraftDirty(banners, { ...base, url: '' }), true);
+  assert.equal(isBannerDraftDirty(banners, { ...base, stillImage: { fileId: 's', url: '/img/s' } }), true);
+  assert.equal(isBannerDraftDirty(banners, { ...base, image: { fileId: 'other', url: '/img/other' } }), true);
+  assert.equal(isBannerDraftDirty(banners, bannerDraftOf(null)), false);
+  assert.equal(isBannerDraftDirty(banners, { ...bannerDraftOf(null), alt: '새' }), true);
 });

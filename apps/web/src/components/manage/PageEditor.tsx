@@ -12,6 +12,8 @@ import { ActionStatus } from '../ActionStatus';
 import { DefaultAvatar } from '../DefaultAvatar';
 import { RemoteImage } from '../RemoteImage';
 import { PortfolioForm, PortfolioSection } from '../me/PortfolioSection';
+import { BannerForm } from './BannerForm';
+import { BannerSlotNotice, BannerSlotSection } from './BannerSlotSection';
 import { EditSheet } from './EditSheet';
 import { GuestbookSwitch } from './GuestbookSwitch';
 import { LinkForm } from './LinkForm';
@@ -24,7 +26,8 @@ import { managerHref, managerMenuLabel } from './menu';
  * 구역 목록에서 고른 대상(`selection`)에 따라 편집 패널이 구역 목록 → 외부 링크·링크 폼·광고 블록·배너 슬롯·포트폴리오·항목 폼·방명록·
  * 프로필 안내로 바뀝니다. 1024px 이상은 오른쪽 패널(머리 `← 전체`), 1023px 이하는 하단 시트입니다. 고르면 초점은 패널 제목(시트는 첫 입력)으로,
  * 처음 패널로 돌아오면 처음 고른 요소로 돌아갑니다. 예외로 광고 블록 패널의 `외부 링크 목록에서 끌어 옮기기`는 외부 링크 패널을 열고
- * 초점을 광고 행 손잡이로 옮깁니다.
+ * 초점을 광고 행 손잡이로 옮깁니다. 배너 슬롯이 회수되어(편집 상태의 `slot.kind`가 'ad') 배너 패널·폼이 사라지면 처음 패널로 돌아가
+ * 회수 안내(`BannerSlotNotice`)에 초점을 둡니다.
  */
 export function PageEditor() {
   const wide = useWideLayout();
@@ -35,8 +38,10 @@ export function PageEditor() {
     takeEntryTrigger,
     discardLinkDraft,
     discardPortfolioDraft,
+    discardBannerDraft,
     isLinkDirty,
     isPortfolioDirty,
+    isBannerDirty,
     resetSelection,
     setFormPending,
   } = useManager();
@@ -83,13 +88,15 @@ export function PageEditor() {
       (handle ?? titleRef.current)?.focus({ preventScroll: !handle });
       return;
     }
-    // 처음 고른 요소로 돌려줍니다. 처음 패널의 구역 목록 버튼은 다시 그려져 끊겨 있으므로 같은 구역 버튼을 찾습니다.
+    // 회수 안내가 있으면 거기로, 아니면 처음 고른 요소로 돌려줍니다. 처음 패널의 구역 목록 버튼은 다시 그려져 끊겨 있으므로 같은 구역 버튼을 찾습니다.
+    const revokedNotice = document.querySelector<HTMLElement>('.page-overview [data-slot-notice]');
     const trigger = takeEntryTrigger();
     const section = previous ? sectionOfKey(previous) : null;
     const sectionButton = section
       ? document.querySelector<HTMLElement>(`.section-picker [data-section="${section}"]`)
       : null;
-    if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+    if (revokedNotice) revokedNotice.focus();
+    else if (trigger?.isConnected) trigger.focus({ preventScroll: true });
     else if (sectionButton) sectionButton.focus({ preventScroll: true });
     else overviewRef.current?.focus({ preventScroll: true });
   }, [key, wide, takeEntryTrigger, slotHandleFocus]);
@@ -170,11 +177,30 @@ export function PageEditor() {
       );
       break;
     case 'banner-slot':
-    case 'banner':
-      // 배너 목록(T15)·배너 폼(T16)이 이 패널을 채웁니다. 지금은 한도 배지와 보이는 배너 0장 안내만 둡니다.
-      title = selection.kind === 'banner' ? (banner ? `배너 · ${banner.alt}` : '새 배너') : '배너 슬롯';
+      title = '배너 슬롯';
       help = '링크 사이에 넣는 내 배너예요. 여러 장이면 방문자가 넘겨 봐요.';
-      body = <BannerSlotPanel />;
+      body = <BannerSlotSection notice={doneNotice?.key === formKey ? doneNotice.text : null} />;
+      break;
+    case 'banner':
+      title = banner ? `배너 · ${banner.alt}` : '새 배너';
+      help = banner ? '방문자에게 보이는 배너를 고쳐요.' : '이미지를 올리면 미리보기에 바로 보여요.';
+      dirty = isBannerDirty(draftKey(selection.id));
+      body = (
+        <BannerForm
+          key={key}
+          banner={banner ?? null}
+          variant={variant}
+          action={formAction}
+          onDone={(result) => {
+            discardBannerDraft(draftKey(selection.id));
+            finish(formKey, { kind: 'banner-slot' }, result);
+          }}
+          onCancel={() => {
+            discardBannerDraft(draftKey(selection.id));
+            finish(formKey, { kind: 'banner-slot' });
+          }}
+        />
+      );
       break;
     case 'link':
       title = link ? `링크 · ${link.title}` : '새 링크';
@@ -287,26 +313,6 @@ function AdSlotPanel({ onMove }: { onMove: () => void }) {
   );
 }
 
-/** 배너 슬롯 패널 머리 부분: 보이는 배너·보관 한도 배지(링크 한도와 따로)와 보이는 배너 0장 안내. */
-function BannerSlotPanel() {
-  const { bannerLimits } = useManager().state;
-  return (
-    <>
-      <div className="panel-badges">
-        <p className={`limit-badge${bannerLimits.visibleUsed >= bannerLimits.visibleMax ? ' limit-full' : ''}`}>
-          보이는 배너 {bannerLimits.visibleUsed}/{bannerLimits.visibleMax}장
-        </p>
-        <p className={`limit-badge${bannerLimits.totalUsed >= bannerLimits.totalMax ? ' limit-full' : ''}`}>
-          숨긴 배너 포함 전체 {bannerLimits.totalUsed}/{bannerLimits.totalMax}장
-        </p>
-      </div>
-      {bannerLimits.visibleUsed === 0 ? (
-        <p className="notice-box">보이는 배너가 없어 방문자 화면에서 배너 슬롯이 보이지 않아요.</p>
-      ) : null}
-    </>
-  );
-}
-
 /**
  * 처음 패널: 구역 목록(키보드·스크린리더로 구역을 고르는 길)과 프로필 메뉴 안내. 1023px 이하에서는 쓰지 않고, 서버가 넓은 배치로
  * 그린 첫 화면에서도 CSS(`.page-overview`)로 숨겨 하이드레이션 전에 눌리지 않는 목록이 보이지 않게 합니다.
@@ -332,7 +338,7 @@ function PageOverview({ headingRef }: { headingRef: React.RefObject<HTMLHeadingE
           target: { kind: 'banner-slot' },
           title: '배너 슬롯',
           meta: `보이는 배너 ${bannerLimits.visibleUsed}/${bannerLimits.visibleMax}장 · 전체 ${bannerLimits.totalUsed}장`,
-          dirty: false,
+          dirty: dirty.banner,
         },
     {
       target: { kind: 'portfolio' },
@@ -355,6 +361,7 @@ function PageOverview({ headingRef }: { headingRef: React.RefObject<HTMLHeadingE
         </h1>
         <p className="panel-help">방문자 화면에서 구역이나 항목을 선택해 편집해요.</p>
       </div>
+      <BannerSlotNotice />
       <h2 className="panel-subtitle">구역 선택</h2>
       <ul className="section-picker">
         {rows.map((row) => (

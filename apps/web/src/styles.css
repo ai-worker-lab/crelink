@@ -2517,3 +2517,81 @@ body:has(.sheet[open]) {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- 배너 슬롯 패널·배너 폼(0083·0084, design/ad-banner-block/handoff.md `배너 슬롯 패널`) ---------- */
+/*
+ * 배너 행: 손잡이 · 3:1 썸네일 96×32 · 대체 문구(한 줄 말줄임)·도메인, 아래 줄에 숨기기 스위치 · 수정.
+ * 패널 폭(380~430)에 썸네일까지 한 줄로 두면 대체 문구가 두세 글자만 남아, 링크 행의 좁은 화면 배치처럼 조작을 아래 줄로 내린다.
+ */
+.banner-edit-card {
+  padding: var(--ds-space-8) var(--ds-space-12);
+}
+.banner-edit-item > .link-edit-row {
+  flex-wrap: wrap;
+}
+.banner-edit-item .link-edit-card {
+  flex-basis: calc(100% - 40px - var(--ds-space-8));
+}
+.banner-edit-item .link-edit-controls {
+  width: 100%;
+  justify-content: flex-end;
+}
+.banner-slot-badges + .section-help {
+  margin-top: var(--ds-space-12);
+}
+.panel-section > .banner-slot-badges + .section-help {
+  margin-top: 0;
+}
+.banner-edit-thumb {
+  flex: none;
+  width: 96px;
+  height: 32px;
+  border-radius: var(--ds-corner-sm);
+  background: var(--ds-color-surface-raised);
+  object-fit: cover;
+}
+.banner-edit-alt,
+.banner-edit-domain {
+  display: block;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.banner-edit-list ~ :is(.link-add, .notice-box),
+.banner-empty-notice {
+  margin-top: var(--ds-space-12);
+}
+.manager-panel .banner-empty-notice,
+.manager-panel .banner-edit-list ~ :is(.link-add, .notice-box) {
+  margin-top: 0;
+}
+/* 배너 폼: 저장 실패 줄 안 `다시 시도`. */
+.banner-form-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-8);
+}
+.banner-form-error > p {
+  margin: 0;
+}
+.banner-form-image {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-6);
+}
+.banner-alt-count {
+  font-family: var(--ds-font-mono);
+}
+/* 좁은 화면 회수 안내: sticky 줄 아래, 미리보기 위. */
+.manager-panel > .banner-slot-notice {
+  margin-top: var(--ds-space-12);
+}
+@media (max-width: 1023px) {
+  .banner-edit-thumb {
+    width: 72px;
+    height: 24px;
+  }
+}

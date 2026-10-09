@@ -118,12 +118,14 @@ export function PreviewLanding({ mode, framed }: { mode: PreviewMode; framed: bo
     socials,
     linkDrafts,
     portfolioDrafts,
+    bannerDrafts,
     guestbookAction,
     guestbookVersion,
     selection,
     select,
     isLinkDirty,
     isPortfolioDirty,
+    isBannerDirty,
     dirty,
     formPending,
   } = useManager();
@@ -147,6 +149,7 @@ export function PreviewLanding({ mode, framed }: { mode: PreviewMode; framed: bo
     socials,
     links: [...linkDrafts.values()],
     portfolio: [...portfolioDrafts.values()],
+    banners: [...bannerDrafts.values()],
   };
   const drafted = toLandingPreview(state, drafts);
   // 방명록 켜기를 저장하는 동안은 탭을 그리지 않습니다(저장 전에 목록을 부르면 꺼진 랜딩의 404를 받음).
@@ -163,8 +166,12 @@ export function PreviewLanding({ mode, framed }: { mode: PreviewMode; framed: bo
         dirtyKeys.add(targetKey({ kind: 'portfolio-item', id: key === DRAFT_ITEM_ID ? null : key }));
       }
     }
+    for (const key of bannerDrafts.keys()) {
+      if (isBannerDirty(key)) dirtyKeys.add(targetKey({ kind: 'banner', id: key === DRAFT_ITEM_ID ? null : key }));
+    }
     if (dirty.link) dirtyKeys.add('links');
     if (dirty.portfolio) dirtyKeys.add('portfolio');
+    if (dirty.banner) dirtyKeys.add('banner-slot');
     if (dirty.profile || dirty.socials) dirtyKeys.add('profile');
     const slot = previewBannerSlot(state, drafts);
     edit = {

@@ -284,7 +284,7 @@ function BannerSlot({
               <EditItemTag
                 key={banner.id}
                 edit={edit}
-                target={{ kind: 'banner', id: banner.id }}
+                target={{ kind: 'banner', id: banner.id === DRAFT_ITEM_ID ? null : banner.id }}
                 kindLabel="배너"
                 title={banner.alt}
               />
@@ -301,7 +301,7 @@ function BannerSlot({
             <EditItem
               key={banner.id}
               edit={edit}
-              target={{ kind: 'banner', id: banner.id }}
+              target={{ kind: 'banner', id: banner.id === DRAFT_ITEM_ID ? null : banner.id }}
               kindLabel="배너"
               title={banner.alt}
               className="banner-frame"
