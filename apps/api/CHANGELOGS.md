@@ -4,6 +4,7 @@
 
 ## 2026-10-09
 
+- 배너 슬롯 부여·배너 차단·차단 도메인 배너 처리(설계 T6, 미정 3 A). 근거 `docs/work/api/0072-banner-slot-grant-block.md`. `PUT /api/admin/creators/{userId}/banner-slot`(부여 시각 유지·회수해도 배너 보관, 400 `validation_failed`·404 `creator_not_found`), `PUT /api/admin/banners/{id}/block`(링크 차단과 같은 규칙, 404 `banner_not_found`), `GET /api/admin/creators/{userId}`의 `bannerSlot`·`banners`·`bannerLimits`를 실제 데이터로, `POST /api/admin/blocked-domains`가 같은 트랜잭션에서 걸리는 크리에이터 배너를 차단하고 게시 중·예약 크리링 배너를 내림(게시 끝 = 지금). 시험 `test/admin-banner-slot.e2e-spec.ts` 5건.
 - 광고 블록·배너 슬롯 위치·공개 응답·노출 기록·편집 상태(설계 T2). 근거 `docs/work/api/0068-ad-banner-slot-public.md`.
   - `PUT /api/me/links/order`: 같은 트랜잭션(사용자 잠금)에서 `landing_blocks.slot_position` 저장. `slotIndex`(0 이상 정수, 아니면 400 `validation_failed`)가 링크 수 이상이면 NULL(맨 뒤). 생략하면 다시 매기기 전의 슬롯 앞 링크 수를 새 위치로 둬 상대 위치 유지(NULL은 NULL). 응답은 그대로 `LinkView[]`.
   - `GET /api/public/landings/{publicId}`: 첫 list 구역 `blocks[].slot`을 `resolveBannerSlot`으로 채움(숨김이면 null). 링크 질의는 숨김·차단 포함 전체를 읽어 서버에서 거름(공개 링크 목록은 그대로), 배너 질의 1개(부여됨이면 그 랜딩의 보이는 크리에이터 배너, 아니면 게시 중 크리링 배너 `sort_order, created_at`). `clickUrl`: 광고는 `passAccepted`일 때만 `{SHORT}/a/{배너}/{랜딩}`(아니면 저장된 URL), 크리에이터 배너는 `{SHORT}/b/{배너}`(연결 URL 없으면 null). `passAccepted`이고 광고 블록이 보이면 첫 장 노출 +1(백그라운드).

@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   BlockedDomainView,
+  CreatorBannerView,
   CRELINK_LIMITS,
   LinkView,
   OperatorCreatorDetail,
@@ -13,7 +14,13 @@ import { Database, isUniqueViolation } from '../database';
 import { apiError, UUID_PATTERN } from '../common/http';
 import { bodyObject, optionalText } from '../common/input';
 import { AppConfig } from '../config.service';
-import { CreatorService, LINK_COLUMNS, LinkRow } from '../creator/creator.service';
+import {
+  CREATOR_BANNER_COLUMNS,
+  CreatorBannerRow,
+  CreatorService,
+  LINK_COLUMNS,
+  LinkRow,
+} from '../creator/creator.service';
 import { StatsService } from './stats.service';
 
 /** 운영자 부여 슬롯 상한. 보이는 링크가 전체 상한(50)을 넘을 수 없으므로 50 - 5. */
@@ -22,7 +29,7 @@ const DOMAIN_PATTERN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)
 
 const SUMMARY_SELECT = `
   SELECT u.id AS user_id, u.email, l.display_name, s.slug, l.public_id, u.suspended_at IS NOT NULL AS suspended,
-         u.created_at, u.extra_link_slots, sl.id AS short_link_id,
+         u.created_at, u.extra_link_slots, sl.id AS short_link_id, l.id AS landing_id, u.banner_slot_granted_at,
          (SELECT count(*)::int FROM visits v
           WHERE v.short_link_id = sl.id AND v.occurred_at > now() - interval '30 days') AS visits_30d
   FROM users u
@@ -40,6 +47,9 @@ interface SummaryRow {
   created_at: Date;
   extra_link_slots: number;
   short_link_id: string;
+  /** 배너 한도·목록은 랜딩 단위입니다(MVP는 사용자당 랜딩 1개). */
+  landing_id: string;
+  banner_slot_granted_at: Date | null;
   visits_30d: number;
 }
 
@@ -105,19 +115,20 @@ export class AdminService {
   async detail(userId: string): Promise<OperatorCreatorDetail> {
     const row = await this.summaryRow(userId);
     const db = this.database.pool;
-    const [{ extraLinkSlots, ...limits }, links] = await Promise.all([
+    const [{ extraLinkSlots, ...limits }, links, banners, bannerLimits] = await Promise.all([
       this.creator.limits(db, userId),
       this.creator.links(db, userId),
+      this.creator.creatorBanners(db, row.landing_id),
+      this.creator.bannerLimits(db, row.landing_id),
     ]);
     return {
       ...this.summary(row),
       extraLinkSlots,
       limits,
       links,
-      // 부여 시각·배너 목록·사용 수는 0072(부여·차단)가 채웁니다.
-      bannerSlot: { grantedAt: null },
-      banners: [],
-      bannerLimits: { ...this.config.bannerSlotLimits, visibleUsed: 0, totalUsed: 0 },
+      bannerSlot: { grantedAt: row.banner_slot_granted_at?.toISOString() ?? null },
+      banners,
+      bannerLimits,
     };
   }
 
@@ -162,22 +173,61 @@ export class AdminService {
     return this.detail(userId);
   }
 
-  async setLinkBlock(linkId: string, body: unknown): Promise<LinkView> {
+  /**
+   * 배너 슬롯 부여·회수(R21 ①⑤). 다시 부여해도 처음 부여 시각을 유지하고, 회수해도 배너 행은 보관합니다.
+   * 이 UPDATE가 users 행을 잠그므로 크리에이터 배너 쓰기(사용자 잠금 → 부여 확인)와 순서가 맞습니다.
+   */
+  async setBannerSlot(userId: string, body: unknown): Promise<OperatorCreatorDetail> {
+    const granted = bodyObject(body).granted;
+    if (typeof granted !== 'boolean') {
+      throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', 'granted는 true 또는 false여야 합니다.');
+    }
+    await this.summaryRow(userId);
+    await this.database.query(
+      `UPDATE users SET banner_slot_granted_at = CASE WHEN $2 THEN coalesce(banner_slot_granted_at, now()) END
+       WHERE id = $1`,
+      [userId, granted],
+    );
+    return this.detail(userId);
+  }
+
+  /** 링크·배너 차단 요청 `SetLinkBlockRequest`. 사유는 차단할 때만 저장합니다. */
+  private blockInput(body: unknown): { blocked: boolean; reason: string | null } {
     const input = bodyObject(body);
     if (typeof input.blocked !== 'boolean') {
       throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', 'blocked는 true 또는 false여야 합니다.');
     }
     const reason = optionalText(input.reason, '차단 사유', CRELINK_LIMITS.blockedReasonMax) ?? null;
+    return { blocked: input.blocked, reason };
+  }
+
+  async setLinkBlock(linkId: string, body: unknown): Promise<LinkView> {
+    const { blocked, reason } = this.blockInput(body);
     const updated = UUID_PATTERN.test(linkId)
       ? await this.database.query<LinkRow>(
           `UPDATE links SET blocked_at = CASE WHEN $2 THEN coalesce(blocked_at, now()) END,
                             blocked_reason = CASE WHEN $2 THEN $3 END, updated_at = now()
            WHERE id = $1 RETURNING ${LINK_COLUMNS}`,
-          [linkId, input.blocked, reason],
+          [linkId, blocked, reason],
         )
       : null;
     if (!updated?.rowCount) throw apiError(HttpStatus.NOT_FOUND, 'link_not_found', '링크를 찾을 수 없습니다.');
     return this.creator.linkView(updated.rows[0]);
+  }
+
+  /** 크리에이터 배너 차단·풀기(R21 ④). 차단해도 배너 행과 숨김 상태는 그대로이고, 크리에이터가 주소를 바꿔도 유지됩니다. */
+  async setBannerBlock(bannerId: string, body: unknown): Promise<CreatorBannerView> {
+    const { blocked, reason } = this.blockInput(body);
+    const updated = UUID_PATTERN.test(bannerId)
+      ? await this.database.query<CreatorBannerRow>(
+          `UPDATE creator_banners SET blocked_at = CASE WHEN $2 THEN coalesce(blocked_at, now()) END,
+                                      blocked_reason = CASE WHEN $2 THEN $3 END, updated_at = now()
+           WHERE id = $1 RETURNING ${CREATOR_BANNER_COLUMNS}`,
+          [bannerId, blocked, reason],
+        )
+      : null;
+    if (!updated?.rowCount) throw apiError(HttpStatus.NOT_FOUND, 'banner_not_found', '배너를 찾을 수 없습니다.');
+    return this.creator.creatorBannerView(updated.rows[0]);
   }
 
   async blockedDomains(): Promise<BlockedDomainView[]> {
@@ -191,7 +241,10 @@ export class AdminService {
     }));
   }
 
-  /** 도메인을 막고, 그 도메인과 하위 도메인의 기존 링크를 같은 트랜잭션에서 차단합니다. */
+  /**
+   * 도메인을 막고, 같은 트랜잭션에서 그 도메인과 하위 도메인의 기존 링크·크리에이터 배너를 차단합니다(R14 ③, R21 ④).
+   * 걸리는 게시 중·예약 크리링 배너는 내립니다(게시 끝 = 지금, 예약이면 시작도 지금. 설계 미정 3 A).
+   */
   async addBlockedDomain(operatorId: string, body: unknown): Promise<BlockedDomainView[]> {
     const input = bodyObject(body);
     const domain =
@@ -212,6 +265,17 @@ export class AdminService {
            WHERE blocked_at IS NULL AND (host = $1 OR right(host, length($1) + 1) = '.' || $1)`,
           [domain, reason ?? `차단 도메인: ${domain}`],
         );
+        await client.query(
+          `UPDATE creator_banners SET blocked_at = now(), blocked_reason = $2, updated_at = now()
+           WHERE blocked_at IS NULL AND (host = $1 OR right(host, length($1) + 1) = '.' || $1)`,
+          [domain, reason ?? `차단 도메인: ${domain}`],
+        );
+        await client.query(
+          `UPDATE ad_banners SET ends_at = least(coalesce(ends_at, now()), now()), starts_at = least(starts_at, now()),
+                                 updated_at = now()
+           WHERE (ends_at IS NULL OR ends_at > now()) AND (host = $1 OR right(host, length($1) + 1) = '.' || $1)`,
+          [domain],
+        );
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -222,7 +286,7 @@ export class AdminService {
     return this.blockedDomains();
   }
 
-  /** 목록에서만 뺍니다. 이미 차단된 링크는 운영자가 링크별로 풉니다. */
+  /** 목록에서만 뺍니다. 이미 차단된 링크·배너는 운영자가 하나씩 풉니다. 내린 크리링 배너도 그대로 끝남입니다. */
   async removeBlockedDomain(domain: string): Promise<void> {
     const deleted = await this.database.query('DELETE FROM blocked_domains WHERE domain = $1', [
       domain.trim().toLowerCase(),

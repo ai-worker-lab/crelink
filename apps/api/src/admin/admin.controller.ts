@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import {
   BlockedDomainView,
+  CreatorBannerView,
   LinkView,
   OperatorCreatorDetail,
   OperatorCreatorListResponse,
@@ -45,9 +46,19 @@ export class AdminController {
     return this.admin.setSuspension(userId, body);
   }
 
+  @Put('creators/:userId/banner-slot')
+  setBannerSlot(@Param('userId') userId: string, @Body() body: unknown): Promise<OperatorCreatorDetail> {
+    return this.admin.setBannerSlot(userId, body);
+  }
+
   @Put('links/:linkId/block')
   setLinkBlock(@Param('linkId') linkId: string, @Body() body: unknown): Promise<LinkView> {
     return this.admin.setLinkBlock(linkId, body);
+  }
+
+  @Put('banners/:bannerId/block')
+  setBannerBlock(@Param('bannerId') bannerId: string, @Body() body: unknown): Promise<CreatorBannerView> {
+    return this.admin.setBannerBlock(bannerId, body);
   }
 
   @Get('blocked-domains')
