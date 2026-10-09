@@ -1484,11 +1484,30 @@ a.portfolio-card:hover {
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: var(--ds-space-8);
-  padding: var(--ds-space-20);
+  column-gap: var(--ds-space-8);
+  padding: var(--ds-space-8) var(--ds-space-20);
   border-top: 1px solid var(--ds-color-border-default);
   font-size: var(--ds-font-size-14);
   color: var(--ds-color-text-subtle);
+}
+/* 바닥글 링크는 누를 높이 44px. 미리보기의 span도 방문자 화면과 같은 밑줄 모양. */
+.profile-footer a,
+.profile-footer .footer-cta,
+.profile-footer .footer-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  white-space: nowrap;
+}
+.profile-footer .footer-cta,
+.profile-footer .footer-link {
+  color: var(--ds-color-text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--ds-color-border-strong);
+  text-underline-offset: 3px;
+}
+.profile-footer a.footer-cta:hover {
+  text-decoration-color: currentColor;
 }
 .profile-footer .brand {
   font-size: var(--ds-font-size-16);
@@ -1988,7 +2007,7 @@ a.portfolio-card:hover {
 }
 .preview-screen .profile-footer {
   margin: 0;
-  padding: var(--ds-space-16);
+  padding: var(--ds-space-8) var(--ds-space-16);
 }
 /* 미리보기 안 링크는 이동하지 않으므로 눌러도 손가락 모양을 두지 않는다(탭 전환은 그대로). */
 .preview-screen a {

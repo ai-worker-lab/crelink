@@ -10,7 +10,8 @@ test('빈 랜딩은 크리링 표시와 함께 열리고, 없는 단축 주소�
   await expect(page.getByText('아직 준비 중인 페이지예요.')).toBeVisible();
   // 프로필 사진이 없으면 기본 프로필(PRD R17)
   await expect(page.locator('.profile-head .default-avatar')).toBeVisible();
-  await expect(page.getByRole('contentinfo').getByRole('link', { name: '크리링', exact: true })).toBeVisible();
+  const footer = page.getByRole('contentinfo');
+  await expect(footer.getByRole('link', { name: '나도 크리링 만들기', exact: true })).toHaveAttribute('href', '/');
   await expect(page.locator('.link-card')).toHaveCount(0);
   await expectMobileFits(page, '빈 /p/{publicId}');
 
@@ -45,6 +46,10 @@ test('운영자가 정지한 크리에이터: 단축 URL은 creator_suspended �
 
   await visitor.page.goto(creator.landingUrl);
   await expect(visitor.page.getByRole('heading', { name: '운영이 중지된 페이지예요.' })).toBeVisible();
+  // 오류 화면 바닥글은 가입 유도 없이 `크리링` 표시만(design/landing-footer-cta/handoff.md 상태 D).
+  const footer = visitor.page.getByRole('contentinfo');
+  await expect(footer.getByRole('link', { name: '크리링', exact: true })).toBeVisible();
+  await expect(footer.getByRole('link', { name: '나도 크리링 만들기' })).toHaveCount(0);
   await expect(visitor.page.getByRole('link', { name: '정지 전 링크' })).toHaveCount(0);
   const click = await visitor.context.request.get(creator.links[0].clickUrl, { maxRedirects: 0 });
   expect(click.headers().location).toBe(`${WEB_URL}/notice?reason=link_unavailable`);
