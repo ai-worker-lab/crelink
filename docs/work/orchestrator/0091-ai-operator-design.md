@@ -3,7 +3,7 @@
 - 단계: 티켓
 - 역할: orchestrator
 - 상위: 0088
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P0
 - 작성일: 2026-10-10
@@ -53,3 +53,4 @@
   - F1(위험 수용): ADR 0015 `결과와 트레이드오프`에 실행 호스트 자격 위험 수용, 헌장 지킬 규칙 10(실행 호스트 자격으로 토큰 발급·멈춤 해제·DB 직접 쓰기·사람 전용 통제 우회 금지), 사람 선행 조건(실행 계정 분리·CODEOWNERS)을 헌장 `실행 환경 설치` 6·7과 설계 `권한·보안`·`위험`에, 런북 17-1 주의.
   - `/admin/slot-event` 상태 배지를 공용 `badge-*`로(0106에서 `ad-status-*` 규칙을 공용으로 옮겼기 때문에 0089 화면 배지 색이 빠져 있었음), 중복된 `.badge-positive` 삭제.
   - 검사(모두 실제 실행, Node 24.20, 슬롯 5): `pnpm verify` 8단계 모두 통과(API 29 스위트 227건, 웹 64건, shared 55건; 첫 실행은 Prettier 1건으로 lint 실패 → 고친 뒤 통과). `make up PM2_HOME=/tmp/c0091pm2` 뒤 `pnpm smoke` 5/5, `pnpm e2e tests/e2e/ai-operator.spec.ts tests/e2e/slot-event.spec.ts` → 프로젝트 의존으로 전체 15/15(`main` 9 + `ad-banner` 4 + `slot-event` 2). 로컬 `guard`: 실행 없음 1, 실행 중 0, 멈춤 1, 닫은 뒤 1. 토큰 경로 `POST api/me/links` 404.
+- 2026-10-10: PR #70을 squash 머지했습니다(main `f00353c`). Deploy run 37964001074의 plan·이미지 api/web·배포 home-server·배포 기록 태그가 모두 success였습니다. 이어서 런북 17-2로 운영 토큰을 발급했습니다(`~/.config/crelink/ai-operator.env`, 600). `precheck`은 종료 0이었습니다. 운영 적용은 에픽 0088 진행 기록에 있습니다. 상태를 `완료`로 바꿉니다.

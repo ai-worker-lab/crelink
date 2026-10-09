@@ -4,7 +4,7 @@
 - 역할: orchestrator
 - 상위: 0089
 - 선행: 0121, 0122, 0123, 0124
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P0
 - 작성일: 2026-10-10
@@ -43,3 +43,4 @@
   - `make up`·`make status`는 pm2 `.local/pm2/interactor.sock` 연결 `EINVAL`로 실패했습니다(worktree 경로가 길어 유닉스 소켓 경로 한도를 넘는 것으로 보임 `[INFERENCE]`). API(`nest start --watch`)·웹(`next dev`) 프로세스는 이 worktree 코드로 떠 있었고 `GET /api/health/ready` 200이라 smoke·E2E는 그 인스턴스로 실행했습니다. 분류 대기 [0127](0127-pm2-socket-path-too-long.md)로 등록했습니다.
   - 작업 중 worktree의 `package.json`·`pnpm-lock.yaml`이 누가 바꿨는지 모르게 바뀌어 있어(`@playwright/test` 1.64 등, 하위 에이전트들은 바꾸지 않았다고 보고) 범위 밖이라 되돌리고 `pnpm install --frozen-lockfile`로 맞췄습니다.
 - 2026-10-10: PR [#69](https://github.com/ai-worker-lab/crelink/pull/69).
+- 2026-10-10: main `7950025`(#69)로 운영에 배포했습니다(Deploy 37961349623 success). 상태를 `완료`로 바꿉니다.
