@@ -180,7 +180,7 @@ export function PreviewLanding({ mode, framed }: { mode: PreviewMode; framed: bo
         if (!formPending) select(target, trigger);
       },
       dirtyKeys,
-      linkAddNotice: linkLimitNotice(state.limits),
+      linkAddNotice: linkLimitNotice(state.limits, state.slotEvent),
       canAddPortfolio: state.portfolio.length < CRELINK_LIMITS.portfolioItems,
       slotPlaceholder: slot.hidden === 'no_banners' ? { kind: slot.kind, afterLinkCount: slot.afterLinkCount } : null,
     };

@@ -24,8 +24,10 @@ export default defineConfig({
   },
   // 크리링 배너는 모든 무료 랜딩이 함께 보는 전역 데이터라, 다른 시나리오가 화면을 연 채 배너(이미지)가 지워지면 이미지 404가 콘솔 오류로
   // 남습니다. 그래서 광고 배너 시나리오는 나머지가 끝난 뒤 따로 돕니다(tests/e2e/README.md `fixture 원리`).
+  // 링크 슬롯 이벤트도 전역 데이터(이벤트 기간)를 바꾸므로 그 뒤에 따로 돕니다(한 파일이라 테스트는 차례로).
   projects: [
-    { name: 'main', testIgnore: /ad-banner\.spec\.ts$/ },
+    { name: 'main', testIgnore: /(ad-banner|slot-event)\.spec\.ts$/ },
     { name: 'ad-banner', testMatch: /ad-banner\.spec\.ts$/, dependencies: ['main'] },
+    { name: 'slot-event', testMatch: /slot-event\.spec\.ts$/, dependencies: ['ad-banner'] },
   ],
 });

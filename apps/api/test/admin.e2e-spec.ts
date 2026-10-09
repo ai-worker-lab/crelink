@@ -117,6 +117,7 @@ describe('운영자 API (R10, R13, R14)와 보존 작업 (R11)', () => {
       extraLinkSlots: 0,
       limits: { visibleMax: 5, visibleUsed: 0, totalMax: 50, totalUsed: 1 },
       links: [expect.objectContaining({ title: '숨김', hidden: true })],
+      slotEvent: null,
     });
     const slots = await api<OperatorCreatorDetail>(
       t.baseUrl,

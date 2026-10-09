@@ -86,6 +86,7 @@ function state(patch: Partial<CreatorLandingState> = {}): CreatorLandingState {
     adBanners: [],
     banners: [],
     bannerLimits: { visibleMax: 5, visibleUsed: 0, totalMax: 20, totalUsed: 0 },
+    slotEvent: { event: null, entry: null },
     ...patch,
   };
 }

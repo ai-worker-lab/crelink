@@ -43,6 +43,11 @@ const API_ERROR_MESSAGES: Record<CrelinkErrorCode, string> = {
   banner_slot_not_granted: '배너 슬롯이 회수되어 이 자리에 다시 크리링 광고 블록이 나와요.',
   ad_banner_not_found: '광고 배너를 찾을 수 없어요. 새로고침해 주세요.',
   banner_period_invalid: '게시 끝은 시작보다 뒤여야 해요.',
+  // 링크 슬롯 이벤트 고정 문구(설계 docs/specs/crelink-slot-event.md `디자인 검토 의견` 3, design/slot-event/handoff.md `문구 원문`).
+  // 신청의 404는 관리 화면이 `진행 중인 이벤트가 없어 신청하지 못했어요.`로 바꿔 보입니다(`SLOT_EVENT_NOT_FOUND_APPLY`).
+  slot_event_not_found: '이벤트를 찾을 수 없어요. 새로고침해 주세요.',
+  slot_event_closed: '이벤트 신청 기간이 아니어서 신청하지 못했어요.',
+  slot_event_period_invalid: '끝은 시작보다 뒤여야 해요.',
 };
 
 /** 웹(BFF·클라이언트)에서만 생기는 오류 코드. */

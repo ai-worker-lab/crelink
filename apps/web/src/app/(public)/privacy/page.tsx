@@ -5,8 +5,9 @@ import Link from 'next/link';
 export const metadata: Metadata = { title: '개인정보 처리방침' };
 
 /**
- * 개인정보 수집·보관·국외 이전 고지(R9·R11·R19, Sentry). 근거: docs/specs/crelink-mvp.md `권한·보안·개인정보`,
+ * 개인정보 수집·보관·국외 이전 고지(R9·R11·R19·R24, Sentry). 근거: docs/specs/crelink-mvp.md `권한·보안·개인정보`,
  * docs/specs/crelink-guestbook.md `권한·보안·개인정보`, docs/specs/crelink-ad-banner.md `권한·보안·개인정보`(배너 클릭·광고 노출 수),
+ * docs/specs/crelink-slot-event.md `권한·보안·개인정보`(이벤트 신청 기록),
  * docs/adr/0012-error-monitoring-sentry.md, docs/adr/0014-sentry-free-plan-features.md. 법률 검토 전 문구입니다.
  */
 export default function PrivacyPage() {
@@ -52,6 +53,7 @@ export default function PrivacyPage() {
           <ul>
             <li>구글 로그인으로 받은 이메일 주소와 구글 계정 식별자</li>
             <li>크리에이터가 직접 입력한 프로필(사진·이름·소개), SNS 계정 주소, 포트폴리오, 외부 링크와 올린 이미지</li>
+            <li>외부 링크 +5 이벤트를 신청한 경우 신청 기록(신청한 계정과 신청 시각)</li>
           </ul>
         </section>
 
@@ -116,6 +118,7 @@ export default function PrivacyPage() {
             <li>서비스 오류 파악과 성능 개선, 이용자 의견 확인(오류·성능 진단 정보)</li>
             <li>크리에이터 랜딩페이지 방명록 제공</li>
             <li>크리링 광고 블록 운영(광고 배너별 노출·클릭 수 집계, 크리링 운영자만 조회)</li>
+            <li>외부 링크 +5 이벤트 보너스 제공(신청자 확인은 크리링 운영자만)</li>
           </ul>
         </section>
 
@@ -132,6 +135,7 @@ export default function PrivacyPage() {
             </li>
             <li>크리링 광고 노출·클릭 수는 개인을 알아볼 수 있는 정보가 없는 합계라 계속 보관해요.</li>
             <li>크리에이터 계정 정보와 입력한 내용은 계정을 이용하는 동안 보관해요.</li>
+            <li>이벤트 신청 기록은 계정을 이용하는 동안 보관하고, 계정을 지우면 함께 지워요.</li>
             <li>
               방명록 글은 작성자가 지울 때까지 보관해요. 크리에이터가 방명록을 꺼도 글은 지우지 않고 보관하며, 다시 켜면
               그대로 보여요.

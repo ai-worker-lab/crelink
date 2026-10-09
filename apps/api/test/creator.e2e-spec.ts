@@ -58,7 +58,7 @@ describe('크리에이터 편집 API', () => {
     }
   });
 
-  it('편집 상태는 랜딩·단축 URL·빈 목록·한도를 준다', async () => {
+  it('편집 상태는 랜딩·단축 URL·빈 목록·한도·링크 슬롯 이벤트(미신청)를 준다', async () => {
     const { cookie } = await newCreator();
     const body = await state(cookie);
     expect(body.landing.url).toBe(`${WEB_URL}/p/${body.landing.publicId}`);
@@ -68,6 +68,7 @@ describe('크리에이터 편집 API', () => {
       socials: [],
       portfolio: [],
       limits: { visibleMax: 5, visibleUsed: 0, totalMax: 50, totalUsed: 0 },
+      slotEvent: { event: { bonusLinks: 5, endsAt: null, status: 'open' }, entry: null },
     });
   });
 

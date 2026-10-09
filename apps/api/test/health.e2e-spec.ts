@@ -93,6 +93,8 @@ describe('API 기동과 health', () => {
         'sessions',
         'short_links',
         'short_slugs',
+        'slot_event_entries',
+        'slot_events',
         'social_links',
         'user_identities',
         'users',
@@ -105,6 +107,7 @@ describe('API 기동과 health', () => {
         { version: '0001_crelink_mvp' },
         { version: '0002_guestbook' },
         { version: '0003_ad_banner' },
+        { version: '0005_slot_event' },
       ]);
     } finally {
       await client.end();

@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>크리링 · 외부 링크 +5 이벤트 상태 모음</title>
+<link rel="stylesheet" href="../system/tokens.css">
+<link rel="stylesheet" href="slot-event.css">
+</head>
+<body>
+<main class="states" data-od-id="states-page">
+  <h1>외부 링크 +5 이벤트 상태 모음</h1>
+  <p class="states-intro">각 표본은 이 문서를 연 화면 폭의 실제 배치로 그려요. 1024px 이상은 관리 화면 오른쪽 편집 패널(폭 430), 1023px 이하는 관리 화면 한 열·하단 시트, 700px 이하는 운영자 카드 배치예요. 점선 틀과 회색 설명 상자는 시안 전용이에요. 예시 날짜: 시작 2026. 10. 10. 오전 10:00, 끝 2026. 11. 30. 오후 11:59(한국 시간).</p>
+
+  <!-- A. 페이지 편집 이벤트 띠 -->
+  <section class="state-group" aria-labelledby="group-a" data-od-id="group-band">
+    <h2 id="group-a">A. 페이지 편집 이벤트 띠</h2>
+    <p>넓은 화면: 처음 패널 머리 아래·구역 선택 위. 좁은 화면: sticky 줄 아래·미리보기 위(배너 슬롯 회수 안내와 같은 자리). 둘 다 `페이지 편집` 메뉴에서만 보여요.</p>
+    <div class="state-grid">
+      <article class="sample" data-state="A1">
+        <h3>A1 미신청 · 진행 중 · 끝 있음 <code>status=open, entry=null</code></h3>
+        <div class="ctx is-panel-ctx">
+          <div class="panel-head only-wide"><p class="panel-title">페이지 편집</p><p class="panel-help">방문자 화면에서 구역이나 항목을 선택해 편집해요.</p></div>
+          <section class="event-offer" aria-labelledby="a1-title" data-od-id="a1">
+            <div class="event-offer-text">
+              <p class="event-offer-title" id="a1-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></p>
+              <p class="event-offer-body">신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번, <time datetime="2026-11-30T23:59:00+09:00">2026. 11. 30. 오후 11:59</time>까지 신청할 수 있어요.</p>
+            </div>
+            <button type="button" class="primary" aria-describedby="a1-title">신청하기</button>
+            <div class="action-status" aria-live="polite"></div>
+          </section>
+          <p class="panel-subtitle only-wide">구역 선택</p>
+          <div class="only-narrow" data-preview-stub></div>
+        </div>
+      </article>
+      <article class="sample" data-state="A2">
+        <h3>A2 미신청 · 진행 중 · 끝 없음 <code>endsAt=null</code></h3>
+        <div class="ctx is-panel-ctx">
+          <section class="event-offer" aria-labelledby="a2-title" data-od-id="a2">
+            <div class="event-offer-text">
+              <p class="event-offer-title" id="a2-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></p>
+              <p class="event-offer-body">신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번 신청할 수 있어요.</p>
+            </div>
+            <button type="button" class="primary" aria-describedby="a2-title">신청하기</button>
+            <div class="action-status" aria-live="polite"></div>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="A3">
+        <h3>A3 신청 중 <code>요청 진행 중</code></h3>
+        <div class="ctx is-panel-ctx">
+          <section class="event-offer" aria-labelledby="a3-title" aria-busy="true" data-od-id="a3">
+            <div class="event-offer-text">
+              <p class="event-offer-title" id="a3-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></p>
+              <p class="event-offer-body">신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번, <time datetime="2026-11-30T23:59:00+09:00">2026. 11. 30. 오후 11:59</time>까지 신청할 수 있어요.</p>
+            </div>
+            <button type="button" class="primary" aria-describedby="a3-title" disabled>신청 중…</button>
+            <div class="action-status" aria-live="polite"></div>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="A4">
+        <h3>A4 신청 완료 직후 <code>성공(새로 신청·이미 신청함 같음)</code></h3>
+        <div class="ctx is-panel-ctx">
+          <p class="form-success event-result" role="status" tabindex="-1">이벤트를 신청했어요. 이제 보이는 외부 링크를 10개까지 둘 수 있어요.</p>
+          <p class="ctx-hidden">띠는 사라지고 이 알림이 같은 자리에 남아요(초점 이동). `페이지 편집`을 떠나거나 새로 열면 없어져요. 숫자는 다시 읽은 `limits.visibleMax`.</p>
+        </div>
+      </article>
+      <article class="sample" data-state="A5">
+        <h3>A5 오류 · 기간 아님 <code>409 slot_event_closed</code></h3>
+        <div class="ctx is-panel-ctx">
+          <p class="form-error event-result" role="alert" tabindex="-1">이벤트 신청 기간이 아니어서 신청하지 못했어요.</p>
+          <p class="ctx-hidden">끝났거나 운영자가 시작을 미뤘어요. 이벤트 정보를 다시 읽고 띠를 지워요. 다시 시도 버튼은 없어요.</p>
+        </div>
+      </article>
+      <article class="sample" data-state="A6">
+        <h3>A6 오류 · 이벤트 없음 <code>404 slot_event_not_found</code></h3>
+        <div class="ctx is-panel-ctx">
+          <p class="form-error event-result" role="alert" tabindex="-1">진행 중인 이벤트가 없어 신청하지 못했어요.</p>
+        </div>
+      </article>
+      <article class="sample" data-state="A7">
+        <h3>A7 오류 · 네트워크·그 밖 <code>network_error 등</code></h3>
+        <div class="ctx is-panel-ctx">
+          <section class="event-offer" aria-labelledby="a7-title" data-od-id="a7">
+            <div class="event-offer-text">
+              <p class="event-offer-title" id="a7-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></p>
+              <p class="event-offer-body">신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번, <time datetime="2026-11-30T23:59:00+09:00">2026. 11. 30. 오후 11:59</time>까지 신청할 수 있어요.</p>
+            </div>
+            <button type="button" class="primary" aria-describedby="a7-title">다시 시도</button>
+            <div class="action-status" aria-live="polite"><p class="form-error" role="alert">서버에 연결할 수 없어요. 인터넷 연결을 확인해 주세요.</p></div>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="A8">
+        <h3>A8 띠 없음 <code>신청함 · scheduled · ended · 이벤트 없음 · 조회 실패</code></h3>
+        <div class="ctx is-panel-ctx">
+          <div class="panel-head only-wide"><p class="panel-title">페이지 편집</p><p class="panel-help">방문자 화면에서 구역이나 항목을 선택해 편집해요.</p></div>
+          <p class="panel-subtitle only-wide">구역 선택</p>
+          <ul class="section-picker only-wide"><li><button type="button"><span class="section-picker-title">외부 링크</span><span class="section-picker-meta">보이는 링크 3/10</span></button></li></ul>
+          <div class="only-narrow" data-preview-stub></div>
+          <p class="ctx-hidden">지금 화면 그대로예요. 신청한 계정은 구역 선택의 `보이는 링크 3/10`처럼 한도에만 보너스가 반영돼요.</p>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- B. 외부 링크 패널 -->
+  <section class="state-group" aria-labelledby="group-b" data-od-id="group-links">
+    <h2 id="group-b">B. 외부 링크 패널(좁은 화면은 하단 시트)</h2>
+    <p>한도 배지 · 이벤트 줄 · 도움말 · 결과 안내 · 링크 행(표본은 2개만) · `링크 추가` 또는 한도 안내 순서예요. 이벤트 줄은 한도 배지 바로 아래에 하나만 둬요.</p>
+    <div class="state-grid">
+      <article class="sample" data-state="B1">
+        <h3>B1 미신청 · 진행 중 · 여유 <code>3/5</code></h3>
+        <div class="ctx is-panel-ctx is-sheet-ctx">
+          <div data-panel-head></div>
+          <div class="ctx-links">
+            <div class="panel-badges"><p class="limit-badge">보이는 링크 3/5</p></div>
+            <section class="event-offer is-compact" aria-labelledby="b1-title" data-od-id="b1">
+              <div class="event-offer-text">
+                <p class="event-offer-title" id="b1-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></p>
+                <p class="event-offer-body">이벤트를 신청하면 보이는 링크를 5개 더 둘 수 있어요.</p>
+              </div>
+              <button type="button" class="secondary" aria-describedby="b1-title">신청하기</button>
+              <div class="action-status" aria-live="polite"></div>
+            </section>
+            <p class="section-help" data-help="3"></p>
+            <ul class="link-list link-edit-list" data-rows></ul>
+            <button type="button" class="secondary link-add">링크 추가</button>
+          </div>
+        </div>
+      </article>
+      <article class="sample" data-state="B2">
+        <h3>B2 신청 중</h3>
+        <div class="ctx is-panel-ctx is-sheet-ctx">
+          <div data-panel-head></div>
+          <div class="ctx-links">
+            <div class="panel-badges"><p class="limit-badge">보이는 링크 3/5</p></div>
+            <section class="event-offer is-compact" aria-labelledby="b2-title" aria-busy="true" data-od-id="b2">
+              <div class="event-offer-text">
+                <p class="event-offer-title" id="b2-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></p>
+                <p class="event-offer-body">이벤트를 신청하면 보이는 링크를 5개 더 둘 수 있어요.</p>
+              </div>
+              <button type="button" class="secondary" aria-describedby="b2-title" disabled>신청 중…</button>
+              <div class="action-status" aria-live="polite"></div>
+            </section>
+            <p class="section-help" data-help="3"></p>
+          </div>
+        </div>
+      </article>
+      <article class="sample" data-state="B3">
+        <h3>B3 신청 완료 직후 <code>3/10</code></h3>
+        <div class="ctx is-panel-ctx is-sheet-ctx">
+          <div data-panel-head></div>
+          <div class="ctx-links">
+            <div class="panel-badges"><p class="limit-badge">보이는 링크 3/10</p></div>
+            <p class="event-status" tabindex="-1"><span class="badge badge-positive">이벤트 보너스 +5 받음</span><span>2026년 10월 10일 신청</span></p>
+            <p class="section-help" data-help="3"></p>
+            <div class="action-status" aria-live="polite"><p class="form-success">이벤트를 신청했어요. 이제 보이는 외부 링크를 10개까지 둘 수 있어요.</p></div>
+            <ul class="link-list link-edit-list" data-rows></ul>
+            <button type="button" class="secondary link-add">링크 추가</button>
+          </div>
+        </div>
+      </article>
+      <article class="sample" data-state="B4">
+        <h3>B4 신청 실패 · 기간 아님·이벤트 없음 <code>409 · 404</code></h3>
+        <div class="ctx is-panel-ctx is-sheet-ctx">
+          <div data-panel-head></div>
+          <div class="ctx-links">
+            <div class="panel-badges"><p class="limit-badge">보이는 링크 3/5</p></div>
+            <p class="form-error event-result" role="alert" tabindex="-1">이벤트 신청 기간이 아니어서 신청하지 못했어요.</p>
+            <p class="section-help" data-help="3"></p>
+          </div>
+        </div>
+      </article>
+      <article class="sample" data-state="B5">
+        <h3>B5 신청 실패 · 네트워크·그 밖</h3>
+        <div class="ctx is-panel-ctx is-sheet-ctx">
+          <div data-panel-head></div>
+          <div class="ctx-links">
+            <div class="panel-badges"><p class="limit-badge">보이는 링크 3/5</p></div>
+            <section class="event-offer is-compact" aria-labelledby="b5-title" data-od-id="b5">
+              <div class="event-offer-text">
+                <p class="event-offer-title" id="b5-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></p>
+                <p class="event-offer-body">이벤트를 신청하면 보이는 링크를 5개 더 둘 수 있어요.</p>
+              </div>
+              <button type="button" class="secondary" aria-describedby="b5-title">다시 시도</button>
+              <div class="action-status" aria-live="polite"><p class="form-error" role="alert">서버에 연결할 수 없어요. 인터넷 연결을 확인해 주세요.</p></div>
+            </section>
+            <p class="section-help" data-help="3"></p>
+          </div>
+        </div>
+      </article>
+      <article class="sample" data-state="B6">
+        <h3>B6 신청함 <code>entry 있음 · 진행 중이든 끝났든</code></h3>
+        <div class="ctx is-panel-ctx is-sheet-ctx">
+          <div data-panel-head></div>
+          <div class="ctx-links">
+            <div class="panel-badges"><p class="limit-badge">보이는 링크 3/10</p></div>
+            <p class="event-status"><span class="badge badge-positive">이벤트 보너스 +5 받음</span><span>2026년 10월 10일 신청</span></p>
+            <p class="section-help" data-help="3"></p>
+            <ul class="link-list link-edit-list" data-rows></ul>
+            <button type="button" class="secondary link-add">링크 추가</button>
+          </div>
+        </div>
+      </article>
+      <article class="sample" data-state="B7">
+        <h3>B7 한도 참 · 미신청 · 진행 중 <code>5/5</code></h3>
+        <div class="ctx is-panel-ctx is-sheet-ctx">
+          <div data-panel-head></div>
+          <div class="ctx-links">
+            <div class="panel-badges"><p class="limit-badge limit-full">보이는 링크 5/5</p></div>
+            <section class="event-offer is-compact" aria-labelledby="b7-title" data-od-id="b7">
+              <div class="event-offer-text">
+                <p class="event-offer-title" id="b7-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></p>
+                <p class="event-offer-body">이벤트를 신청하면 보이는 링크를 5개 더 둘 수 있어요.</p>
+              </div>
+              <button type="button" class="secondary" aria-describedby="b7-title">신청하기</button>
+              <div class="action-status" aria-live="polite"></div>
+            </section>
+            <p class="section-help" data-help="5"></p>
+            <ul class="link-list link-edit-list" data-rows></ul>
+            <p class="notice-box">보이는 링크 한도(5개)에 도달했어요. 이벤트를 신청하면 5개 더 둘 수 있어요. 다른 링크를 숨기거나 지워도 새 링크를 추가할 수 있어요.</p>
+          </div>
+        </div>
+      </article>
+      <article class="sample" data-state="B8">
+        <h3>B8 한도 참 · 신청함 <code>10/10</code></h3>
+        <div class="ctx is-panel-ctx is-sheet-ctx">
+          <div data-panel-head></div>
+          <div class="ctx-links">
+            <div class="panel-badges"><p class="limit-badge limit-full">보이는 링크 10/10</p></div>
+            <p class="event-status"><span class="badge badge-positive">이벤트 보너스 +5 받음</span><span>2026년 10월 10일 신청</span></p>
+            <p class="section-help" data-help="10"></p>
+            <ul class="link-list link-edit-list" data-rows></ul>
+            <p class="notice-box">보이는 링크 한도(10개)에 도달했어요. 다른 링크를 숨기거나 지우면 새 링크를 추가할 수 있어요. 한도를 늘리려면 크리링 운영자에게 문의해 주세요.</p>
+          </div>
+        </div>
+      </article>
+      <article class="sample" data-state="B9">
+        <h3>B9 한도 참 · 미신청 · 신청 불가 <code>scheduled · ended · 없음</code></h3>
+        <div class="ctx is-panel-ctx is-sheet-ctx">
+          <div data-panel-head></div>
+          <div class="ctx-links">
+            <div class="panel-badges"><p class="limit-badge limit-full">보이는 링크 5/5</p></div>
+            <p class="section-help" data-help="5"></p>
+            <ul class="link-list link-edit-list" data-rows></ul>
+            <p class="notice-box">보이는 링크 한도(5개)에 도달했어요. 다른 링크를 숨기거나 지우면 새 링크를 추가할 수 있어요. 한도를 늘리려면 크리링 운영자에게 문의해 주세요.</p>
+          </div>
+        </div>
+      </article>
+      <article class="sample" data-state="B10">
+        <h3>B10 운영자 추가 슬롯 2 + 이벤트 <code>visibleMax 12</code></h3>
+        <div class="ctx is-panel-ctx is-sheet-ctx">
+          <div data-panel-head></div>
+          <div class="ctx-links">
+            <div class="panel-badges"><p class="limit-badge">보이는 링크 4/12</p></div>
+            <p class="event-status"><span class="badge badge-positive">이벤트 보너스 +5 받음</span><span>2026년 10월 10일 신청</span></p>
+            <p class="section-help" data-help="4"></p>
+            <p class="ctx-hidden">한도는 늘 `limits.visibleMax` 그대로예요(무료 5 + 추가 슬롯 + 이벤트 5, 전체 상한 50까지). 패널은 한도를 나눠 보여 주지 않아요.</p>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- C. 홈 -->
+  <section class="state-group" aria-labelledby="group-c" data-od-id="group-home">
+    <h2 id="group-c">C. 홈 `/`</h2>
+    <p>대표 설명 아래, 시작 버튼 위. 표본은 대표 문장을 27로 줄였어요(실제 38~64).</p>
+    <div class="state-grid is-wide">
+      <article class="sample" data-state="C1">
+        <h3>C1 로그인 전 · 진행 중 · 끝 있음</h3>
+        <div class="ctx is-home">
+          <section class="landing" aria-labelledby="c1-h" data-od-id="c1">
+            <p class="brand-mark">크리링</p>
+            <p class="sample-home-h1" id="c1-h">인스타그램 프로필 링크 하나로 나를 소개하세요.</p>
+            <p>크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.</p>
+            <section class="home-event" aria-labelledby="c1-title" data-od-id="c1-event">
+              <h4 class="home-event-title" id="c1-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></h4>
+              <p>가입하고 이벤트를 신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번 신청할 수 있어요.</p>
+              <p class="home-event-period">신청 기간 <time datetime="2026-10-10T10:00:00+09:00">2026. 10. 10. 오전 10:00</time> ~ <time datetime="2026-11-30T23:59:00+09:00">2026. 11. 30. 오후 11:59</time></p>
+            </section>
+            <div class="home-actions"><div class="button-row"><a class="primary" href="#c1">구글로 시작하기</a></div></div>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="C2">
+        <h3>C2 로그인 전 · 진행 중 · 끝 없음</h3>
+        <div class="ctx is-home">
+          <section class="home-event" aria-labelledby="c2-title" data-od-id="c2-event">
+            <h4 class="home-event-title" id="c2-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></h4>
+            <p>가입하고 이벤트를 신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번 신청할 수 있어요.</p>
+            <p class="home-event-period">신청 기간 <time datetime="2026-10-10T10:00:00+09:00">2026. 10. 10. 오전 10:00</time>부터</p>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="C3">
+        <h3>C3 로그인 후 · 미신청 · 진행 중</h3>
+        <div class="ctx is-home">
+          <section class="landing" aria-labelledby="c3-h" data-od-id="c3">
+            <p class="brand-mark">크리링</p>
+            <p class="sample-home-h1" id="c3-h">인스타그램 프로필 링크 하나로 나를 소개하세요.</p>
+            <p>크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.</p>
+            <section class="home-event" aria-labelledby="c3-title" data-od-id="c3-event">
+              <h4 class="home-event-title" id="c3-title"><span class="badge">이벤트</span><span>외부 링크 +5 이벤트</span></h4>
+              <p>이벤트를 신청하면 보이는 외부 링크를 5개 더 둘 수 있어요. 계정마다 한 번 신청할 수 있어요.</p>
+              <p class="home-event-period">신청 기간 <time datetime="2026-10-10T10:00:00+09:00">2026. 10. 10. 오전 10:00</time> ~ <time datetime="2026-11-30T23:59:00+09:00">2026. 11. 30. 오후 11:59</time></p>
+              <a class="secondary" href="#c3">내 크리링에서 신청하기</a>
+            </section>
+            <div class="home-actions">
+              <p class="home-account">haru.film.official.creator@gmail.com으로 로그인했어요.</p>
+              <div class="button-row"><a class="primary" href="#c3">내 크리링 편집</a><span class="logout-control"><button type="button" class="secondary">로그아웃</button></span></div>
+            </div>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="C4">
+        <h3>C4 안내 없음 <code>로그인 후 신청함 · scheduled · ended · 이벤트 없음 · 조회 실패</code></h3>
+        <div class="ctx is-home">
+          <section class="landing" aria-labelledby="c4-h" data-od-id="c4">
+            <p class="brand-mark">크리링</p>
+            <p class="sample-home-h1" id="c4-h">인스타그램 프로필 링크 하나로 나를 소개하세요.</p>
+            <p>크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.</p>
+            <div class="home-actions"><div class="button-row"><a class="primary" href="#c4">구글로 시작하기</a></div></div>
+          </section>
+          <p class="ctx-hidden">지금 홈 그대로예요(자리 없이 숨김). 이벤트 조회가 실패해도 홈은 오류를 보이지 않아요.</p>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- D. 운영자 이벤트 -->
+  <section class="state-group" aria-labelledby="group-d" data-od-id="group-admin">
+    <h2 id="group-d">D. 운영자 `/admin/slot-event`(운영자 메뉴 `이벤트`)</h2>
+    <p>기간 카드와 신청자 카드 두 개예요. 700px 이하에서 신청자 표는 카드 목록이 돼요.</p>
+    <div class="state-grid is-wide">
+      <article class="sample" data-state="D1">
+        <h3>D1 진행 중 · 신청자 있음 · 1/7쪽</h3>
+        <div class="ctx is-stage">
+          <section class="card" aria-labelledby="d1-period" data-od-id="d1-period">
+            <div class="card-head"><h4 class="sample-h" id="d1-period">이벤트 기간</h4><span class="badge ad-status ad-status-live">진행 중</span></div>
+            <p class="slot-event-state">지금 신청을 받고 있어요. 홈과 관리 화면에 안내가 보여요.</p>
+            <div class="slot-event-form" data-period="2026-10-10T10:00|2026-11-30T23:59"></div>
+          </section>
+          <section class="card" aria-labelledby="d1-entries" data-od-id="d1-entries">
+            <h4 class="sample-h" id="d1-entries">신청자</h4>
+            <dl class="stat-tiles slot-event-count"><div><dt>신청 수</dt><dd>128</dd></div></dl>
+            <p class="section-help">신청 시각이 최신인 순서예요. 전체 128명 · 1/7쪽</p>
+            <div class="table-scroll slot-event-table-wrap" data-entries="5"></div>
+            <nav class="pagination" aria-label="쪽 이동"><span aria-hidden="true"></span><span>1 / 7</span><a href="#d1-entries">다음 쪽</a></nav>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="D2">
+        <h3>D2 시작 전 <code>status=scheduled</code></h3>
+        <div class="ctx is-stage">
+          <section class="card" aria-labelledby="d2-period" data-od-id="d2-period">
+            <div class="card-head"><h4 class="sample-h" id="d2-period">이벤트 기간</h4><span class="badge ad-status ad-status-scheduled">시작 전</span></div>
+            <p class="slot-event-state">시작 시각부터 신청을 받아요. 그 전에는 홈과 관리 화면에 안내가 보이지 않아요.</p>
+            <div class="slot-event-form" data-period="2026-10-20T10:00|"></div>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="D3">
+        <h3>D3 끝남 <code>status=ended</code></h3>
+        <div class="ctx is-stage">
+          <section class="card" aria-labelledby="d3-period" data-od-id="d3-period">
+            <div class="card-head"><h4 class="sample-h" id="d3-period">이벤트 기간</h4><span class="badge ad-status ad-status-ended">끝남</span></div>
+            <p class="slot-event-state">새 신청을 받지 않아요. 받은 보너스는 그대로이고, 홈과 관리 화면 안내는 숨었어요.</p>
+            <div class="slot-event-form" data-period="2026-10-10T10:00|2026-11-30T23:59"></div>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="D4">
+        <h3>D4 신청자 없음 <code>entryCount=0</code></h3>
+        <div class="ctx is-stage">
+          <section class="card" aria-labelledby="d4-entries" data-od-id="d4-entries">
+            <h4 class="sample-h" id="d4-entries">신청자</h4>
+            <dl class="stat-tiles slot-event-count"><div><dt>신청 수</dt><dd>0</dd></div></dl>
+            <p class="empty-text">아직 신청한 크리에이터가 없어요.</p>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="D5">
+        <h3>D5 저장 중</h3>
+        <div class="ctx is-stage">
+          <section class="card" aria-labelledby="d5-period" data-od-id="d5-period">
+            <div class="card-head"><h4 class="sample-h" id="d5-period">이벤트 기간</h4><span class="badge ad-status ad-status-live">진행 중</span></div>
+            <div class="slot-event-form" data-period="2026-10-10T10:00|2026-12-31T23:59" data-pending></div>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="D6">
+        <h3>D6 저장 성공</h3>
+        <div class="ctx is-stage">
+          <section class="card" aria-labelledby="d6-period" data-od-id="d6-period">
+            <div class="card-head"><h4 class="sample-h" id="d6-period">이벤트 기간</h4><span class="badge ad-status ad-status-live">진행 중</span></div>
+            <div class="slot-event-form" data-period="2026-10-10T10:00|2026-12-31T23:59" data-status="success|이벤트 기간을 저장했어요."></div>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="D7">
+        <h3>D7 끝이 시작보다 앞 <code>400 slot_event_period_invalid · 화면 검사</code></h3>
+        <div class="ctx is-stage">
+          <section class="card" aria-labelledby="d7-period" data-od-id="d7-period">
+            <div class="card-head"><h4 class="sample-h" id="d7-period">이벤트 기간</h4><span class="badge ad-status ad-status-live">진행 중</span></div>
+            <div class="slot-event-form" data-period="2026-10-10T10:00|2026-10-01T23:59" data-invalid="end" data-status="error|끝은 시작보다 뒤여야 해요."></div>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="D8">
+        <h3>D8 시작 비움 <code>화면 검사(필수)</code></h3>
+        <div class="ctx is-stage">
+          <section class="card" aria-labelledby="d8-period" data-od-id="d8-period">
+            <div class="card-head"><h4 class="sample-h" id="d8-period">이벤트 기간</h4><span class="badge ad-status ad-status-live">진행 중</span></div>
+            <div class="slot-event-form" data-period="|2026-11-30T23:59" data-invalid="start" data-status="error|시작 시각을 넣어 주세요."></div>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="D9">
+        <h3>D9 저장 실패 · 네트워크·그 밖</h3>
+        <div class="ctx is-stage">
+          <section class="card" aria-labelledby="d9-period" data-od-id="d9-period">
+            <div class="card-head"><h4 class="sample-h" id="d9-period">이벤트 기간</h4><span class="badge ad-status ad-status-live">진행 중</span></div>
+            <div class="slot-event-form" data-period="2026-10-10T10:00|2026-12-31T23:59" data-retry data-status="error|서버에 연결할 수 없어요. 인터넷 연결을 확인해 주세요."></div>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="D10">
+        <h3>D10 마지막 쪽 · 긴 이메일·이름 <code>7/7</code></h3>
+        <div class="ctx is-stage">
+          <section class="card" aria-labelledby="d10-entries" data-od-id="d10-entries">
+            <h4 class="sample-h" id="d10-entries">신청자</h4>
+            <dl class="stat-tiles slot-event-count"><div><dt>신청 수</dt><dd>128</dd></div></dl>
+            <p class="section-help">신청 시각이 최신인 순서예요. 전체 128명 · 7/7쪽</p>
+            <div class="table-scroll slot-event-table-wrap" data-entries="2" data-offset="2"></div>
+            <nav class="pagination" aria-label="쪽 이동"><a href="#d10-entries">이전 쪽</a><span>7 / 7</span><span aria-hidden="true"></span></nav>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="D13">
+        <h3>D13 없는 쪽 <code>?page=9 · entries=[] · entryCount&gt;0</code></h3>
+        <div class="ctx is-stage">
+          <section class="card" aria-labelledby="d13-entries" data-od-id="d13-entries">
+            <h4 class="sample-h" id="d13-entries">신청자</h4>
+            <dl class="stat-tiles slot-event-count"><div><dt>신청 수</dt><dd>128</dd></div></dl>
+            <p class="empty-text">이 쪽에는 신청자가 없어요. <a href="#d13-entries">첫 쪽으로</a></p>
+          </section>
+        </div>
+      </article>
+      <article class="sample" data-state="D11">
+        <h3>D11 불러오는 중</h3>
+        <div class="ctx is-stage">
+          <div role="status" aria-live="polite">
+            <p class="page-title">외부 링크 +5 이벤트</p>
+            <p class="visually-hidden">이벤트를 불러오는 중…</p>
+            <div class="skeleton-menu" aria-hidden="true">
+              <span class="skeleton-bar slot-event-skeleton-card"></span>
+              <span class="skeleton-bar slot-event-skeleton-row"></span>
+              <span class="skeleton-bar slot-event-skeleton-row"></span>
+              <span class="skeleton-bar slot-event-skeleton-row"></span>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="sample" data-state="D12">
+        <h3>D12 불러오기 오류 <code>AdminShell ErrorPanel · 404 slot_event_not_found · 5xx · 네트워크</code></h3>
+        <div class="ctx is-stage">
+          <div class="empty-state" role="alert">
+            <span class="error-badge" aria-hidden="true">!</span>
+            <p class="sample-h">이벤트를 불러오지 못했어요.</p>
+            <p>서버에 연결할 수 없어요. 인터넷 연결을 확인해 주세요.</p>
+            <a class="primary" href="#d12">다시 시도</a>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- E. 크리에이터 상세 -->
+  <section class="state-group" aria-labelledby="group-e" data-od-id="group-creator">
+    <h2 id="group-e">E. 운영자 크리에이터 상세 `/admin/creators/{userId}`</h2>
+    <p>머리 정보 목록에 `이벤트 신청일` 줄, `계정 관리` 카드의 추가 링크 슬롯 도움말에 한도 분해를 더해요.</p>
+    <div class="state-grid is-wide">
+      <article class="sample" data-state="E1">
+        <h3>E1 신청함 · 추가 슬롯 2</h3>
+        <div class="ctx is-stage" data-creator="2|2026년 10월 10일"></div>
+      </article>
+      <article class="sample" data-state="E2">
+        <h3>E2 신청 안 함 · 추가 슬롯 2</h3>
+        <div class="ctx is-stage" data-creator="2|"></div>
+      </article>
+      <article class="sample" data-state="E3">
+        <h3>E3 신청함 · 추가 슬롯 45(전체 상한에 걸림)</h3>
+        <div class="ctx is-stage" data-creator="45|2026년 10월 10일"></div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<script>
+// 표본의 반복 부분(링크 행·기간 폼·신청자 표·크리에이터 카드)을 채우는 시안 데모 코드입니다. 구현은 이 코드를 옮기지 않습니다.
+const handle = '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M7 4h2v2H7zm4 0h2v2h-2zM7 9h2v2H7zm4 0h2v2h-2zm-4 5h2v2H7zm4 0h2v2h-2z" fill="currentColor"/></svg>';
+const favicon = '<svg class="favicon favicon-default" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M8 12a3 3 0 0 0 4 0l3-3a3 3 0 0 0-4-4l-1 1M12 8a3 3 0 0 0-4 0l-3 3a3 3 0 0 0 4 4l1-1" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+const avatar = '<span class="default-avatar profile-avatar"><svg viewBox="0 0 96 96" focusable="false" aria-hidden="true"><circle cx="48" cy="38" r="16" fill="currentColor"/><path d="M18 84c4-16 16-24 30-24s26 8 30 24z" fill="currentColor"/></svg></span>';
+const LINKS = ['유튜브 채널 · 여행 브이로그', '협업 문의 메일'];
+let uid = 0;
+
+document.querySelectorAll('[data-rows]').forEach((ul) => {
+  ul.innerHTML = LINKS.map((t) => `<li class="link-edit-item"><div class="link-edit-row"><button type="button" class="drag-handle" aria-label="${t} 순서 바꾸기">${handle}</button><div class="link-card link-edit-card">${favicon}<span class="link-text"><span class="link-title">${t}</span></span></div><div class="link-edit-controls"><button type="button" role="switch" class="hide-switch" aria-checked="false" aria-label="${t} 숨기기"><span class="hide-switch-track" aria-hidden="true"><span class="hide-switch-thumb"></span></span><span aria-hidden="true">숨김</span></button><button type="button" class="secondary" aria-label="${t} 수정">수정</button></div></div></li>`).join('');
+});
+document.querySelectorAll('[data-help]').forEach((p) => {
+  p.textContent = `카드를 누르면 고칠 수 있고, 손잡이를 끌면 순서가 바뀌어요. 광고 블록 행도 같은 손잡이로 옮겨요. 숨긴 링크와 차단된 링크는 방문자에게 보이지 않고 한도에도 들어가지 않아요. 숨긴 링크 포함 전체 ${p.dataset.help}/50개.`;
+});
+document.querySelectorAll('[data-panel-head]').forEach((el) => {
+  const id = `ph-${++uid}`;
+  el.outerHTML = `<div class="panel-head only-wide"><button type="button" class="back-button"><span aria-hidden="true">←</span> 전체</button><p class="panel-title" id="${id}">외부 링크</p></div><div class="only-narrow"><div class="sheet-head"><p class="sheet-title">외부 링크</p><button type="button" class="icon-button" aria-label="닫기"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div></div>`;
+});
+document.querySelectorAll('[data-preview-stub]').forEach((el) => {
+  el.innerHTML = `<div class="preview-screen is-bare"><div class="preview-main"><div class="profile"><header class="profile-head">${avatar}<p class="profile-name">하루필름</p></header><ul class="link-list"><li><div class="link-card">${favicon}<span class="link-text"><span class="link-title">유튜브 채널 · 여행 브이로그</span></span></div></li></ul></div></div></div>`;
+});
+
+document.querySelectorAll('[data-period]').forEach((el) => {
+  const [start, end] = el.dataset.period.split('|');
+  const id = `pf-${++uid}`;
+  const pending = el.hasAttribute('data-pending');
+  const invalid = el.dataset.invalid;
+  const [kind, text] = (el.dataset.status || '|').split('|');
+  const dis = pending ? ' disabled' : '';
+  const status = kind ? `<p class="${kind === 'success' ? 'form-success' : 'form-error'}"${kind === 'error' ? ' role="alert"' : ''}>${text}</p>` : '';
+  const label = pending ? '저장 중…' : el.hasAttribute('data-retry') ? '다시 시도' : '기간 저장';
+  el.outerHTML = `<form class="slot-event-form" novalidate><div class="ad-banner-period"><div class="field"><label for="${id}-s">시작 (필수)</label><input id="${id}-s" class="input" type="datetime-local" required value="${start}"${invalid === 'start' ? ' aria-invalid="true"' : ''} aria-describedby="${id}-sh"${dis}><p class="field-help" id="${id}-sh">한국 시간 기준이에요.</p></div><div class="field"><label for="${id}-e">끝</label><input id="${id}-e" class="input" type="datetime-local" value="${end}"${invalid === 'end' ? ' aria-invalid="true"' : ''} aria-describedby="${id}-eh"${dis}><p class="field-help" id="${id}-eh">비워 두면 끝을 정할 때까지 계속 신청을 받아요.</p></div></div><div class="action-status" aria-live="polite">${status}</div><div class="form-actions"><button type="submit" class="primary"${dis}>${label}</button></div></form>`;
+});
+
+const ENTRIES = [
+  ['2026. 10. 12. 오후 9:41', 'haru.film.official.creator@gmail.com', '하루필름', 'harufilm'],
+  ['2026. 10. 12. 오후 6:05', 'minji@studio.kr', '민지의 작업실', 'minji-studio'],
+  ['2026. 10. 10. 오전 11:20', 'very.long.email.address.for.overflow.check.1234567890@example-creator-domain.co.kr', '이름이 아주 긴 크리에이터 채널 이름 확인용 표시 이름 예시', 'a-very-long-slug-for-checking-wrap-0012'],
+  ['2026. 10. 10. 오전 10:03', 'jun.cooks@gmail.com', null, 'juncooks'],
+  ['2026. 10. 10. 오전 10:01', 'seoyeon.draws@naver.com', '서연 드로잉', 'seoyeon'],
+];
+document.querySelectorAll('[data-entries]').forEach((el) => {
+  const offset = Number(el.dataset.offset || 0);
+  const rows = ENTRIES.slice(offset, offset + Number(el.dataset.entries));
+  el.innerHTML = `<table class="data-table slot-event-table"><caption class="visually-hidden">이벤트 신청자 목록</caption><thead><tr><th scope="col">신청일시</th><th scope="col">이메일</th><th scope="col">이름</th><th scope="col">단축 주소</th></tr></thead><tbody>${rows.map(([at, email, name, slug]) => `<tr><td>${at}</td><td><a href="#group-e">${email}</a></td><td>${name ?? '—'}</td><td><code>${slug}</code></td></tr>`).join('')}</tbody></table>`;
+});
+
+document.querySelectorAll('[data-creator]').forEach((el) => {
+  const [extraText, appliedAt] = el.dataset.creator.split('|');
+  const extra = Number(extraText);
+  const id = `cr-${++uid}`;
+  const bonus = appliedAt ? 5 : 0;
+  const max = Math.min(5 + extra + bonus, 50);
+  const help = `보이는 링크 한도 = 무료 5개 + 추가 슬롯 ${extra}개${appliedAt ? ' + 이벤트 5개' : ''}${5 + extra + bonus > 50 ? ' → 전체 링크 상한 50개' : ''}`;
+  el.innerHTML = `<dl class="meta-list"><div><dt>이메일</dt><dd>haru.film.official.creator@gmail.com</dd></div><div><dt>상태</dt><dd>이용 중</dd></div><div><dt>이벤트 신청일</dt><dd>${appliedAt ? `${appliedAt} · 보이는 링크 +5` : '신청 안 함'}</dd></div></dl><section class="card" aria-labelledby="${id}" data-od-id="${id}-account"><h4 class="sample-h" id="${id}">계정 관리</h4><p class="section-help">보이는 링크 4/${max} · 전체 링크 6/50</p><div class="control-grid"><form class="subform"><div class="field"><label for="${id}-x">추가 링크 슬롯</label><div class="inline-fields"><input id="${id}-x" class="input input-number" type="number" min="0" step="1" value="${extra}" aria-describedby="${id}-h"><button type="submit" class="primary">슬롯 저장</button></div><p class="field-help" id="${id}-h">${help}</p></div></form></div></section>`;
+});
+</script>
+</body>
+</html>

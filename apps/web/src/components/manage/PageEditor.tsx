@@ -19,6 +19,7 @@ import { GuestbookSwitch } from './GuestbookSwitch';
 import { LinkForm } from './LinkForm';
 import { LinksSection } from './LinksSection';
 import { useManager } from './ManagerContext';
+import { SlotEventBand } from './SlotEventOffer';
 import { managerHref, managerMenuLabel } from './menu';
 
 /**
@@ -43,6 +44,7 @@ export function PageEditor() {
     isPortfolioDirty,
     isBannerDirty,
     resetSelection,
+    resetSlotEvent,
     setFormPending,
   } = useManager();
   const formAction = useAction();
@@ -61,6 +63,8 @@ export function PageEditor() {
   }
   // 다른 메뉴로 옮기면 고른 대상을 지웁니다(초안은 남음). 돌아오면 처음 패널부터.
   useEffect(() => resetSelection, [resetSelection]);
+  // 링크 슬롯 이벤트 결과 줄은 `페이지 편집`을 떠날 때까지만 남습니다(design/slot-event/handoff.md `관리 화면 페이지 편집 띠`).
+  useEffect(() => resetSlotEvent, [resetSlotEvent]);
   // 폼 저장 중에는 미리보기 고르기를 막습니다(ManagerPreview가 봄).
   useEffect(() => setFormPending(formAction.pending), [formAction.pending, setFormPending]);
   // 저장이 끝났을 때 그 폼이 아직 고른 대상인지(메뉴를 떠났거나 다른 대상을 골랐으면 패널을 바꾸지 않음).
@@ -362,6 +366,7 @@ function PageOverview({ headingRef }: { headingRef: React.RefObject<HTMLHeadingE
         <p className="panel-help">방문자 화면에서 구역이나 항목을 선택해 편집해요.</p>
       </div>
       <BannerSlotNotice />
+      <SlotEventBand />
       <h2 className="panel-subtitle">구역 선택</h2>
       <ul className="section-picker">
         {rows.map((row) => (

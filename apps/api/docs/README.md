@@ -198,7 +198,7 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 ## 크리에이터 규칙
 
 - 단축 주소(R8, `src/creator/slug.service.ts`): 입력은 앞뒤 공백을 빼고 소문자로 바꾼 뒤 `SLUG_PATTERN`·3~30자·예약어를 봅니다. 다른 단축 URL의 현재 주소나 90일 안의 옛 주소면 409 `slug_taken`. 자기 옛 주소는 되돌릴 수 있습니다. 첫 변경(`slug_changed_at`이 없음)은 바로, 그 뒤에는 마지막 변경에서 30일 뒤부터(429 `slug_change_too_soon`). 자동 주소로 되돌려도 30일 제한은 마지막 변경 시각 기준이라 우회할 수 없습니다. 같은 주소로 바꾸는 요청은 아무것도 바꾸지 않고 200입니다. 예약 기간이 끝난 남의 옛 주소는 행을 지우고 새로 만듭니다.
-- 링크 한도(R13): 보이는(숨기지 않고 차단되지 않은) 링크 ≤ 5 + `extra_link_slots`(409 `link_limit_reached`), 숨긴 링크 포함 ≤ 50(409 `link_total_limit_reached`). 추가와 숨김 해제에서 확인하며, 같은 사용자의 링크 변경은 사용자 행 잠금으로 줄 세웁니다. 운영자 추가 슬롯은 0~45.
+- 링크 한도(R13, R24 ②): 보이는(숨기지 않고 차단되지 않은) 링크 ≤ min(5 + `extra_link_slots` + 링크 슬롯 이벤트 보너스 합, 50)(409 `link_limit_reached`), 숨긴 링크 포함 ≤ 50(409 `link_total_limit_reached`). 보너스 합은 `slot_event_entries.bonus_links`의 합이라 운영자 추가 슬롯과 따로 더해집니다([링크 슬롯 이벤트](#링크-슬롯-이벤트)). 계산은 `CreatorService.limits` 한 곳이고, 추가와 숨김 해제에서 확인하며, 같은 사용자의 링크 변경은 사용자 행 잠금으로 줄 세웁니다(신청은 한도를 늘리기만 해서 잠그지 않음). 운영자 추가 슬롯은 0~45.
 - 차단 도메인(R14): 링크 호스트가 차단 도메인이거나 그 하위 도메인이면 추가·URL 수정이 422 `link_domain_blocked`. 운영자가 도메인을 추가하면 같은 트랜잭션에서 기존 링크의 `blocked_at`을 채웁니다. 목록에서 빼도 이미 차단된 링크는 운영자가 링크별로 풉니다.
 - 광고 블록·배너 슬롯 위치(R20 ①②, R21 ①, [기술 설계](../../../docs/specs/crelink-ad-banner.md#위치-모델)): 위치는 첫 list 구역의 `landing_blocks.slot_position`(NULL = 맨 뒤, k = `position < k`인 링크들 다음) 하나이고 링크 한도에 들지 않습니다. `PUT /api/me/links/order`가 링크를 0..n-1로 다시 매기며 같은 트랜잭션에서 저장합니다: `slotIndex`(0 이상 정수, 아니면 400 `validation_failed`)가 n 이상이면 NULL, 아니면 그 값. 생략하면(옛 웹) 다시 매기기 전의 슬롯 앞 링크 수(`SLOT_INDEX_SQL`)를 새 위치로 둬 상대 위치를 유지합니다. 편집 상태 `slot.slotIndex`도 같은 식(빈 번호와 무관)이고, `slot.kind`는 `users.banner_slot_granted_at`이 있으면 `creator`입니다.
 - 공개 랜딩 슬롯(`src/creator/public-landing.controller.ts`): 첫 list 구역에만 `resolveBannerSlot`(공유 계약)을 적용하고 숨김이면 `slot: null`입니다. 링크는 숨김·차단 포함 전체를 읽어 위치를 계산하고 보이는 링크만 내려 줍니다. 배너 질의는 1개(부여됨: 그 랜딩의 숨김·차단 아닌 크리에이터 배너, 아니면 게시 중 `starts_at <= now() < ends_at` 크리링 배너 `sort_order, created_at`)입니다. `clickUrl`: 광고는 `passAccepted`일 때만 `{SHORT}/a/{배너}/{랜딩}`, 아니면 저장된 URL(R20 ⑧ 서비스 화면 제외). 크리에이터 배너는 늘 `{SHORT}/b/{배너}`이고 연결 URL이 없으면 null. `passAccepted`이고 광고 블록이 보이면 첫 장 노출을 `TrackingService.recordAdStat`로 `ad_banner_daily_stats`(Asia/Seoul 날짜·배너·랜딩 공개 ID, 개인 식별 정보 없음)에 더합니다(응답을 기다리지 않음). 관리 미리보기(`GET /api/me/landing`의 `adBanners`)는 저장된 URL이고 세지 않습니다(R7 ⑥).
@@ -246,6 +246,18 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 - 내리기 `PUT …/{id}/end`: `ends_at = least(coalesce(ends_at, now()), now())`, 예약 배너는 `starts_at = least(starts_at, now())`도 함께 당깁니다. 이미 끝난 배너는 바꾸지 않고 200(멱등). 수정·내리기는 배너 행 잠금(`FOR UPDATE`)으로 줄 섭니다.
 - 정렬 `PUT …/order`: 전체 id를 받아(아니면 400 `order_mismatch`) 0..n-1로 다시 매기고 새 순서의 목록을 돌려줍니다.
 - 등록·정렬·내리기는 트랜잭션 advisory lock(`pg_advisory_xact_lock(931475212)`, 보존 작업 931475211·migration 931475210과 다른 키)으로 줄 세워 맨 뒤 순서와 정렬이 동시 요청에 섞이지 않습니다.
+
+## 링크 슬롯 이벤트
+
+`src/slot-event/`(R24 ①③⑤). 계약은 `packages/shared/src/crelink.ts`의 `링크 슬롯 이벤트 (R24)` 절, 설계는 [링크 슬롯 +5 이벤트 기술 설계](../../../docs/specs/crelink-slot-event.md)입니다. API가 다루는 이벤트는 코드 `link-slots-plus-5`(`SLOT_EVENT_CODE`)인 `slot_events` 행 하나이고, migration `0005_slot_event`가 적용 시각에 열리고 끝이 없게 시드합니다. 이벤트를 만들거나 지우는 경로는 없습니다.
+
+- 상태는 한 문장 안의 같은 `now()`로 정합니다: `starts_at > now()` `scheduled`, `ends_at <= now()` `ended`, 그 밖에는 `open`(크리링 배너 게시 기간과 같은 규칙).
+- 공개 `GET /api/public/slot-event`: `{ event }`(행이 없으면 null), 기간·보너스만 주고 신청 수·신청자는 주지 않습니다. `Cache-Control: no-store`.
+- 신청 `POST /api/me/slot-event/entry`(`SessionGuard`, 본문 없음, 대상은 세션 본인): 한 트랜잭션에서 `INSERT … SELECT … WHERE starts_at <= now() AND (ends_at IS NULL OR now() < ends_at) ON CONFLICT (event_id, user_id) DO NOTHING`. 신청 행은 그때의 이벤트 `bonus_links` 사본이라 나중에 이벤트를 고쳐도 받은 보너스는 그대로이고 회수하지 않습니다. 행이 생기면 201, 이미 신청한 계정이면 기간과 관계없이 200(같은 `CreatorSlotEventState`), 이벤트 행이 없으면 404 `slot_event_not_found`, 그 밖에는 409 `slot_event_closed`(시작 전·끝남은 문구로 구분). 같은 계정의 동시 신청은 PK가 줄 세워 1행만 생깁니다. 상태 코드는 `@Res({ passthrough: true })`로 정합니다.
+- 편집 상태 `GET /api/me/landing`의 `slotEvent { event, entry }`(질의 하나), 운영자 상세 `GET /api/admin/creators/{userId}`의 `slotEvent`(신청 행 또는 null). 둘 다 `limits.visibleMax`에 보너스가 들어 있습니다.
+- 운영자 `GET /api/admin/slot-event?page=`(`OperatorGuard`): 이벤트·`entryCount`·신청 최신순(`applied_at DESC, user_id`) 20개(`CRELINK_LIMITS.operatorPageSize`)와 신청자 이메일·표시 이름·현재 단축 주소. `page`는 운영자 크리에이터 목록과 같은 `pageNumber`(없으면 1, 1 이상 정수가 아니면 400 `validation_failed`).
+- 기간 `PUT /api/admin/slot-event { startsAt, endsAt }`: 시간대가 붙은 ISO 8601만 받고(`zonedTime`, 크리링 배너와 같음, 아니면 400 `validation_failed`), `endsAt` null·생략은 끝 없음, 끝 ≤ 시작은 400 `slot_event_period_invalid`(DB CHECK도 `ends_at > starts_at`). 응답은 1쪽. 지금 끝내려면 끝을 지금으로 저장합니다(새 신청만 막힘).
+- 시험: `test/slot-event.e2e-spec.ts`, `test/migrations.e2e-spec.ts` `0005_slot_event`.
 
 ## 통계와 보존 작업
 

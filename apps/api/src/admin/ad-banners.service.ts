@@ -3,7 +3,7 @@ import { AdBannerListResponse, AdBannerStatus, AdBannerView, CRELINK_LIMITS } fr
 import type { PoolClient } from 'pg';
 import { Database, Queryable } from '../database';
 import { apiError, insertWithRandomId, UUID_PATTERN } from '../common/http';
-import { bodyObject, orderedIds, parseHttpUrl, requiredText } from '../common/input';
+import { bodyObject, orderedIds, parseHttpUrl, requiredText, zonedTime } from '../common/input';
 import { CreatorService } from '../creator/creator.service';
 import { FilesService } from '../files/files.service';
 
@@ -11,8 +11,6 @@ import { FilesService } from '../files/files.service';
 const AD_BANNERS_LOCK_KEY = 931475212;
 /** 크리링 배너 공개 ID 길이. 클릭 주소 `{SHORT}/a/{publicId}/{landingPublicId}`에 씁니다. */
 const AD_BANNER_PUBLIC_ID_LENGTH = 10;
-/** 시간대가 붙은 ISO 8601(초·밀리초 선택). 시간대가 없으면 받지 않습니다. */
-const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/i;
 
 /**
  * 크리링 배너 한 장과 상태·누적 노출·클릭. 상태 판정은 한 문장 안의 같은 `now()`이며, 공개 랜딩의 게시 중 조건
@@ -66,19 +64,6 @@ function bannerUrl(value: unknown): { url: string; host: string } {
     );
   }
   return { url: url.href, host: url.hostname };
-}
-
-/** 게시 시각. 시간대가 붙은 ISO 8601만 받고, 그대로 DB에 넘길 문자열과 비교용 밀리초를 돌려줍니다. */
-function bannerTime(value: unknown, label: string): { text: string; ms: number } {
-  const ms = typeof value === 'string' && ISO_WITH_ZONE.test(value) ? Date.parse(value) : Number.NaN;
-  if (Number.isNaN(ms)) {
-    throw apiError(
-      HttpStatus.BAD_REQUEST,
-      'validation_failed',
-      `${label}은(는) 시간대가 붙은 날짜·시각이어야 합니다(예: 2026-10-09T09:00:00+09:00).`,
-    );
-  }
-  return { text: value as string, ms };
 }
 
 function assertPeriod(startsMs: number, endsMs: number | null): void {
@@ -205,8 +190,8 @@ export class AdBannersService {
     const input = bodyObject(body);
     const alt = requiredText(input.alt, '대체 문구', CRELINK_LIMITS.bannerAltMax);
     const { url, host } = bannerUrl(input.url);
-    const startsAt = bannerTime(input.startsAt, '게시 시작');
-    const endsAt = input.endsAt === undefined || input.endsAt === null ? null : bannerTime(input.endsAt, '게시 끝');
+    const startsAt = zonedTime(input.startsAt, '게시 시작');
+    const endsAt = input.endsAt === undefined || input.endsAt === null ? null : zonedTime(input.endsAt, '게시 끝');
     assertPeriod(startsAt.ms, endsAt?.ms ?? null);
     return this.database.transaction(async (client) => {
       const imageId = await this.imageFileId(client, input.imageFileId, null);
@@ -237,9 +222,9 @@ export class AdBannersService {
     const changes: Record<string, unknown> = {};
     if (input.alt !== undefined) changes.alt = requiredText(input.alt, '대체 문구', CRELINK_LIMITS.bannerAltMax);
     if (input.url !== undefined) Object.assign(changes, bannerUrl(input.url));
-    const startsAt = input.startsAt === undefined ? undefined : bannerTime(input.startsAt, '게시 시작');
+    const startsAt = input.startsAt === undefined ? undefined : zonedTime(input.startsAt, '게시 시작');
     const endsAt =
-      input.endsAt === undefined ? undefined : input.endsAt === null ? null : bannerTime(input.endsAt, '게시 끝');
+      input.endsAt === undefined ? undefined : input.endsAt === null ? null : zonedTime(input.endsAt, '게시 끝');
     return this.database.transaction(async (client) => {
       const existing = await this.stored(client, id);
 

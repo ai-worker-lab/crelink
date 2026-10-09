@@ -12,7 +12,7 @@ import {
 import { domainToASCII } from 'node:url';
 import { Database, isUniqueViolation } from '../database';
 import { apiError, UUID_PATTERN } from '../common/http';
-import { bodyObject, optionalText } from '../common/input';
+import { bodyObject, optionalText, pageNumber } from '../common/input';
 import { AppConfig } from '../config.service';
 import {
   CREATOR_BANNER_COLUMNS,
@@ -21,6 +21,7 @@ import {
   LINK_COLUMNS,
   LinkRow,
 } from '../creator/creator.service';
+import { SlotEventService } from '../slot-event/slot-event.service';
 import { StatsService } from './stats.service';
 
 /** 운영자 부여 슬롯 상한. 보이는 링크가 전체 상한(50)을 넘을 수 없으므로 50 - 5. */
@@ -60,6 +61,7 @@ export class AdminService {
     private readonly creator: CreatorService,
     private readonly stats: StatsService,
     private readonly config: AppConfig,
+    private readonly slotEvents: SlotEventService,
   ) {}
 
   private summary(row: SummaryRow): OperatorCreatorSummary {
@@ -89,10 +91,7 @@ export class AdminService {
   /** 이메일·표시 이름·현재 단축 주소 부분 일치 검색. 최근 가입 순, page는 1부터. */
   async list(queryInput: unknown, pageInput: unknown): Promise<OperatorCreatorListResponse> {
     const query = typeof queryInput === 'string' ? queryInput.trim().slice(0, 100) : '';
-    const page = pageInput === undefined ? 1 : Number(pageInput);
-    if (!Number.isInteger(page) || page < 1) {
-      throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', 'page는 1 이상의 정수여야 합니다.');
-    }
+    const page = pageNumber(pageInput);
     const pageSize = CRELINK_LIMITS.operatorPageSize;
     const pattern = `%${query.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
     const filter = `WHERE ($1 = '' OR u.email ILIKE $2 OR l.display_name ILIKE $2 OR s.slug ILIKE $2)`;
@@ -115,11 +114,12 @@ export class AdminService {
   async detail(userId: string): Promise<OperatorCreatorDetail> {
     const row = await this.summaryRow(userId);
     const db = this.database.pool;
-    const [{ extraLinkSlots, ...limits }, links, banners, bannerLimits] = await Promise.all([
+    const [{ extraLinkSlots, ...limits }, links, banners, bannerLimits, slotEvent] = await Promise.all([
       this.creator.limits(db, userId),
       this.creator.links(db, userId),
       this.creator.creatorBanners(db, row.landing_id),
       this.creator.bannerLimits(db, row.landing_id),
+      this.slotEvents.entry(db, userId),
     ]);
     return {
       ...this.summary(row),
@@ -129,6 +129,7 @@ export class AdminService {
       bannerSlot: { grantedAt: row.banner_slot_granted_at?.toISOString() ?? null },
       banners,
       bannerLimits,
+      slotEvent,
     };
   }
 
