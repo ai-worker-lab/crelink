@@ -2,6 +2,10 @@
 
 내부 참고용으로 인프라의 모든 변경을 적용 여부와 관계없이 기록합니다. 환경별 적용 시각·결과·복구 정보는 운영 work item이나 배포 플랫폼에 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-10-09
+
+- 배너 클릭 경로(에픽 0063 T8): `prod/Caddyfile` 단축 호스트의 클릭 matcher를 정규식 하나(`^/(c/[a-z0-9]{10}|a/[a-z0-9]{10}/[a-z0-9]{10}|b/[a-z0-9]{10})$`, GET만)로 넓혀 광고 클릭 `/a/{크리링 배너}/{랜딩}`·크리에이터 배너 클릭 `/b/{배너}`를 api로 넘김(reverse_proxy 블록 수 그대로, 주석·머리말 갱신). `prod/tests/caddy-routing.sh`에 통과(경로·쿼리 유지)·404(세그먼트별 대문자·9자·11자, 세그먼트 수, 끝 슬래시, POST·HEAD, `--path-as-is` 상위 경로)·웹 호스트 web·색 전환 뒤 `/b/` api 경우 추가, `prod/README.md` Caddyfile 줄. API에 경로가 생기기 전(T7)에 머지돼도 `/a/`·`/b/`는 API 404일 뿐이라 main에 먼저 머지. 근거 `docs/work/infra/0074-caddy-banner-routes.md`, `docs/specs/crelink-ad-banner.md` "통합과 배포 순서".
+
 ## 2026-10-08
 
 - 런북 2-2 OIDC subject 설명과 5 최초 배포의 자동 배포 조건을 "main push(머지)"로 고침(Deploy가 `workflow_run` 대신 main push로 시작, 서버·스크립트 변경 없음). 근거 `docs/work/orchestrator/0060-ci-pr-only.md`.
