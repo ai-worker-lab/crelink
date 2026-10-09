@@ -6,14 +6,18 @@ import {
   type PublicSlotEventResponse,
   type SlotEventView,
 } from '@crelink/shared';
+import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { HomeSlotEvent } from '../../components/HomeSlotEvent';
 import { LogoutButton } from '../../components/LogoutButton';
 import { serverApi, ServerApiError } from '../../lib/api/server';
+import { crelinkOpenGraph, SITE_DESCRIPTION } from '../../lib/site';
 
 // 로그인 상태는 요청마다 확인합니다.
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = { openGraph: { ...crelinkOpenGraph('크리링', SITE_DESCRIPTION), url: '/' } };
 
 type SessionState =
   { kind: 'signed-out' } | { kind: 'signed-in'; user: MeResponse } | { kind: 'error'; message: string };
