@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-10
@@ -40,3 +40,4 @@
 - 2026-10-10: 착수·구현(AI 운영자 실행 `a55c29dc-5122-4664-b7de-2a548d5cddd5`, 브랜치 `work/0154-home-intro-web`). `page.tsx`를 로그인한 홈(`SignedInHome`, 지금 화면 그대로)과 로그인 전·오류 소개(`HomeIntro`)로 나누고, 새 `components/HomeExampleLanding.tsx`, `styles.css` `.home-*` 규칙(701px·1024px 경계), E2E 홈 `구글로 시작하기` 단언을 `.first()`로 좁힘. 웹 README `/` 행과 웹 변경 기록 갱신.
 - 2026-10-10: 로컬 확인(슬롯 74, Playwright Chromium, 로그인 전). 이벤트 열림(B)·끝남(A, 로컬 DB에서 기간만 잠시 바꾸고 원래 값으로 되돌림) 모두 1280·1024·800·390·320px에서 문서 `scrollWidth = clientWidth`, `main` 넘침 0, 화면 밖 요소 0개. 1024px 이상 두 열(1280: 580px·384px)·카드 3열, 1023px 이하 한 열·카드 1열, 예시 폭 384/358/288. 제목 64(1280)·38(390·320), 구획 제목 27/22. 첫 버튼 위치 1280px A 537px(시안 측정과 같음)·B 618px, 390px A 아래 끝 296px·B 458px. 버튼 높이 50px, `사용 안내 자세히 보기` 44px·`/docs/guide`. 제목 단계 h1 → (이벤트 h2) → h2·h3×3 → h2·h3×3 → h2. 접근성 트리에 예시 틀 안 내용 없음(figure 이름 = 캡션), 키보드 순서 첫 버튼 → 사용 안내 → 마지막 버튼 → 문서 → 개인정보 처리방침. 1280·390px 스크린숏 눈으로 확인(예시 이름 굵기 맞춤 1회 수정).
 - 2026-10-10: 검증(Node 24.20.0, 슬롯 74). `pnpm verify` 8개 통과, `pnpm smoke` 5개 통과, E2E `slot-event` 2개(`--project slot-event --no-deps`, 로그인 전 홈 첫 `구글로 시작하기`·로그인한 홈 `내 크리링에서 신청하기`·기간 끝 홈 안내 숨김 포함)·`notices` 2개 통과, `pnpm work:scope 0154` 통과. 의존 프로젝트 `ad-banner` 2개는 `/admin/ad-banners`의 hydration 콘솔 오류(서버 렌더 글자와 브라우저 글자가 다름)로 실패했습니다. 홈을 지나지 않는 화면이고, 분류 대기 [0126](../web/0126-format-datetime-server-locale.md)(서버 렌더 날짜 표기 차이)과 같은 원인으로 보입니다(원인 확인은 하지 않음). 이 셸 기본 Node 22에서는 API jest가 ESM require 오류로 돌지 않아 Node 24로 실행했습니다. 로그인 확인 오류 상태(E)는 화면으로 띄우지 않았고 분기 코드만 확인했습니다(지금과 같은 `form-error role="alert"`가 첫 버튼 줄 위).
+- 2026-10-10: 완료(AI 운영자 실행 `d9c7ae80-fdbd-40be-9150-735983b583b4`). PR #81 squash 머지(main `7b3a796`), Deploy 37997082044 success(운영 주소 검사 포함, 실행 `d75996d3-6850-4927-aa66-a9edfba5f558` 기록).
