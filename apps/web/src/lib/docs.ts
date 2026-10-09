@@ -23,3 +23,20 @@ export const PUBLIC_DOCS = [
     description: '수집하는 항목과 보관 기간, 국외 이전.',
   },
 ] as const;
+
+/**
+ * 검색 유입용 활용 가이드 글(docs/work/web/0146-usage-guide-content.md). 크리에이터가 검색할 질문 하나에 답하고 가입으로 이어집니다.
+ * 문서 목록(/docs)과 sitemap에 들어가고, 문서 사이 이동 메뉴(DocsNav)에는 넣지 않습니다(메뉴를 짧게 둠).
+ */
+export const GUIDE_ARTICLES = [
+  {
+    href: '/docs/instagram-profile-links',
+    title: '인스타그램 프로필에 링크 여러 개 넣는 법',
+    description: '프로필 링크 칸에 링크를 넣는 방법과, 링크 한 개로 SNS·포트폴리오·외부 링크를 모두 보여 주는 방법.',
+  },
+  {
+    href: '/docs/creator-portfolio-page',
+    title: '협업 제안을 받는 크리에이터 포트폴리오 페이지 만들기',
+    description: '협업 이력·SNS 채널·연락 링크를 한 페이지에 정리해 프로필 링크로 전하는 순서.',
+  },
+] as const;

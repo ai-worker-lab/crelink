@@ -1,6 +1,6 @@
 import { CRELINK_WEB_PATHS } from '@crelink/shared';
 import type { Metadata } from 'next';
-import { PUBLIC_DOCS } from './docs';
+import { GUIDE_ARTICLES, PUBLIC_DOCS } from './docs';
 
 /**
  * 운영 본 도메인. 운영 설정 `infra/prod/secrets/<대상>.sops.env`의 평문 `WEB_URL`과 같은 값이어야 합니다.
@@ -30,10 +30,15 @@ export function crelinkOpenGraph(title: string, description: string): NonNullabl
 }
 
 /**
- * sitemap에 넣는 공개 경로: 홈·문서 목록·공개 문서.
+ * sitemap에 넣는 공개 경로: 홈·문서 목록·공개 문서·활용 가이드 글.
  * 공개 랜딩은 넣지 않습니다. 외부에서 들어온 랜딩 요청은 단축 주소로 보내 방문을 기록하므로(PRD R7) 검색 봇이 방문 통계를 늘립니다.
  */
-export const SITEMAP_PATHS = ['/', CRELINK_WEB_PATHS.docs, ...PUBLIC_DOCS.map((doc) => doc.href)];
+export const SITEMAP_PATHS = [
+  '/',
+  CRELINK_WEB_PATHS.docs,
+  ...PUBLIC_DOCS.map((doc) => doc.href),
+  ...GUIDE_ARTICLES.map((article) => article.href),
+];
 
 /** 검색 봇이 볼 필요 없는 로그인·관리·운영자·BFF 경로. */
 export const ROBOTS_DISALLOW = ['/admin', '/me', '/auth/', '/api/'];

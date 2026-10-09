@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { PUBLIC_DOCS } from '../../../lib/docs';
+import { GUIDE_ARTICLES, PUBLIC_DOCS } from '../../../lib/docs';
 
 export const metadata: Metadata = { title: '문서' };
 
@@ -17,6 +17,17 @@ export default function DocsIndexPage() {
           </li>
         ))}
       </ul>
+      <section aria-labelledby="docs-articles">
+        <h2 id="docs-articles">활용 가이드</h2>
+        <ul className="docs-list">
+          {GUIDE_ARTICLES.map((article) => (
+            <li key={article.href}>
+              <Link href={article.href}>{article.title}</Link>
+              <p>{article.description}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
     </article>
   );
 }
