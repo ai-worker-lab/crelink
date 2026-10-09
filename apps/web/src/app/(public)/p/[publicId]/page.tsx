@@ -68,9 +68,18 @@ export default async function PublicLandingPage(props: Props) {
         {result.ok ? <Landing landing={result.data} /> : <LandingError error={result.error} />}
       </main>
       <footer className="profile-footer">
-        <Link className="brand" href="/">
-          크리링
-        </Link>
+        {result.ok ? (
+          // 정상 랜딩만 가입 유도 문구. 유입 경로 쿼리는 0087 결정 전이라 붙이지 않는다(design/landing-footer-cta/handoff.md).
+          <Link className="footer-cta" href="/">
+            <span>
+              나도 <strong className="brand">크리링</strong> 만들기
+            </span>
+          </Link>
+        ) : (
+          <Link className="brand" href="/">
+            크리링
+          </Link>
+        )}
         <span aria-hidden="true">·</span>
         <Link href={CRELINK_WEB_PATHS.privacy}>개인정보 처리방침</Link>
       </footer>

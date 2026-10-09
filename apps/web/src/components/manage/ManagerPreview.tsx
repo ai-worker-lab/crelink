@@ -206,9 +206,13 @@ export function PreviewLanding({ mode, framed }: { mode: PreviewMode; framed: bo
         />
       </div>
       <p className="profile-footer">
-        <span className="brand">크리링</span>
+        <span className="footer-cta">
+          <span>
+            나도 <span className="brand">크리링</span> 만들기
+          </span>
+        </span>
         <span aria-hidden="true">·</span>
-        <span>개인정보 처리방침</span>
+        <span className="footer-link">개인정보 처리방침</span>
       </p>
     </div>
   );

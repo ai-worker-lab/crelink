@@ -39,4 +39,4 @@
   - 산출물: [`design/landing-footer-cta/index.html`](../../../design/landing-footer-cta/index.html)(상태 A 기본·B 배너 슬롯·C 빈 랜딩·D 오류·E 관리 화면 미리보기와 상호작용, 1280·390px, A는 320px도), [`handoff.md`](../../../design/landing-footer-cta/handoff.md), `design/system/DESIGN.md` 공개 랜딩 장식 규칙에 크리링 표시 줄 내용 추가.
   - 결정: 바닥글에 줄을 더하지 않고 첫 링크 `크리링`을 `나도 크리링 만들기`(링크 하나, `크리링`만 16px 굵게)로 바꿈. 배너 슬롯 계정도 같은 줄(바닥글은 광고 구좌가 아닌 R3 ② 표시 줄, 지금 결제 없이 수동 부여, 숨기려면 API 변경 필요). 랜딩 오류 화면은 지금 모양 유지. 관리 화면 미리보기도 같은 문구. 링크는 지금 `/` 그대로(0087 결정·처리방침 고지 전이라 쿼리 없음), 0087 이후 제안 규칙 `/?from=landing-footer`.
   - 검증: `pnpm design:check --require-lint` 통과(기존 산출물 P2 알림 6건만), `pnpm docs:check` 통과, 로컬 정적 서버에서 Playwright로 index.html 1280·390px 가로 넘침 없음·바닥글 한 줄 확인. 운영 랜딩은 열지 않음.
-  - 승인: 디자인 승인(AI 승인). 구현은 [0151](../web/0151-landing-footer-cta-web.md)로 넘겼습니다.
+  - 승인: 디자인 승인(AI 승인). 구현은 [0151](../orchestrator/0151-landing-footer-cta-web.md)로 넘겼습니다.
