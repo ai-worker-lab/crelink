@@ -41,6 +41,14 @@
 - 운영자 age 개인키는 평문 파일로 두지 않고 키체인에서 `SOPS_AGE_KEY_CMD`로 꺼냅니다. 복호화 결과를 파일·로그·채팅에 남기지 않습니다.
 - Supabase: dev·prod 프로젝트와 자격 증명을 분리하고 서버 전용 키는 클라이언트에 전달하지 않습니다.
 
+## AI 운영자 토큰
+
+- AI 운영자([헌장](../ops/ai-operator.md))가 운영 API를 부르는 Bearer 토큰(`crl_ai_…`) 원문은 운영자 Mac의 `~/.config/crelink/ai-operator.env`(권한 600, `CRELINK_AI_BASE_URL`·`CRELINK_AI_TOKEN`·`CRELINK_AI_HOST`)에만 둡니다. `scripts/ai-operator.mjs`는 이 파일 권한이 600이 아니면 실행하지 않습니다.
+- DB(`api_tokens`)에는 SHA-256 해시와 구별용 앞 12자만 저장합니다. 원문은 발급 때 CLI가 한 번만 출력합니다.
+- SOPS 암호문·CI·GitHub secret·저장소에 넣지 않습니다. 운영 서버 앱이 읽는 설정이 아니라 실행 호스트의 자격 증명이고 CI는 이 토큰을 쓰지 않습니다. 잃어버리면 새로 발급합니다.
+- 발급은 운영 서버 활성 색 API 컨테이너 안의 CLI로만 하고 출력을 SSH 파이프로 운영자 Mac 파일에 바로 씁니다(화면·셸 기록·서버 디스크에 남지 않음). 회전은 새 토큰 발급 → 파일 교체 → `precheck` 확인 → 옛 토큰 폐기 순서입니다. 절차는 [prod 런북 17](../../infra/docs/prod-runbook.md#17-ai-운영자-토큰)입니다.
+- 노출되면 바로 폐기(운영자 화면 `/admin/agent-runs` 또는 CLI `revoke-token`)하고 새로 발급합니다.
+
 ## 로컬 파일과 노출 대응
 
 `make up`(또는 `pnpm instance`, [scripts/lib/instance.mjs](../../scripts/lib/instance.mjs))은 위 네 로컬 파일이 없으면 추적 예시에서 권한 `600`으로 만들고, 예시에 있는 포트·주소 값은 이 checkout의 인스턴스 값으로 채웁니다. 기존 개인 설정은 덮어쓰지 않습니다. 같은 checkout의 포트·연결 문자열은 `.local/instance.env`에 있고, PM2가 각 프로세스에 자기 값만 넘깁니다(`ecosystem.config.cjs`).

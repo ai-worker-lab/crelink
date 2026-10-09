@@ -303,6 +303,132 @@ describe('runMigrations', () => {
     });
   });
 
+  describe('0004_ai_operator', () => {
+    const source = join(__dirname, '../migrations');
+    const insertUser = async (email: string, role = 'creator', kind?: string) =>
+      (
+        await pool.query<{ id: string }>(
+          kind
+            ? 'INSERT INTO users (email, role, kind) VALUES ($1, $2, $3) RETURNING id'
+            : 'INSERT INTO users (email, role) VALUES ($1, $2) RETURNING id',
+          kind ? [email, role, kind] : [email, role],
+        )
+      ).rows[0].id;
+    const violates = (constraint: string) => ({ code: '23514', constraint });
+
+    beforeEach(async () => {
+      for (const name of ['0001_crelink_mvp.sql', '0002_guestbook.sql', '0003_ad_banner.sql'])
+        copyFileSync(join(source, name), join(directory, name));
+      await runMigrations(pool, directory);
+    });
+
+    const apply = async () => {
+      copyFileSync(join(source, '0004_ai_operator.sql'), join(directory, '0004_ai_operator.sql'));
+      await runMigrations(pool, directory);
+    };
+
+    it('기존 사용자는 사람·지표 포함으로 두고, 멈춤 설정 1행(꺼짐)을 만들며 lock_timeout은 그 파일 안에서만 쓴다', async () => {
+      const existing = await insertUser('old@example.com', 'operator');
+
+      await apply();
+
+      expect(await versions()).toEqual(['0001_crelink_mvp', '0002_guestbook', '0003_ad_banner', '0004_ai_operator']);
+      const user = await pool.query('SELECT kind, metrics_excluded_at FROM users WHERE id = $1', [existing]);
+      expect(user.rows).toEqual([{ kind: 'human', metrics_excluded_at: null }]);
+      const settings = await pool.query('SELECT id, paused, paused_reason, updated_by FROM ai_operator_settings');
+      expect(settings.rows).toEqual([{ id: true, paused: false, paused_reason: null, updated_by: null }]);
+      await expect(pool.query('INSERT INTO ai_operator_settings DEFAULT VALUES')).rejects.toMatchObject({
+        code: '23505',
+      });
+      await expect(pool.query('INSERT INTO ai_operator_settings (id) VALUES (false)')).rejects.toMatchObject(
+        violates('ai_operator_settings_id_check'),
+      );
+      expect((await pool.query('SHOW lock_timeout')).rows[0].lock_timeout).toBe('0');
+    });
+
+    it('AI 계정은 운영자여야 하고 이메일(대소문자 무시)당 1개, 사람 계정은 같은 이메일이어도 된다', async () => {
+      await apply();
+      await expect(insertUser('ai@crelink.invalid', 'creator', 'ai')).rejects.toMatchObject(
+        violates('users_ai_is_operator'),
+      );
+      await expect(insertUser('x@crelink.invalid', 'operator', 'robot')).rejects.toMatchObject(
+        violates('users_kind_check'),
+      );
+      await insertUser('ai@crelink.invalid', 'operator', 'ai');
+      await expect(insertUser('AI@crelink.invalid', 'operator', 'ai')).rejects.toMatchObject({
+        code: '23505',
+        constraint: 'users_ai_email_idx',
+      });
+      await insertUser('ai@crelink.invalid', 'creator');
+    });
+
+    it('진행 중 실행은 1개뿐이고 running과 ended_at은 짝이며, 토큰 해시·라벨 형식을 지킨다', async () => {
+      await apply();
+      const ai = await insertUser('ai@crelink.invalid', 'operator', 'ai');
+      await pool.query("INSERT INTO agent_runs (actor_user_id, status, trigger) VALUES ($1, 'running', 'schedule')", [
+        ai,
+      ]);
+      await expect(
+        pool.query("INSERT INTO agent_runs (actor_user_id, status, trigger) VALUES ($1, 'running', 'manual')", [ai]),
+      ).rejects.toMatchObject({ code: '23505', constraint: 'agent_runs_one_running_idx' });
+      await expect(
+        pool.query("INSERT INTO agent_runs (status, trigger, ended_at) VALUES ('running', 'manual', now())"),
+      ).rejects.toMatchObject(violates('agent_runs_check'));
+      await expect(
+        pool.query("INSERT INTO agent_runs (status, trigger) VALUES ('succeeded', 'manual')"),
+      ).rejects.toMatchObject(violates('agent_runs_check'));
+      await pool.query("INSERT INTO agent_runs (status, trigger, ended_at) VALUES ('paused', 'schedule', now())");
+
+      const token = (label: string, hash: string) =>
+        pool.query("INSERT INTO api_tokens (user_id, label, token_hash, prefix) VALUES ($1, $2, $3, 'crl_ai_abcde')", [
+          ai,
+          label,
+          hash,
+        ]);
+      await expect(token('맥', 'not-a-hash')).rejects.toMatchObject(violates('api_tokens_token_hash_check'));
+      await expect(token('', 'a'.repeat(64))).rejects.toMatchObject(violates('api_tokens_label_check'));
+      await expect(token('가'.repeat(61), 'a'.repeat(64))).rejects.toMatchObject(violates('api_tokens_label_check'));
+      await token('가'.repeat(60), 'a'.repeat(64));
+      await expect(token('맥', 'a'.repeat(64))).rejects.toMatchObject({ code: '23505' });
+    });
+
+    it('계정을 지우면 토큰은 지워지고 실행·행동 기록은 남아 계정 칸만 NULL이 되며, 실행을 지우면 행동 기록의 run_id만 NULL', async () => {
+      await apply();
+      const ai = await insertUser('ai@crelink.invalid', 'operator', 'ai');
+      const creator = await insertUser('creator@example.com');
+      await pool.query(
+        "INSERT INTO api_tokens (user_id, label, token_hash, prefix) VALUES ($1, '맥', $2, 'crl_ai_abcde')",
+        [ai, 'b'.repeat(64)],
+      );
+      const run = await pool.query<{ id: string }>(
+        "INSERT INTO agent_runs (actor_user_id, status, trigger, ended_at) VALUES ($1, 'succeeded', 'schedule', now()) RETURNING id",
+        [ai],
+      );
+      await pool.query(
+        `INSERT INTO operator_actions (actor_kind, actor_user_id, actor_email, action, target_type, target_id, subject_user_id, run_id)
+         VALUES ('ai', $1, 'ai@crelink.invalid', 'creator.extra_slots', 'user', $2, $3, $4)`,
+        [ai, creator, creator, run.rows[0].id],
+      );
+      await expect(
+        pool.query("INSERT INTO operator_actions (actor_kind, action, target_type) VALUES ('robot', 'x', 'y')"),
+      ).rejects.toMatchObject(violates('operator_actions_actor_kind_check'));
+
+      await pool.query('DELETE FROM users WHERE id = ANY($1)', [[ai, creator]]);
+
+      expect((await pool.query('SELECT 1 FROM api_tokens')).rowCount).toBe(0);
+      expect((await pool.query('SELECT actor_user_id FROM agent_runs')).rows).toEqual([{ actor_user_id: null }]);
+      expect(
+        (
+          await pool.query(
+            'SELECT actor_user_id, actor_email, subject_user_id, run_id IS NOT NULL AS has_run FROM operator_actions',
+          )
+        ).rows,
+      ).toEqual([{ actor_user_id: null, actor_email: 'ai@crelink.invalid', subject_user_id: null, has_run: true }]);
+      await pool.query('DELETE FROM agent_runs');
+      expect((await pool.query('SELECT run_id FROM operator_actions')).rows).toEqual([{ run_id: null }]);
+    });
+  });
+
   describe('0005_slot_event', () => {
     const source = join(__dirname, '../migrations');
     // 0004(다른 에픽)가 함께 머지돼도 그대로 맞도록 0005 앞의 파일을 모두 먼저 적용합니다.

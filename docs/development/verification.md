@@ -64,7 +64,7 @@
 | --- | --- |
 | `plan` | 배포 커밋, 변경 영역(`api`·`web`·`release`, 태그 `deploy/prod-api`·`deploy/prod-web`·`deploy/prod` 기준), `infra/prod/targets.json`의 사용 대상·플랫폼, 접속 설정(`vars.TS_OIDC_*`·`DEPLOY_SSH_KEY`) 여부. 접속 설정이 없으면 이미지까지만 만들고 배포를 건너뛰며 경고를 남깁니다. |
 | `이미지 api`·`이미지 web` | 바뀐 영역만 `ghcr.io/ai-worker-lab/crelink-<api\|web>:<SHA>`로 푸시(대상 플랫폼 합집합). Sentry 빌드 인자(`SENTRY_RELEASE`·`vars.SENTRY_*`)를 넘기고, secret `SENTRY_AUTH_TOKEN`이 있으면 빌드 중 소스맵을 Sentry에 올립니다(실패하면 빌드 실패, 없으면 건너뜀. [ADR 0012](../adr/0012-error-monitoring-sentry.md)) |
-| `배포 <대상>` | 대상마다 차례로 Tailscale(OIDC, `tag:ci`) → `ssh deploy@<host> deploy …`로 `infra/prod` 묶음을 보내 서버 `deploy.sh` 실행(비활성 색에 올려 헬스를 통과하면 edge Caddy reload로 전환하는 Blue/Green 무중단 배포). 새 색이 헬스에 실패하면 서버가 그 색만 내려 활성 색·트래픽은 그대로이고 job이 실패합니다. 이어서 `운영 주소 검사` 단계가 `ssh deploy@<host> verify`(서버의 `verify.sh`가 Cloudflare를 거쳐 웹 `/`·`/privacy`·BFF health 200, `https://go.shaul.kr/<없는 주소>` 302 → notice, 배너 클릭 `/b/<없는 배너>`·`/a/<없는 배너>/<없는 랜딩>` 302 → `link_unavailable` notice, `https://go.shaul.kr/api/health` 404 확인)를 실행하고, 실패하면 `자동 롤백` 단계가 직전 릴리스로 되돌린 뒤(같은 무중단 전환) job을 실패로 끝냅니다. |
+| `배포 <대상>` | 대상마다 차례로 Tailscale(OIDC, `tag:ci`) → `ssh deploy@<host> deploy …`로 `infra/prod` 묶음을 보내 서버 `deploy.sh` 실행(비활성 색에 올려 헬스를 통과하면 edge Caddy reload로 전환하는 Blue/Green 무중단 배포). 새 색이 헬스에 실패하면 서버가 그 색만 내려 활성 색·트래픽은 그대로이고 job이 실패합니다. 이어서 `운영 주소 검사` 단계가 `ssh deploy@<host> verify`(서버의 `verify.sh`가 Cloudflare를 거쳐 웹 `/`·`/privacy`·BFF health 200, 토큰 없는 AI 토큰 경로 `/api/agent/api/health` 401, `https://go.shaul.kr/<없는 주소>` 302 → notice, 배너 클릭 `/b/<없는 배너>`·`/a/<없는 배너>/<없는 랜딩>` 302 → `link_unavailable` notice, `https://go.shaul.kr/api/health` 404 확인, 모두 11개)를 실행하고, 실패하면 `자동 롤백` 단계가 직전 릴리스로 되돌린 뒤(같은 무중단 전환) job을 실패로 끝냅니다. |
 | `배포 기록 태그` | 성공하면 `deploy/prod`와 바뀐 영역의 `deploy/prod-api`·`deploy/prod-web`를 옮깁니다. |
 
 수동 롤백은 [`.github/workflows/rollback.yml`](../../.github/workflows/rollback.yml)(입력 `target`·`release`)입니다. 의존성 갱신 PR은 [`.github/dependabot.yml`](../../.github/dependabot.yml)이 주 1회 엽니다. 워크플로 문법은 `actionlint`로 검사합니다(로컬 설치 시 `actionlint .github/workflows/*.yml`).
@@ -78,6 +78,7 @@ GitHub Actions가 돌지 않을 때(장애, 비공개 시절의 사용량 한도
 - 명분이 되는 예: 운영 설정·비밀값(운영 DSN 빌드에서만 그려지는 화면 등), 데이터 migration, 인프라·네트워크 경로(Caddy·Cloudflare·Blue/Green) 변경, 외부 서비스 연동, 사용자가 보고한 운영 장애 재현.
 - 명분이 아닌 예: 로컬 `pnpm e2e`·`pnpm smoke`로 이미 확인한 화면·흐름, `운영 주소 검사`와 같은 주소 다시 부르기, 운영 확인 기록만을 위한 별도 PR.
 - 할 때는 먼저 사용자에게 이유·범위(읽기만인지, 쓰기·데이터 생성이 있는지, 쓸 계정)를 알리고, 결과는 해당 work item `진행 기록`에 남깁니다.
+- AI 운영자 실행은 사용자에게 먼저 알리는 대신 이유·범위를 실행 기록(`/admin/agent-runs`)과 work item에 남깁니다. 운영 공개 주소(단축 주소·공개 랜딩·클릭 주소)는 방문·클릭 통계를 바꾸므로 열지 않습니다([AI 운영자 헌장](../ops/ai-operator.md), [저장소 공통 정책](repository-policy.md#ai-운영자-위임)).
 
 ## 완료 보고 전 확인 범위
 

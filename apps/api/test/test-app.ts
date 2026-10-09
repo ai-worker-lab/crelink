@@ -5,11 +5,15 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import type { ApiError, GoogleAuthCallbackResponse } from '@crelink/shared';
+import { AGENT_RUN_HEADER, type ApiError, type GoogleAuthCallbackResponse } from '@crelink/shared';
 import { Pool } from 'pg';
+import { SYSTEM_ACTOR } from '../src/ai-operator/audit';
+import { issueApiToken } from '../src/ai-operator/tokens';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/app.setup';
 import { GoogleOAuth } from '../src/auth/google-oauth';
+import { provisionAccount } from '../src/auth/provision';
+import { withTransaction } from '../src/database';
 import { GeoIpService } from '../src/short-link/tracking.service';
 import { createTestDatabase, TestDatabase } from './test-database';
 
@@ -109,12 +113,21 @@ export async function login(baseUrl: string, code: string): Promise<LoginResult>
   return { status: response.status, body: await response.json(), cookie: session?.split(';')[0] ?? null, setCookies };
 }
 
-/** JSON 요청. body가 있으면 JSON으로 보냅니다. 응답 본문 타입 T는 호출하는 테스트가 기대하는 계약 타입입니다. */
+/**
+ * JSON 요청. body가 있으면 JSON으로 보냅니다. 응답 본문 타입 T는 호출하는 테스트가 기대하는 계약 타입입니다.
+ * `token`은 AI 운영자 API 토큰(`Authorization: Bearer`), `runId`는 실행 헤더(`X-Crelink-Agent-Run`), `headers`는 그 밖 헤더입니다.
+ */
 export async function api<T = ApiError>(
   baseUrl: string,
   method: string,
   path: string,
-  options: { cookie?: string | null; body?: unknown } = {},
+  options: {
+    cookie?: string | null;
+    body?: unknown;
+    token?: string;
+    runId?: string;
+    headers?: Record<string, string>;
+  } = {},
 ): Promise<{ status: number; body: T; headers: Headers }> {
   const response = await fetch(`${baseUrl}${path}`, {
     method,
@@ -122,6 +135,9 @@ export async function api<T = ApiError>(
     headers: {
       ...(options.cookie ? { cookie: options.cookie } : {}),
       ...(options.body !== undefined ? { 'content-type': 'application/json' } : {}),
+      ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
+      ...(options.runId ? { [AGENT_RUN_HEADER]: options.runId } : {}),
+      ...options.headers,
     },
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
@@ -137,4 +153,16 @@ export async function waitForRows<T>(read: () => Promise<T[]>, count = 1): Promi
     await sleep(50);
   }
   throw new Error(`기록이 ${count}건 생기지 않았습니다.`);
+}
+
+/** AI 운영자 계정(`kind='ai'`, 운영자)과 토큰을 CLI와 같은 함수로 만듭니다. 원문 토큰과 토큰 id를 돌려줍니다. */
+export async function createAiOperator(
+  pool: Pool,
+  email = 'ai-operator@crelink.invalid',
+): Promise<{ userId: string; token: string; tokenId: string; email: string }> {
+  return withTransaction(pool, async (client) => {
+    const userId = await provisionAccount(client, { email, role: 'operator', kind: 'ai' });
+    const issued = await issueApiToken(client, SYSTEM_ACTOR, { userId, label: '시험' });
+    return { userId, token: issued.token, tokenId: issued.row.id, email };
+  });
 }

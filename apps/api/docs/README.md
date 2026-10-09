@@ -121,6 +121,8 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 - 역할: 구글이 검증한 이메일이 `OPERATOR_EMAILS`에 있으면 로그인할 때마다 `operator`, 아니면 `creator`로 갱신합니다.
 - 세션: 쿠키 `cl_session`(원문 무작위 토큰, 30일), DB `sessions.token_hash`는 SHA-256 hex. API는 웹 BFF·웹 서버가 전달한 `Cookie` 헤더에서 읽습니다.
 - `/api/me/*`는 로그인 필수(401 `unauthenticated`), 남의 리소스는 404. `/api/admin/*`는 로그인(401) 후 `role='operator'`(아니면 403 `forbidden`). 정지하면 그 사용자의 세션을 모두 지우고, 세션 조회도 정지 사용자를 제외하며, 다시 로그인하면 403 `account_suspended`.
+- 공용 인증(`AuthService.authenticateRequest`, R23 ①): 세 가드(`SessionGuard`·`OperatorGuard`·`OptionalSessionGuard`)가 함께 씁니다. `Authorization: Bearer`가 있으면 쿠키를 보지 않고 AI 운영자 토큰으로만 인증합니다. 형식(`AI_TOKEN_PATTERN`)이 아니거나, 없거나 폐기됐거나, 계정이 정지됐거나 `users.kind`가 `ai`가 아니면 401 `unauthenticated`이고, `OptionalSessionGuard`도 잘못된 Bearer는 비회원으로 두지 않고 401입니다. 토큰은 `api_tokens.token_hash`(SHA-256 hex) 인덱스 조회 1회이고 `last_used_at`은 같은 문장에서 1분에 한 번만 갱신합니다. 두 경로 모두 `request.sessionUser`(기존 `CurrentUser`)와 `request.actor`(`@CurrentActor()`: `userId`·`email`·`kind`·`runId`)를 채웁니다.
+- 행위자 규칙(`src/auth/actor-policy.ts` `ActorPolicy`, 인증 직후·파이프와 업로드 전): `@ActorKinds('human'|'ai')`(사람·AI 전용, 아니면 403 `forbidden`), AI의 상태 변경 요청(GET·HEAD·OPTIONS 밖)은 멈춤이면 409 `ai_operator_paused`(`@AllowWhilePaused` 밖), 실행 헤더 `X-Crelink-Agent-Run`이 이 계정의 `running` 실행이고 시작 뒤 90분 안이 아니면 409 `agent_run_required`(`@AgentRunExempt` 밖). 오류 순서는 401 → 403(운영자 아님) → 403(사람·AI 전용) → 409 멈춤 → 409 실행 헤더이고, 운영자 API와 크리에이터 API(`/api/me/*`) 모두에 적용됩니다. 가드 검사 뒤 쓰기까지의 멈춤 경쟁은 행동 기록이 막습니다([AI 운영자](#ai-운영자)).
 - 오류 응답은 모두 `{ code, message }`입니다(`src/common/http.ts`의 `ApiExceptionFilter`). 없는 `/api` 경로는 404 `not_found`, 예상하지 못한 오류는 500 `internal_error`와 로그, Sentry 전송([오류 모니터링](#오류-모니터링)).
 - 본문 파서(express body-parser, JSON 한도 기본 100KB)가 컨트롤러 전에 내는 클라이언트 오류는 `HttpException`이 아니라 http-errors(`status`, `expose`)라서 필터가 따로 읽습니다. 4xx이고 `expose`인 것만 그 상태로 응답하고 로그를 남기지 않습니다: 잘못된 JSON 400 `validation_failed`, 본문 한도 초과 413 `validation_failed`("요청 본문이 너무 큽니다."), 지원하지 않는 문자셋 415 `validation_failed`. 시험: `test/error-response.e2e-spec.ts`.
 
@@ -266,3 +268,32 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 - 통계 API는 원본과 집계를 합칩니다. 집계된 날짜의 순 방문자는 날짜별 순 방문자 합이라, 원본 기간의 순 방문자(기간 전체에서 중복 제거)와 계산 방식이 다릅니다.
 - 링크별 클릭의 `linkId`는 링크 공개 ID(`{SHORT}/c/{linkPublicId}`의 값)입니다. 지운 링크도 기록이 남아 있으면 `title: null`로 나옵니다.
 - 배너별 클릭(`bannerClicks`, R21 ④·미정 4 A)은 `creator_banner_clicks` 원본과 `creator_banner_click_rollups`를 합친 기간 합계입니다. `bannerId`는 배너 공개 ID(`{SHORT}/b/{bannerPublicId}`의 값)이고, 지운 배너는 `alt: null`입니다. `totals.linkClicks`·`daily`에는 넣지 않습니다.
+
+## AI 운영자
+
+`src/ai-operator/`(R23). 계약은 `packages/shared/src/crelink.ts`의 `AI 운영자 (R23)` 절, 설계는 [AI 운영자 기술 설계](../../../docs/specs/crelink-ai-operator.md)입니다. 데이터는 migration `0004_ai_operator`(`users.kind`·`metrics_excluded_at`, `api_tokens`, `agent_runs`, `operator_actions`, `ai_operator_settings`)입니다.
+
+- 행동 기록: 모든 `/api/admin/*` 쓰기(`admin.service.ts`·`ad-banners.service.ts`)와 토큰 발급·폐기·멈춤은 한 트랜잭션에서 `FOR UPDATE`로 이전 값을 읽고 바꾼 뒤 `recordOperatorAction(client, actor, entry)`(`audit.ts`)로 행위자·행동·대상·관련 크리에이터·바뀐 필드의 전후 값·실행 id를 남깁니다. 쓰기가 실패하면 기록도 없고, 멱등 요청도 기록합니다. 행위자가 AI이면 같은 트랜잭션에서 `ai_operator_settings`를 `FOR SHARE`로 다시 읽어 멈춤이면 409 `ai_operator_paused`로 쓰기까지 되돌립니다(`PUT pause`는 `FOR UPDATE`). AI는 운영자·AI 계정 대상 `creator.*` 쓰기가 403 `forbidden`입니다.
+- 실행 기록 `POST·PATCH·GET /api/admin/agent-runs`(`agent-runs.service.ts`): 시작은 한 트랜잭션에서 90분 지난 `running`을 `abandoned`로 닫고, 멈춤이면 같은 멈춤 동안(`started_at >= settings.updated_at`)의 직전 `paused` 행에 합치거나 새 `paused` 행을 만들며, 아니면 겹침 409 `agent_run_in_progress`(부분 유니크 인덱스 위반 포함). 갱신은 자기 실행만(403), 닫힌 실행 409 `agent_run_closed`, `refs[].url`은 http·https만. `cost_usd`(numeric)·토큰 수(bigint)는 node-pg 문자열을 number로 바꿉니다. 목록·운영 기록은 방명록과 같은 커서(`src/common/cursor.ts`)입니다.
+- 멈춤·토큰: `GET /api/admin/ai-operator`, `PUT …/pause`·`PUT …/tokens/{id}/revoke`는 사람만(`@ActorKinds('human')`). 멈춤 값이 그대로면 `updated_at`·`updated_by`를 바꾸지 않아 같은 멈춤의 paused 합치기가 이어집니다.
+- 지표 `GET /api/admin/metrics`(`metrics.service.ts`): 한 문장(같은 `now()`). 실사용자는 사람 크리에이터·지표 제외 아님·정지 아님이고 보이는 링크(`VISIBLE_LINK_CONDITION`, 공개 랜딩·관리 한도·단축 주소 클릭과 같은 상수) 또는 포트폴리오가 있는 계정입니다. 지표 제외는 `PUT /api/admin/creators/{id}/metrics-exclusion`(사람만).
+
+### AI 운영자 토큰 CLI
+
+`src/cli/ai-operator.ts` → `dist/cli/ai-operator.js`. Nest 앱·`AppConfig`·Sentry 초기화·migration 없이 DB 연결 1개(`max: 1`, `application_name=crelink-ai-operator-cli`, `databaseConnectionConfig`)만 씁니다. 표준 출력에는 결과만(토큰은 원문 한 줄), 진단은 표준 오류, 실패는 종료 코드 1입니다. 0004 전 DB면 "migration 0004_ai_operator가 적용된 API를 먼저 배포" 안내와 종료 1입니다.
+
+| 명령 | 하는 일 |
+| --- | --- |
+| `ensure-account [--email <이메일>]` | AI 계정(`kind='ai'`, `role='operator'`)·랜딩·단축 주소를 없을 때만 만들고 userId 출력. 같은 이메일의 사람 계정이 있으면 실패 |
+| `issue-token --label <이름> [--email …]` | 계정이 없으면 만들고 토큰 원문 한 줄 출력(DB에는 해시만), `ai_operator.token_issue`(system) 기록 |
+| `list-tokens [--email …]` | id·label·prefix·생성·마지막 사용·폐기(원문 없음), 탭 구분, 첫 줄은 머리글 |
+| `revoke-token <id>` | 폐기(멱등), `ai_operator.token_revoke`(system) 기록. 없는 id면 종료 1 |
+
+기본 이메일은 `ai-operator@crelink.invalid`(예약 최상위 도메인)입니다. 로컬 실행(이 worktree의 `apps/api/.env` DB, 0004가 적용된 DB여야 함 — `make up`으로 API를 한 번 띄우면 적용됨):
+
+```sh
+pnpm --filter @crelink/shared build && pnpm --filter @crelink/api build
+pnpm --filter @crelink/api --silent ai-operator list-tokens   # 또는 node apps/api/dist/cli/ai-operator.js list-tokens
+```
+
+`issue-token`의 출력은 토큰 원문이므로 터미널 기록·채팅·저장소에 남기지 말고 바로 `~/.config/crelink/ai-operator.env`(권한 600)로 옮깁니다. pnpm으로 부를 때는 `--silent`로 pnpm 머리말이 표준 출력에 섞이지 않게 합니다. 운영 절차는 [런북 17](../../../infra/docs/prod-runbook.md#17-ai-운영자-토큰)입니다.

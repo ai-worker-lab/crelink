@@ -224,6 +224,25 @@ export class E2EData {
     }
   }
 
+  /**
+   * AI 운영자 계정(`kind='ai'`, `role='operator'`, Google 신원·세션 없음)과 API 토큰. 서버 CLI `ensure-account`·`issue-token`처럼
+   * 랜딩·단축 주소까지 가입과 같은 행을 만든 뒤 Google 신원·세션을 지웁니다(설계 docs/specs/crelink-ai-operator.md `CLI`).
+   * 토큰 원문은 이 테스트 안에서만 씁니다.
+   */
+  async aiAccount(): Promise<{ userId: string; email: string; token: string; tokenId: string; tokenLabel: string }> {
+    const { userId, email } = await this.user({ role: 'operator', displayName: `E2E AI ${this.run}` });
+    await this.db.query(`UPDATE users SET kind = 'ai' WHERE id = $1`, [userId]);
+    await this.db.query('DELETE FROM user_identities WHERE user_id = $1', [userId]);
+    await this.db.query('DELETE FROM sessions WHERE user_id = $1', [userId]);
+    const token = `crl_ai_${randomBytes(32).toString('base64url')}`;
+    const tokenLabel = this.unique('e2e-token');
+    const { rows: tokens } = await this.db.query<{ id: string }>(
+      `INSERT INTO api_tokens (user_id, label, token_hash, prefix) VALUES ($1, $2, $3, $4) RETURNING id`,
+      [userId, tokenLabel, createHash('sha256').update(token).digest('hex'), token.slice(0, 12)],
+    );
+    return { userId, email, token, tokenId: tokens[0].id, tokenLabel };
+  }
+
   /** 테스트 전용 차단 도메인 이름. 테스트가 끝나면 차단 목록에서 지웁니다. */
   blockedDomain(): string {
     const domain = `${this.unique('blk')}.${TEST_HOST_SUFFIX}`;
@@ -309,6 +328,13 @@ async function removeUsers(db: pg.Pool, where: string, values: unknown[]) {
     `SELECT f.storage_key FROM files f JOIN users u ON u.id = f.owner_user_id WHERE ${where}`,
     values,
   );
+  // 운영 감사 기록은 사용자를 지워도 남으므로(ON DELETE SET NULL) 테스트 사용자가 남긴 실행·행동 기록을 함께 지웁니다.
+  await db.query(
+    `DELETE FROM operator_actions WHERE actor_user_id IN (SELECT u.id FROM users u WHERE ${where})
+        OR subject_user_id IN (SELECT u.id FROM users u WHERE ${where})`,
+    values,
+  );
+  await db.query(`DELETE FROM agent_runs WHERE actor_user_id IN (SELECT u.id FROM users u WHERE ${where})`, values);
   await db.query(
     `DELETE FROM ad_banners WHERE image_file_id IN (SELECT f.id FROM files f JOIN users u ON u.id = f.owner_user_id WHERE ${where})
         OR still_file_id IN (SELECT f.id FROM files f JOIN users u ON u.id = f.owner_user_id WHERE ${where})`,

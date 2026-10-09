@@ -19,6 +19,8 @@
 | 재시작 복구 | 점유 브랜치의 worktree 안 상태가 active인 항목을 재개 |
 | 구조화 로그 | `.local/runner/events.jsonl` |
 
+[AI 운영자](../ops/ai-operator.md)는 이 실행기와 별개입니다. 실행기는 착수 가능한 work item을 하나씩 에이전트에게 맡기는 도구이고, AI 운영자는 30분마다(Orca 자동화) 지표·실행 기록·work item을 읽고 무엇을 할지 고르는 주기 실행입니다. AI 운영자는 work item 규칙과 브랜치 점유를 똑같이 따르므로 두 쪽이 같은 티켓을 동시에 잡지 않습니다.
+
 ## 명령
 
 ```sh

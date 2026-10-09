@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { AppConfig } from '../config.service';
 import { Database } from '../database';
 import { readCookie, serializeCookie, UUID_PATTERN } from '../common/http';
+import { VISIBLE_LINK_CONDITION } from '../creator/creator.service';
 import { countBusinessMetric } from '../monitoring/metrics';
 import { LandingPassService } from './landing-pass.service';
 import { requestFacts, TrackingService } from './tracking.service';
@@ -73,7 +74,7 @@ export class ShortLinkController {
       available: boolean;
     }>(
       `SELECT l.id, l.url, sl.id AS short_link_id,
-              (NOT l.hidden AND l.blocked_at IS NULL AND u.suspended_at IS NULL) AS available
+              (${VISIBLE_LINK_CONDITION} AND u.suspended_at IS NULL) AS available
        FROM links l JOIN users u ON u.id = l.user_id JOIN short_links sl ON sl.user_id = l.user_id
        WHERE l.public_id = $1`,
       [linkPublicId],

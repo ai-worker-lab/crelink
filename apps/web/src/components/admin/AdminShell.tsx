@@ -1,3 +1,4 @@
+import { CRELINK_WEB_PATHS } from '@crelink/shared';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { ServerApiError } from '../../lib/api/server';
@@ -9,18 +10,25 @@ import { SiteHeader } from '../SiteHeader';
 /**
  * 운영자 화면 틀. 조회가 403이면 권한 없음 안내, 그 밖의 오류는 오류 안내를 그립니다.
  * 화면마다 오류 제목(`errorTitle`)과 `다시 시도`로 다시 읽을 주소(`retryHref`, 문서를 새로 불러옴)를 줄 수 있고, 없으면 크리에이터 목록으로 안내합니다.
+ * 주소가 가리키는 대상이 없거나(404) 주소 값이 틀리면(400, 잘못된 커서·걸러보기) `backHref`·`backLabel`로 돌아갈 곳을 안내합니다.
  */
 export function AdminShell({
   error,
   errorTitle = '운영자 화면을 불러오지 못했어요.',
   retryHref,
+  backHref,
+  backLabel = '돌아가기',
   children,
 }: {
   error?: ServerApiError | null;
   errorTitle?: string;
   retryHref?: string;
+  backHref?: string;
+  backLabel?: string;
   children: ReactNode;
 }) {
+  const backAction =
+    backHref && error && (error.status === 400 || error.status === 404) ? { href: backHref, label: backLabel } : null;
   return (
     <div className="app-page">
       <SiteHeader label="운영자 메뉴">
@@ -28,6 +36,8 @@ export function AdminShell({
         <Link href="/admin/blocked-domains">차단 도메인</Link>
         <Link href="/admin/ad-banners">광고 배너</Link>
         <Link href="/admin/slot-event">이벤트</Link>
+        <Link href={CRELINK_WEB_PATHS.adminAgentRuns}>AI 실행 기록</Link>
+        <Link href={CRELINK_WEB_PATHS.adminActions}>운영 기록</Link>
         <Link href="/me">내 크리링</Link>
         <LogoutButton />
       </SiteHeader>
@@ -44,9 +54,10 @@ export function AdminShell({
               title={errorTitle}
               message={error.message}
               action={
-                retryHref
+                backAction ??
+                (retryHref
                   ? { href: retryHref, label: '다시 시도', reload: true }
-                  : { href: '/admin', label: '크리에이터 목록으로' }
+                  : { href: '/admin', label: '크리에이터 목록으로' })
               }
             />
           )

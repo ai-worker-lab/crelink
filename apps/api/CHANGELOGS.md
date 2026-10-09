@@ -4,12 +4,23 @@
 
 ## 2026-10-10
 
+- AI 운영자 API(R23, 설계 `docs/specs/crelink-ai-operator.md`). 근거 `docs/work/api/0101-ai-operator-auth.md`·`0102-operator-action-log.md`·`0103-agent-runs-metrics-api.md`.
+  - migration `0004_ai_operator`(첫 줄 `lock_timeout`, 머리말 되돌리기): `users.kind`(`human`·`ai`, CHECK `users_ai_is_operator`)·`metrics_excluded_at`, AI 이메일 부분 유니크 `users_ai_email_idx`, 새 테이블 `api_tokens`(해시만)·`agent_runs`(진행 중 1개 부분 유니크 `agent_runs_one_running_idx`)·`operator_actions`·`ai_operator_settings`(1행). expand만.
+  - 공용 인증 `AuthService.authenticateRequest`: 세 가드가 함께 쓰고 `Authorization: Bearer`(AI 토큰)면 쿠키를 보지 않음. 형식 오류·없음·폐기·정지·사람 계정 토큰은 401(`OptionalSessionGuard` 포함), `last_used_at` 1분 갱신. `request.actor`·`@CurrentActor()`, Reflector 데코레이터 `@ActorKinds`·`@AgentRunExempt`·`@AllowWhilePaused`와 `ActorPolicy`(AuthModule export): 403 사람·AI 전용 → 409 `ai_operator_paused` → 409 `agent_run_required`(실행 헤더는 자기 계정의 90분 안 `running`), 운영자·크리에이터 API 모두. `hashSessionToken` → `src/auth/token-hash.ts` `hashToken`.
+  - `AuthService.provision` → 자유 함수 `provisionAccount(client, { email, role, kind })`(`src/auth/provision.ts`), `Database.transaction` 본문 → `withTransaction(pool, run)`, `loadLocalEnvironment(file?)`.
+  - CLI `src/cli/ai-operator.ts`(`dist/cli/ai-operator.js`, 패키지 스크립트 `ai-operator`): `ensure-account`·`issue-token --label`·`list-tokens`·`revoke-token <id>`, DB 연결 1개·Nest·Sentry 초기화·migration 없음, 0004 전 DB면 안내 후 종료 1. 토큰 함수 `issueApiToken`·`revokeApiToken`(`src/ai-operator/tokens.ts`)은 HTTP 폐기와 공유.
+  - 행동 기록 `recordOperatorAction`(`src/ai-operator/audit.ts`, AI면 `FOR SHARE`로 멈춤 재확인): 모든 `/api/admin/*` 쓰기(추가 슬롯·정지·배너 슬롯·지표 제외·링크·배너 차단·차단 도메인 추가·삭제·크리링 배너 등록·수정·순서·내리기)를 트랜잭션 + `FOR UPDATE` 이전 값으로 바꾸고 기록. AI의 운영자·AI 계정 대상 `creator.*` 쓰기 403. 차단 도메인 `created_by`는 행위자.
+  - 새 경로: `GET /api/admin/actions?cursor=&actor=`, `PUT /api/admin/creators/{id}/metrics-exclusion`(사람만), `GET /api/admin/ai-operator`, `PUT …/ai-operator/pause`(사람만), `PUT …/ai-operator/tokens/{id}/revoke`(사람만, 멱등), `POST·PATCH·GET /api/admin/agent-runs`(겹침 409·90분 포기·paused 합치기·닫힌 실행 409·다른 계정 403·refs http(s)), `GET /api/admin/metrics`. 크리에이터 요약에 `accountKind`·`metricsExcluded`.
+  - 공용화: 방명록 커서 → `src/common/cursor.ts`(`parseCursor`·`cursorBeforeSql`·`cursorPage`), `VISIBLE_LINK_CONDITION`(`creator.service.ts`)을 공개 랜딩·관리 한도·단축 주소 클릭·지표가 함께 씀.
+  - 시험: 새 `test/ai-operator-auth.e2e-spec.ts` 7건·`operator-actions.e2e-spec.ts` 8건·`agent-runs.e2e-spec.ts` 8건·`ai-operator-cli.e2e-spec.ts` 6건, `migrations.e2e-spec.ts` 0004 4건, `health.e2e-spec.ts`·`admin.e2e-spec.ts` 기대값 갱신. 문서 `docs/README.md`(`인증과 권한`, `AI 운영자`, `AI 운영자 토큰 CLI`).
+
 - 링크 슬롯 +5 이벤트(R24 ①②③⑤, R13). 근거 `docs/work/api/0121-slot-event-api.md`, 설계 `docs/specs/crelink-slot-event.md`. 계약(`packages/shared`)은 0120 그대로이고 바꾸지 않음.
   - migration `0005_slot_event`(첫 줄 `SET LOCAL lock_timeout = '5s'`, 머리 주석에 되돌리기): `slot_events`(코드 형식·보너스 1~45·`ends_at > starts_at` CHECK), `slot_event_entries`(PK `(event_id, user_id)`, 이벤트 FK `RESTRICT`, 사용자 FK `CASCADE`, 보너스 사본 1~45), 인덱스 `(event_id, applied_at DESC)`·`(user_id)`, 시드 `link-slots-plus-5`(보너스 5, 시작 = 적용 시각, 끝 없음). 새 테이블·시드 행만 더하는 expand.
   - 새 `src/slot-event/`(`SlotEventModule`, `CreatorModule`·`AdminModule`이 가져옴): `GET /api/public/slot-event`(`no-store`, 행이 없으면 `event: null`), `POST /api/me/slot-event/entry`(`INSERT … SELECT … WHERE 열림 ON CONFLICT DO NOTHING`, 새로 201·이미 신청 200, 404 `slot_event_not_found`, 409 `slot_event_closed` 시작 전·끝남 문구 구분), `GET /api/admin/slot-event?page=`(신청 수·최신순 20개, 400 `validation_failed`), `PUT /api/admin/slot-event`(400 `validation_failed`·`slot_event_period_invalid`, 응답 1쪽). 상태는 SQL 한 문장의 `now()`.
   - `CreatorService.limits`: `visibleMax = min(5 + extra_link_slots + 신청 보너스 합, 50)`(링크 추가·숨김 해제 검사도 이 값). `GET /api/me/landing`의 `slotEvent`, `GET /api/admin/creators/{userId}`의 `slotEvent`(신청 행 또는 null).
   - 공용 입력 도우미: 기간 시각 `zonedTime`(크리링 배너 `bannerTime`을 옮김, 문구 그대로)·쪽 번호 `pageNumber`(운영자 크리에이터 목록의 검사를 옮김)를 `src/common/input.ts`로.
   - 시험: `test/slot-event.e2e-spec.ts` 12건(공개 no-store, 401, 신청 전 5·뒤 10·다시 200, 동시 10건 → 1행·201 하나, 6번째 링크·숨김 해제, 추가 슬롯 2 → 12·0 → 10·45 → 50, 보너스 사본, 시작 전·끝난 뒤 409·끝난 뒤 보너스 유지, 운영자 401·403, 쪽 나눔·최신순·page 400, 기간 400 두 종류, 이벤트 없음 404), `test/migrations.e2e-spec.ts` 0005 3건, `test/health.e2e-spec.ts`·`creator.e2e-spec.ts`·`admin.e2e-spec.ts` 기대값. API 시험 175 → 190개.
+
 
 ## 2026-10-09
 

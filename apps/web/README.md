@@ -15,22 +15,34 @@ Next.js App Router와 TypeScript 기반 크리링(CreLink) 웹 클라이언트�
 | `/notice?reason=` | 단축 주소·로그인 오류 안내 |
 | `/privacy` | 개인정보 수집·보관·쿠키 고지(법률 검토 전 문구) |
 | `/docs`, `/docs/guide`, `/docs/releases`, `/docs/brand` | 공개 문서(목록 `src/lib/docs.ts`): 크리에이터 사용 안내, 릴리스 노트(빌드 때 루트 `RELEASES.md`의 첫 `## `부터 끝까지, 없으면 빈 상태), 브랜드와 디자인(`@crelink/design-tokens` 값으로 만든 색·글꼴·간격·모서리 견본), `/privacy` 링크. 모두 정적 화면 |
-| `/admin`, `/admin/creators/[userId]`, `/admin/blocked-domains`, `/admin/ad-banners`, `/admin/slot-event` | 운영자 화면. 401이면 `/`, 403이면 권한 없음 안내. `/admin/ad-banners`는 크리링 광고 배너 목록·걸러보기·순서·등록·수정·내리기. `/admin/slot-event`는 링크 슬롯 이벤트 기간(`SlotEventPeriodForm`, 한국 시간 `datetime-local`)·신청 수·신청자(최신순 20명씩, `?page=`가 1 이상 정수가 아니면 1쪽) |
+| `/admin`, `/admin/creators/[userId]`, `/admin/blocked-domains`, `/admin/ad-banners`, `/admin/slot-event` | 운영자 화면. 401이면 `/`, 403이면 권한 없음 안내. `/admin/ad-banners`는 크리링 광고 배너 목록·걸러보기·순서·등록·수정·내리기. `/admin/slot-event`는 링크 슬롯 이벤트 기간(`SlotEventPeriodForm`, 한국 시간 `datetime-local`)·신청 수·신청자(최신순 20명씩, `?page=`가 1 이상 정수가 아니면 1쪽). 크리에이터 목록 상태 칸·상세에 `AI`(상세는 `AI 계정`)·`지표 제외` 배지, 사람 계정 상세는 `지표 제외` 켜기·끄기(AI 계정은 안내 문구), AI 계정 정지 확인 문구에 "AI 토큰 인증도 막힙니다" |
+| `/admin/agent-runs`, `/admin/agent-runs/[runId]` | AI 운영자 실행 기록(설계 `docs/specs/crelink-ai-operator.md` `화면 상태와 API 대응`). 첫 쪽은 멈춤 스위치(상태·사유·바꾼 사람·시각, 켤 때 선택 사유와 확인)·진행 중 실행(90분이 지나면 "다음 실행 때 포기 처리됨")·지표 카드(실사용자 `n / 100`, 가입·방문·클릭·광고·이벤트, 기준 시각. 지표만 실패하면 그 자리에 오류 문구)·실행 `<details>` 카드 목록·`AI 계정` 절(토큰 목록과 `폐기`), `?cursor=` 쪽은 실행 목록만. 페이지 이동 `이전 기록`·`처음으로`. 관련 링크는 http(s)만 새 창 링크. 상세는 실행 전체와 그 실행의 운영 기록, 없으면 `AI 실행 기록으로` |
+| `/admin/actions` | 운영 기록(사람·AI·시스템의 운영 쓰기). 걸러보기 `?actor=`(`전체`·`사람`·`AI`·`시스템`), 행은 시각·행위자 배지·행동 이름(모르는 값은 원래 키)·대상·크리에이터 상세 링크·전후 값 JSON 글자·실행 링크. 700px 이하는 공용 쌓는 표(`.data-table.is-stacked`, 광고 배너 표와 같은 규칙)로 카드. 잘못된 커서·`actor`는 오류 안내와 `처음으로` |
 
 SNS 채널 아이콘 자산의 출처·상표 사용 규칙은 [SNS 채널 아이콘](docs/sns-icons.md)에 있습니다.
 
 ## BFF(`src/app/api/backend/[...path]/route.ts`)
 
-- 허용 목록(메서드·경로)에 있는 요청만 전달하고 나머지는 404 `route_not_allowed`입니다. 로그인 시작·콜백은 BFF가 아니라 위 route handler가 부릅니다.
+- 허용 목록(메서드·경로)에 있는 요청만 전달하고 나머지는 404 `route_not_allowed`입니다. 로그인 시작·콜백은 BFF가 아니라 위 route handler가 부릅니다. AI 운영자 쓰기는 `PUT api/admin/ai-operator/pause`·`PUT api/admin/ai-operator/tokens/{id}/revoke`·`PUT api/admin/creators/{id}/metrics-exclusion`만 열고, 조회 GET은 서버 렌더만 부르므로 열지 않습니다.
 - 요청 쿠키 중 `cl_session`만 API로 넘기고, API 응답의 `Set-Cookie`·`Content-Type`·`Cache-Control`·`ETag`·`Last-Modified`와 본문(이미지 바이너리 포함)을 그대로 돌려줍니다. 204는 본문 없이 돌려줍니다.
 - `POST api/me/files`만 multipart 본문과 `Content-Type`(boundary 포함)을 그대로 넘기고, 그 밖의 본문은 JSON으로 넘깁니다.
 - POST·PUT·PATCH·DELETE는 `Origin` 헤더의 호스트가 요청 호스트와 같아야 하며, 없거나 다르면 403 `forbidden`입니다.
+- 오류 응답(`{ code, message }`)·돌려줄 응답 헤더 고르기·upstream 호출은 AI 토큰 경로와 함께 `src/lib/api/proxy.ts`를 씁니다.
+
+## AI 토큰 경로(`src/app/api/agent/[...path]/route.ts`)
+
+AI 운영자 실행 호스트가 `Authorization: Bearer <토큰>`으로 운영 API를 부르는 경로입니다(`AI_AGENT_PROXY_PATH`, 설계 `docs/specs/crelink-ai-operator.md` `웹 토큰 경로`). 판정은 `next`·`server-only`를 부르지 않는 `src/lib/api/agent-proxy.ts`이고 `agent-proxy.spec.ts`가 규칙마다 시험합니다.
+
+- 허용 경로(조각 경계 고정): `api/health`·`api/me`(정확 일치), `api/me/…`, `api/files/…`, `api/admin/…`. 그 밖, 빈 조각·`.`·`..`(디코드 뒤)는 404 `route_not_allowed`. 대상 URL을 만든 뒤 `pathname`을 같은 규칙으로 다시 검사합니다.
+- `Authorization`이 `Bearer ` 스킴이 아니면 401 `unauthenticated`로 API에 보내지 않습니다(`api/health` 포함). `Origin` 헤더가 있으면(브라우저) 403 `forbidden`. CORS 허용 헤더는 내지 않습니다.
+- API로는 `apiRequestHeaders({ Accept })`에 `Authorization`·`X-Crelink-Agent-Run`만 더해 보내고 쿠키는 넘기지 않습니다. 상태 변경 본문은 바이트 그대로 원래 `Content-Type`(multipart 포함)과 함께 넘깁니다.
+- 응답은 상태·본문과 `Content-Type`·`Cache-Control`·`ETag`·`Last-Modified`만 돌려주고 `Set-Cookie`는 넘기지 않습니다. 권한은 API가 확인합니다.
 
 ## 실행
 
 저장소 루트에서 `pnpm dev:web` 또는 `pnpm --filter @crelink/web start`로 개발 서버를 `http://localhost:<웹 포트>`에서 실행하고, `pnpm --filter @crelink/web build`로 프로덕션 빌드를 생성합니다. `<웹 포트>`는 `WEB_PORT` 환경변수, 없으면 이 checkout 인스턴스의 웹 포트(`pnpm instance --get WEB_PORT`)이고, API는 `http://127.0.0.1:<API 포트>`를 사용합니다. 실제 포트는 `pnpm instance`로 확인합니다.
 
-웹 단위 시험은 화면 없이 확인할 수 있는 순수 함수(`src/lib/*.test.ts`, 지금은 관리 화면 미리보기의 초안 덮어쓰기 `landing-preview.ts`)에만 두고 Node 내장 시험 실행기로 돌립니다: `pnpm --filter @crelink/web test`(루트 `pnpm test`에 포함). 화면 동작은 E2E(`tests/e2e/`)가 맡습니다.
+웹 단위 시험은 화면 없이 확인할 수 있는 순수 함수(`src/**/*.spec.ts`: 관리 화면 미리보기 `landing-preview.ts`, AI 토큰 경로 판정 `lib/api/agent-proxy.ts`, 표기 `lib/format.ts` 등)에만 두고 Node 내장 시험 실행기로 돌립니다: `pnpm --filter @crelink/web test`(루트 `pnpm test`에 포함). 화면 동작은 E2E(`tests/e2e/`)가 맡습니다.
 
 `make up`(또는 `pnpm instance`)이 `apps/web/.env.local`이 없으면 `.env.example`에서 만들고 `API_INTERNAL_URL`을 이 checkout 인스턴스의 API 주소(`pnpm instance --get API_INTERNAL_URL`)로 채웁니다. `make web-up`으로 띄우면 인스턴스 값이 파일 값보다 우선합니다([로컬 개발 환경](../../docs/development/local-environment.md#인스턴스와-포트)). `.env.local`에는 실제 비밀값을 저장하지 말고 서버 비밀값도 `NEXT_PUBLIC_*`로 설정하지 않습니다.
 

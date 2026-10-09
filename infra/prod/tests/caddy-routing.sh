@@ -4,8 +4,8 @@
 # - 실제 caddy:2.11.7-alpine(edge/compose.yaml과 같은 이미지·읽기 전용·권한 축소)에 서버와 같은 설정 폴더(/etc/caddy 폴더 bind:
 #   저장소 Caddyfile + lib.sh upstreams_for가 쓰는 upstreams.caddy)를 붙입니다. 다른 점은 아래뿐입니다.
 #   호스트 CRELINK_SHORT_HOST=go.localhost·CRELINK_WEB_HOST=links.localhost, 호스트 포트(127.0.0.1의 빈 포트),
-#   api·web 자리에 요청 메서드·경로·X-Forwarded-For를 응답 헤더(x-echo-*)로 되돌려주는 스텁(같은 네트워크, 색 별칭 api-blue·web-blue·
-#   api-green·web-green만. 색 없는 api·web 이름은 없어서 Caddyfile이 그 이름을 쓰면 실패합니다).
+#   api·web 자리에 요청 메서드·경로·X-Forwarded-For·Authorization·X-Crelink-Agent-Run을 응답 헤더(x-echo-*)로 되돌려주는 스텁
+#   (같은 네트워크, 색 별칭 api-blue·web-blue·api-green·web-green만. 색 없는 api·web 이름은 없어서 Caddyfile이 그 이름을 쓰면 실패합니다).
 # - 방문자 IP: 호스트에서 보낸 요청은 Docker 게이트웨이(사설 대역)에서 오므로 cloudflared처럼 신뢰됩니다. 사설 대역이 아닌 곳에서 오는 요청은
 #   203.0.113.0/24(TEST-NET-3) 네트워크의 클라이언트 컨테이너로 흉내 냅니다.
 # - 관리 API: 컨테이너 안 localhost:2019에서만 열리고(같은 네트워크·호스트에서 닿지 않음) upstreams.caddy를 green으로 바꾼 뒤
@@ -67,7 +67,7 @@ result() { # result <설명> <기대> <실제>
 echo "== 준비"
 docker network create --label "crelink-test=$run_id" "$net" >/dev/null
 docker network create --label "crelink-test=$run_id" --subnet 203.0.113.0/24 "$pubnet" >/dev/null
-# 업스트림 스텁: 받은 요청(메서드·경로·X-Forwarded-For·본문 길이)을 응답 헤더로, 요청 헤더 전체를 본문(JSON)으로 돌려줍니다.
+# 업스트림 스텁: 받은 요청(메서드·경로·X-Forwarded-For·Authorization·X-Crelink-Agent-Run·본문 길이)을 응답 헤더로, 요청 헤더 전체를 본문(JSON)으로 돌려줍니다.
 stub_js='
 const role = process.env.ROLE;
 require("http").createServer((q, s) => {
@@ -80,6 +80,8 @@ require("http").createServer((q, s) => {
     s.setHeader("x-echo-method", q.method);
     s.setHeader("x-echo-url", q.url);
     s.setHeader("x-echo-xff", q.headers["x-forwarded-for"] ?? "-");
+    s.setHeader("x-echo-auth", q.headers["authorization"] ?? "-");
+    s.setHeader("x-echo-agent-run", q.headers["x-crelink-agent-run"] ?? "-");
     s.setHeader("x-echo-len", String(n));
     s.setHeader("content-type", "application/json");
     s.end(JSON.stringify(q.headers));
@@ -198,6 +200,15 @@ check 'POST /api/backend/me/links' '200 web POST /api/backend/me/links' -X POST 
 check 'GET /c/abcde12345 (웹 호스트도 web)' '200 web GET /c/abcde12345' "$links/c/abcde12345"
 check 'GET /a/abcde12345/fghij67890 (웹 호스트도 web)' '200 web GET /a/abcde12345/fghij67890' "$links/a/abcde12345/fghij67890"
 check 'GET /b/abcde12345 (웹 호스트도 web)' '200 web GET /b/abcde12345' "$links/b/abcde12345"
+# AI 운영자 토큰 경로(docs/specs/crelink-ai-operator.md `웹 토큰 경로`): Caddy는 경로를 가리지 않고 web에 넘기며 인증·실행 헤더를 바꾸지 않아야 합니다.
+# 시험 값은 실제 토큰 형식(crl_ai_ + 43자)이 아닙니다.
+agent_auth='Bearer crl_ai_caddy-routing-test'
+agent_run=11111111-2222-4333-8444-555555555555
+agent_req=(-X POST -H "Authorization: $agent_auth" -H "X-Crelink-Agent-Run: $agent_run" -H 'Content-Type: application/json'
+	-d '{"trigger":"schedule"}' "$links/api/agent/api/admin/agent-runs")
+check 'POST /api/agent/api/admin/agent-runs (AI 토큰 경로)' '200 web POST /api/agent/api/admin/agent-runs' "${agent_req[@]}"
+result 'AI 토큰 경로: Authorization·X-Crelink-Agent-Run 그대로 전달' "$agent_auth|$agent_run" \
+	"$("${CURL[@]}" -o /dev/null -w '%header{x-echo-auth}|%header{x-echo-agent-run}' "${agent_req[@]}")"
 head -c 5000000 /dev/zero >"$work/5mb"
 head -c 7340032 /dev/zero >"$work/7mib"
 check 'POST 본문 5MB' '200 web POST /upload' --data-binary "@$work/5mb" "$links/upload"

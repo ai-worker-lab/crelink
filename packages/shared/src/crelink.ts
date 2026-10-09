@@ -128,7 +128,14 @@ export type CrelinkErrorCode =
   // 링크 슬롯 이벤트(R24)
   | 'slot_event_not_found'
   | 'slot_event_closed'
-  | 'slot_event_period_invalid';
+  | 'slot_event_period_invalid'
+  // AI 운영자(R23). 근거: docs/specs/crelink-ai-operator.md `오류 코드`.
+  | 'agent_run_not_found'
+  | 'agent_run_in_progress'
+  | 'agent_run_closed'
+  | 'agent_run_required'
+  | 'ai_operator_paused'
+  | 'api_token_not_found';
 
 /** `/notice?reason=`에 쓰는 사유. 단축 도메인 리디렉트와 로그인 콜백이 사용합니다. */
 export type NoticeReason =
@@ -562,6 +569,10 @@ export interface OperatorCreatorSummary {
   visitsLast30Days: number;
   suspended: boolean;
   createdAt: string;
+  /** 사람 계정인지 AI 운영자 계정인지(R23 ①). */
+  accountKind: AccountKind;
+  /** 운영자가 시험 계정으로 지표에서 뺐는지(PRD `목표`, R23 ⑧). */
+  metricsExcluded: boolean;
 }
 
 /** `GET /api/admin/creators?query=&page=` 응답. page는 1부터. */
@@ -695,6 +706,233 @@ export interface AdBannerRequest {
  */
 export type UpdateAdBannerRequest = Partial<AdBannerRequest>;
 
+// ---------- AI 운영자 (R23) ----------
+// 근거: docs/specs/crelink-ai-operator.md (API 계약 초안). 0089(슬롯 이벤트)는 지표 `events`와 행동 이름만 더합니다.
+
+/** 계정 종류. AI 계정은 Google 신원 없이 API 토큰(Bearer)으로만 로그인하는 운영자입니다. */
+export type AccountKind = 'human' | 'ai';
+
+/** 운영자 행동 기록의 행위자 종류. `system`은 서버 CLI(토큰 발급·폐기)입니다. */
+export type OperatorActorKind = 'human' | 'ai' | 'system';
+
+export const AI_OPERATOR_LIMITS = {
+  /** 시작 뒤 이 시간이 지난 `running` 실행은 다음 시작 때 `abandoned`로 닫히고 실행 헤더로 쓸 수 없습니다. */
+  staleRunMinutes: 90,
+  runPageSize: 20,
+  actionPageSize: 50,
+  summaryMax: 2000,
+  /** `actions`·`nextSteps` 항목 하나의 길이와 항목 수. */
+  listItemMax: 300,
+  listItemsMax: 30,
+  refsMax: 20,
+  refLabelMax: 100,
+  pausedReasonMax: 200,
+  hostMax: 60,
+  modelMax: 100,
+  tokenLabelMax: 60,
+  /** PRD `목표`의 실사용자 목표 수. */
+  realUserGoal: 100,
+} as const;
+
+/** AI의 상태 변경 요청에 붙이는 진행 중 실행 id 헤더. */
+export const AGENT_RUN_HEADER = 'X-Crelink-Agent-Run';
+
+/** AI 운영자 토큰 원문 접두사. 원문은 `crl_ai_` + base64url 43자이고 DB에는 SHA-256 해시만 둡니다. */
+export const AI_TOKEN_PREFIX = 'crl_ai_';
+export const AI_TOKEN_PATTERN = /^crl_ai_[A-Za-z0-9_-]{43}$/;
+
+/** 웹의 토큰 전용 경로 접두사. `{AI_AGENT_PROXY_PATH}/api/…`를 같은 색 API의 `/api/…`로 넘깁니다(쿠키 없음). */
+export const AI_AGENT_PROXY_PATH = '/api/agent';
+
+export interface ApiTokenView {
+  id: string;
+  label: string;
+  /** 원문 앞 12자(`crl_ai_` + 5자). */
+  prefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface AiAccountView {
+  userId: string;
+  email: string;
+  createdAt: string;
+  suspended: boolean;
+  /** 만든 순서(최근 먼저). 폐기한 토큰도 포함합니다. */
+  tokens: ApiTokenView[];
+}
+
+export type AgentRunStatus = 'running' | 'succeeded' | 'failed' | 'paused' | 'abandoned';
+export type AgentRunTrigger = 'schedule' | 'manual';
+export type AgentRunRefKind = 'pr' | 'work_item' | 'commit' | 'deploy' | 'other';
+
+/** 실행과 관련된 PR·work item 등. url은 http·https만 받습니다. */
+export interface AgentRunRef {
+  kind: AgentRunRefKind;
+  label: string;
+  url: string | null;
+}
+
+export interface AgentRunView {
+  id: string;
+  status: AgentRunStatus;
+  trigger: AgentRunTrigger;
+  host: string | null;
+  startedAt: string;
+  /** `running`이면 null. `paused`는 같은 멈춤 동안 마지막으로 합친 시각입니다. */
+  endedAt: string | null;
+  /** 같은 멈춤 동안 합친 `paused` 기록 수(1부터). */
+  pausedCount: number;
+  summary: string | null;
+  actions: string[];
+  nextSteps: string[];
+  refs: AgentRunRef[];
+  model: string | null;
+  costUsd: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  /** 실행한 AI 계정의 이메일. 계정을 지웠으면 null. */
+  actorEmail: string | null;
+  /** 이 실행에서 남긴 운영자 행동 기록 수. */
+  operatorActionCount: number;
+}
+
+/** `GET /api/admin/agent-runs?cursor=` 응답. 최신순 `AI_OPERATOR_LIMITS.runPageSize`개. 잘못된 커서는 400 `validation_failed`. */
+export interface AgentRunPage {
+  items: AgentRunView[];
+  nextCursor: string | null;
+}
+
+/** `GET /api/admin/agent-runs/{runId}` 응답. 없거나 형식이 틀린 id는 404 `agent_run_not_found`. */
+export interface AgentRunDetail extends AgentRunView {
+  /** 이 실행의 운영자 행동 기록(최신순). */
+  operatorActions: OperatorActionView[];
+}
+
+/**
+ * `POST /api/admin/agent-runs`(AI만, 201). 응답은 `AgentRunView`이며 멈춤이면 `status: 'paused'`(실행하지 않음).
+ * 90분이 지난 `running`은 먼저 `abandoned`로 닫힙니다. 진행 중 실행이 있으면 409 `agent_run_in_progress`.
+ */
+export interface StartAgentRunRequest {
+  trigger: AgentRunTrigger;
+  host?: string | null;
+  model?: string | null;
+}
+
+/**
+ * `PATCH /api/admin/agent-runs/{runId}`(AI만, 자기 실행). 응답은 `AgentRunView`. 바뀐 필드만 보내고, status를 주면 닫힙니다.
+ * 400 `validation_failed`, 403 `forbidden`(다른 계정의 실행), 404 `agent_run_not_found`, 409 `agent_run_closed`.
+ * 실행 헤더가 없어도 되고 멈춤 중에도 됩니다(기록 닫기).
+ */
+export interface UpdateAgentRunRequest {
+  status?: 'succeeded' | 'failed';
+  summary?: string | null;
+  actions?: string[];
+  nextSteps?: string[];
+  refs?: Array<{ kind: AgentRunRefKind; label: string; url?: string | null }>;
+  model?: string | null;
+  costUsd?: number | null;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+}
+
+/** `GET /api/admin/ai-operator` 응답. `PUT …/pause`·`PUT …/tokens/{id}/revoke`도 같은 형식을 돌려줍니다. */
+export interface AiOperatorStatus {
+  paused: boolean;
+  pausedReason: string | null;
+  updatedAt: string;
+  /** 마지막으로 멈춤을 바꾼 사람 운영자 이메일. 없으면 null. */
+  updatedBy: string | null;
+  accounts: AiAccountView[];
+  /** 진행 중(`running`) 실행. 90분이 지났어도 다음 시작 전까지는 여기 남습니다(`startedAt`으로 판단). */
+  runningRun: AgentRunView | null;
+  /** 가장 최근에 시작한 닫힌 실행(`running` 밖 상태: 성공·실패·멈춤·포기). */
+  lastRun: AgentRunView | null;
+}
+
+/** `PUT /api/admin/ai-operator/pause`(사람 운영자만). reason은 `AI_OPERATOR_LIMITS.pausedReasonMax`자 이하. */
+export interface SetAiOperatorPauseRequest {
+  paused: boolean;
+  reason?: string | null;
+}
+
+/** 운영자 행동 이름. 다른 에픽이 더한 행동도 기록에 오므로 화면은 모르는 값을 원래 키로 보여 줍니다. */
+export type OperatorActionType =
+  | 'creator.extra_slots'
+  | 'creator.suspension'
+  | 'creator.banner_slot'
+  | 'creator.metrics_exclusion'
+  | 'link.block'
+  | 'banner.block'
+  | 'blocked_domain.add'
+  | 'blocked_domain.remove'
+  | 'ad_banner.create'
+  | 'ad_banner.update'
+  | 'ad_banner.reorder'
+  | 'ad_banner.end'
+  | 'ai_operator.pause'
+  | 'ai_operator.token_issue'
+  | 'ai_operator.token_revoke';
+
+export type OperatorActionTargetType =
+  'user' | 'link' | 'creator_banner' | 'blocked_domain' | 'ad_banner' | 'ai_operator' | 'api_token';
+
+export interface OperatorActionView {
+  id: string;
+  createdAt: string;
+  actor: { kind: OperatorActorKind; userId: string | null; email: string | null };
+  /** `OperatorActionType` 값. 다른 에픽이 더한 행동도 오므로 string입니다. */
+  action: string;
+  /** `OperatorActionTargetType` 값. */
+  targetType: string;
+  targetId: string | null;
+  /** 행동이 걸린 크리에이터(링크·배너 차단은 그 소유자). 크리에이터 상세 링크에 씁니다. */
+  subjectUserId: string | null;
+  /** 바뀐 필드만 담은 이전·이후 값. 화면은 JSON 글자로만 보여 줍니다. */
+  before: unknown;
+  after: unknown;
+  runId: string | null;
+}
+
+/**
+ * `GET /api/admin/actions?cursor=&actor=` 응답. 최신순 `AI_OPERATOR_LIMITS.actionPageSize`개.
+ * actor는 `OperatorActorKind` 중 하나(없으면 전체). 잘못된 커서·actor는 400 `validation_failed`.
+ */
+export interface OperatorActionPage {
+  items: OperatorActionView[];
+  nextCursor: string | null;
+}
+
+/** 지표 확장 지점(R24 이벤트 등). */
+export interface AiOperatorMetricEvent {
+  key: string;
+  label: string;
+  value: number;
+}
+
+/**
+ * `GET /api/admin/metrics` 응답. 실사용자 정의는 PRD `목표`(설계 `지표 정의`). 기간은 지금부터 거꾸로 센 시간이고,
+ * 광고 배너 노출·클릭만 서울 날짜 오늘 포함 7일입니다.
+ */
+export interface AiOperatorMetrics {
+  generatedAt: string;
+  goal: { realUsers: number };
+  realUsers: number;
+  /** 사람 크리에이터 수와 그중 지표 제외 수. */
+  creators: { total: number; excluded: number };
+  signups: { last24Hours: number; last7Days: number; last30Days: number };
+  visits: { last7Days: number; last30Days: number };
+  linkClicks: { last7Days: number; last30Days: number };
+  adBanners: { live: number; impressionsLast7Days: number; clicksLast7Days: number };
+  events: AiOperatorMetricEvent[];
+}
+
+/** `PUT /api/admin/creators/{userId}/metrics-exclusion`(사람 운영자만). 응답은 `OperatorCreatorDetail`. */
+export interface SetMetricsExclusionRequest {
+  excluded: boolean;
+}
+
 /** 단축 주소 리디렉트가 랜딩 주소에 붙이는 통과 표시 쿼리 이름. 웹은 이 표시가 유효할 때만 외부에서 온 요청을 그대로 그립니다(PRD R7). */
 export const LANDING_PASS_PARAM = 'pass';
 
@@ -745,6 +983,25 @@ export const CRELINK_API_PATHS = {
     `/api/landings/${encodeURIComponent(publicId)}/guestbook${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
   guestbookEntry: (entryId: string) => `/api/guestbook/${encodeURIComponent(entryId)}`,
   guestbookEntryHidden: (entryId: string) => `/api/guestbook/${encodeURIComponent(entryId)}/hidden`,
+  // AI 운영자(R23)
+  adminAiOperator: '/api/admin/ai-operator',
+  adminAiOperatorPause: '/api/admin/ai-operator/pause',
+  adminApiTokenRevoke: (tokenId: string) => `/api/admin/ai-operator/tokens/${encodeURIComponent(tokenId)}/revoke`,
+  /** `cursor`: 이전 응답의 `AgentRunPage.nextCursor`. */
+  adminAgentRuns: (cursor?: string | null) =>
+    `/api/admin/agent-runs${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+  adminAgentRun: (runId: string) => `/api/admin/agent-runs/${encodeURIComponent(runId)}`,
+  /** `cursor`: 이전 응답의 `OperatorActionPage.nextCursor`, `actor`: 행위자 걸러보기. */
+  adminActions: (options: { cursor?: string | null; actor?: OperatorActorKind | null } = {}) => {
+    const query = new URLSearchParams();
+    if (options.actor) query.set('actor', options.actor);
+    if (options.cursor) query.set('cursor', options.cursor);
+    const text = query.toString();
+    return `/api/admin/actions${text ? `?${text}` : ''}`;
+  },
+  adminMetrics: '/api/admin/metrics',
+  adminCreatorMetricsExclusion: (userId: string) =>
+    `/api/admin/creators/${encodeURIComponent(userId)}/metrics-exclusion`,
 } as const;
 
 /** 랜딩의 방명록 탭을 여는 주소 해시(`#guestbook`). 해시는 리디렉트를 지나도 유지되어 단축 주소(R7)를 거쳐도 탭이 열립니다. */
@@ -771,6 +1028,10 @@ export const CRELINK_WEB_PATHS = {
   docsGuide: '/docs/guide',
   docsReleases: '/docs/releases',
   docsBrand: '/docs/brand',
+  // AI 운영자(R23) 운영자 화면
+  adminAgentRuns: '/admin/agent-runs',
+  adminAgentRun: (runId: string) => `/admin/agent-runs/${encodeURIComponent(runId)}`,
+  adminActions: '/admin/actions',
 } as const;
 
 // ---------- 링크 슬롯 이벤트 (R24) ----------

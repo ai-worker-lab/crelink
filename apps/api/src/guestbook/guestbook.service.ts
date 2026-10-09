@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { CRELINK_LIMITS, GuestbookEntryView, GuestbookPage, SessionUser } from '@crelink/shared';
 import { Database } from '../database';
 import { apiError, UUID_PATTERN } from '../common/http';
+import { cursorAtSql, cursorBeforeSql, cursorPage, parseCursor } from '../common/cursor';
 import { bodyObject, optionalBoolean, requiredText } from '../common/input';
 import { CreatorService, PublicLandingRow } from '../creator/creator.service';
 import { FilesService } from '../files/files.service';
@@ -13,7 +14,7 @@ interface EntryRow {
   hidden: boolean;
   author_user_id: string;
   created_at: Date;
-  /** created_at의 epoch 마이크로초(커서용). JS Date는 밀리초까지라 DB 값을 그대로 씁니다. */
+  /** created_at의 epoch 마이크로초(커서용, `cursorAtSql`). */
   cursor_at: string;
   author_display_name: string | null;
   author_avatar_file_id: string | null;
@@ -22,26 +23,9 @@ interface EntryRow {
 /** `e`(guestbook_entries 행)에서 EntryRow를 읽는 컬럼과 조인. 작성자 이름·사진은 작성자 랜딩의 현재 값입니다. */
 const ENTRY_SELECT = `
   SELECT e.id, e.body, e.is_secret, e.hidden_at IS NOT NULL AS hidden, e.author_user_id, e.created_at,
-         (extract(epoch FROM e.created_at) * 1000000)::bigint::text AS cursor_at,
+         ${cursorAtSql('e.created_at')} AS cursor_at,
          al.display_name AS author_display_name, al.avatar_file_id AS author_avatar_file_id
   FROM e JOIN users au ON au.id = e.author_user_id LEFT JOIN landings al ON al.user_id = e.author_user_id`;
-
-/** 커서 원문 `{epoch 마이크로초}.{글 id}`. 밖에는 base64url로만 내보냅니다. */
-const CURSOR_PATTERN = /^(\d{1,16})\.([0-9a-f-]{36})$/;
-
-/** `?cursor=`. 없으면 null(첫 쪽), 해석할 수 없으면 400 `validation_failed`. */
-function parseCursor(value: unknown): { at: string; id: string } | null {
-  if (value === undefined) return null;
-  const invalid = apiError(
-    HttpStatus.BAD_REQUEST,
-    'validation_failed',
-    '방명록 목록 위치가 올바르지 않습니다. 처음부터 다시 불러와 주세요.',
-  );
-  if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(value)) throw invalid;
-  const match = CURSOR_PATTERN.exec(Buffer.from(value, 'base64url').toString('utf8'));
-  if (!match || !UUID_PATTERN.test(match[2])) throw invalid;
-  return { at: match[1], id: match[2] };
-}
 
 function entryNotFound() {
   return apiError(HttpStatus.NOT_FOUND, 'guestbook_entry_not_found', '방명록 글을 찾을 수 없습니다.');
@@ -62,18 +46,16 @@ export class GuestbookService {
 
   async list(publicId: string, viewer: SessionUser | null, cursorValue: unknown): Promise<GuestbookPage> {
     const landing = await this.openLanding(publicId);
-    const cursor = parseCursor(cursorValue);
+    const cursor = parseCursor(cursorValue, '방명록 목록 위치가 올바르지 않습니다. 처음부터 다시 불러와 주세요.');
     const viewerId = viewer?.id ?? null;
     const isOwner = viewerId === landing.user_id;
     const pageSize = CRELINK_LIMITS.guestbookPageSize;
-    // 커서 시각은 정수 마이크로초를 float8로 곱합니다. 2^53 미만 정수는 float8로 정확하므로 DB 값과 같은 시각이 됩니다.
     const result = await this.database.query<EntryRow>(
       `WITH e AS (
          SELECT * FROM guestbook_entries
          WHERE landing_id = $1
            AND (author_user_id = $2 OR $3::boolean OR (NOT is_secret AND hidden_at IS NULL))
-           AND ($4::float8 IS NULL
-                OR (created_at, id) < (timestamptz 'epoch' + $4::float8 * interval '1 microsecond', $5::uuid))
+           AND ${cursorBeforeSql('created_at', 'id', 4, 5)}
        )
        ${ENTRY_SELECT}
        WHERE au.suspended_at IS NULL
@@ -81,14 +63,8 @@ export class GuestbookService {
        LIMIT $6`,
       [landing.id, viewerId, isOwner, cursor?.at ?? null, cursor?.id ?? null, pageSize + 1],
     );
-    const rows = result.rows.slice(0, pageSize);
-    const last = rows[rows.length - 1];
-    return {
-      entries: rows.map((row) => this.view(row, viewerId, isOwner)),
-      nextCursor:
-        result.rows.length > pageSize ? Buffer.from(`${last.cursor_at}.${last.id}`).toString('base64url') : null,
-      viewer: { signedIn: viewer !== null, isOwner },
-    };
+    const { items, nextCursor } = cursorPage(result.rows, pageSize, (row) => this.view(row, viewerId, isOwner));
+    return { entries: items, nextCursor, viewer: { signedIn: viewer !== null, isOwner } };
   }
 
   async create(publicId: string, user: SessionUser, body: unknown): Promise<GuestbookEntryView> {

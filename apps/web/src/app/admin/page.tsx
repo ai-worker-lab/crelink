@@ -2,6 +2,7 @@ import { CRELINK_API_PATHS, type OperatorCreatorListResponse } from '@crelink/sh
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AdminShell } from '../../components/admin/AdminShell';
+import { CreatorStatusBadges } from '../../components/admin/CreatorStatusBadges';
 import { loadSignedIn } from '../../lib/api/server';
 import { formatDate, formatNumber } from '../../lib/format';
 
@@ -92,7 +93,9 @@ function CreatorTable({
                   <code>{creator.slug}</code>
                 </td>
                 <td className="num">{formatNumber(creator.visitsLast30Days)}</td>
-                <td>{creator.suspended ? <span className="badge badge-danger">정지</span> : '이용 중'}</td>
+                <td>
+                  <CreatorStatusBadges creator={creator} />
+                </td>
                 <td>{formatDate(creator.createdAt)}</td>
               </tr>
             ))}

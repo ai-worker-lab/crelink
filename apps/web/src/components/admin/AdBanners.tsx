@@ -46,6 +46,11 @@ const FILTERS: ReadonlyArray<{ value: Filter; label: string; empty: string }> = 
 ];
 
 const STATUS_LABELS: Record<AdBannerStatus, string> = { live: '게시 중', scheduled: '예약', ended: '끝남' };
+const STATUS_BADGES: Record<AdBannerStatus, string> = {
+  live: 'badge badge-positive',
+  scheduled: 'badge badge-warning',
+  ended: 'badge badge-muted',
+};
 
 /** 끄는 동안 행이 세로로만 움직이게 합니다. */
 const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
@@ -182,12 +187,12 @@ export function AdBanners({ list }: { list: AdBannerListResponse }) {
           지금 게시 중인 배너가 없어 모든 랜딩에서 광고 블록이 숨어 있어요.
         </p>
       ) : null}
-      <div className="ad-banners-filters" role="group" aria-label="상태로 걸러 보기">
+      <div className="filter-chips" role="group" aria-label="상태로 걸러 보기">
         {FILTERS.map((item) => (
           <button
             key={item.value}
             type="button"
-            className="ad-banners-filter"
+            className="filter-chip"
             aria-pressed={filter === item.value}
             onClick={() => setFilter(item.value)}
           >
@@ -219,8 +224,8 @@ export function AdBanners({ list }: { list: AdBannerListResponse }) {
           }}
         >
           <SortableContext items={sortable ? ids : []} strategy={verticalListSortingStrategy}>
-            <div className="table-scroll ad-banners-table-wrap">
-              <table className={`data-table ad-banners-table${sortable ? ' is-sortable' : ''}`}>
+            <div className="table-scroll is-stacked">
+              <table className={`data-table is-stacked ad-banners-table${sortable ? ' is-sortable' : ''}`}>
                 <caption className="visually-hidden">광고 배너 목록</caption>
                 <thead>
                   <tr>
@@ -331,14 +336,14 @@ function AdBannerRow({
         <span className="ad-period">~ {banner.endsAt ? formatDateTime(banner.endsAt) : '내릴 때까지'}</span>
       </td>
       <td className="ad-col-status">
-        <span className={`badge ad-status ad-status-${banner.status}`}>{STATUS_LABELS[banner.status]}</span>
+        <span className={`${STATUS_BADGES[banner.status]} ad-status`}>{STATUS_LABELS[banner.status]}</span>
       </td>
       <td className="num ad-col-stat">
-        <span className="ad-stat-label">노출 </span>
+        <span className="stacked-label">노출 </span>
         {formatNumber(banner.impressions)}
       </td>
       <td className="num ad-col-stat ad-col-clicks">
-        <span className="ad-stat-label">클릭 </span>
+        <span className="stacked-label">클릭 </span>
         {formatNumber(banner.clicks)}
       </td>
       <td className="ad-col-actions">

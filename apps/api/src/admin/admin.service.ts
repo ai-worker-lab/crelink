@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import {
+  AccountKind,
   BlockedDomainView,
   CreatorBannerView,
   CRELINK_LIMITS,
@@ -8,12 +9,15 @@ import {
   OperatorCreatorListResponse,
   OperatorCreatorStats,
   OperatorCreatorSummary,
+  UserRole,
 } from '@crelink/shared';
+import type { PoolClient } from 'pg';
 import { domainToASCII } from 'node:url';
 import { Database, isUniqueViolation } from '../database';
 import { apiError, UUID_PATTERN } from '../common/http';
 import { bodyObject, optionalText, pageNumber } from '../common/input';
 import { AppConfig } from '../config.service';
+import { OperatorActor, recordOperatorAction } from '../ai-operator/audit';
 import {
   CREATOR_BANNER_COLUMNS,
   CreatorBannerRow,
@@ -31,6 +35,7 @@ const DOMAIN_PATTERN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)
 const SUMMARY_SELECT = `
   SELECT u.id AS user_id, u.email, l.display_name, s.slug, l.public_id, u.suspended_at IS NOT NULL AS suspended,
          u.created_at, u.extra_link_slots, sl.id AS short_link_id, l.id AS landing_id, u.banner_slot_granted_at,
+         u.kind, u.metrics_excluded_at IS NOT NULL AS metrics_excluded,
          (SELECT count(*)::int FROM visits v
           WHERE v.short_link_id = sl.id AND v.occurred_at > now() - interval '30 days') AS visits_30d
   FROM users u
@@ -51,9 +56,48 @@ interface SummaryRow {
   /** 배너 한도·목록은 랜딩 단위입니다(MVP는 사용자당 랜딩 1개). */
   landing_id: string;
   banner_slot_granted_at: Date | null;
+  kind: AccountKind;
+  metrics_excluded: boolean;
   visits_30d: number;
 }
 
+/** 운영자 쓰기 전에 `FOR UPDATE`로 잠근 계정의 이전 값. */
+interface LockedUser {
+  role: UserRole;
+  kind: AccountKind;
+  extra_link_slots: number;
+  suspended: boolean;
+  banner_slot_granted: boolean;
+  metrics_excluded: boolean;
+}
+
+function creatorNotFound() {
+  return apiError(HttpStatus.NOT_FOUND, 'creator_not_found', '크리에이터를 찾을 수 없습니다.');
+}
+
+/** 링크·배너 차단 요청 `SetLinkBlockRequest`. 사유는 차단할 때만 저장합니다. */
+function blockInput(body: unknown): { blocked: boolean; reason: string | null } {
+  const input = bodyObject(body);
+  if (typeof input.blocked !== 'boolean') {
+    throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', 'blocked는 true 또는 false여야 합니다.');
+  }
+  const reason = optionalText(input.reason, '차단 사유', CRELINK_LIMITS.blockedReasonMax) ?? null;
+  return { blocked: input.blocked, reason };
+}
+
+/** `{ [field]: boolean }` 요청 본문. 아니면 400 `validation_failed`. */
+function booleanField(body: unknown, field: string): boolean {
+  const value = bodyObject(body)[field];
+  if (typeof value !== 'boolean') {
+    throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', `${field}는 true 또는 false여야 합니다.`);
+  }
+  return value;
+}
+
+/**
+ * 운영자 화면 API(R10, R13, R14, R21, R23 ③⑧). 모든 쓰기는 한 트랜잭션에서 `FOR UPDATE`로 이전 값을 읽고 바꾼 뒤
+ * `recordOperatorAction`으로 행위자·행동·대상·전후 값을 남깁니다(설계 `docs/specs/crelink-ai-operator.md` `행동 기록 규칙`).
+ */
 @Injectable()
 export class AdminService {
   constructor(
@@ -75,6 +119,8 @@ export class AdminService {
       visitsLast30Days: row.visits_30d,
       suspended: row.suspended,
       createdAt: row.created_at.toISOString(),
+      accountKind: row.kind,
+      metricsExcluded: row.metrics_excluded,
     };
   }
 
@@ -82,10 +128,31 @@ export class AdminService {
     const result = UUID_PATTERN.test(userId)
       ? await this.database.query<SummaryRow>(`${SUMMARY_SELECT} WHERE u.id = $1`, [userId])
       : null;
-    if (!result?.rowCount) {
-      throw apiError(HttpStatus.NOT_FOUND, 'creator_not_found', '크리에이터를 찾을 수 없습니다.');
-    }
+    if (!result?.rowCount) throw creatorNotFound();
     return result.rows[0];
+  }
+
+  /**
+   * `creator.*` 쓰기의 대상 계정을 잠그고 이전 값을 읽습니다. 없으면 404 `creator_not_found`.
+   * 행위자가 AI이고 대상이 운영자·AI 계정이면 403 `forbidden`(AI가 사람 운영자를 정지해 멈춤·토큰 폐기를 막는 일 방지).
+   * 이 잠금이 users 행을 먼저 잡으므로 크리에이터 배너 쓰기(사용자 잠금 → 부여 확인)와 순서가 맞습니다.
+   */
+  private async lockCreator(client: PoolClient, actor: OperatorActor, userId: string): Promise<LockedUser> {
+    const result = UUID_PATTERN.test(userId)
+      ? await client.query<LockedUser>(
+          `SELECT role, kind, extra_link_slots, suspended_at IS NOT NULL AS suspended,
+                  banner_slot_granted_at IS NOT NULL AS banner_slot_granted,
+                  metrics_excluded_at IS NOT NULL AS metrics_excluded
+           FROM users WHERE id = $1 FOR UPDATE`,
+          [userId],
+        )
+      : null;
+    const user = result?.rows[0];
+    if (!user) throw creatorNotFound();
+    if (actor.kind === 'ai' && (user.role === 'operator' || user.kind === 'ai')) {
+      throw apiError(HttpStatus.FORBIDDEN, 'forbidden', 'AI 운영자는 운영자·AI 계정을 바꿀 수 없습니다.');
+    }
+    return user;
   }
 
   /** 이메일·표시 이름·현재 단축 주소 부분 일치 검색. 최근 가입 순, page는 1부터. */
@@ -138,7 +205,7 @@ export class AdminService {
     return this.stats.stats(row.short_link_id, from, to);
   }
 
-  async setExtraSlots(userId: string, body: unknown): Promise<OperatorCreatorDetail> {
+  async setExtraSlots(actor: OperatorActor, userId: string, body: unknown): Promise<OperatorCreatorDetail> {
     const extraSlots = bodyObject(body).extraSlots;
     if (
       typeof extraSlots !== 'number' ||
@@ -152,83 +219,149 @@ export class AdminService {
         `추가 슬롯은 0~${MAX_EXTRA_SLOTS} 사이의 정수여야 합니다.`,
       );
     }
-    await this.summaryRow(userId);
-    await this.database.query('UPDATE users SET extra_link_slots = $2 WHERE id = $1', [userId, extraSlots]);
+    await this.database.transaction(async (client) => {
+      const before = await this.lockCreator(client, actor, userId);
+      await client.query('UPDATE users SET extra_link_slots = $2 WHERE id = $1', [userId, extraSlots]);
+      await recordOperatorAction(client, actor, {
+        action: 'creator.extra_slots',
+        targetType: 'user',
+        targetId: userId,
+        subjectUserId: userId,
+        before: { extraSlots: before.extra_link_slots },
+        after: { extraSlots },
+      });
+    });
     return this.detail(userId);
   }
 
-  /** 정지하면 기존 세션을 모두 지워 바로 로그아웃시키고, 랜딩·단축 URL은 안내 화면으로 바뀝니다. */
-  async setSuspension(userId: string, body: unknown): Promise<OperatorCreatorDetail> {
-    const suspended = bodyObject(body).suspended;
-    if (typeof suspended !== 'boolean') {
-      throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', 'suspended는 true 또는 false여야 합니다.');
-    }
-    await this.summaryRow(userId);
+  /** 정지하면 기존 세션을 모두 지워 바로 로그아웃시키고, 랜딩·단축 URL은 안내 화면으로 바뀝니다. AI 계정은 토큰 인증도 막힙니다. */
+  async setSuspension(actor: OperatorActor, userId: string, body: unknown): Promise<OperatorCreatorDetail> {
+    const suspended = booleanField(body, 'suspended');
     await this.database.transaction(async (client) => {
+      const before = await this.lockCreator(client, actor, userId);
       await client.query(
         `UPDATE users SET suspended_at = CASE WHEN $2 THEN coalesce(suspended_at, now()) END WHERE id = $1`,
         [userId, suspended],
       );
       if (suspended) await client.query('DELETE FROM sessions WHERE user_id = $1', [userId]);
+      await recordOperatorAction(client, actor, {
+        action: 'creator.suspension',
+        targetType: 'user',
+        targetId: userId,
+        subjectUserId: userId,
+        before: { suspended: before.suspended },
+        after: { suspended },
+      });
     });
     return this.detail(userId);
   }
 
-  /**
-   * 배너 슬롯 부여·회수(R21 ①⑤). 다시 부여해도 처음 부여 시각을 유지하고, 회수해도 배너 행은 보관합니다.
-   * 이 UPDATE가 users 행을 잠그므로 크리에이터 배너 쓰기(사용자 잠금 → 부여 확인)와 순서가 맞습니다.
-   */
-  async setBannerSlot(userId: string, body: unknown): Promise<OperatorCreatorDetail> {
-    const granted = bodyObject(body).granted;
-    if (typeof granted !== 'boolean') {
-      throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', 'granted는 true 또는 false여야 합니다.');
-    }
-    await this.summaryRow(userId);
-    await this.database.query(
-      `UPDATE users SET banner_slot_granted_at = CASE WHEN $2 THEN coalesce(banner_slot_granted_at, now()) END
-       WHERE id = $1`,
-      [userId, granted],
-    );
+  /** 배너 슬롯 부여·회수(R21 ①⑤). 다시 부여해도 처음 부여 시각을 유지하고, 회수해도 배너 행은 보관합니다. */
+  async setBannerSlot(actor: OperatorActor, userId: string, body: unknown): Promise<OperatorCreatorDetail> {
+    const granted = booleanField(body, 'granted');
+    await this.database.transaction(async (client) => {
+      const before = await this.lockCreator(client, actor, userId);
+      await client.query(
+        `UPDATE users SET banner_slot_granted_at = CASE WHEN $2 THEN coalesce(banner_slot_granted_at, now()) END
+         WHERE id = $1`,
+        [userId, granted],
+      );
+      await recordOperatorAction(client, actor, {
+        action: 'creator.banner_slot',
+        targetType: 'user',
+        targetId: userId,
+        subjectUserId: userId,
+        before: { bannerSlotGranted: before.banner_slot_granted },
+        after: { bannerSlotGranted: granted },
+      });
+    });
     return this.detail(userId);
   }
 
-  /** 링크·배너 차단 요청 `SetLinkBlockRequest`. 사유는 차단할 때만 저장합니다. */
-  private blockInput(body: unknown): { blocked: boolean; reason: string | null } {
-    const input = bodyObject(body);
-    if (typeof input.blocked !== 'boolean') {
-      throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', 'blocked는 true 또는 false여야 합니다.');
-    }
-    const reason = optionalText(input.reason, '차단 사유', CRELINK_LIMITS.blockedReasonMax) ?? null;
-    return { blocked: input.blocked, reason };
+  /** 시험 계정을 지표에서 빼거나 다시 넣습니다(R23 ⑧, 사람 운영자만은 컨트롤러 `@ActorKinds('human')`). 뺀 시각은 처음 값을 유지합니다. */
+  async setMetricsExclusion(actor: OperatorActor, userId: string, body: unknown): Promise<OperatorCreatorDetail> {
+    const excluded = booleanField(body, 'excluded');
+    await this.database.transaction(async (client) => {
+      const before = await this.lockCreator(client, actor, userId);
+      await client.query(
+        `UPDATE users SET metrics_excluded_at = CASE WHEN $2 THEN coalesce(metrics_excluded_at, now()) END
+         WHERE id = $1`,
+        [userId, excluded],
+      );
+      await recordOperatorAction(client, actor, {
+        action: 'creator.metrics_exclusion',
+        targetType: 'user',
+        targetId: userId,
+        subjectUserId: userId,
+        before: { metricsExcluded: before.metrics_excluded },
+        after: { metricsExcluded: excluded },
+      });
+    });
+    return this.detail(userId);
   }
 
-  async setLinkBlock(linkId: string, body: unknown): Promise<LinkView> {
-    const { blocked, reason } = this.blockInput(body);
-    const updated = UUID_PATTERN.test(linkId)
-      ? await this.database.query<LinkRow>(
-          `UPDATE links SET blocked_at = CASE WHEN $2 THEN coalesce(blocked_at, now()) END,
-                            blocked_reason = CASE WHEN $2 THEN $3 END, updated_at = now()
-           WHERE id = $1 RETURNING ${LINK_COLUMNS}`,
-          [linkId, blocked, reason],
-        )
-      : null;
-    if (!updated?.rowCount) throw apiError(HttpStatus.NOT_FOUND, 'link_not_found', '링크를 찾을 수 없습니다.');
-    return this.creator.linkView(updated.rows[0]);
+  async setLinkBlock(actor: OperatorActor, linkId: string, body: unknown): Promise<LinkView> {
+    const { blocked, reason } = blockInput(body);
+    const row = await this.database.transaction(async (client) => {
+      const found = UUID_PATTERN.test(linkId)
+        ? await client.query<{ user_id: string; blocked: boolean; blocked_reason: string | null }>(
+            'SELECT user_id, blocked_at IS NOT NULL AS blocked, blocked_reason FROM links WHERE id = $1 FOR UPDATE',
+            [linkId],
+          )
+        : null;
+      const before = found?.rows[0];
+      if (!before) throw apiError(HttpStatus.NOT_FOUND, 'link_not_found', '링크를 찾을 수 없습니다.');
+      const updated = await client.query<LinkRow>(
+        `UPDATE links SET blocked_at = CASE WHEN $2 THEN coalesce(blocked_at, now()) END,
+                          blocked_reason = CASE WHEN $2 THEN $3 END, updated_at = now()
+         WHERE id = $1 RETURNING ${LINK_COLUMNS}`,
+        [linkId, blocked, reason],
+      );
+      const after = updated.rows[0];
+      await recordOperatorAction(client, actor, {
+        action: 'link.block',
+        targetType: 'link',
+        targetId: linkId,
+        subjectUserId: before.user_id,
+        before: { blocked: before.blocked, reason: before.blocked_reason },
+        after: { blocked: after.blocked, reason: after.blocked_reason },
+      });
+      return after;
+    });
+    return this.creator.linkView(row);
   }
 
   /** 크리에이터 배너 차단·풀기(R21 ④). 차단해도 배너 행과 숨김 상태는 그대로이고, 크리에이터가 주소를 바꿔도 유지됩니다. */
-  async setBannerBlock(bannerId: string, body: unknown): Promise<CreatorBannerView> {
-    const { blocked, reason } = this.blockInput(body);
-    const updated = UUID_PATTERN.test(bannerId)
-      ? await this.database.query<CreatorBannerRow>(
-          `UPDATE creator_banners SET blocked_at = CASE WHEN $2 THEN coalesce(blocked_at, now()) END,
-                                      blocked_reason = CASE WHEN $2 THEN $3 END, updated_at = now()
-           WHERE id = $1 RETURNING ${CREATOR_BANNER_COLUMNS}`,
-          [bannerId, blocked, reason],
-        )
-      : null;
-    if (!updated?.rowCount) throw apiError(HttpStatus.NOT_FOUND, 'banner_not_found', '배너를 찾을 수 없습니다.');
-    return this.creator.creatorBannerView(updated.rows[0]);
+  async setBannerBlock(actor: OperatorActor, bannerId: string, body: unknown): Promise<CreatorBannerView> {
+    const { blocked, reason } = blockInput(body);
+    const row = await this.database.transaction(async (client) => {
+      const found = UUID_PATTERN.test(bannerId)
+        ? await client.query<{ user_id: string; blocked: boolean; blocked_reason: string | null }>(
+            `SELECT user_id, blocked_at IS NOT NULL AS blocked, blocked_reason FROM creator_banners
+             WHERE id = $1 FOR UPDATE`,
+            [bannerId],
+          )
+        : null;
+      const before = found?.rows[0];
+      if (!before) throw apiError(HttpStatus.NOT_FOUND, 'banner_not_found', '배너를 찾을 수 없습니다.');
+      const updated = await client.query<CreatorBannerRow>(
+        `UPDATE creator_banners SET blocked_at = CASE WHEN $2 THEN coalesce(blocked_at, now()) END,
+                                    blocked_reason = CASE WHEN $2 THEN $3 END, updated_at = now()
+         WHERE id = $1 RETURNING ${CREATOR_BANNER_COLUMNS}`,
+        [bannerId, blocked, reason],
+      );
+      const after = updated.rows[0];
+      await recordOperatorAction(client, actor, {
+        action: 'banner.block',
+        targetType: 'creator_banner',
+        targetId: bannerId,
+        subjectUserId: before.user_id,
+        before: { blocked: before.blocked, reason: before.blocked_reason },
+        after: { blocked: after.blocked, reason: after.blocked_reason },
+      });
+      return after;
+    });
+    return this.creator.creatorBannerView(row);
   }
 
   async blockedDomains(): Promise<BlockedDomainView[]> {
@@ -245,8 +378,9 @@ export class AdminService {
   /**
    * 도메인을 막고, 같은 트랜잭션에서 그 도메인과 하위 도메인의 기존 링크·크리에이터 배너를 차단합니다(R14 ③, R21 ④).
    * 걸리는 게시 중·예약 크리링 배너는 내립니다(게시 끝 = 지금, 예약이면 시작도 지금. 설계 미정 3 A).
+   * 행동 기록의 after에 함께 차단·종료된 링크·배너·크리링 배너 수를 남깁니다.
    */
-  async addBlockedDomain(operatorId: string, body: unknown): Promise<BlockedDomainView[]> {
+  async addBlockedDomain(actor: OperatorActor, body: unknown): Promise<BlockedDomainView[]> {
     const input = bodyObject(body);
     const domain =
       typeof input.domain === 'string' ? domainToASCII(input.domain.trim().toLowerCase().replace(/\.$/, '')) : '';
@@ -259,24 +393,36 @@ export class AdminService {
         await client.query('INSERT INTO blocked_domains (domain, reason, created_by) VALUES ($1, $2, $3)', [
           domain,
           reason,
-          operatorId,
+          actor.userId,
         ]);
-        await client.query(
+        const links = await client.query(
           `UPDATE links SET blocked_at = now(), blocked_reason = $2, updated_at = now()
            WHERE blocked_at IS NULL AND (host = $1 OR right(host, length($1) + 1) = '.' || $1)`,
           [domain, reason ?? `차단 도메인: ${domain}`],
         );
-        await client.query(
+        const banners = await client.query(
           `UPDATE creator_banners SET blocked_at = now(), blocked_reason = $2, updated_at = now()
            WHERE blocked_at IS NULL AND (host = $1 OR right(host, length($1) + 1) = '.' || $1)`,
           [domain, reason ?? `차단 도메인: ${domain}`],
         );
-        await client.query(
+        const adBanners = await client.query(
           `UPDATE ad_banners SET ends_at = least(coalesce(ends_at, now()), now()), starts_at = least(starts_at, now()),
                                  updated_at = now()
            WHERE (ends_at IS NULL OR ends_at > now()) AND (host = $1 OR right(host, length($1) + 1) = '.' || $1)`,
           [domain],
         );
+        await recordOperatorAction(client, actor, {
+          action: 'blocked_domain.add',
+          targetType: 'blocked_domain',
+          targetId: domain,
+          after: {
+            domain,
+            reason,
+            blockedLinks: links.rowCount ?? 0,
+            blockedBanners: banners.rowCount ?? 0,
+            endedAdBanners: adBanners.rowCount ?? 0,
+          },
+        });
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -288,12 +434,21 @@ export class AdminService {
   }
 
   /** 목록에서만 뺍니다. 이미 차단된 링크·배너는 운영자가 하나씩 풉니다. 내린 크리링 배너도 그대로 끝남입니다. */
-  async removeBlockedDomain(domain: string): Promise<void> {
-    const deleted = await this.database.query('DELETE FROM blocked_domains WHERE domain = $1', [
-      domain.trim().toLowerCase(),
-    ]);
-    if (!deleted.rowCount) {
-      throw apiError(HttpStatus.NOT_FOUND, 'domain_not_found', '차단 목록에 없는 도메인입니다.');
-    }
+  async removeBlockedDomain(actor: OperatorActor, domainValue: string): Promise<void> {
+    const domain = domainValue.trim().toLowerCase();
+    await this.database.transaction(async (client) => {
+      const deleted = await client.query<{ domain: string; reason: string | null }>(
+        'DELETE FROM blocked_domains WHERE domain = $1 RETURNING domain, reason',
+        [domain],
+      );
+      const before = deleted.rows[0];
+      if (!before) throw apiError(HttpStatus.NOT_FOUND, 'domain_not_found', '차단 목록에 없는 도메인입니다.');
+      await recordOperatorAction(client, actor, {
+        action: 'blocked_domain.remove',
+        targetType: 'blocked_domain',
+        targetId: before.domain,
+        before: { domain: before.domain, reason: before.reason },
+      });
+    });
   }
 }

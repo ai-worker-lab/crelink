@@ -4,7 +4,7 @@
 
 ## 주요 문서
 
-- [저장소 공통 정책](development/repository-policy.md) — 언어·기준 정보·문서 배치·ADR·진입점·변경 기록·의존성 버전(LTS 기준)
+- [저장소 공통 정책](development/repository-policy.md) — 언어·기준 정보·문서 배치·ADR·진입점·AI 운영자 위임·변경 기록·의존성 버전(LTS 기준)
 - [제품 탐색과 PRD](product/README.md) — PRD 확정 전 유사 서비스 벤치마킹과 라이브러리·오픈소스·SaaS 기술 조사, [PRD 템플릿](product/TEMPLATE.md)·[벤치마킹 템플릿](product/research/TEMPLATE.md)·[기술 조사 템플릿](references/TEMPLATE.md)
 - [기술 설계와 티켓 분해](specs/README.md) — PRD·디자인 인계를 받아 `orchestrator`가 설계 문서(`docs/specs/`)를 쓰고 역할별 검토·사용자 승인 후 계약 → 병렬 구현 → 통합 티켓으로 나누는 절차, [설계 템플릿](specs/TEMPLATE.md)
 - [로컬 개발 환경](development/local-environment.md) — PostgreSQL/Valkey Compose와 로컬 웹·모바일 앱·API 실행, worktree별 로컬 인스턴스, 로그 조회
@@ -34,6 +34,8 @@
 - [ADR 0011 운영 배포 무중단 방식](adr/0011-zero-downtime-deploy.md) — 고정 edge Caddy + Blue/Green 앱 스택, Caddy reload 전환, 선행 0단계(graceful shutdown·`start_interval`·DB pool 상한)(승인, home-server 운영 적용. ADR 0010의 Kamal 후보 문구와 단일 스택·헬스 실패 복구 방식 대체)
 - [ADR 0012 오류·성능 모니터링에 Sentry](adr/0012-error-monitoring-sentry.md) — Sentry SaaS(미국 리전), 오류 전부 + 성능 추적 10%, IP·내부 사용자 ID만, CI 이미지 빌드에서 소스맵 업로드, DSN 없으면 꺼짐, `/privacy` 국외 이전 고지(승인. 리플레이·브라우저 세션 제외는 ADR 0014가 대체)
 - [ADR 0014 Sentry 무료 요금제 기능 모두 사용](adr/0014-sentry-free-plan-features.md) — API Logs·업무 지표·Cron 체크인, 웹 오류 세션 리플레이(가림)·브라우저 세션·콘솔 로그·관리 화면 의견 보내기, Uptime 1개·Inbound filters, 유료 기능 제외(승인)
+- [ADR 0015 AI 운영자에게 운영·개발·배포 권한 위임](adr/0015-ai-operator.md) — AI 전용 계정(API 토큰), 운영자 행동 기록·실행 기록, 멈춤 스위치, 30분 실행, 저장소 정책 예외와 예외가 아닌 규칙(승인)
+- [AI 운영자 헌장](ops/ai-operator.md) — AI 운영자가 실행마다 읽는 목표·권한·지킬 법·약관 규칙·한 실행의 순서·배포와 롤백·상한·설치·멈추기, [실행 프롬프트](ops/ai-operator-prompt.md)
 - [외부 서비스·도구 의존](architecture/external-dependencies.md) — 현재 사용 중이거나 계획된 외부 SaaS·도구와 기준 위치
 - [자주 묻는 질문](faq.md) — 저장소 구조, 개발 도구, 로컬 실행, 배포 목표, 언어 정책
 - [배포 대상 아키텍처](architecture/deployment-target.md) — 운영 배치(배포 대상 서버·Supabase·Cloudflare Tunnel)와 운영상 경계
@@ -45,6 +47,10 @@
 - [RELEASES](../RELEASES.md) — 사용자에게 공개한 릴리스 노트
 
 제품 문서: [크리링 PRD](product/crelink.md)(확정, MVP 범위)와 [크리링 MVP 기술 설계](specs/crelink-mvp.md)(승인). 참고 자료: [크리링 서비스 기획 및 MVP Handoff](product/crelink-mvp-handoff.md)(PDF 사본 `product/crelink-mvp-handoff.pdf`) — AI가 제안한 검토 재료이며 확정된 결정이 아닙니다. 작성 절차는 [제품 탐색과 PRD](product/README.md), 제품 소개는 [루트 README](../README.md)에 둡니다.
+
+제품 조사(`product/research/`): [링크 인 바이오 유사 서비스 벤치마킹](product/research/link-in-bio-benchmark.md)(인포크링크·인링크·리틀리 화면·기능, 광고 블록), [광고 수익 배분과 정산 방식 조사](product/research/ad-revenue-share.md)·[크리에이터에게 광고 수익 보여 주기 조사](product/research/creator-ad-revenue-reporting.md)(R22 철회로 사실 기록), [초기 사용자 모집 조사](product/research/initial-user-acquisition.md)(실사용자 100명 목표: Linktree·리틀리·인포크 초기 확보 방식, 국내 합법 채널, 정보통신망법 제50조·제50조의7과 인스타그램·Meta 약관, 단계별 지표, AI 운영자가 혼자 할 수 있는 일).
+
+AI 운영자: [AI 운영자 기술 설계](specs/crelink-ai-operator.md) — 전용 계정·토큰 인증·웹 토큰 경로 `/api/agent`·행동 기록·실행 기록·멈춤·지표의 데이터·계약과 티켓 분해(승인, 에픽 0088).
 
 운영 배포: [크리링 운영 배포·CD 기술 설계](specs/crelink-prod-deploy.md) — 구성, Caddy 공개 정책, 환경변수, CD 흐름, 위험(승인, 에픽 0024).
 
