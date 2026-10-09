@@ -124,7 +124,11 @@ export type CrelinkErrorCode =
   | 'banner_total_limit_reached'
   | 'banner_slot_not_granted'
   | 'ad_banner_not_found'
-  | 'banner_period_invalid';
+  | 'banner_period_invalid'
+  // 링크 슬롯 이벤트(R24)
+  | 'slot_event_not_found'
+  | 'slot_event_closed'
+  | 'slot_event_period_invalid';
 
 /** `/notice?reason=`에 쓰는 사유. 단축 도메인 리디렉트와 로그인 콜백이 사용합니다. */
 export type NoticeReason =
@@ -219,7 +223,7 @@ export interface PortfolioItemView {
 }
 
 export interface LinkLimits {
-  /** 지금 보이게 둘 수 있는 최대 수 = freeVisibleLinks + extraLinkSlots. */
+  /** 지금 보이게 둘 수 있는 최대 수 = min(freeVisibleLinks + extraLinkSlots + 링크 슬롯 이벤트 보너스 합, totalLinks). */
   visibleMax: number;
   /** 숨기지 않고 차단되지 않은 링크 수. */
   visibleUsed: number;
@@ -282,6 +286,8 @@ export interface CreatorLandingState {
   /** 이 랜딩의 크리에이터 배너 전체(숨김·차단 포함, 순서대로). 회수 뒤에도 보관분이 들어 있고, 웹은 slot.kind = 'creator'일 때만 씁니다. */
   banners: CreatorBannerView[];
   bannerLimits: BannerLimits;
+  /** 링크 슬롯 이벤트(R24)와 이 계정의 신청. `limits.visibleMax`에는 받은 보너스가 이미 들어 있습니다. */
+  slotEvent: CreatorSlotEventState;
 }
 
 /** `PATCH /api/me/landing`. 빈 문자열·null은 비움입니다. 응답은 `CreatorLandingState`. */
@@ -576,6 +582,8 @@ export interface OperatorCreatorDetail extends OperatorCreatorSummary {
   /** 크리에이터 배너 전체(회수 뒤 보관분·숨김·차단 포함, 순서대로). */
   banners: CreatorBannerView[];
   bannerLimits: BannerLimits;
+  /** 링크 슬롯 이벤트 신청(R24). 신청하지 않았으면 null. 보너스는 extraLinkSlots와 따로 limits.visibleMax에 더해집니다. */
+  slotEvent: SlotEventEntryView | null;
 }
 
 export interface CountByValue {
@@ -727,6 +735,11 @@ export const CRELINK_API_PATHS = {
   adminAdBanner: (id: string) => `/api/admin/ad-banners/${encodeURIComponent(id)}`,
   adminAdBannerEnd: (id: string) => `/api/admin/ad-banners/${encodeURIComponent(id)}/end`,
   adminAdBannersOrder: '/api/admin/ad-banners/order',
+  /** 링크 슬롯 이벤트(R24). */
+  publicSlotEvent: '/api/public/slot-event',
+  meSlotEventEntry: '/api/me/slot-event/entry',
+  /** `GET ?page=`(1부터), `PUT`은 `SetSlotEventPeriodRequest`. */
+  adminSlotEvent: '/api/admin/slot-event',
   /** `cursor`: 이전 응답의 `GuestbookPage.nextCursor`. */
   landingGuestbook: (publicId: string, cursor?: string | null) =>
     `/api/landings/${encodeURIComponent(publicId)}/guestbook${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
@@ -759,3 +772,64 @@ export const CRELINK_WEB_PATHS = {
   docsReleases: '/docs/releases',
   docsBrand: '/docs/brand',
 } as const;
+
+// ---------- 링크 슬롯 이벤트 (R24) ----------
+// 근거: docs/specs/crelink-slot-event.md. 신청한 계정만 보이는 외부 링크 한도가 bonusLinks만큼 늘어납니다(R13 운영자 추가 슬롯과 따로 합산).
+
+/** 'scheduled' = 시작 전, 'open' = 신청 받는 중, 'ended' = 끝남. API가 DB 시각으로 정합니다. 열림 = startsAt <= 지금 < endsAt. */
+export type SlotEventStatus = 'scheduled' | 'open' | 'ended';
+
+export interface SlotEventView {
+  /** 신청하면 늘어나는 보이는 외부 링크 수. */
+  bonusLinks: number;
+  startsAt: string;
+  /** null이면 운영자가 끝을 정할 때까지 계속. */
+  endsAt: string | null;
+  status: SlotEventStatus;
+}
+
+/** `GET /api/public/slot-event`. 이벤트가 없으면 event: null. */
+export interface PublicSlotEventResponse {
+  event: SlotEventView | null;
+}
+
+export interface SlotEventEntryView {
+  appliedAt: string;
+  /** 신청 때 받은 보너스(이벤트 설정이 바뀌어도 그대로, 회수 없음). */
+  bonusLinks: number;
+}
+
+/**
+ * `CreatorLandingState.slotEvent`, `POST /api/me/slot-event/entry` 응답(201 새로 신청, 200 이미 신청 — 멱등).
+ * 신청 오류: 404 `slot_event_not_found`, 409 `slot_event_closed`(시작 전·끝남).
+ */
+export interface CreatorSlotEventState {
+  event: SlotEventView | null;
+  entry: SlotEventEntryView | null;
+}
+
+export interface OperatorSlotEventEntry {
+  userId: string;
+  email: string;
+  displayName: string | null;
+  slug: string;
+  appliedAt: string;
+}
+
+/**
+ * `GET /api/admin/slot-event?page=`, `PUT /api/admin/slot-event` 응답. entries는 신청 최신순, page는 1부터,
+ * pageSize는 `CRELINK_LIMITS.operatorPageSize`. 이벤트가 없으면 404 `slot_event_not_found`.
+ */
+export interface OperatorSlotEventResponse {
+  event: SlotEventView;
+  entryCount: number;
+  entries: OperatorSlotEventEntry[];
+  page: number;
+  pageSize: number;
+}
+
+/** `PUT /api/admin/slot-event`. ISO 8601. endsAt null = 끝 없음. 끝 ≤ 시작이면 400 `slot_event_period_invalid`. */
+export interface SetSlotEventPeriodRequest {
+  startsAt: string;
+  endsAt: string | null;
+}
