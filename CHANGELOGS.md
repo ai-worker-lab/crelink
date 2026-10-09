@@ -6,6 +6,7 @@
 
 ## 2026-10-10
 
+- 0144 공개 랜딩 하단 가입 유도 문구 디자인 완료(사용자 위임에 따른 AI 승인). 디자인 `design/landing-footer-cta/`(바닥글 첫 링크 `크리링` → `나도 크리링 만들기`, 배너 슬롯 계정도 같은 줄, 랜딩 오류 화면은 그대로, 관리 화면 미리보기도 같은 문구, 링크는 `/` 그대로이고 0087 이후 제안 규칙 `/?from=landing-footer`, 390·1280px, 새 토큰·API 없음). `design/system/DESIGN.md` 공개 랜딩 장식 규칙에 크리링 표시 줄 내용을 더했습니다. 구현 티켓 `docs/work/web/0151-landing-footer-cta-web.md`를 `준비`로 등록했습니다. 0150을 `완료`로 바꾸고(PR #75, Deploy 37976002570), 0150 인계 미결정 1(처리방침 로컬 저장 고지)을 사람 결정이 필요한 분류 대기 `docs/work/web/0152-privacy-local-progress-notice.md`로 등록했습니다. 근거 `docs/work/designer/0144-landing-footer-signup-cta.md`.
 - 0150 관리 화면 첫 사용 안내 카드 구현을 `검증`으로 올렸습니다(AI 운영자 실행, 웹 변경 내용은 `apps/web/CHANGELOGS.md`). 검증 근거는 `docs/work/web/0150-first-run-guide-web.md` 진행 기록에 있습니다.
 - 0143 첫 사용 안내 디자인(실사용자 전환) 완료(사용자 위임에 따른 AI 승인). 디자인 `design/first-run-guide/`(빈 랜딩 관리 화면 3단계 시작 안내 카드: 링크·포트폴리오 1개 추가 → 내 크리링 링크 복사 → 인스타그램 프로필에 붙여 넣기, 상태 A~E, 390·1280px, 새 토큰·API 없음). 구현 티켓 `docs/work/web/0150-first-run-guide-web.md`를 `준비`로 등록했습니다. 근거 `docs/work/designer/0143-first-run-guide-design.md`.
 - 0141(검색·링크 미리보기 기본기)을 `완료`로 바꾸고 배포·운영 확인 근거를 남겼습니다(PR #71, Deploy 37965904574). 분류 대기 work item 2개 등록: 검색엔진 소유 확인·sitemap 제출(사람 계정 필요) `docs/work/orchestrator/0148-search-console-registration.md`, Dependabot 취약점 8건(개발·빌드 도구 간접 의존성) `docs/work/orchestrator/0149-dev-dependency-vulnerabilities.md`. 근거 `docs/work/web/0141-search-and-link-preview-basics.md`.

@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: web
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-10
@@ -37,3 +37,4 @@
 - 2026-10-10: 생성·분류(사용자 위임(2026-10-10, ADR 0015)에 따른 AI 승인, 실행 `56b87e7c-5ab2-4e5e-a4e1-4fc5657acd96`). 0143 인계에서 나눈 구현 티켓입니다. 다음 실행이 착수합니다.
 - 2026-10-10: 구현(AI 운영자 실행 `2792f26a-7fab-485b-96c3-822787ad27e0`). `apps/web`만 바꿨고 새 API·공유 계약 없음. 시작 안내 카드 `components/manage/FirstRunGuide.tsx`(상태 A~D, 1024px 이상 처음 패널 제목 아래·1023px 이하 `편집` 모드 sticky 줄 아래), 판정 `lib/first-run-guide.ts`(①은 `visibleItemCount` = `toLandingPreview` 기준 보이는 링크 + 포트폴리오), 로컬 진행 `lib/use-first-run-progress.ts`(`crelink.firstRunGuide.<publicId>`, 하이드레이션 뒤 읽음, 저장 실패 시 메모리), `ManagerContext.firstRunGuide`, `CopyButton` `onCopied`로 주소 막대·sticky 줄·`주소 설정`·카드의 `복사`가 ② 기록, `/docs/guide` 한 줄. 인계에 없는 상태 판단: ③을 마쳤는데 보이는 항목이 0개로 돌아가 카드가 다시 보이면 ③ 완료 글자는 버튼 이름을 따른 `붙여 넣었어요`로 둠. 카드 `복사`의 버튼 이름은 보이는 글자(`복사`·`다시 복사`)이고, 버튼 옆 복사 결과 문장은 주소 막대처럼 화면에서만 숨김(상태 줄이 보이므로). 개인정보 처리방침 한 줄은 미결정이라 바꾸지 않음. 검사: `pnpm --filter @crelink/web typecheck` 통과, `pnpm exec eslint apps/web`·`pnpm exec prettier --check apps/web` 통과, `pnpm --filter @crelink/web test` 76건 통과. `pnpm verify`·`make up`·`pnpm smoke`·1280/390px 브라우저 확인은 아직 하지 않음.
 - 2026-10-10: 통합 검증(같은 실행). `pnpm verify` 통과(8단계), `make up`(PORT_SLOT=15, 긴 경로 pm2 소켓 오류는 0127대로 `PM2_HOME` 짧은 경로로 우회) 후 `pnpm smoke` 5개 통과, `pnpm e2e tests/e2e/creator.spec.ts` 2개 통과. 로컬 브라우저(일회성 Playwright 스크립트, 로컬 DB 시험 사용자는 끝에 삭제): 1280px·390px 빈 랜딩에서 A(0/3, ① 현재 단계) 보임·가로 넘침 없음, 카드 `복사` → `copied` 저장·상태 줄 `주소를 복사했어요.`, 390px `미리보기` 모드에서 카드 숨김, × → 사라짐·초점 1280px `페이지 편집`·390px sticky 줄 `복사`. 보이는 링크 1개 계정: B(`완료 · 방문자에게 1개가 보여요`, ② `aria-current`) → 주소 막대 `복사`로 C(3줄 방법·대신 등록하지 않음 안내·`붙여 넣었어요`) → D(`준비를 마쳤어요`, 초점 `닫기`) → 다시 들어오면 카드 없음(E). 앱 콘솔 오류 없음(외부 링크 아이콘 DNS 실패 2건만, 설계상 정상). 개인정보 처리방침 한 줄(인계 미결정 1)은 반영하지 않음.
+- 2026-10-10: 완료(사용자 위임(2026-10-10, ADR 0015)에 따른 AI 승인, 실행 `3c8e84eb-a25c-4880-b9a6-09ca69c9c858`). 근거: 위 검증 기록, PR [#75](https://github.com/ai-worker-lab/crelink/pull/75) CI 통과 후 머지, Deploy [37976002570](https://github.com/ai-worker-lab/crelink/actions/runs/37976002570) success(`운영 주소 검사` 포함). 개인정보 처리방침 한 줄(인계 미결정 1)은 사람 결정으로 남깁니다.
