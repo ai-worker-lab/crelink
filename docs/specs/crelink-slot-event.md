@@ -263,8 +263,10 @@ export interface SetSlotEventPeriodRequest {
 ## 운영 적용 절차
 
 1. PR을 main에 머지하면 CD가 API를 새 색으로 띄우며 migration `0005_slot_event`를 실행합니다. 이 순간이 이벤트 시작입니다(끝 없음).
-2. 배포 뒤 확인: `GET https://links.shaul.kr/api/public/slot-event`가 `status: "open"`, 로그인 전 홈에 이벤트 구역.
-3. 끝을 정하려면 운영자(사람 또는 AI)가 `/admin/slot-event`에서 끝 시각을 저장하거나 `PUT /api/admin/slot-event`를 부릅니다. 바로 닫으려면 끝을 지금으로 저장합니다.
+2. 배포 뒤 확인(본 도메인 `links.shaul.kr`은 모든 요청이 웹으로 가고 웹·BFF에 `/api/public/slot-event`가 없으므로 API는 edge 안에서 봅니다, [운영 런북 6](../../infra/docs/prod-runbook.md#6-운영-확인)과 같은 방식):
+   - `ssh home-server` 뒤 `c=$(cat /opt/crelink/state/active-color)`, `sudo docker exec crelink-edge-caddy-1 wget -q -O - http://api-$c:3000/api/public/slot-event`가 `"status":"open"`(`bonusLinks` 5, `endsAt` null)을 돌려줍니다.
+   - 로그인 전 `https://links.shaul.kr/` 홈에 이벤트 구역(`외부 링크 +5 이벤트`, `구글로 시작하기`)이 보입니다.
+3. 끝을 정하려면 운영자(사람 또는 AI)가 `/admin/slot-event`에서 끝 시각을 저장합니다(화면은 웹 BFF `PUT /api/backend/api/admin/slot-event`를 거쳐 API `PUT /api/admin/slot-event`를 부름). 바로 닫으려면 끝을 지금으로 저장합니다.
 4. 시작을 늦추고 싶으면 배포 직후 운영자 화면에서 시작을 미래 시각으로 저장합니다(그 사이 신청한 행은 유지).
 
 ## 미정
@@ -282,3 +284,4 @@ export interface SetSlotEventPeriodRequest {
 
 - 2026-10-10: 초안 → 승인(디자인 검토 의견 1~7 반영: 신청 404를 409와 같이 처리, 운영자 `page` 검사).
 - 2026-10-10: 통합(0125). 계약·화면 계약 변화 없음. E2E는 이벤트 기간을 바꾸므로 Playwright 프로젝트 `slot-event`를 `ad-banner` 뒤에 둡니다(위험과 스파이크 첫 줄대로). 범위 밖 발견 2건을 분류 대기로 등록했습니다: `docs/work/web/0126-format-datetime-server-locale.md`, `docs/work/orchestrator/0127-pm2-socket-path-too-long.md`.
+- 2026-10-10: PR #69 검토 반영. `운영 적용 절차` 2의 확인 주소를 고쳤습니다. 본 도메인 `https://links.shaul.kr/api/public/slot-event`는 웹으로 가서 404이므로, 운영 런북 6의 edge 내부 검사(`docker exec crelink-edge-caddy-1 wget … http://api-$c:3000/api/public/slot-event`)와 로그인 전 홈 이벤트 구역 확인으로 바꿨습니다.
