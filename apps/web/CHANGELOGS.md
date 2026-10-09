@@ -2,6 +2,10 @@
 
 내부 참고용으로 웹 클라이언트의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-10-09
+
+- 움직이는 배너 정지 이미지 도우미 `src/lib/still-image.ts`(스파이크 0075, 설계 S1): 로컬 `File`의 첫 장면을 `createImageBitmap(file)`로 얻어 가운데 기준 비율로 자르고 최대 크기 안 PNG `File`로 만드는 `makeStillImage`, 자르기 계산 `stillCrop`, `stillFileName`. 아직 화면에서 쓰지 않음(T12가 `ImageField`에 연결). 단위 테스트 `still-image.spec.ts` 9건. Chromium·Firefox·WebKit·iOS 26.5 시뮬레이터 Safari에서 GIF·움직이는 WebP·APNG 첫 장면·투명도 확인, `ImageDecoder`는 iOS에 없고 WebKit에서 자르기·투명도가 깨져 쓰지 않음.
+
 ## 2026-10-08
 
 - 관리 화면 `페이지 편집`을 미리보기 직접 편집으로 바꾸고 프로필·SNS 채널을 `프로필` 메뉴로 옮김(PRD R18 사용자 결정, 디자인 `design/preview-direct-edit/`, 근거 `docs/work/orchestrator/0058-preview-direct-edit.md`). 새 API·공유 계약 변경 없음.
