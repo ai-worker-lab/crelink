@@ -29,12 +29,14 @@ const USAGE = `사용법: node scripts/ai-operator.mjs <명령> [옵션]
 
 설정: ~/.config/crelink/ai-operator.env(권한 600, CRELINK_AI_ENV_FILE로 바꿈)의
   CRELINK_AI_BASE_URL(예: https://links.shaul.kr/api/agent), CRELINK_AI_TOKEN, 선택 CRELINK_AI_AGENT·CRELINK_AI_HOST·CRELINK_AI_MODEL.
-  CRELINK_AI_AGENT를 생략하면 고정 담당자 'orchestrator'를 기록합니다.
+  CRELINK_AI_AGENT를 생략하면 Crelink 전담 담당자 'crelink-pm'을 기록합니다.
   같은 이름의 환경변수가 파일보다 우선합니다. 진행 중 실행 id: ~/.local/state/crelink/ai-operator/current-run
   (CRELINK_AI_STATE_DIR로 바꿈).`;
 
 const RUN_HEADER = 'X-Crelink-Agent-Run';
 const USER_AGENT = 'crelink-ai-operator/1';
+const PM_AGENT = 'crelink-pm';
+const PM_MODEL = 'openai-codex/gpt-6.1-sol';
 const STALE_RUN_MINUTES = 90;
 const REF_KINDS = ['pr', 'work_item', 'commit', 'deploy', 'other'];
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -80,7 +82,7 @@ function loadConfig() {
   return {
     baseUrl,
     token,
-    agent: read('CRELINK_AI_AGENT') || 'orchestrator',
+    agent: read('CRELINK_AI_AGENT') || PM_AGENT,
     host: read('CRELINK_AI_HOST') || null,
     model: read('CRELINK_AI_MODEL') || null,
   };
@@ -425,20 +427,22 @@ function automationCommand(args) {
   const { values } = parseArgs({ args, options: { repo: { type: 'string' } } });
   const repo = resolve(values.repo ?? defaultRepo());
   const promptFile = join(scriptDir, '../docs/ops/ai-operator-prompt.md');
-  const prompt = readFileSync(promptFile, 'utf8').trim();
+  const runtimeEnv = `CRELINK_AI_AGENT=${shellQuote(PM_AGENT)} CRELINK_AI_MODEL=${shellQuote(PM_MODEL)}`;
+  const prompt = `${runtimeEnv}를 모든 node scripts/ai-operator.mjs 명령 앞에 붙입니다.\n\n${readFileSync(promptFile, 'utf8').trim()}`;
   // 기준 checkout의 작업 트리는 건드리지 않고(fetch는 원격 참조만 갱신), 최신 main의 이 스크립트를 임시 파일로 꺼내 실행합니다.
   const temp = '"${TMPDIR:-/tmp}/crelink-ai-operator-precheck.mjs"';
   const precheckCommand = [
     `git -C ${shellQuote(repo)} fetch -q origin main`,
     `git -C ${shellQuote(repo)} show origin/main:scripts/ai-operator.mjs > ${temp}`,
-    `node ${temp} precheck`,
+    `${runtimeEnv} node ${temp} precheck`,
   ].join(' && ');
   const parts = [
     'orca automations create',
-    `--name ${shellQuote('crelink-ai-operator')}`,
+    `--name ${shellQuote('crelink-pm')}`,
     `--trigger ${shellQuote('*/20 * * * *')}`,
     '--timezone Asia/Seoul',
     '--provider omp',
+    `--extra-agent-args=${shellQuote(`--model ${PM_MODEL}`)}`,
     `--repo ${shellQuote(`path:${repo}`)}`,
     '--workspace-mode new-per-run',
     '--base-branch origin/main',
