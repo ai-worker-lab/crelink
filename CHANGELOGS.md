@@ -15,6 +15,8 @@
 - AI 운영자 실행 프롬프트가 매 실행 `docs/ops/ai-operations-team.md`를 읽고, 비용이 0원이어도 결제·광고·유료 도구·외부 홍보·사람 계정 변경·법률/개인정보 위험 수용·되돌릴 수 없는 운영 DB 변경을 사람 승인 전 금지하도록 했습니다. 상세 `docs/work/orchestrator/0160-runtime-cost-gate.md`.
 - 0161 가입 후 첫 공개 링크 활성화 지표를 구현하고 운영 반영했습니다. 공유 계약·API 집계·운영자 화면·지표 명세와 7/30일·중복 제거·숨김/차단/제외 회귀를 맞췄고, PR #90·main Deploy #38122253755·`links.shaul.kr` 주소 검사를 모두 통과했습니다. 상세 `docs/work/orchestrator/0161-activation-first-link-metric.md`.
 - 0162 백로그를 지표·상태·PR·Deploy 근거로 분류했습니다. P1이면서 비용·외부 계정 없이 모집 전 고지를 보강할 수 있는 0140 이용약관 페이지를 `준비`로 전환하고, 검색엔진 등록·모집 채널·개인정보·친구 초대 결정은 사람 승인 대기로 유지했습니다. 근거: `docs/work/orchestrator/0162-operator-backlog-triage.md`, `docs/work/web/0140-terms-of-service-page.md`.
+- 최근 실행이 `work:next --all`의 `eligible: false` 목록을 빈 백로그로 오인한 원인을 수정했습니다. `pnpm` 실패를 빈 작업으로 해석하지 않고 `node scripts/work.mjs`를 사용하며, `진행`·`검증` 연결 작업과 비용 없는 `분류 대기` 후보를 다음 작업으로 선택하도록 헌장·프롬프트와 `0162` work item을 추가했습니다.
+- AI 운영자가 무변경으로 멈추지 않고 공개 자료·현재 지표·사용자 피드백을 조사해 가설과 비용 없는 가역적 실험을 연결하도록 능동 연구 루프를 운영 헌장·실행 프롬프트·팀 역할에 추가했습니다. `docs/work/orchestrator/0163-autonomous-research-loop.md`에 출처, 측정, 중단 조건과 사람 승인 경계를 기록했습니다.
 
 ## 2026-10-10
 
