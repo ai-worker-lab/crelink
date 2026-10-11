@@ -102,8 +102,8 @@ export function LinkForm({
             <option value="주요 채널 보기">주요 채널 · 주요 채널 보기</option>
           </select>
           <p id={`${baseId}-purpose-help`} className="field-help">
-            표시 이름이 비어 있을 때만 제목을 제안해요. 제안한 제목도 자유롭게 고칠 수 있어요. 다른 제목을
-            제안받으려면 표시 이름을 비우고 목적을 다시 골라 주세요. 실제 주소는 직접 입력하고 저장을 눌러야 공개돼요.{' '}
+            표시 이름이 비어 있을 때만 제목을 제안해요. 제안한 제목도 자유롭게 고칠 수 있어요. 다른 제목을 제안받으려면
+            표시 이름을 비우고 목적을 다시 골라 주세요. 실제 주소는 직접 입력하고 저장을 눌러야 공개돼요.{' '}
             <Link href={GUIDE_ARTICLES[1].href} target="_blank" rel="noopener noreferrer">
               협업 문의용 구성 예시 보기 (새 창)
             </Link>

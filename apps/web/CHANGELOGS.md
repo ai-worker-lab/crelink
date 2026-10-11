@@ -4,7 +4,7 @@
 
 ## 2026-10-12
 
-- `0168` 새 링크 편집기에 `링크 목적 (선택)`을 추가해 협업 문의/대표 작업/주요 채널의 제목을 trim 기준 빈 표시 이름에만 제안합니다. 기존 제목·다른 필드·수정 폼·명시 저장·오류·한도·권한 계약은 유지합니다. 기존 협업 가이드/사용 안내/관리 동선을 연결하고 무료·광고 안내를 보완했으며 0164 CTA는 변경하지 않았습니다. 기존 승인 디자인 재사용을 PM이 승인했고 React 격리 smoke만 수행했습니다. 실제 브라우저/API/DB·전체 검증·출시는 PM QA 대기입니다. 근거: `src/components/manage/LinkForm.tsx`, `src/app/(public)/docs/creator-portfolio-page/page.tsx`, `src/app/(public)/docs/guide/page.tsx`, `design/preview-direct-edit/handoff.md`, `docs/work/orchestrator/0168-creator-starter-kit.md`.
+- `0168` 새 링크 편집기에 `링크 목적 (선택)`을 추가해 협업 문의/대표 작업/주요 채널의 제목을 trim 기준 빈 표시 이름에만 제안합니다. 기존 제목·다른 필드·수정 폼·명시 저장·오류·한도·권한 계약과 0164 CTA는 유지합니다. 협업 가이드·사용 안내·관리 동선과 무료·광고 안내를 보완했습니다. PM 승인 디자인 재사용 후 localhost verify 8·smoke 5, 실제 production 빌드의 두 폭 목적 선택/입력 보존/수동 저장/차단 422 시나리오 2·기존 전체 E2E 19와 PNG를 확인했습니다. 개발 모드 `/me` 계측 오류와 출시 대기는 티켓에 구분해 기록했습니다. 근거: `src/components/manage/LinkForm.tsx`, `src/app/(public)/docs/creator-portfolio-page/page.tsx`, `src/app/(public)/docs/guide/page.tsx`, `design/preview-direct-edit/handoff.md`, `docs/work/orchestrator/0168-creator-starter-kit.md`.
 - `0168` 협업 가이드에 첫 대표 작업 선택·역할 제목 예시·로그아웃한 방문자의 외부 주소 접근 확인·비공개 정보 제외·기존 링크 직접 수정 안내를 구현했습니다. 기존 문서 URL·Server Component·스타일·CTA를 재사용하고 새 계정/추적/외부 공개 권한 변경은 하지 않습니다. 근거: `src/app/(public)/docs/creator-portfolio-page/page.tsx`, `docs/work/orchestrator/0168-creator-starter-kit.md`.
 
 ## 2026-10-11

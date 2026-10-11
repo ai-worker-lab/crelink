@@ -6,7 +6,7 @@
 
 ## 2026-10-12
 
-- `0168`의 기존 편집기에 새 링크 목적별 빈 제목 제안을 구현하고 협업 가이드·사용 안내·가입/관리 연결을 맞췄습니다. 최신 main 이력·R25·무료 홍보 정책·PR103 DB 정리 수정을 merge로 보존하고 PM 승인 디자인 재사용 인계/기술 대응/QA 절차를 기록했습니다. React 격리 smoke만 확인했으며 실제 UI/API/DB QA·CI·출시는 미수행입니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`, `docs/specs/crelink-mvp.md`, `design/preview-direct-edit/handoff.md`, [웹 변경 기록](apps/web/CHANGELOGS.md).
+- `0168` 기존 편집기에 새 링크 목적별 빈 제목 제안을 구현하고 협업 가이드·사용 안내·가입/관리 연결을 맞췄습니다. 기존 입력·저장/권한/한도 계약과 0164 CTA를 보존했습니다. 실제 localhost verify 8단계·smoke 5건, standalone production 모드의 목적 선택/명시 저장/실제 422 시나리오 2건·전체 E2E 19건과 390px/1280px PNG가 통과했습니다. 기존 `/me` 개발 계측 오류는 별도로 기록했고 예외를 무시하지 않았습니다. CI·운영 출시는 다음 gate입니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`, `docs/specs/crelink-mvp.md`, `design/preview-direct-edit/handoff.md`, [웹 변경 기록](apps/web/CHANGELOGS.md).
 - `0168`의 Research 순환7/8에서 Notion 공식 공개 페이지의 방문자용 주소·하위 페이지/기여자 정보 공개 경계를 확인하고, 기존 협업 가이드에 대표 작업 선택·방문자 접근/공개 권한 점검 소재를 실제 구현했습니다. localhost 390px/1280px 렌더·내부 탐색·가로 넘침을 확인했고 시각 캡처는 timeout입니다. 전체 키트는 진행, 출시는 미수행·성장 효과는 미관측입니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`, [웹 변경 기록](apps/web/CHANGELOGS.md).
 
 - 무료 회사 채널에 실제 서비스 소개와 자발적 첫 사용 의견 모집 글을 게시했습니다([Discussion #111](https://github.com/ai-worker-lab/crelink/discussions/111)). Google·네이버 검색 콘솔은 실제 로그인 화면까지 확인했고 정상 회사 인증·확인 값 부족을 기술 선행 조건으로 기록합니다. 홍보 승인 대기로 되돌리지 않으며 게시·접근 확인을 사용자 성장이나 검색 등록 완료로 표현하지 않습니다. 근거: `docs/work/product/0153-acquisition-human-requests.md`, `docs/work/orchestrator/0148-search-console-registration.md`, `docs/product/acquisition-playbook.md`.
