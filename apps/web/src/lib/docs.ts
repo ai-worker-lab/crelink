@@ -8,6 +8,11 @@ export const PUBLIC_DOCS = [
     description: '가입부터 프로필·링크 편집, 크리링 링크를 인스타그램에 붙이기까지.',
   },
   {
+    href: '/docs/first-crelink-challenge',
+    title: '첫 크리링 완성 챌린지',
+    description: '목적 하나와 내 실제 링크 하나로 시작해 공유할 준비까지. 보상·외부 게시 의무 없는 자발적 안내.',
+  },
+  {
     href: CRELINK_WEB_PATHS.docsReleases,
     title: '릴리스 노트',
     description: '공개한 버전마다 바뀐 점.',

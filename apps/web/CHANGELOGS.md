@@ -2,6 +2,10 @@
 
 내부 참고용으로 웹 클라이언트의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-10-12
+
+- 첫 크리링 완성 챌린지(0169)를 별도 `/docs/first-crelink-challenge`에 구현했습니다. 기존 공개 문서 표현과 네이티브 목적별 안내를 사용해 본인 실제 링크 직접 저장·공개 확인·단축 주소 복사 준비로 연결하며 참가/완료 수집·추가 보상·외부 게시 의무는 없습니다. `PUBLIC_DOCS` 등록으로 문서 목록·메뉴·sitemap에 연결하고 슬롯 이벤트는 기존 공개 API를 요청마다 조회해 열림·시작 전·종료·없음·오류를 구분합니다. `0168` 편집기·`0164` CTA·기존 슬롯 신청 계약은 변경하지 않았습니다. 근거: `docs/work/orchestrator/0169-slot-event-growth-experiment.md`, `src/app/(public)/docs/first-crelink-challenge/page.tsx`, `src/lib/docs.ts`.
+
 ## 2026-10-11
 
 - AI 실행 기록 화면의 주기 표기를 20분으로 맞췄습니다. 자동화 주기와 실행 호스트 안내의 원본은 `scripts/ai-operator.mjs`·`docs/ops/ai-operator.md`입니다.

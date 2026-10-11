@@ -6,6 +6,7 @@
 
 ## 2026-10-12
 
+- 첫 크리링 완성 챌린지(0169)의 참여 동기·대안·중단/측정 한계를 공개 원문과 기존 코드로 조사하고 PRD R25·슬롯 설계·티켓 및 실제 자사 안내 경로를 구현했습니다. 새 참가 DB/개인정보/보상 없이 기존 직접 링크 작성과 공유 준비를 연결하며 종료 이벤트 오표시를 막고 `0168`·`0164` 수정 화면을 보존합니다. 운영 출시 시각·전후 7일 관측·성장 결과는 아직 미확인입니다. 웹 세부는 `apps/web/CHANGELOGS.md`, 근거는 `docs/work/orchestrator/0169-slot-event-growth-experiment.md`·`docs/product/research/crelink-growth-team-research.md`입니다.
 - `0153` 단기 P1 무료 모집을 실제 실행했습니다. Research/Growth의 Sol Orca 워커 결과로 현행 플랫폼/접근 blocker와 협업 문의용 제출 텍스트를 분리하고, PM은 `guard` 0 뒤 공식 GitHub 회사 프로젝트 About 소개·홈페이지 연결을 공개했습니다. localhost 텍스트 소비·공개 GitHub 표시를 확인했으며 디스콰이엇/커뮤니티 제출·성장 효과는 미관측입니다. 이전 완료 자동화 run27~30의 보존/idle/인스턴스 조건을 확인해 정확한 네 checkout만 정리했습니다. 근거: `docs/work/product/0153-acquisition-human-requests.md`, `docs/product/acquisition-playbook.md`, `docs/product/growth/creator-outreach.txt`.
 - 사용자가 무료 외부 홍보를 AI 자율 실행으로 위임하고 사람 승인 필수 범위를 지출·결제로 한정했습니다. PM·실행팀·운영 프롬프트·모집 실행안·팀별 계획의 과거 홍보 승인 대기를 실행/접근 조건으로 전환합니다. 법·플랫폼 규칙·수신동의·개인정보·사칭/스팸·인증/멈춤·데이터 보호 금지는 유지합니다. 실제 URL/시각·제출/공개/실패·철회·측정과 문안 준비를 구분하며 과거 기록은 보존합니다. 근거: `docs/work/orchestrator/0171-autonomous-public-promotion.md`, `docs/ops/ai-operator.md`, `docs/ops/ai-operations-team.md`.
 
