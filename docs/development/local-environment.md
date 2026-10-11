@@ -14,7 +14,7 @@ make status   # 인스턴스 주소, 컨테이너, PM2 프로세스
 
 API는 시작 시 `apps/api/.env`가 있으면 읽고, 이미 프로세스 환경에 있는 값은 덮어쓰지 않습니다. 필수 설정은 `DATABASE_URL`(PostgreSQL 연결 문자열)과 `PORT`(API 포트)이며 기본값은 없습니다. 둘 중 하나가 빠지면 API는 `DATABASE_URL is required` 또는 `PORT is required` 오류로 종료됩니다. `pnpm instance`가 만든 `apps/api/.env`에 이 checkout 값이 들어 있고, `make api-up`은 인스턴스 값을 환경으로 넘깁니다. `.env`는 커밋하지 마세요. 마이그레이션은 API 시작 시 PostgreSQL advisory lock을 사용하여 인스턴스 간 직렬 실행됩니다.
 
-`Makefile`은 인프라(PostgreSQL·Valkey)는 Docker Compose, API·웹·Expo 개발 서버는 checkout 전용 PM2(`PM2_HOME=.local/pm2`, `ecosystem.config.cjs`의 `crelink-api`·`crelink-web`·`crelink-app`)로 관리합니다. Compose project와 포트는 인스턴스 설정에서 옵니다. `*-up`은 PM2 프로세스를 지우고 다시 시작해 현재 인스턴스 값을 받습니다. 세 서버 시작 대상은 `packages/shared`를 먼저 빌드합니다. 웹·앱의 `@crelink/shared` import는 `packages/shared/package.json`의 `exports`/`main`이 가리키는 `dist/` 산출물을 사용합니다. `@crelink/design-tokens`는 커밋된 `generated/` 생성물을 가리키므로 빌드 단계가 없으며, 토큰을 바꾼 뒤에는 `pnpm tokens:generate`를 실행합니다([사용법](../../packages/design-tokens/docs/usage.md)). PM2 표시는 프로세스가 응답 가능함을 보장하지 않으므로, `make status`에 `online`으로 보여도 실패 시 `pnpm logs <서비스>`로 로그를 확인하세요.
+`Makefile`은 인프라(PostgreSQL·Valkey)는 Docker Compose, API·웹·Expo 개발 서버는 checkout 전용 PM2(`ecosystem.config.cjs`의 `crelink-api`·`crelink-web`·`crelink-app`)로 관리합니다. PM2 홈은 [`scripts/pm2-home.mjs`](../../scripts/pm2-home.mjs)가 사용자 ID·checkout 실제 경로의 해시로 `/tmp` 아래 짧은 경로를 정해, 긴 worktree에서도 유닉스 소켓 한도를 넘지 않고 인스턴스를 분리합니다. `node scripts/pm2-home.mjs`로 경로를 확인합니다. `PM2_HOME` 환경변수 또는 make 인수로 바꿀 수 있으며, 로그 조회에도 같은 값을 넘깁니다. 이전 `.local/pm2`에서 실행 중인 서비스는 전환 전에 `make down PM2_HOME="$PWD/.local/pm2"`로 종료합니다. Compose project와 포트는 인스턴스 설정에서 옵니다. `*-up`은 PM2 프로세스를 지우고 다시 시작해 현재 인스턴스 값을 받습니다. 세 서버 시작 대상은 `packages/shared`를 먼저 빌드합니다. 웹·앱의 `@crelink/shared` import는 `packages/shared/package.json`의 `exports`/`main`이 가리키는 `dist/` 산출물을 사용합니다. `@crelink/design-tokens`는 커밋된 `generated/` 생성물을 가리키므로 빌드 단계가 없으며, 토큰을 바꾼 뒤에는 `pnpm tokens:generate`를 실행합니다([사용법](../../packages/design-tokens/docs/usage.md)). PM2 표시는 프로세스가 응답 가능함을 보장하지 않으므로, `make status`에 `online`으로 보여도 실패 시 `pnpm logs <서비스>`로 로그를 확인하세요.
 
 | 영역 | 시작 | 종료 | 재시작 |
 | --- | --- | --- | --- |
@@ -60,7 +60,7 @@ pnpm logs app --follow        # Expo 로그를 계속 출력(Ctrl+C로 종료)
 pnpm logs infra --lines 50    # 이 인스턴스 Compose project의 PostgreSQL·Valkey 로그
 ```
 
-api·web·app은 `.local/pm2/logs/crelink-<서비스>-out.log`·`-error.log`, infra는 `docker compose logs`를 읽습니다([`scripts/logs.mjs`](../../scripts/logs.mjs)). 기본은 마지막 100줄을 출력하고 끝납니다. 로그가 없으면 `make <서비스>-up` 또는 `make infra-up`을 안내합니다.
+api·web·app은 PM2 홈 아래 `logs/crelink-<서비스>-out.log`·`-error.log`, infra는 `docker compose logs`를 읽습니다([`scripts/logs.mjs`](../../scripts/logs.mjs)). `PM2_HOME`을 따로 썼다면 `PM2_HOME=<같은 경로> pnpm logs api`처럼 지정합니다. 기본은 마지막 100줄을 출력하고 끝납니다. 로그가 없으면 실제 조회 경로와 `make <서비스>-up`을 안내합니다.
 
 ## 테스트
 
