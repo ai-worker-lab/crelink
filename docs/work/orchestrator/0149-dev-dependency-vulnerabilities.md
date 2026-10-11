@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 검증
+- 상태: 완료
 - 종류: 유지보수
 - 우선순위: P2
 - 작성일: 2026-10-10
@@ -47,3 +47,4 @@ overrides가 상위 패키지와 맞지 않으면 테스트·빌드가 깨질 �
   - 운영 런타임: `pnpm why <패키지> --prod --filter @crelink/api`·`--filter @crelink/web`로 6개 패키지 모두 없음(같은 방법으로 `@nestjs/core`·`next`는 나옴). 모두 `@crelink/app`(Expo)·루트 개발 도구·`ts-jest` 경로라 운영 이미지 영향 없음.
   - 갱신: `pnpm-workspace.yaml` `overrides`에 `handlebars@<4.7.10: ^4.7.10`(경보 #8·#9·#10), `js-yaml@>=4.0.0 <4.3.2: ^4.3.2`(#3, 3.x는 경보 범위 밖이라 그대로), `xcode>uuid: ^11.1.1`(#1, 트리 안 uuid는 `xcode` 하나뿐). 잠금 파일은 `handlebars@4.7.10`·`js-yaml@4.3.2`·`uuid@11.1.1`로 바뀜. 확인: `xcode` `generateUuid()`가 uuid 11 CJS로 동작, `handlebars` 4.7.10 `compile` 동작.
   - 남김(고친 버전이 없거나 올릴 수 없음, 앱 개발·빌드 도구 한정): `node-forge`(#5, 고친 버전 없음, `@expo/cli`), `sprintf-js`(#7, 고친 버전 없음, `argparse` 1.x), `decode-uri-component`(#2, 0.5.0은 ESM 전용이라 CJS인 `query-string` 7.1.3(`expo-router`)이 `require`로 부를 수 없음). 경보는 사람 `gh` 자격으로 닫지 않고 열어 둡니다. Expo 메이저 갱신 때 다시 봅니다.
+- 2026-10-12 재확인: 실제 GitHub 열린 경보는 #5 `node-forge` high(수정 버전 없음), #7 `sprintf-js` medium(수정 버전 없음), #2 `decode-uri-component` medium(0.5.0) 3건으로 위 잔여 사유와 같습니다. 최종 checkout에서 `pnpm --filter @crelink/api why --prod node-forge sprintf-js decode-uri-component`와 web 동일 명령은 모두 결과가 없고 양성 대조 `@nestjs/core` 12.1.2·`next` 16.4.0은 정상 조회됐습니다. 기존 갱신은 main에 보존되고 Node24/26 CI가 통과했습니다. 범위 내 고칠 수 있는 갱신/운영 graph 분류/잔여 경보 공개 수용 기준을 완료로 정리하며, 패치 부재·상위 CJS/ESM 전환은 숨기거나 강제 override하지 않습니다. 새 패치 또는 호환 가능한 Expo 상위 갱신이 나오면 재평가합니다.

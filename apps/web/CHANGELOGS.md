@@ -4,7 +4,8 @@
 
 ## 2026-10-12
 
-- `0168` 새 링크 편집기에 `링크 목적 (선택)`을 추가해 협업 문의/대표 작업/주요 채널의 제목을 trim 기준 빈 표시 이름에만 제안합니다. 기존 제목·다른 필드·수정 폼·명시 저장·오류·한도·권한 계약과 0164 CTA는 유지합니다. 협업 가이드·사용 안내·관리 동선과 무료·광고 안내를 보완했습니다. PM 승인 디자인 재사용 후 localhost verify 8·smoke 5, 실제 production 빌드의 두 폭 목적 선택/입력 보존/수동 저장/차단 422 시나리오 2·기존 전체 E2E 19와 PNG를 확인했습니다. 개발 모드 `/me` 계측 오류와 출시 대기는 티켓에 구분해 기록했습니다. 근거: `src/components/manage/LinkForm.tsx`, `src/app/(public)/docs/creator-portfolio-page/page.tsx`, `src/app/(public)/docs/guide/page.tsx`, `design/preview-direct-edit/handoff.md`, `docs/work/orchestrator/0168-creator-starter-kit.md`.
+- 첫 크리링 완성 챌린지(0169)를 별도 `/docs/first-crelink-challenge`에 구현했습니다. 기존 공개 문서 표현과 네이티브 목적별 안내를 사용해 본인 실제 링크 직접 저장·공개 확인·단축 주소 복사 준비로 연결하며 참가/완료 수집·추가 보상·외부 게시 의무는 없습니다. `PUBLIC_DOCS` 등록으로 문서 목록·메뉴·sitemap에 연결하고 슬롯 이벤트는 기존 공개 API를 요청마다 조회해 열림·시작 전·종료·없음·오류를 구분합니다. `0168` 편집기·`0164` CTA·기존 슬롯 신청 계약은 변경하지 않았습니다. 근거: `docs/work/orchestrator/0169-slot-event-growth-experiment.md`, `src/app/(public)/docs/first-crelink-challenge/page.tsx`, `src/lib/docs.ts`.
+- `0168` 새 링크 편집기에 `링크 목적 (선택)`을 추가해 세 목적의 제목을 빈 표시 이름에만 제안하고 기존 제목/URL/설명/썸네일·명시 저장/오류/한도/권한·0164 CTA를 유지했습니다. 실제 production localhost 시나리오2·E2E19·390/1280 PNG 후 Node24/26 CI·PR106 main·실제 Deploy/운영 주소 검사와 실서버390px 안내를 확인했습니다. T0 10/12 02:44:02 KST·7일 리뷰10/19 02:44:02 KST, 개발 `/me` 계측 오류와 성장 미관측은 티켓에 구분합니다. 근거: `src/components/manage/LinkForm.tsx`, `src/app/(public)/docs/creator-portfolio-page/page.tsx`, `src/app/(public)/docs/guide/page.tsx`, `docs/work/orchestrator/0168-creator-starter-kit.md`.
 - `0168` 협업 가이드에 첫 대표 작업 선택·역할 제목 예시·로그아웃한 방문자의 외부 주소 접근 확인·비공개 정보 제외·기존 링크 직접 수정 안내를 구현했습니다. 기존 문서 URL·Server Component·스타일·CTA를 재사용하고 새 계정/추적/외부 공개 권한 변경은 하지 않습니다. 근거: `src/app/(public)/docs/creator-portfolio-page/page.tsx`, `docs/work/orchestrator/0168-creator-starter-kit.md`.
 
 ## 2026-10-11

@@ -285,3 +285,32 @@ export interface SetSlotEventPeriodRequest {
 - 2026-10-10: 초안 → 승인(디자인 검토 의견 1~7 반영: 신청 404를 409와 같이 처리, 운영자 `page` 검사).
 - 2026-10-10: 통합(0125). 계약·화면 계약 변화 없음. E2E는 이벤트 기간을 바꾸므로 Playwright 프로젝트 `slot-event`를 `ad-banner` 뒤에 둡니다(위험과 스파이크 첫 줄대로). 범위 밖 발견 2건을 분류 대기로 등록했습니다: `docs/work/web/0126-format-datetime-server-locale.md`, `docs/work/orchestrator/0127-pm2-socket-path-too-long.md`.
 - 2026-10-10: PR #69 검토 반영. `운영 적용 절차` 2의 확인 주소를 고쳤습니다. 본 도메인 `https://links.shaul.kr/api/public/slot-event`는 웹으로 가서 404이므로, 운영 런북 6의 edge 내부 검사(`docker exec crelink-edge-caddy-1 wget … http://api-$c:3000/api/public/slot-event`)와 로그인 전 홈 이벤트 구역 확인으로 바꿨습니다.
+
+## 첫 크리링 완성 챌린지 (0169)
+
+2026-10-12 남은 작업 실행 요청·R23 위임에 따른 AI 선택입니다. 입력은 PRD R26과 [참여 동기·대안 조사](../product/research/crelink-growth-team-research.md#2026-10-12-첫-크리링-완성-챌린지-선택)입니다. 기존 슬롯 이벤트 설계에 별도 자사 안내 경로만 연결하며 R24 신청·한도·기간 계약은 바꾸지 않습니다.
+
+| 요구 | 구현과 확인점 |
+| --- | --- |
+| R26 ①② 자발적 목적→실제 링크→공유 준비 | `apps/web/src/app/(public)/docs/first-crelink-challenge/page.tsx`: 기본 Server Component, 기존 `.prose`·`primary`·문서 layout 사용. 목적 3개는 네이티브 `details/summary`, 다음 단계는 앵커. 사용자가 기존 `/me` 편집기에서 자기 URL을 직접 입력·저장·공개 확인하고 단축 주소를 복사합니다. 단계별 저장/게시를 대신하지 않으며 완료 인증/진행률도 만들지 않습니다. |
+| R26 ③ 최소 수집·의무 없음 | 새 Client Component·참가 상태·localStorage·쿠키·추적 쿼리·API 쓰기·DB migration 없음. 원래 가입/링크 저장만 기존 경로에서 일어납니다. 공개 콘텐츠 사용·자율 중단·외부 게시 선택을 명시합니다. |
+| R26 ④ 현재 슬롯 상태 | `dynamic = 'force-dynamic'`, 기존 `serverApi`의 `cache: 'no-store'`로 `GET /api/public/slot-event` 조회. 공개 조회만 하며 세션/계정/신청 명단을 읽지 않습니다. 신청 버튼이나 POST는 새 안내에 만들지 않고 `/me`의 기존 명시적 신청으로 연결합니다. |
+| R26 ⑤ 비중복 경로 | `src/lib/docs.ts`의 `PUBLIC_DOCS`에 추가해 기존 문서 목록·`DocsNav`·`SITEMAP_PATHS`에서 발견합니다. `0168` 편집기/프리셋/가이드와 `0164` 홈·공개 랜딩 CTA 및 기존 `/docs/guide` 본문은 수정하지 않습니다. 문서 탐색과 최종 활성화 지표의 중복 영향은 남습니다. |
+
+### 공개 상태 문구
+
+| API/조회 상태 | 안내 |
+| --- | --- |
+| `open` | 현재 신청 기간, 실제 `bonusLinks` 값, 관리 화면에서 직접 신청·신청 시점 상태 재확인 |
+| `scheduled` | 시작 전·지금 신청 불가, 첫 링크 작성은 가능 |
+| `ended` | 종료·새 신청 불가·기존 보너스 유지, 첫 링크 작성은 가능 |
+| `event: null` | 현재 안내할 이벤트 없음, 기본 한도에서 작성 |
+| `ServerApiError`(미설정·네트워크·API 오류) | 상태 확인 불가, 신청 가능하다고 표현하지 않음, 관리 화면 재확인 |
+
+모든 상태에서 기본 5개·계정당 한 번·운영자 수동 슬롯과 별도 합산·전체 상한·종료 뒤 보너스 유지를 설명합니다. 이 안내에는 계정별 신청 여부가 없으므로 “이미 신청했다면” 조건문으로만 설명하고 실제 계정 상태는 기존 관리 화면이 표시합니다. URL/저장/한도/신청 오류는 기존 편집기와 BFF/API가 그대로 처리합니다.
+
+### 출시와 검증 인계
+
+새 레이아웃/토큰/에셋 없이 기존 공개 문서 표현을 재사용합니다. checkout에는 `node_modules/next/dist/docs/`가 없어 [Next.js 16 공식 Server/Client 안내](https://nextjs.org/docs/app/getting-started/server-and-client-components)를 확인했습니다. 설치 후 버전 일치 문서·타입/정적 검사 및 실제 웹 검증은 PM의 통합 gate입니다. 워커는 지시대로 build/lint/tests/formatter를 실행하지 않으며 통과 근거를 만들지 않습니다.
+
+실제 런타임 시나리오는 [0169 인계](../work/orchestrator/0169-slot-event-growth-experiment.md)에 있습니다. 공개 기간은 실제 Deploy/공개 확인 뒤 시작·종료를 기록하고, 7일 전후 관측은 기존 집계만 사용합니다. 종료 시 경로/문서 등록을 revert하고 기존 신청·보너스·저장 링크는 보존합니다. 운영 데이터 삭제/보너스 회수는 롤백이 아닙니다.
