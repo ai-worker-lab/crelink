@@ -28,6 +28,7 @@
 
 - 발견: `docs/work/orchestrator/0091-ai-operator-design.md` 통합 검증
 - 관련: `Makefile`, `scripts/pm2-home.mjs`, `scripts/logs.mjs`, [로컬 개발 환경](../../development/local-environment.md)
+- [PR #103](https://github.com/ai-worker-lab/crelink/pull/103)
 
 ## 진행 기록
 
@@ -38,3 +39,4 @@
 - 2026-10-11: Node 24.18.0·저장소 고정 pnpm 10.10.0으로 `pnpm verify` 8단계를 모두 통과했습니다(API 29개 suite·228건, 웹 76건). 긴 경로의 실제 API·웹에서 `pnpm smoke` 5건(health/readiness·홈 렌더링·1280px/390px 가로 넘침)을 통과했습니다. `work:scope 0109 --base origin/main`도 변경 8파일 소유 범위를 통과했습니다. OpenDesign이 없어 `od lint`는 건너뛰었고 디자인 정적 검사는 통과했습니다.
 - 2026-10-11: Corepack 경유 실행·설치는 각각 20초·240초 무출력 timeout으로 실패해, 캐시에 있던 같은 고정 버전의 pnpm 실행 파일로 설치·검증했습니다. 임시 launcher와 smoke worktree를 정리하고, 두 로컬 시험 인스턴스의 컨테이너·시험 볼륨·PM2 프로세스를 제거했습니다. 최종 `pnpm verify --docs` 3단계도 통과했습니다. 운영 공개 주소·사용자 데이터·운영 DB·서버·토큰·멈춤 설정은 건드리지 않았습니다.
 - 다음: PR의 CI와 최신 main 포함 여부를 확인합니다. 2026-10-12 Asia/Seoul 이후 일일 병합 수를 재확인하고, CI 통과·직전 guard 성공일 때만 병합·Deploy 확인을 수행합니다. 실사용자 지표는 이번 로컬 도구 변경의 효과로 해석하지 않습니다.
+- 2026-10-11: 공개 직전 `guard`가 종료 코드 0으로 계속해도 된다고 확인한 뒤 브랜치를 push하고 PR #103을 열었습니다. CI가 시작됐으며 현재 필수 검사가 끝나지 않아 병합은 막혀 있습니다. 오늘 일일 병합 상한에 따라 main 머지·Deploy는 수행하지 않았습니다.
