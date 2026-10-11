@@ -8,7 +8,7 @@ import { loadLocalEnvironment } from '../src/local-env';
  */
 export interface TestDatabase {
   url: string;
-  drop(): Promise<void>;
+  drop(options?: { force?: boolean }): Promise<void>;
 }
 
 // 테스트가 앱을 띄우려고 process.env.DATABASE_URL을 일회용 DB로 바꾸므로, 관리 연결 주소는 처음 읽은 값을 유지합니다.
@@ -34,11 +34,13 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   url.pathname = `/${name}`;
   return {
     url: url.toString(),
-    async drop() {
+    async drop({ force = false } = {}) {
       const cleanup = new Client({ connectionString: adminUrl });
       await cleanup.connect();
       try {
-        await cleanup.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+        // pool.end()는 연결 종료 메시지를 보낸 뒤 반환할 수 있습니다. 정상 정리는 서버가 연결 종료를
+        // 처리하도록 두고, 살아 있는 연결을 끊는 FORCE는 DB 장애를 의도적으로 만드는 시험에만 씁니다.
+        await cleanup.query(`DROP DATABASE IF EXISTS ${name}${force ? ' WITH (FORCE)' : ''}`);
       } finally {
         await cleanup.end();
       }

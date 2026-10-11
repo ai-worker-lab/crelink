@@ -2,6 +2,10 @@
 
 내부 참고용으로 백엔드 API의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-10-12
+
+- 통합 CI에서 드러난 일회용 DB 정리 경합을 고쳤습니다. 정상 정리는 종료 중인 pool 연결을 FORCE로 끊지 않으며, readiness 장애 시험은 `drop({ force: true })`로 의도를 명시합니다. 운영 API·DB 동작은 변경하지 않습니다. 근거: `test/test-database.ts`, `test/health.e2e-spec.ts`, `docs/work/orchestrator/0109-pm2-socket-path-length.md`.
+
 ## 2026-10-11
 
 - AI 실행 기록 `agent_runs`에 실행 에이전트 식별자(`agent`)를 추가했습니다. API·공유 계약·`0006_agent_run_agent` migration·실행 기록 테스트가 함께 갱신되며, 기존 행은 미확인 값을 `NULL`로 유지합니다.
