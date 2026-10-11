@@ -46,6 +46,8 @@
 - [제품 요구](../../product/crelink.md)
 - [운영팀 연구·보고 계약](../../ops/ai-operations-team.md)
 - [기존 모집 문안](../../product/acquisition-playbook.md)
+- [기술 대응·QA 계획](../../specs/crelink-mvp.md#r25-협업-시작-키트)
+- [기존 승인 디자인 재사용 인계](../../../design/preview-direct-edit/handoff.md#0168-협업-시작-키트-재사용-인계)
 
 ## 진행 기록
 
@@ -55,6 +57,19 @@
 - 2026-10-11: 실행 `765f7b84-e128-49cf-b7e5-55e00e95a751`에서 아래 API/Data 심층·측정 카드·8팀 보고를 갱신했습니다. 원본 URL 파서11건과 네트워크 없는 임시 PostgreSQL17의 원본 집계 SQL3상태 smoke를 통과하고 컨테이너를 제거했습니다. `node scripts/work.mjs --check`137개·`node scripts/docs-check.mjs`242개·`node scripts/design.mjs check`29개 통과, scope는 기존 설치 node_modules 임시 연결을 포함한3개 변경 모두 orchestrator 소유로 통과한 뒤 연결을 제거했습니다. `pnpm verify --docs` 자체와 OpenDesign lint·실제 HTTP/UI·DB 동시성은 미실행입니다. 저장소 변경은 기존 티켓·CHANGELOGS뿐이며 전체0168 진행, 일일 상한으로 머지/배포 없음. 다음은 Security/QA 심층·PRD/설계/디자인 인계입니다.
 - 2026-10-11: 실행 `c8f292ee-2eea-41a3-bee6-0b637b145f6a`에서 Security/QA 심층·정상/edge/모의 출시 시나리오·8팀 초단기 P1과 필수 선행 P0 조건을 아래에 확정했습니다. 원본 URL hostname8건·고립 PostgreSQL 원본 차단SQL의 차단5/허용3 집계 smoke 통과, 임시 컨테이너 제거 완료. work137개·docs242개·design29개 통과, OpenDesign lint 미설치로 skip. scope는 최초yaml 누락 실패 뒤 기존0109 설치 node_modules 임시 연결로3개 경로 소유 검사 통과·연결 제거. 실제 HTTP/UI·새 기능·출시·수요는 미검증, 일일 병합 상한으로 main/Deploy 없음. 다음 실행은 SRE 심층을 출시 선행으로 연결하며0168 PRD 제품 결정 산출물을 완성합니다.
 - 2026-10-11: 실행 `cfb0aa2e-682b-49ea-92de-6916119c8a1a`에서 PRD R25·5가지 사용자 흐름·관측/출시 조건을 AI 승인 제품 기준으로 완성했습니다. SRE/Release 순환5/8은 실제 Actions job와 deploy 원본으로 plan-only·주소검사 미실행을 확인했고 8팀 보고를 아래에 기록했습니다. 캐시 고정 pnpm10.10.0 임시 launcher로 **`pnpm verify --docs` 실제3단계 통과**(work137·docs242·design29), scope는 기존 설치 node_modules 임시 연결로4경로 소유검사 통과·연결/launcher 제거했습니다. OpenDesign lint는 미설치로 skip, 새UI/HTTP/API/DB·합성 계정 시험은 미수행입니다. PR105는 이번 실행 전에 main 병합됐으나 PR106 브랜치는 아직 통합 전입니다. 다음 실행은 최신 main과 초기0168 기록을 통합/보존하고 확정 R25의 디자인·기술 설계로 진행합니다. 일일 상한으로 병합/배포 없으며 전체0168 진행을 유지합니다.
+- 2026-10-12: Orca Task `task_597620ef968c` / Dispatch `ctx_95bf5127b367`에서 최신 `origin/main`을 merge commit `e7c4668`, `877f9b9`로 통합했습니다. 0168 이전 커밋/연구 기록·R25와 최신 무료 홍보 정책을 함께 보존하고 PR103의 정상 시험 DB 정리 경합 수정도 포함했습니다. main 병합·push·운영 API/자격·자동화 변경은 하지 않았습니다.
+- 2026-10-12: PM은 질문 `msg_dfe45223c8e6`에 기존 승인 디자인의 native select/input/button 재사용과 0168 addendum을 승인했습니다. OpenDesign MCP 장치 호출은 `No such tool`로 실패했으며 새 OpenDesign 실행·승인·lint를 수행하지 않았습니다. 기존 `LinkForm`의 새 링크에 세 목적을 고르는 선택 필드를 구현했고, trim 기준 빈 제목만 제안합니다. 제안된 제목도 다음 선택으로 덮어쓰지 않으며 URL·설명·썸네일·기존 편집·submit/오류/한도/권한 흐름은 유지했습니다. 기존 협업 가이드·사용 안내·관리 연결과 무료/광고 안내를 맞췄고 0164 CTA 코드는 수정하지 않았습니다.
+- 2026-10-12: `npm exec --yes --package=pnpm@10.10.0 -- pnpm install --frozen-lockfile`로 로컬 의존성을 설치하고 설치된 Next.js client directive 문서를 읽었습니다. 별도 파일을 남기지 않는 Node24/TypeScript/React 격리 smoke에서 실제 `LinkForm`을 렌더하고 목적 핸들러를 실행해 세 제목·직접/제안 제목 보존·공백 제목·다른 필드 보존·직접 작성 선택·pending 잠금·기존 수정에 선택 UI 없음·선택만으로 API 호출 없음이 통과했습니다. 초기 smoke harness의 jsx/jsxs 혼용으로 key 경고, 첫 교정으로 select 캡처 실패가 있었고 harness를 수정한 마지막 실행은 경고 없이 통과했습니다. Manager/API 경계는 격리했으며 실제 브라우저·HTTP/DB 저장·실패/한도/권한을 검증한 것이 아닙니다. build/lint/tests/formatters·전체 검증은 PM 요청에 따라 실행하지 않았습니다. 상태와 수용 기준 체크는 실제 QA 전 `진행`/미체크로 유지합니다.
+
+### 2026-10-12 PM 최종 QA 인계
+
+- 변경 흐름: 기존 `/docs` 목록→협업 가이드의 가상 구성/무료 범위/실제 주소 준비→기존 홈/Google 가입 또는 `/me`→페이지 편집의 새 링크→선택 목적/직접 제목→사용자 URL→기존 저장. 예시/목적 자체의 API/추적/가입/링크 생성은 없습니다.
+- 시작: 고정 pnpm10.10.0으로 `pnpm install --frozen-lockfile`, `pnpm instance`, `make up`, `make status`. PATH에 pnpm이 없으면 `npm exec --yes --package=pnpm@10.10.0 -- pnpm <명령>`을 사용하고 make 실행 시 같은 고정 pnpm을 PATH에 제공해야 합니다. 주소는 `pnpm instance`의 checkout 값을 사용합니다. 이번 워커는 서버를 띄우지 않았습니다.
+- 최종 명령: PM이 `pnpm work:scope 0168 --base origin/main`, `pnpm verify`, `pnpm smoke`, 기존 `pnpm e2e`를 수행하고 실제 화면을 390px/1280px에서 확인합니다. 기존 [가상 사용자 절차](../../development/user-simulation.md)의 네 localhost 대상 가드와 `metricsExcluded: true`만 사용하며 지표 포함 대조군·운영 사용자/DB는 사용하지 않습니다.
+- 수동 QA: 세 목적을 각각 빈 제목에서 선택; 수동/제안 제목을 둔 채 목적 변경 시 보존; 제목을 비운 뒤 새 목적 재선택; 주소/설명/썸네일 보존; 프리셋 없이 저장; 기존 수정·취소·메뉴 이동 후 초안; pending; 실제 HTTP(S) URL 저장 후 공개 표시; 주소 없음·비HTTP URL·차단422·한도409·세션401·타인수정404·네트워크 실패의 기존 오류/초안 보존. 예시 열람/선택에 저장 요청이 없고 실제 저장만 기존 집계 경로를 사용함을 확인합니다.
+- 불확실성: native select의 선택 표시 자체는 폼 재마운트 시 초기화될 수 있으나 제목/주소 초안은 기존 Manager 계약으로 유지합니다. React 격리 smoke는 하단 시트 초점·가로 넘침·실제 브라우저 검증/URL 안전/HTTP 상태·집계를 입증하지 않습니다. 이러한 경계는 출시 차단 QA 항목입니다.
+- 출시: PM이 QA/CI→guard→main→Deploy→운영 주소 검사를 기록하기 전 출시 완료가 아닙니다. T0/7일 뒤 점검일은 실제 배포 때 채우며, 0164 관측 기간과 겹치면 교란을 기록합니다. 롤백은 이번 0168 UI/가이드 변경 커밋의 revert로 기존 직접 편집으로 복구하며 사용자 링크/보너스는 삭제·회수하지 않습니다.
+
 
 ## 2026-10-11 실행 조사·자사 원고
 

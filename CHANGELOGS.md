@@ -6,6 +6,7 @@
 
 ## 2026-10-12
 
+- `0168`의 기존 편집기에 새 링크 목적별 빈 제목 제안을 구현하고 협업 가이드·사용 안내·가입/관리 연결을 맞췄습니다. 최신 main 이력·R25·무료 홍보 정책·PR103 DB 정리 수정을 merge로 보존하고 PM 승인 디자인 재사용 인계/기술 대응/QA 절차를 기록했습니다. React 격리 smoke만 확인했으며 실제 UI/API/DB QA·CI·출시는 미수행입니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`, `docs/specs/crelink-mvp.md`, `design/preview-direct-edit/handoff.md`, [웹 변경 기록](apps/web/CHANGELOGS.md).
 - `0168`의 Research 순환7/8에서 Notion 공식 공개 페이지의 방문자용 주소·하위 페이지/기여자 정보 공개 경계를 확인하고, 기존 협업 가이드에 대표 작업 선택·방문자 접근/공개 권한 점검 소재를 실제 구현했습니다. localhost 390px/1280px 렌더·내부 탐색·가로 넘침을 확인했고 시각 캡처는 timeout입니다. 전체 키트는 진행, 출시는 미수행·성장 효과는 미관측입니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`, [웹 변경 기록](apps/web/CHANGELOGS.md).
 
 - PR #103 최신 main 통합에서 드러난 시험 DB 정리 경합을 제거했습니다. 정상 fixture 종료는 강제 연결 종료 없는 DROP을 사용하고, readiness의 실제 DB 장애 시험만 FORCE를 명시합니다. 실패를 무시하거나 테스트를 건너뛰지 않습니다. 근거: `apps/api/test/test-database.ts`, `apps/api/test/health.e2e-spec.ts`, `docs/work/orchestrator/0109-pm2-socket-path-length.md`.

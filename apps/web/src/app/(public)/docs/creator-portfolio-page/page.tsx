@@ -54,10 +54,12 @@ export default function CreatorPortfolioPage() {
           </li>
         </ul>
         <p>
-          먼저 실제 주소가 준비된 링크 하나를 골라요. <strong>페이지 편집 → + 링크 추가</strong>에서 표시 이름과{' '}
-          <code>https://</code> 또는 <code>http://</code>로 시작하는 주소를 직접 입력하고 <strong>저장</strong>을
-          눌러요. 이메일 주소 자체나 <code>mailto:</code> 대신, 연락 방법을 안내하는 웹페이지 주소를 사용하세요. 문의
-          폼이 없다면 대표 작업부터 넣어도 돼요. 새 외부 서비스 가입은 필요하지 않아요.
+          먼저 실제 주소가 준비된 링크 하나를 골라요. <strong>페이지 편집 → + 링크 추가</strong>에서{' '}
+          <strong>링크 목적 (선택)</strong>을 고르면 비어 있는 표시 이름에 제목을 제안해요. 목적을 고르지 않고 직접
+          작성해도 되고, 이미 쓴 제목은 바뀌지 않아요. <code>https://</code> 또는 <code>http://</code>로 시작하는
+          실제 주소를 직접 입력하고 <strong>저장</strong>을 눌러요. 목적 선택만으로 저장·공개되지 않아요. 이메일 주소
+          자체나 <code>mailto:</code> 대신, 연락 방법을 안내하는 웹페이지 주소를 사용하세요. 문의 폼이 없다면 대표
+          작업부터 넣어도 돼요. 새 외부 서비스 가입은 필요하지 않아요.
         </p>
         <p>
           주소가 없으면 제목만 먼저 생각해 두고 저장은 나중에 해요. 예시 주소를 내 페이지에 넣거나 다른 사람의 작업을 내
@@ -68,8 +70,10 @@ export default function CreatorPortfolioPage() {
           게시나 이벤트 신청이 링크 작성의 필수 조건은 아니에요.
         </p>
         <p>
-          무료 범위와 현재 이벤트 조건은 <Link href={CRELINK_WEB_PATHS.docsGuide}>사용 안내</Link>에서 확인해요. 협업
-          문의나 방문 증가를 보장하는 기능은 아니에요.
+          기본 무료 범위에서는 짧은 주소 1개와 보이는 외부 링크 {CRELINK_LIMITS.freeVisibleLinks}개를 쓸 수 있어요.
+          배너 슬롯이 없는 페이지에는 크리링 광고 블록이 표시돼요. 현재 한도와 이벤트 조건은{' '}
+          <Link href={CRELINK_WEB_PATHS.docsGuide}>사용 안내</Link>에서 확인해요. 협업 문의나 방문 증가를 보장하는
+          기능은 아니에요.
         </p>
       </section>
 
@@ -107,7 +111,7 @@ export default function CreatorPortfolioPage() {
         <h2 id="pf-build">2. 크리링에 정리하기</h2>
         <p>
           <Link href="/">크리링 홈</Link>에서 <strong>구글로 시작하기</strong>로 가입하면 내 페이지가 바로 만들어져요.
-          관리 화면에서 아래 순서로 채워요.
+          관리 화면에서 아래 순서로 채워요. 이미 가입했다면 <Link href="/me">내 크리링 편집</Link>으로 이동해요.
         </p>
         <ol>
           <li>
