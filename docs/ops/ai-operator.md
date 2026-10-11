@@ -1,6 +1,7 @@
 # AI 운영자 헌장
 
 크리링 AI 운영자가 실행마다 처음 읽는 문서입니다. 결정은 [ADR 0015](../adr/0015-ai-operator.md), 구현은 [AI 운영자 기술 설계](../specs/crelink-ai-operator.md)가 기준입니다. 실행 프롬프트는 [ai-operator-prompt.md](ai-operator-prompt.md)이고, 도구는 [`scripts/ai-operator.mjs`](../../scripts/ai-operator.mjs)입니다.
+이 20분 자동화의 단일 담당자는 저장소 `.omp/agents/orchestrator.md`의 `orchestrator` 에이전트입니다. 전문 역할은 내부 책임 분류일 뿐 별도 agent를 spawn·dispatch하지 않습니다. 실행 모델은 Orca 자동화와 `CRELINK_AI_MODEL`에 고정한 최상위 모델입니다.
 
 ## 목표
 
@@ -52,7 +53,7 @@
 - 한 실행에 끝나지 않는 개발은 work item과 브랜치가 기억입니다. 시작할 때 work item을 만들거나 고르고, `work/NNNN-<slug>` worktree(`../crelink-worktrees/NNNN-<slug>`)에서 일하며, 실행을 닫기 전에 커밋·push하고 work item `진행 기록`에 "다음에 할 일"을 적습니다.
 - 다음 실행은 `context`의 직전 `다음 할 일`과 `refs`(work item·PR)로 같은 worktree를 찾아 이어 갑니다. worktree가 없으면 원격 브랜치로 다시 만듭니다.
 - 커밋 메시지에 트레일러 `AI-Operator-Run: <실행 id>`를 붙입니다(실행 id는 `start` 출력).
-- 여러 역할이 필요한 기능은 [기술 설계와 티켓 분해](../specs/README.md)를 거칩니다. 승인은 AI 승인으로 기록합니다.
+- 여러 영역이 필요한 기능도 같은 `orchestrator` 에이전트가 기술 설계·구현·통합 검증을 순서대로 수행합니다. 역할별 별도 agent를 호출하지 않고, 승인·비용·법률 경계는 기존 헌장을 그대로 적용합니다.
 
 ## 배포와 롤백
 
