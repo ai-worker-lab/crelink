@@ -22,7 +22,7 @@ const STATUS: Record<AgentRunStatus, { label: string; className: string }> = {
   abandoned: { label: '포기', className: 'badge badge-danger' },
 };
 
-const TRIGGER_LABELS: Record<AgentRunTrigger, string> = { schedule: '30분 주기', manual: '수동' };
+const TRIGGER_LABELS: Record<AgentRunTrigger, string> = { schedule: '20분 주기', manual: '수동' };
 
 const REF_KIND_LABELS: Record<AgentRunRefKind, string> = {
   pr: 'PR',

@@ -34,7 +34,7 @@
 - [ADR 0011 운영 배포 무중단 방식](adr/0011-zero-downtime-deploy.md) — 고정 edge Caddy + Blue/Green 앱 스택, Caddy reload 전환, 선행 0단계(graceful shutdown·`start_interval`·DB pool 상한)(승인, home-server 운영 적용. ADR 0010의 Kamal 후보 문구와 단일 스택·헬스 실패 복구 방식 대체)
 - [ADR 0012 오류·성능 모니터링에 Sentry](adr/0012-error-monitoring-sentry.md) — Sentry SaaS(미국 리전), 오류 전부 + 성능 추적 10%, IP·내부 사용자 ID만, CI 이미지 빌드에서 소스맵 업로드, DSN 없으면 꺼짐, `/privacy` 국외 이전 고지(승인. 리플레이·브라우저 세션 제외는 ADR 0014가 대체)
 - [ADR 0014 Sentry 무료 요금제 기능 모두 사용](adr/0014-sentry-free-plan-features.md) — API Logs·업무 지표·Cron 체크인, 웹 오류 세션 리플레이(가림)·브라우저 세션·콘솔 로그·관리 화면 의견 보내기, Uptime 1개·Inbound filters, 유료 기능 제외(승인)
-- [ADR 0015 AI 운영자에게 운영·개발·배포 권한 위임](adr/0015-ai-operator.md) — AI 전용 계정(API 토큰), 운영자 행동 기록·실행 기록, 멈춤 스위치, 30분 실행, 저장소 정책 예외와 예외가 아닌 규칙(승인)
+- [ADR 0015 AI 운영자에게 운영·개발·배포 권한 위임](adr/0015-ai-operator.md) — AI 전용 계정(API 토큰), 운영자 행동 기록·실행 기록, 멈춤 스위치, 20분 실행, 저장소 정책 예외와 예외가 아닌 규칙(승인)
 - [AI 운영자 헌장](ops/ai-operator.md) — AI 운영자가 실행마다 읽는 목표·권한·지킬 법·약관 규칙·한 실행의 순서·배포와 롤백·상한·설치·멈추기, [실행 프롬프트](ops/ai-operator-prompt.md)
 - [사람이 할 일](ops/human-todo.md) — AI 운영자가 할 수 없어 사람이 해야 하는 일(보안·운영 기반, 실사용자 모집, 결정 대기, 정기)
 - [외부 서비스·도구 의존](architecture/external-dependencies.md) — 현재 사용 중이거나 계획된 외부 SaaS·도구와 기준 위치
