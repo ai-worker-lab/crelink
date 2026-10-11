@@ -4,6 +4,7 @@
 
 ## 2026-10-11
 
+- 협업 가이드 `/docs/creator-portfolio-page`에 가상의 3목적 구성 예시와 첫 링크 직접 작성 안내를 추가했습니다(0168). 현재 `prose`·Server Component·CTA·메타데이터를 유지하고 예시 URL/외부 클릭·새 수집·새 컨트롤 없이 사용자 소유 HTTP(S) 주소와 명시 저장을 안내합니다. localhost 390px/1280px DOM·내부 탐색 확인, 이미지 캡처 timeout·운영 미출시. 근거: `src/app/(public)/docs/creator-portfolio-page/page.tsx`, `docs/work/orchestrator/0168-creator-starter-kit.md`.
 - AI 실행 기록 화면의 주기 표기를 20분으로 맞췄습니다. 자동화 주기와 실행 호스트 안내의 원본은 `scripts/ai-operator.mjs`·`docs/ops/ai-operator.md`입니다.
 - AI 실행 기록 상세에 실행 에이전트·호스트·모델을 표시해 실행 주체와 실행 환경을 함께 확인할 수 있게 했습니다.
 - 이용약관 초안 페이지(`/terms`, 0140)를 추가하고 홈·공개 랜딩·문서 목록·문서 하단에서 연결했습니다. 서비스·계정 정지·금지 행위·광고 블록·외부 링크 +5 이벤트·AI 운영자·약관 변경·문의 방법을 명시했으며 법률 검토 전 문안임을 표시했습니다. 근거 `docs/work/web/0140-terms-of-service-page.md`.

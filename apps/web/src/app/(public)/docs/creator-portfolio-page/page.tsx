@@ -36,6 +36,43 @@ export default function CreatorPortfolioPage() {
         </ul>
       </section>
 
+      <section aria-labelledby="pf-first-link">
+        <h2 id="pf-first-link">협업 문의용 링크, 무엇부터 넣을까요?</h2>
+        <p>모든 링크를 한꺼번에 채울 필요는 없어요. 내가 만든 작업 하나와 연락받을 곳부터 준비해 보세요.</p>
+        <p>
+          <strong>가상의 구성 예시 — 실제 고객·후기·성과 사례가 아닙니다.</strong>
+        </p>
+        <ul>
+          <li>
+            <strong>대표 작업 보기:</strong> 처음 방문한 사람이 내 작업을 바로 볼 수 있는 영상·작품·포트폴리오 페이지.
+          </li>
+          <li>
+            <strong>협업 문의하기:</strong> 내가 관리하고 실제로 문의를 받을 수 있는 웹 문의 폼이나 연락 안내 페이지.
+          </li>
+          <li>
+            <strong>주요 채널 보기:</strong> 지금 활동하고 있는 내 채널.
+          </li>
+        </ul>
+        <p>
+          먼저 실제 주소가 준비된 링크 하나를 골라요. <strong>페이지 편집 → + 링크 추가</strong>에서 표시 이름과{' '}
+          <code>https://</code> 또는 <code>http://</code>로 시작하는 주소를 직접 입력하고 <strong>저장</strong>을 눌러요.
+          이메일 주소 자체나 <code>mailto:</code> 대신, 연락 방법을 안내하는 웹페이지 주소를 사용하세요. 문의 폼이
+          없다면 대표 작업부터 넣어도 돼요. 새 외부 서비스 가입은 필요하지 않아요.
+        </p>
+        <p>
+          주소가 없으면 제목만 먼저 생각해 두고 저장은 나중에 해요. 예시 주소를 내 페이지에 넣거나 다른 사람의 작업을
+          내 작업처럼 소개하지 않아요. 썸네일·설명·여러 링크는 선택 사항이에요.
+        </p>
+        <p>
+          저장한 링크가 미리보기에 보이는지 확인하고 내 크리링 링크를 복사해요. 어디에 공유할지는 내가 정해요.
+          공유·홍보 게시나 이벤트 신청이 링크 작성의 필수 조건은 아니에요.
+        </p>
+        <p>
+          무료 범위와 현재 이벤트 조건은 <Link href={CRELINK_WEB_PATHS.docsGuide}>사용 안내</Link>에서 확인해요.
+          협업 문의나 방문 증가를 보장하는 기능은 아니에요.
+        </p>
+      </section>
+
       <section aria-labelledby="pf-build">
         <h2 id="pf-build">2. 크리링에 정리하기</h2>
         <p>

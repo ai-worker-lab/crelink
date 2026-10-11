@@ -6,6 +6,7 @@
 
 ## 2026-10-11
 
+- `0168` 기존 협업 가이드에 가상 구성·목적별 제목 예시·직접 HTTP(S) 주소 입력/저장·자발적 공유 안내를 실제 코드로 반영했습니다. localhost 390px/1280px DOM 가로 넘침·문서 목록과 사용 안내 이동을 확인했으며 이미지 캡처는 timeout으로 미확보입니다. 새 프리셋·운영 출시·성장 효과는 미완료/미관측입니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`, [웹 변경 기록](apps/web/CHANGELOGS.md).
 - `0168` 시작 키트의 제품 요구 R25·비회원/신규/기존/실패/공유 시나리오·측정/중단 조건을 사용자 위임에 따른 AI 승인으로 PRD에 확정했습니다. SRE/Release 순환5/8 심층에서 PR105의 main 반영과 실제 Deploy의 plan-only/주소검사 미실행을 구분하고, 최신 main 통합·합성 시험 가드·일일 병합 상한을 출시 선행으로 연결했습니다. 기능 구현·출시·성장 효과는 미관측입니다. 근거: `docs/product/crelink.md`, `docs/work/orchestrator/0168-creator-starter-kit.md`.
 - `0168` Security/QA 심층에서 실제 URL host와 차단 도메인 경계를 원본 파서8건·고립 PostgreSQL 차단5/허용3으로 확인했습니다. 정상/edge/모의 시나리오와 8팀 초단기 P1·출시 선행 P0·완료 조건·승인/측정 한계를 기존 티켓에 연결했습니다. 새 기능·HTTP/UI 시험·출시는 아직 수행하지 않았습니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`.
 - `0168` API/Data 심층 조사에서 기존 URL·소유자·한도·저장 계약 재사용을 확인하고, 실제 원본 URL 파서 11건과 PostgreSQL17 합성 데이터의 원본 집계 SQL 3상태를 실행했습니다. 현재 보이는 링크의 최소 생성시각·정지·포트폴리오에 따른 지표 차이, 키트 측정 카드·8팀 추천/보류를 기존 티켓에 기록했습니다. API·추적·기능 출시 변경은 없습니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`.
