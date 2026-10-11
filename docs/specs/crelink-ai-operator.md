@@ -16,8 +16,8 @@
 4. **AI 실행 기록**: `agent_runs`에 실행마다 시작·끝·상태·요약·한 일·다음 할 일·관련 PR/work item·모델/비용을 남깁니다. 실행 중 AI 쓰기는 `X-Crelink-Agent-Run` 헤더(진행 중인 자기 실행 id)가 있어야 합니다. 다음 실행은 직전 실행 기록을 읽어 이어 갑니다.
 5. **멈춤 스위치**: `ai_operator_settings.paused`. 사람 운영자만 바꿉니다. 켜져 있으면 실행 시작이 `paused` 기록만 남기고 끝나며, 진행 중인 실행의 크리링 API 쓰기도 즉시 409 `ai_operator_paused`입니다(실행 닫기만 허용). API를 거치지 않는 main 머지·외부 공개는 실행이 그 직전에 `guard`로 다시 확인해 멈춥니다(헌장 지시). 확실히 막으려면 Orca 자동화를 끕니다.
 6. **겹침 금지**: 실행 시작이 DB에서 원자적으로 확인합니다(진행 중 실행은 부분 유니크 인덱스로 최대 1개). 진행 중 실행이 있으면 409 `agent_run_in_progress`, 시작 뒤 90분이 지난 진행 중 실행은 `abandoned`로 닫습니다. 실행 호스트의 프리체크도 같은 상태를 먼저 봅니다.
-7. **20분 트리거**: 운영자 Mac의 Orca 자동화가 `*/20 * * * *`(`Asia/Seoul`)에 프리체크(`scripts/ai-operator.mjs precheck`)를 돌리고, 통과하면 omp 에이전트를 `origin/main` 기준 새 worktree에서 실행합니다. 프롬프트는 [AI 운영자 헌장](../ops/ai-operator.md)을 읽게 합니다. 자동화 생성 명령은 스크립트가 출력합니다(`automation-command`). 기존 작업 실행기(`pnpm work:run`)는 work item을 하나씩 맡기는 도구이고, AI 운영자는 그 위에서 무엇을 할지 고르는 주기 실행입니다. AI 운영자가 실행기를 부를 필요는 없습니다. `[AI 결정]`
-8. **지표**: `GET /api/admin/metrics`가 실사용자 수(PRD `목표` 정의)와 가입·방문·클릭·광고 배너 성과를 돌려줍니다. 이벤트 수치(0089)는 `events` 배열에 붙입니다.
+7. **20분 트리거**: 운영자 Mac의 Orca 자동화가 `*/20 * * * *`(`Asia/Seoul`)에 프리체크(`scripts/ai-operator.mjs precheck`)를 돌리고, 통과하면 omp 에이전트를 `origin/main` 기준 새 worktree에서 실행합니다. 프롬프트는 [AI 운영자 헌장](../ops/ai-operator.md)과 [AI 운영팀 헌장](../ops/ai-operations-team.md)을 읽게 합니다. 자동화 생성 명령은 스크립트가 출력합니다(`automation-command`). 기존 작업 실행기(`pnpm work:run`)는 work item을 하나씩 맡기는 도구이고, AI 운영자는 그 위에서 무엇을 할지 고르는 주기 실행입니다. AI 운영자가 실행기를 부를 필요는 없습니다. `[AI 결정]`
+8. **지표**: `GET /api/admin/metrics`가 실사용자 수(PRD `목표` 정의), 가입·첫 공개 링크 생성자·방문·클릭·광고 배너 성과를 돌려줍니다. 이벤트 수치(0089)는 `events` 배열에 붙입니다.
 9. **정책**: AI 운영자는 저장소 정책의 "배포·외부 공개 명시 요청", "main 머지 전 알림", "제품 방향은 사용자 결정", "운영 확인 전 알림"에서 헌장 범위만큼 예외입니다([ADR 0015](../adr/0015-ai-operator.md)). 사용자 데이터 파기·비밀값 노출·법·약관 위반은 예외가 없습니다.
 10. **통합 브랜치**: 모든 티켓을 `work/0091-ai-operator-design` 한 브랜치·PR로 통합합니다([작업 관리](../work/README.md) `여러 역할을 한 브랜치에 묶을 때`).
 
@@ -195,6 +195,7 @@ INSERT INTO ai_operator_settings DEFAULT VALUES;
   - **실사용자**: 지표 대상이고 `u.suspended_at IS NULL`이며 `EXISTS (SELECT 1 FROM links l WHERE l.user_id = u.id AND <보이는 링크>) OR EXISTS (SELECT 1 FROM portfolio_items p JOIN landings la ON la.id = p.landing_id WHERE la.user_id = u.id)`. `<보이는 링크>`는 공개 랜딩과 같은 `NOT l.hidden AND l.blocked_at IS NULL`이고, 상수 `VISIBLE_LINK_CONDITION`(`creator.service.ts`)으로 뽑아 공개 랜딩·관리 상태·단축 주소·지표가 함께 씁니다. 차단 도메인은 쓸 때 `links.blocked_at`에 반영되므로 따로 보지 않습니다.
   - **크리에이터**: `total`은 `role='creator' AND kind='human'` 수, `excluded`는 그중 `metrics_excluded_at IS NOT NULL` 수.
   - **가입**: 지표 대상 계정의 `created_at`이 지금부터 24시간·7일·30일 안.
+  - **활성화**: 지표 대상 계정별로 `NOT l.hidden AND l.blocked_at IS NULL`인 링크의 `min(l.created_at)`을 구해 사용자당 한 번만 세며, 그 첫 공개 링크 시각이 지금부터 7일·30일 안인 크리에이터 수를 `activation.firstVisibleLinkCreatorsLast7Days`·`activation.firstVisibleLinkCreatorsLast30Days`로 돌려줍니다. 계정 조건은 현재 지표 대상 기준을 따르고, 기간은 같은 `now()` 기준입니다.
   - **방문·링크 클릭**: 지표 대상 계정 단축 주소의 `visits`·링크 클릭, 지금부터 7일·30일. 기간으로 먼저 거른 뒤 계정 조건을 join합니다.
   - **광고 배너**: 게시 중 수는 `starts_at <= now() AND (ends_at IS NULL OR ends_at > now())`. 노출·클릭은 `ad_banner_daily_stats`가 서울 날짜 단위라 "서울 날짜 오늘 포함 7일"(`day > (now() AT TIME ZONE 'Asia/Seoul')::date - 7`)입니다.
   - **이벤트**: `[{ key: 'slot_event_applications', label: '링크 슬롯 이벤트 신청', value }]`. value는 `slot_event_entries` 전체 행 수(0089와 합의).
@@ -245,6 +246,7 @@ export interface OperatorActionPage { items: OperatorActionView[]; nextCursor: s
 export interface AiOperatorMetricEvent { key: string; label: string; value: number }
 export interface AiOperatorMetrics { generatedAt; goal: { realUsers: number }; realUsers: number;
   creators: { total: number; excluded: number }; signups: { last24Hours; last7Days; last30Days };
+  activation: { firstVisibleLinkCreatorsLast7Days; firstVisibleLinkCreatorsLast30Days };
   visits: { last7Days; last30Days }; linkClicks: { last7Days; last30Days };
   adBanners: { live: number; impressionsLast7Days: number; clicksLast7Days: number }; events: AiOperatorMetricEvent[] }
 export interface SetMetricsExclusionRequest { excluded: boolean }
@@ -317,7 +319,7 @@ Node 내장 모듈만 쓰는 단일 파일입니다(프리체크가 `git show or
 | 화면 | 상태 | 조건(API) | 웹 |
 | --- | --- | --- | --- |
 | `/admin/agent-runs` | 로딩 | 서버 렌더 | 기존 `app/admin/loading.tsx` |
-| | 정상(첫 쪽) | `AiOperatorStatus`·`AiOperatorMetrics`·`AgentRunPage` | 위: 멈춤 스위치(상태·사유·바꾼 사람(null이면 `—`)·시각), 진행 중 실행 표시(90분이 지났으면 "다음 실행 때 포기 처리됨"). 지표 카드(`stat-tiles`, 실사용자 `n / 100`, 가입·방문·클릭·광고, 이벤트). 실행 카드 목록(상태 배지·시작 시각·걸린 시간·요약, 펼치면 한 일·다음 할 일·관련 링크·모델·비용·토큰 수·행동 수, 상세 링크). 아래 `AI 계정` 절 |
+| | 정상(첫 쪽) | `AiOperatorStatus`·`AiOperatorMetrics`·`AgentRunPage` | 위: 멈춤 스위치(상태·사유·바꾼 사람(null이면 `—`)·시각), 진행 중 실행 표시(90분이 지났으면 "다음 실행 때 포기 처리됨"). 지표 카드(`stat-tiles`, 실사용자 `n / 100`, 가입·첫 공개 링크 생성자·방문·클릭·광고, 이벤트). 실행 카드 목록(상태 배지·시작 시각·걸린 시간·요약, 펼치면 한 일·다음 할 일·관련 링크·모델·비용·토큰 수·행동 수, 상세 링크). 아래 `AI 계정` 절 |
 | | 둘째 쪽부터 | `?cursor=` | 실행 목록만 그림(멈춤·지표·AI 계정 절 없음) |
 | | 빈 상태 | `items` 0개 | "아직 AI 실행 기록이 없어요" + 헌장 설치 안내 |
 | | 오류 | 상태·목록 실패 | `AdminShell` 오류(`retryHref='/admin/agent-runs'`). 잘못된 커서(400)도 커서 없는 주소로 |

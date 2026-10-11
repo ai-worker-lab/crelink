@@ -392,6 +392,7 @@ describe('운영자 지표 GET /api/admin/metrics (R23 ⑧, PRD 목표)', () => 
       realUsers: 0,
       creators: { total: 0, excluded: 0 },
       signups: { last24Hours: 0, last7Days: 0, last30Days: 0 },
+      activation: { firstVisibleLinkCreatorsLast7Days: 0, firstVisibleLinkCreatorsLast30Days: 0 },
       visits: { last7Days: 0, last30Days: 0 },
       linkClicks: { last7Days: 0, last30Days: 0 },
       adBanners: { live: 0, impressionsLast7Days: 0, clicksLast7Days: 0 },
@@ -401,6 +402,7 @@ describe('운영자 지표 GET /api/admin/metrics (R23 ⑧, PRD 목표)', () => 
     // 실사용자: 보이는 링크.
     const real = await creator(async (user) => {
       await addLink(user.cookie, { title: 'a', url: 'https://a.example' });
+      await addLink(user.cookie, { title: 'a2', url: 'https://a2.example' });
       await traffic(user.shortLinkId, 'visits', ['1 hour', '3 days', '10 days', '40 days']);
       await traffic(user.shortLinkId, 'link_clicks', ['2 days', '20 days', '31 days']);
     });
@@ -424,6 +426,12 @@ describe('운영자 지표 GET /api/admin/metrics (R23 ⑧, PRD 목표)', () => 
     await creator(async (user) => {
       await addLink(user.cookie, { title: 's', url: 'https://s.example' });
       await t.pool.query('UPDATE users SET suspended_at = now() WHERE id = $1', [user.userId]);
+    });
+    // 활성화 기간: 가입은 오래됐지만 공개 링크를 8일 전에 처음 만들어 최근 30일에는 포함되고 7일에는 빠집니다.
+    await creator(async (user) => {
+      const linkId = await addLink(user.cookie, { title: 'old', url: 'https://old.example' });
+      await t.pool.query("UPDATE users SET created_at = now() - interval '40 days' WHERE id = $1", [user.userId]);
+      await t.pool.query("UPDATE links SET created_at = now() - interval '8 days' WHERE id = $1", [linkId]);
     });
     // 아님: 지표 제외(가입·방문·클릭에서도 빠짐).
     await creator(async (user) => {
@@ -476,10 +484,11 @@ describe('운영자 지표 GET /api/admin/metrics (R23 ⑧, PRD 목표)', () => 
     expect(result).toEqual({
       generatedAt: expect.any(String),
       goal: { realUsers: 100 },
-      realUsers: 2,
-      creators: { total: 7, excluded: 1 },
-      // 지표 대상(제외 1명 빼고 6명): 지금 가입 3(링크·없음·정지), 3일 전 1(포트폴리오), 10일 전 1(숨김), 40일 전 1(차단).
+      realUsers: 3,
+      creators: { total: 8, excluded: 1 },
+      // 지표 대상(제외 1명 빼고 7명): 지금 가입 3(링크·없음·정지), 3일 전 1(포트폴리오), 10일 전 1(숨김), 40일 전 2(차단·활성화 링크).
       signups: { last24Hours: 3, last7Days: 4, last30Days: 5 },
+      activation: { firstVisibleLinkCreatorsLast7Days: 2, firstVisibleLinkCreatorsLast30Days: 3 },
       visits: { last7Days: 2, last30Days: 3 },
       linkClicks: { last7Days: 1, last30Days: 2 },
       adBanners: { live: 1, impressionsLast7Days: 15, clicksLast7Days: 3 },

@@ -176,6 +176,14 @@ function MetricTiles({ metrics }: { metrics: AiOperatorMetrics }) {
     { label: '가입 · 최근 24시간', value: formatNumber(metrics.signups.last24Hours) },
     { label: '가입 · 최근 7일', value: formatNumber(metrics.signups.last7Days) },
     { label: '가입 · 최근 30일', value: formatNumber(metrics.signups.last30Days) },
+    {
+      label: '첫 공개 링크 생성자 · 최근 7일',
+      value: formatNumber(metrics.activation.firstVisibleLinkCreatorsLast7Days),
+    },
+    {
+      label: '첫 공개 링크 생성자 · 최근 30일',
+      value: formatNumber(metrics.activation.firstVisibleLinkCreatorsLast30Days),
+    },
     { label: '방문 · 최근 7일', value: formatNumber(metrics.visits.last7Days) },
     { label: '방문 · 최근 30일', value: formatNumber(metrics.visits.last30Days) },
     { label: '링크 클릭 · 최근 7일', value: formatNumber(metrics.linkClicks.last7Days) },
