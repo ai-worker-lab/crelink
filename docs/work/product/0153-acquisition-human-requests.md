@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: product
-- 상태: 준비
+- 상태: 진행
 - 종류: 운영
 - 우선순위: P1 (AI 제안)
 - 작성일: 2026-10-10
@@ -38,3 +38,9 @@
 
 - 2026-10-10: 생성(AI 운영자 실행 `5b00b66d-da34-4ae0-b577-66981c116236`, 헌장 `사람에게 알리기`대로 사람 결정 필요 항목을 분류 대기로 등록).
 - 2026-10-12: 사용자 결정으로 기존 사람 승인·실행 요청을 PM 무료 실행/접근 전제 확인으로 전환. 2026-10-10 생성과 당시 분류 상태·요청일을 역사 기록으로 보존했습니다. 실행일·공개 URL·결과는 기존 원본에 미기록이며 이 변경으로 실제 외부 게시·사용자 성과를 주장하지 않습니다.
+- 2026-10-12 PM 실행 `0c93bdc1-3ff2-4a25-a685-ffa4a382e5b1`: 단기 P1 무료 모집 채널을 선택했습니다. H1 동의/야간·H2 회사 소유 확인 접근·H3 현행 자동 가입/게시 금지·H4 허용 게시판 접근·H5 정상 회사 접근 부족을 구분하고, 일반 홍보 승인을 기다리지 않고 공개 회사 GitHub 프로젝트 About 소개와 홈페이지를 `guard` 0 뒤 공식 API로 설정했습니다. [실제 실행 원본](../../product/acquisition-playbook.md#2026-10-12-실제-실행과-대안)에 공개 URL·시각·규칙·비용·철회·7일 관측을 기록했습니다. H1~H5 전체 실행이나 이 티켓 전체 완료는 아닙니다.
+- 실제 산출물: Growth가 [협업 문의 타깃 완성 문안](../../product/growth/creator-outreach.txt)을 만들고 기존 채널 2·3과 연결했습니다. PM은 `http://127.0.0.1:43853/creator-outreach.txt`를 실제 임시 HTTP 서버로 제공해 390px·1280px 브라우저에서 UTF-8 본문과 제출 필드 추출을 확인했습니다. 미출시 프리셋·가짜 고객/실적·개인정보·빈 치환값이 없으며, 디스콰이엇/커뮤니티 제출은 없습니다. 임시 서버·브라우저는 종료했습니다. Disquiet signup 화면 캡처는 timeout이라 시각 증거 미확보, 실제 signup UI/링크 관측과 GitHub 공개 제목/홈페이지 표시는 확인했습니다. 서비스 UI/API 저장·합성 사용자 시험은 이 텍스트/채널 설정 변경에 해당하지 않아 실행하지 않았습니다.
+- Orca `run_8ce3838b0d5d`: Research `task_c4fb07d6a785`/`ctx_7bc10b3f7ab8`, Growth `task_1ad3b147178e`/`ctx_8054dea0dac7`를 provider `omp`·요청/실효 모델 `openai-codex/gpt-6.1-sol`로 실행했습니다. 양쪽 `worker_done`의 Task/Dispatch·명시 `succeeded`·3문장 근거를 대조했고 accepted settlement 뒤 즉시 `worker-release`의 `released`·transcript `captured`를 확인한 뒤 Delivery를 ack했습니다. reclaimable 목록 0, 운영 credentials 전달 없음, 공유 OS 경계는 지침 기반입니다. PM 기록 신원은 `crelink-pm`, 자동화 모델 인자와 현재 PM 터미널 Sol 표시를 확인했으며 비용/입출력 토큰은 미확인입니다.
+- SRE/Release 안전 정리: automation `5e45d3d1-05e7-4051-ab77-71b3d78e9f30`와 정확한 provenance/완료 상태를 대조했습니다. `run27=1bd63b20-a5c4-45b4-89ca-e8ad830c91e8`, `run28=a1531c32-d0cc-49de-8f7c-0f09a9dcfcb5`, `run29=5ba7a638-e7b8-4a2e-aaa1-f0d09b15627b`, `run30=6b913a40-0767-4024-a29b-384628d28040`의 완료는 직전 context/완료 관측 기록상 최소 20분 이전입니다. 각 `auto-crelink-ai-operator-2-run-{27,28,29,30}-20261011T{1400,1420,1440,1500}` checkout은 clean·HEAD ancestor origin/main·tui-idle satisfied·pinned/자식/미병합 PR 없음·`.local`/자체 인스턴스 없음을 확인했습니다. 정확한 `828cfee2-9609-4dae-a7fa-86c7811b8f93::<해당 경로>`로 terminal close→worktree rm 후 네 경로의 제거를 확인했습니다. 주 checkout·현재 run33·미병합 PR103/104/106·출처가 다른 activation 워커는 보존, 원격 브랜치/실행 이력/PR·공유 인프라는 삭제하지 않았습니다.
+- 다음 행동: `2026-10-19T01:07:01+09:00` 이후 G1 소개 존속/경고/철회와 전체 가입/실사용자 지표를 확인합니다. 디스콰이엇 공식 정책 문의가 가능한 정상 회사 발신 접근을 확인해 AI 개별 실행 허용·무료 등록·철회 조건을 묻고, 조건 확보 뒤에만 PM이 제출합니다. 외부 커뮤니티 접근이 계속 막히면 미완료 `0168`의 디자인/프리셋 구현 gate를 진행하며 `0169` 중복 캠페인은 보류합니다. H5 결정은 PRD `위험과 미정 사항`에 연결했고 전체 계정/게시 기준은 미충족으로 유지합니다.
+- 검증: `pnpm`이 PATH에 없어 최초 명령은 127 실패했습니다. manifest의 `pnpm@10.10.0`을 `npx --yes --package=pnpm@10.10.0 -c 'pnpm verify --docs …'`로 실행해 work141·docs254·design29 검사를 통과했습니다(OpenDesign `od lint`는 로컬 서버 없어 건너뜀). `work:scope`는 초기 yaml 미설치, 임시 루트 의존성 symlink가 변경 경로로 잡혀 실패했으며, 기존 로컬 yaml만 ignored `node_modules/` 디렉터리에 임시 연결해 `node scripts/work-scope.mjs 0153` 6개 경로 통과를 확인한 뒤 연결/디렉터리를 제거했습니다. 기능 코드·새 영구 테스트·운영 시험 사용자·빌드 변경은 없습니다.
