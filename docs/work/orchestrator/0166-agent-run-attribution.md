@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 진행
+- 상태: 검증
 - 종류: 운영
 - 우선순위: P1
 - 작성일: 2026-10-11
@@ -13,12 +13,12 @@
 
 ## 수용 기준
 
-- [ ] `agent_runs`가 실행 에이전트 식별자를 저장·조회합니다.
-- [ ] `scripts/ai-operator.mjs`가 기본 에이전트 `orchestrator`와 모델·호스트를 시작 및 종료 기록에 전달합니다.
-- [ ] `/admin/agent-runs` 상세에서 에이전트·모델·호스트·계정·트리거·시각·비용·토큰·운영 기록을 표시합니다.
-- [ ] 기존 실행의 미확인 에이전트는 임의로 채우지 않고 `NULL`로 보존합니다.
-- [ ] 실행 완료 후 Orca worktree를 제거하고, 활성 실행이나 사람이 사용 중인 worktree는 제거하지 않습니다.
-- [ ] 비용 지출·유료 도구·외부 계정 변경은 기존 사람 승인 게이트를 유지합니다.
+- [x] `agent_runs`가 실행 에이전트 식별자를 저장·조회합니다.
+- [x] `scripts/ai-operator.mjs`가 기본 에이전트 `orchestrator`와 모델·호스트를 시작 및 종료 기록에 전달합니다.
+- [x] `/admin/agent-runs` 상세에서 에이전트·모델·호스트·계정·트리거·시각·비용·토큰·운영 기록을 표시합니다.
+- [x] 기존 실행의 미확인 에이전트는 임의로 채우지 않고 `NULL`로 보존합니다.
+- [x] 실행 완료 후 Orca worktree를 제거하고, 활성 실행이나 사람이 사용 중인 worktree는 제거하지 않습니다.
+- [x] 비용 지출·유료 도구·외부 계정 변경은 기존 사람 승인 게이트를 유지합니다.
 
 ## 범위
 
@@ -28,3 +28,5 @@
 ## 진행 기록
 
 - 2026-10-11: 구현 중. `0006_agent_run_agent`와 API·공유 타입·운영자 스크립트·운영자 화면을 갱신하고, 완료된 Crelink 자동화 및 비활성 진단 worktree를 제거했습니다. 활성 Claude worktree는 보존했습니다.
+
+- 2026-10-11: 구현·검증 단계로 전환했습니다. PR 브랜치를 `origin/main`과 병합해 최신화하고, 설계 문서에서 기존 `trigger` 계약을 보존하도록 보정했으며 실행 기록 회귀 assertion을 복원했습니다. `node_modules/.bin/tsc -p packages/shared/tsconfig.json --noEmit`, `node_modules/.bin/tsc --noEmit -p apps/api/tsconfig.json`, `apps/web` typegen·TypeScript, API `agent-runs.e2e-spec.ts`·`migrations.e2e-spec.ts` 26건이 통과했습니다. PR CI는 게시 후 확인 중입니다.
