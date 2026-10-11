@@ -36,6 +36,8 @@ test('AI 운영자: 토큰 인증·실행 기록·겹침 금지·행동 기록·
   const stateDir = await mkdtemp(join(tmpdir(), 'crelink-ai-e2e-'));
   try {
     const creator = await data.user({
+      // 제외 토글을 확인하는 로컬 지표 대조군만 기본 제외에서 opt-in합니다.
+      metricsExcluded: false,
       displayName: `E2E AI 대상 ${data.run}`,
       links: [{ title: '블로그', url: data.externalUrl('blog') }],
     });
