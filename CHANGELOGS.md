@@ -4,6 +4,10 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-10-12
+
+- 사용자가 무료 외부 홍보를 AI 자율 실행으로 위임하고 사람 승인 필수 범위를 지출·결제로 한정했습니다. PM·실행팀·운영 프롬프트·모집 실행안·팀별 계획의 과거 홍보 승인 대기를 실행/접근 조건으로 전환합니다. 법·플랫폼 규칙·수신동의·개인정보·사칭/스팸·인증/멈춤·데이터 보호 금지는 유지합니다. 실제 URL/시각·제출/공개/실패·철회·측정과 문안 준비를 구분하며 과거 기록은 보존합니다. 근거: `docs/work/orchestrator/0171-autonomous-public-promotion.md`, `docs/ops/ai-operator.md`, `docs/ops/ai-operations-team.md`.
+
 ## 2026-10-11
 
 - 사용자 선택에 따라 Crelink 전담 `crelink-pm`과 프로젝트 실행팀을 구성합니다. 기존 역할을 재사용하고 Research·Growth·Events·QA 역할을 추가하며 중앙 오케스트레이터는 회사/프로젝트 간 조정, PM은 과제 배정·Orca 감독·통합·검증·출시를 책임집니다. 단일 20분 스케줄·제2 계정·Sol 모델·운영 lease/멈춤/guard·비용 승인 경계를 유지하고 실행 담당자 기본값·자동화 생성 명령을 PM 계약으로 맞춥니다. 과거 실행은 재분류하지 않습니다. 근거: `docs/work/orchestrator/0170-crelink-project-team.md`, `.omp/agents/crelink-pm.md`, `docs/ops/ai-operations-team.md`, `scripts/ai-operator.mjs`.

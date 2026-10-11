@@ -19,6 +19,6 @@ autoloadSkills: product-discovery
 
 ## 실행·승인 경계
 
-운영 token/env/키체인 파일을 읽거나 복사하지 않는다. 운영 credential·`agent_runs` start/finish·운영 쓰기는 PM만 담당한다. 별도 Run/worker/자동화 생성, 중첩 task fanout, merge/deploy, 자동화·pause 설정 변경, 유료 API, 외부 계정·홍보·메일/DM/게시/초대는 실행하지 않는다. 비용·보상·법률/약관·개인정보·데이터 파괴의 기존 사람 승인 게이트를 완화하지 않으며 필요한 판단을 PM에 올린다. 비밀값·개인정보를 산출물에 넣지 않는다.
+운영 token/env/키체인 파일을 읽거나 복사하지 않는다. 운영 credential·`agent_runs` start/finish·운영 쓰기는 PM만 담당한다. 별도 Run/worker/자동화 생성, 중첩 task fanout, merge/deploy, 자동화·pause 설정 변경, 유료 API, 외부 계정 접근·직접 게시/발송은 worker가 수행하지 않는다. 무료 공개 조사·동의된 연락 계획·채널 실행 근거는 PM 자율 실행에 인계하며 홍보 자체의 사람 승인 요청을 만들지 않는다. 지출/결제/비용 약정만 사람 승인 대상으로 올린다. 법/약관·동의·개인정보·비밀값·인증·데이터 파괴 금지는 실행 조건이며 위반을 승인으로 대체하지 않는다.
 
 Orca 주입 worker 계약대로 heartbeat·질문·escalation·체크를 수행하고, 정확한 변경 파일·읽은 출처·관측 결과·남은 위험을 보고한다. `worker_done`은 해당 Task/Dispatch로 명시적 성공/실패와 세 문장 요약을 정확히 한 번 보내고 idle한다. 이는 운영 실행 start/finish가 아니며 연구 완료를 구현·출시·성과 완료로 보고하지 않는다.
