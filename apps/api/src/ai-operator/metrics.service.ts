@@ -14,6 +14,8 @@ interface MetricsRow {
   signups_24h: number;
   signups_7d: number;
   signups_30d: number;
+  first_visible_link_creators_7d: number;
+  first_visible_link_creators_30d: number;
   visits_7d: number;
   visits_30d: number;
   clicks_7d: number;
@@ -43,6 +45,12 @@ export class MetricsService {
          SELECT c.occurred_at FROM link_clicks c
          JOIN short_links sl ON sl.id = c.short_link_id JOIN users u ON u.id = sl.user_id
          WHERE c.occurred_at > now() - interval '30 days' AND ${METRICS_TARGET}
+       ), first_visible_links AS (
+         SELECT l.user_id, min(l.created_at) AS first_link_at
+         FROM links l
+         JOIN users u ON u.id = l.user_id
+         WHERE ${METRICS_TARGET} AND ${VISIBLE_LINK_CONDITION}
+         GROUP BY l.user_id
        )
        SELECT now() AS generated_at,
          (SELECT count(*)::int FROM users u
@@ -59,6 +67,10 @@ export class MetricsService {
           WHERE ${METRICS_TARGET} AND u.created_at > now() - interval '7 days') AS signups_7d,
          (SELECT count(*)::int FROM users u
           WHERE ${METRICS_TARGET} AND u.created_at > now() - interval '30 days') AS signups_30d,
+         (SELECT count(*)::int FROM first_visible_links
+          WHERE first_link_at > now() - interval '7 days') AS first_visible_link_creators_7d,
+         (SELECT count(*)::int FROM first_visible_links
+          WHERE first_link_at > now() - interval '30 days') AS first_visible_link_creators_30d,
          (SELECT count(*)::int FROM recent_visits WHERE occurred_at > now() - interval '7 days') AS visits_7d,
          (SELECT count(*)::int FROM recent_visits) AS visits_30d,
          (SELECT count(*)::int FROM recent_clicks WHERE occurred_at > now() - interval '7 days') AS clicks_7d,
@@ -78,6 +90,10 @@ export class MetricsService {
       realUsers: row.real_users,
       creators: { total: row.creators_total, excluded: row.creators_excluded },
       signups: { last24Hours: row.signups_24h, last7Days: row.signups_7d, last30Days: row.signups_30d },
+      activation: {
+        firstVisibleLinkCreatorsLast7Days: row.first_visible_link_creators_7d,
+        firstVisibleLinkCreatorsLast30Days: row.first_visible_link_creators_30d,
+      },
       visits: { last7Days: row.visits_7d, last30Days: row.visits_30d },
       linkClicks: { last7Days: row.clicks_7d, last30Days: row.clicks_30d },
       adBanners: { live: row.ad_live, impressionsLast7Days: row.ad_impressions_7d, clicksLast7Days: row.ad_clicks_7d },

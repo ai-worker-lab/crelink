@@ -924,6 +924,8 @@ export interface AiOperatorMetrics {
   /** 사람 크리에이터 수와 그중 지표 제외 수. */
   creators: { total: number; excluded: number };
   signups: { last24Hours: number; last7Days: number; last30Days: number };
+  /** 지표 대상 크리에이터 중 처음 공개 링크를 만든 사람 수. */
+  activation: { firstVisibleLinkCreatorsLast7Days: number; firstVisibleLinkCreatorsLast30Days: number };
   visits: { last7Days: number; last30Days: number };
   linkClicks: { last7Days: number; last30Days: number };
   adBanners: { live: number; impressionsLast7Days: number; clicksLast7Days: number };
