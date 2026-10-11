@@ -6,6 +6,7 @@
 
 ## 2026-10-11
 
+- 0109의 PM2 홈을 사용자·checkout 실제 경로별 짧은 임시 경로로 바꾸고, `make`와 `pnpm logs`가 같은 원본 및 `PM2_HOME` 재정의를 사용하도록 맞췄습니다. 로컬 개발 안내·FAQ에 전환 절차를 기록하고 중복 결함 0127을 0109로 통합했습니다. 근거: `scripts/pm2-home.mjs`, `docs/work/orchestrator/0109-pm2-socket-path-length.md`.
 - AI 운영자 주기를 20분(`*/20 * * * *`)으로 조정하고 한 실행 상한을 15분으로 줄였습니다. 실행 호스트 도구, 헌장·프롬프트·설계·ADR·PRD·운영자 화면·관련 운영 문서를 같은 계약으로 맞췄습니다. 기존 Orca 자동화는 `node scripts/ai-operator.mjs automation-command` 출력으로 갱신해야 합니다. 근거: 사용자 결정, `scripts/ai-operator.mjs`, `docs/ops/ai-operator.md`.
 - 초기 상태에는 실행 호스트에 토큰과 `crelink-ai-operator` 자동화가 없었지만, 0157에서 제2 AI 계정·토큰과 `crelink-ai-operator-2` 20분 자동화를 설치해 첫 예약 실행과 `agent_runs` 기록을 확인했습니다. 제1 계정과 자동화는 중복 실행 방지를 위해 건드리지 않았습니다.
 - 단일 운영 작업 `docs/work/orchestrator/0156-ai-operator-cadence-deploy.md`를 만들었습니다. localhost 검증 → PR CI → main Deploy → `links.shaul.kr` 운영 주소 검사까지의 수용 기준을 한 항목으로 추적합니다.

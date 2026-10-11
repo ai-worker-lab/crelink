@@ -40,7 +40,7 @@ OpenDesign 산출물은 `design/`, 모바일 앱은 `apps/app/`, 웹 클라이�
 
 ### PM2는 왜 필요하고, 반드시 써야 하나요?
 
-`make api-up/down/restart`, `make web-up/down/restart`, `make app-up/down/restart`가 각 개발 서버를 터미널과 분리해 관리하도록 PM2를 사용합니다. PM2는 루트 개발 의존성으로 고정했고, 상태는 checkout 전용 `.local/pm2/`에 둬 다른 프로젝트·다른 worktree의 PM2 상태와 분리합니다. 운영 서버의 프로세스 관리 수단으로 추가한 것은 아닙니다.
+`make api-up/down/restart`, `make web-up/down/restart`, `make app-up/down/restart`가 각 개발 서버를 터미널과 분리해 관리하도록 PM2를 사용합니다. PM2는 루트 개발 의존성으로 고정했고, 상태는 [`scripts/pm2-home.mjs`](../scripts/pm2-home.mjs)가 정하는 사용자·checkout별 짧은 임시 경로에 둬 다른 프로젝트·다른 worktree와 분리하고 긴 경로의 유닉스 소켓 오류를 피합니다. 운영 서버의 프로세스 관리 수단으로 추가한 것은 아닙니다.
 
 PM2 없이 `pnpm dev:api`, `pnpm dev:web`, `pnpm dev:app`을 터미널에서 직접 실행해도 됩니다. 한 터미널에서 여러 프로세스를 함께 실행하는 도구도 대안이지만, 각 영역의 개별 종료·재시작이 목적이면 PM2가 편리합니다. 기능이 늘거나 팀·운영 요구가 달라지면 다시 평가합니다.
 

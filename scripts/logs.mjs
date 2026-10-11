@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { readInstanceEnv } from './lib/instance.mjs';
+import { pm2Home } from './pm2-home.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SERVICES = ['api', 'web', 'app', 'infra'];
@@ -60,11 +61,11 @@ if (service === 'infra') {
   const args = [...compose, 'logs', '--tail', String(lines), '--no-color', ...(values.follow ? ['--follow'] : [])];
   command = ['docker', [...args, 'postgres', 'valkey']];
 } else {
-  // PM2_HOME은 Makefile이 .local/pm2로 지정합니다. 프로세스 이름은 ecosystem.config.cjs의 crelink-<서비스>입니다.
+  // Makefile과 같은 PM2 홈을 사용합니다. PM2_HOME을 지정하면 로그 조회에도 같은 값을 넘깁니다.
   const files = ['out', 'error']
-    .map((stream) => join(root, '.local/pm2/logs', `crelink-${service}-${stream}.log`))
+    .map((stream) => join(pm2Home, 'logs', `crelink-${service}-${stream}.log`))
     .filter((file) => existsSync(file));
-  if (files.length === 0) fail(`${service} 로그가 없습니다(.local/pm2/logs/). make ${service}-up으로 시작하세요.`);
+  if (files.length === 0) fail(`${service} 로그가 없습니다(${join(pm2Home, 'logs')}/). make ${service}-up으로 시작하세요.`);
   command = ['tail', ['-n', String(lines), ...(values.follow ? ['-F'] : []), ...files]];
 }
 
