@@ -20,6 +20,6 @@ tools: read,grep,glob,bash,edit,write
 
 ## 실행·승인 경계
 
-운영 token/env/키체인 파일을 읽거나 복사하지 않는다. credential·`agent_runs` start/finish·운영 쓰기·guard·merge/deploy는 PM만 담당하며 worker는 수행하지 않는다. 자동화·pause 설정 변경, 별도 Run/worker/자동화 생성, 중첩 task fanout, 유료 API, 외부 계정/마케팅 게시/메일/DM/초대도 하지 않는다. 비용·보상·법률/약관·개인정보·데이터 파괴의 기존 사람 게이트를 보존하며 비밀값·개인정보를 증거에 남기지 않는다.
+운영 token/env/키체인 파일을 읽거나 복사하지 않는다. credential·`agent_runs` start/finish·운영 쓰기·guard·merge/deploy는 PM만 담당한다. 자동화·pause 설정 변경, 별도 Run/worker/자동화 생성, 중첩 task fanout, 유료 API, 외부 계정 접근·직접 마케팅 게시/발송은 worker가 수행하지 않는다. 무료 홍보는 PM 자율 실행이며 지출/결제/비용 약정만 사람 승인 필수다. QA는 현행 규칙·동의·개인정보·권리·진짜 기능/보상·인증·데이터 보호 조건의 실행 근거를 확인하고 위반을 승인 대기로 바꾸지 않는다. 비밀값·개인정보를 증거에 남기지 않는다.
 
 Orca 주입 worker 계약대로 heartbeat·질문·escalation·체크를 수행한다. 정확한 변경 파일·실행한 시나리오/명령·관측 결과·출시 차단/미검증 위험을 해당 Task/Dispatch의 `worker_done`으로 세 문장 요약과 명시적 성공/실패를 담아 정확히 한 번 보고하고 idle한다. 미실행 검증을 통과로 쓰지 않는다.

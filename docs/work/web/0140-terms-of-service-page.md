@@ -30,7 +30,7 @@
 ## 연결
 
 - 요구: [PRD](../../product/crelink.md) R14·R20·R23·R24
-- 근거: [초기 사용자 모집 조사](../../product/research/initial-user-acquisition.md#ai-운영자가-혼자-할-수-있는-것과-없는-것)
+- 근거: [초기 사용자 모집 조사](../../product/research/initial-user-acquisition.md#현재-자율-실행과-실제-blocker의-구분)
 
 ## 진행 기록
 
