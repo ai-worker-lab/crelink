@@ -46,6 +46,8 @@
 - 2026-10-12: `/docs/first-crelink-challenge`와 `PUBLIC_DOCS` 등록을 구현했습니다. 네이티브 목적별 펼치기→기존 홈/`/me`에서 본인 URL 입력·저장→공개 확인/단축 주소 복사 준비를 연결하며 목적·완료 수집은 없습니다. 기존 공개 슬롯 GET만 요청마다 읽어 `open`·`scheduled`·`ended`·없음·조회 실패를 구분합니다. R24 신청 API·편집기·DB·0168·0164 화면은 변경하지 않았습니다.
 - 2026-10-12: PRD R25와 기존 슬롯 설계에 경로·상태·최소 수집·되돌림을 반영했습니다. [연구 원본](../../product/research/crelink-growth-team-research.md#2026-10-12-첫-크리링-완성-챌린지-선택)에 자기결정이론·Linktree 원문, 국내 벤치마킹 재사용, 사용자 동기 미확인, 두 대안, 중단 조건·지표 공백을 기록했습니다. 신청 1건/첫 링크 0명은 2026-10-11 역사 수치이며 최신 기준선이나 캠페인 결과가 아닙니다.
 - 2026-10-12: 워커의 문서/작업 관리 실명령 `node scripts/work.mjs --check`는 141개, `node scripts/docs-check.mjs`는 Markdown 254개 통과했습니다. `pnpm work:scope 0169`는 `pnpm: command not found`, 직접 `node scripts/work-scope.mjs 0169`는 의존성 `yaml`의 `ERR_MODULE_NOT_FOUND`로 실행하지 못했습니다. `node_modules`가 없는 checkout이며 build/lint/tests/formatter·실제 UI/API/DB 시나리오는 지시대로 PM 통합 gate에 남깁니다. 문서 검사 통과를 런타임/출시 통과로 주장하지 않습니다.
+- 2026-10-12 PM 통합: 두 워커의 PRD 번호가 R25로 겹쳐 기존 시작 키트는 R25, 이번 챌린지는 R26으로 정리했습니다. 사용자 요청은 남은 작업의 실행이며 챌린지 세부 내용은 위임에 따른 AI 제품 결정입니다. 과거 워커의 초기 번호를 출시 계약으로 재사용하거나 사용자 직접 발언으로 표시하지 않습니다.
+- 2026-10-12 PM QA: 실제 localhost API 3220·웹 5393에서 `pnpm verify` 8단계와 smoke 5건을 통과했습니다. 폐기용 Playwright 시나리오 2건에서 390px/1280px 실제 화면·키보드 목적 선택·쓰기 없음·지표 제외 합성 계정·기존 편집기로의 이동·명시적 첫 링크 저장과 DB 영속/공개 표시·자동 이벤트 신청 없음·실제 기간 open/scheduled/ended/이벤트 없음과 원상복구가 통과했습니다. 최초 mobile 시나리오는 데스크톱 전용 미리보기 region을 기다려 timeout했고 실제 모바일의 버튼 접근으로 harness를 고쳤습니다. UI 기능 오류를 숨긴 것이 아니며 별도 파일은 증거 확인 후 제거합니다. 실제 두 폭의 PNG와 Orca 브라우저 화면을 확인했습니다. API 중단·전체 회귀·CI·출시는 아직 진행합니다.
 
 ## 게시 기간과 중복 영향
 

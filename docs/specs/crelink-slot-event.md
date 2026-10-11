@@ -288,14 +288,14 @@ export interface SetSlotEventPeriodRequest {
 
 ## 첫 크리링 완성 챌린지 (0169)
 
-2026-10-12 사용자 구현 요청·R23 위임에 따른 AI 선택입니다. 입력은 PRD R25와 [참여 동기·대안 조사](../product/research/crelink-growth-team-research.md#2026-10-12-첫-크리링-완성-챌린지-선택)입니다. 기존 슬롯 이벤트 설계에 별도 자사 안내 경로만 연결하며 R24 신청·한도·기간 계약은 바꾸지 않습니다.
+2026-10-12 남은 작업 실행 요청·R23 위임에 따른 AI 선택입니다. 입력은 PRD R26과 [참여 동기·대안 조사](../product/research/crelink-growth-team-research.md#2026-10-12-첫-크리링-완성-챌린지-선택)입니다. 기존 슬롯 이벤트 설계에 별도 자사 안내 경로만 연결하며 R24 신청·한도·기간 계약은 바꾸지 않습니다.
 
 | 요구 | 구현과 확인점 |
 | --- | --- |
-| R25 ①② 자발적 목적→실제 링크→공유 준비 | `apps/web/src/app/(public)/docs/first-crelink-challenge/page.tsx`: 기본 Server Component, 기존 `.prose`·`primary`·문서 layout 사용. 목적 3개는 네이티브 `details/summary`, 다음 단계는 앵커. 사용자가 기존 `/me` 편집기에서 자기 URL을 직접 입력·저장·공개 확인하고 단축 주소를 복사합니다. 단계별 저장/게시를 대신하지 않으며 완료 인증/진행률도 만들지 않습니다. |
-| R25 ③ 최소 수집·의무 없음 | 새 Client Component·참가 상태·localStorage·쿠키·추적 쿼리·API 쓰기·DB migration 없음. 원래 가입/링크 저장만 기존 경로에서 일어납니다. 공개 콘텐츠 사용·자율 중단·외부 게시 선택을 명시합니다. |
-| R25 ④ 현재 슬롯 상태 | `dynamic = 'force-dynamic'`, 기존 `serverApi`의 `cache: 'no-store'`로 `GET /api/public/slot-event` 조회. 공개 조회만 하며 세션/계정/신청 명단을 읽지 않습니다. 신청 버튼이나 POST는 새 안내에 만들지 않고 `/me`의 기존 명시적 신청으로 연결합니다. |
-| R25 ⑤ 비중복 경로 | `src/lib/docs.ts`의 `PUBLIC_DOCS`에 추가해 기존 문서 목록·`DocsNav`·`SITEMAP_PATHS`에서 발견합니다. `0168` 편집기/프리셋/가이드와 `0164` 홈·공개 랜딩 CTA 및 기존 `/docs/guide` 본문은 수정하지 않습니다. 문서 탐색과 최종 활성화 지표의 중복 영향은 남습니다. |
+| R26 ①② 자발적 목적→실제 링크→공유 준비 | `apps/web/src/app/(public)/docs/first-crelink-challenge/page.tsx`: 기본 Server Component, 기존 `.prose`·`primary`·문서 layout 사용. 목적 3개는 네이티브 `details/summary`, 다음 단계는 앵커. 사용자가 기존 `/me` 편집기에서 자기 URL을 직접 입력·저장·공개 확인하고 단축 주소를 복사합니다. 단계별 저장/게시를 대신하지 않으며 완료 인증/진행률도 만들지 않습니다. |
+| R26 ③ 최소 수집·의무 없음 | 새 Client Component·참가 상태·localStorage·쿠키·추적 쿼리·API 쓰기·DB migration 없음. 원래 가입/링크 저장만 기존 경로에서 일어납니다. 공개 콘텐츠 사용·자율 중단·외부 게시 선택을 명시합니다. |
+| R26 ④ 현재 슬롯 상태 | `dynamic = 'force-dynamic'`, 기존 `serverApi`의 `cache: 'no-store'`로 `GET /api/public/slot-event` 조회. 공개 조회만 하며 세션/계정/신청 명단을 읽지 않습니다. 신청 버튼이나 POST는 새 안내에 만들지 않고 `/me`의 기존 명시적 신청으로 연결합니다. |
+| R26 ⑤ 비중복 경로 | `src/lib/docs.ts`의 `PUBLIC_DOCS`에 추가해 기존 문서 목록·`DocsNav`·`SITEMAP_PATHS`에서 발견합니다. `0168` 편집기/프리셋/가이드와 `0164` 홈·공개 랜딩 CTA 및 기존 `/docs/guide` 본문은 수정하지 않습니다. 문서 탐색과 최종 활성화 지표의 중복 영향은 남습니다. |
 
 ### 공개 상태 문구
 
