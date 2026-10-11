@@ -8,6 +8,9 @@
 
 - `0168`의 Research 순환7/8에서 Notion 공식 공개 페이지의 방문자용 주소·하위 페이지/기여자 정보 공개 경계를 확인하고, 기존 협업 가이드에 대표 작업 선택·방문자 접근/공개 권한 점검 소재를 실제 구현했습니다. localhost 390px/1280px 렌더·내부 탐색·가로 넘침을 확인했고 시각 캡처는 timeout입니다. 전체 키트는 진행, 출시는 미수행·성장 효과는 미관측입니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`, [웹 변경 기록](apps/web/CHANGELOGS.md).
 
+- `0153` 단기 P1 무료 모집을 실제 실행했습니다. Research/Growth의 Sol Orca 워커 결과로 현행 플랫폼/접근 blocker와 협업 문의용 제출 텍스트를 분리하고, PM은 `guard` 0 뒤 공식 GitHub 회사 프로젝트 About 소개·홈페이지 연결을 공개했습니다. localhost 텍스트 소비·공개 GitHub 표시를 확인했으며 디스콰이엇/커뮤니티 제출·성장 효과는 미관측입니다. 이전 완료 자동화 run27~30의 보존/idle/인스턴스 조건을 확인해 정확한 네 checkout만 정리했습니다. 근거: `docs/work/product/0153-acquisition-human-requests.md`, `docs/product/acquisition-playbook.md`, `docs/product/growth/creator-outreach.txt`.
+- 사용자가 무료 외부 홍보를 AI 자율 실행으로 위임하고 사람 승인 필수 범위를 지출·결제로 한정했습니다. PM·실행팀·운영 프롬프트·모집 실행안·팀별 계획의 과거 홍보 승인 대기를 실행/접근 조건으로 전환합니다. 법·플랫폼 규칙·수신동의·개인정보·사칭/스팸·인증/멈춤·데이터 보호 금지는 유지합니다. 실제 URL/시각·제출/공개/실패·철회·측정과 문안 준비를 구분하며 과거 기록은 보존합니다. 근거: `docs/work/orchestrator/0171-autonomous-public-promotion.md`, `docs/ops/ai-operator.md`, `docs/ops/ai-operations-team.md`.
+
 ## 2026-10-11
 
 - `0168` 기존 협업 가이드에 가상 구성·목적별 제목 예시·직접 HTTP(S) 주소 입력/저장·자발적 공유 안내를 실제 코드로 반영했습니다. localhost 390px/1280px DOM 가로 넘침·문서 목록과 사용 안내 이동을 확인했으며 이미지 캡처는 timeout으로 미확보입니다. 새 프리셋·운영 출시·성장 효과는 미완료/미관측입니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`, [웹 변경 기록](apps/web/CHANGELOGS.md).
@@ -16,6 +19,7 @@
 - `0168` API/Data 심층 조사에서 기존 URL·소유자·한도·저장 계약 재사용을 확인하고, 실제 원본 URL 파서 11건과 PostgreSQL17 합성 데이터의 원본 집계 SQL 3상태를 실행했습니다. 현재 보이는 링크의 최소 생성시각·정지·포트폴리오에 따른 지표 차이, 키트 측정 카드·8팀 추천/보류를 기존 티켓에 기록했습니다. API·추적·기능 출시 변경은 없습니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`.
 - `0168`에서 Events/Lifecycle의 기존 3단계 안내·슬롯 신청 코드와 Notion 공식 온보딩 자료를 심층 조사했습니다. 별도 `0169` 체크리스트 시행은 중복 가치가 확인될 때까지 보류하고, 목적을 하나 정하는 자사 소재·출시 순서·측정 한계·8개 팀 보고를 기존 티켓에 갱신했습니다. 기능·캠페인 출시는 하지 않았습니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`.
 - `0168` 협업 문의용 시작 키트의 기존 가이드 중복을 조사하고 새 페이지 대신 기존 `/docs/creator-portfolio-page` 보강을 선택했습니다. 기존 URL 입력 계약에 맞는 자사 원고·제목 제안 요구·8개 팀 보고·순환 조사 순서를 기존 티켓에 기록했습니다. 연구·원고 단계이며 기능 출시·성장 효과는 미관측입니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`.
+- 사용자 선택에 따라 Crelink 전담 `crelink-pm`과 프로젝트 실행팀을 구성합니다. 기존 역할을 재사용하고 Research·Growth·Events·QA 역할을 추가하며 중앙 오케스트레이터는 회사/프로젝트 간 조정, PM은 과제 배정·Orca 감독·통합·검증·출시를 책임집니다. 단일 20분 스케줄·제2 계정·Sol 모델·운영 lease/멈춤/guard·비용 승인 경계를 유지하고 실행 담당자 기본값·자동화 생성 명령을 PM 계약으로 맞춥니다. 과거 실행은 재분류하지 않습니다. 근거: `docs/work/orchestrator/0170-crelink-project-team.md`, `.omp/agents/crelink-pm.md`, `docs/ops/ai-operations-team.md`, `scripts/ai-operator.mjs`.
 - 사람의 명시적 지시로 #105를 main에 병합했습니다. 매 20분 운영 실행에 이전 완료 워크트리의 provenance·유예·변경/커밋 보존·터미널 idle·인스턴스 안전 확인 후 정리하는 절차를 추가했습니다. 조사/계획과 실제 구현·로컬 검증·출시·활동·효과를 구분하고, 구현 가능한 그로스 과제는 조사 순환 대신 실제 산출물과 실행 검증을 우선합니다. 비용/외부 집행 승인과 일반 자동 병합 상한은 유지합니다. 근거: `docs/ops/ai-operator-prompt.md`, `docs/work/orchestrator/0167-growth-team-research.md`.
 - AI 운영자 주기를 20분(`*/20 * * * *`)으로 조정하고 한 실행 상한을 15분으로 줄였습니다. 실행 호스트 도구, 헌장·프롬프트·설계·ADR·PRD·운영자 화면·관련 운영 문서를 같은 계약으로 맞췄습니다. 기존 Orca 자동화는 `node scripts/ai-operator.mjs automation-command` 출력으로 갱신해야 합니다. 근거: 사용자 결정, `scripts/ai-operator.mjs`, `docs/ops/ai-operator.md`.
 - 초기 상태에는 실행 호스트에 토큰과 `crelink-ai-operator` 자동화가 없었지만, 0157에서 제2 AI 계정·토큰과 `crelink-ai-operator-2` 20분 자동화를 설치해 첫 예약 실행과 `agent_runs` 기록을 확인했습니다. 제1 계정과 자동화는 중복 실행 방지를 위해 건드리지 않았습니다.
