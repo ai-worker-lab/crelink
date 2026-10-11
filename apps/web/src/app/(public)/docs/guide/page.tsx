@@ -1,6 +1,7 @@
 import { CRELINK_LIMITS, CRELINK_WEB_PATHS, SOCIAL_PLATFORMS } from '@crelink/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { GUIDE_ARTICLES } from '../../../../lib/docs';
 import { SOCIAL_PLATFORM_LABELS } from '../../../../lib/format';
 
 export const metadata: Metadata = { title: '사용 안내' };
@@ -90,6 +91,12 @@ export default function GuidePage() {
           <li>
             미리보기의 <strong>+ 링크 추가</strong>(또는 링크 구역의 <strong>링크 추가</strong>)를 누르고 표시 이름,
             주소(<code>http://</code>나 <code>https://</code>로 시작), 설명(선택), 썸네일(선택)을 넣어 저장해요.
+          </li>
+          <li>
+            새 링크의 <strong>링크 목적 (선택)</strong>에서 협업 문의·대표 작업·주요 채널을 고르면 비어 있는 표시
+            이름에만 제목을 제안해요. 제안 없이 직접 작성하거나 제목을 고쳐도 돼요. 이미 입력한 제목과 기존 링크는
+            덮어쓰지 않고, 실제 주소는 직접 넣고 <strong>저장</strong>을 눌러야 해요.{' '}
+            <Link href={GUIDE_ARTICLES[1].href}>협업 문의용 구성 예시와 작성 순서</Link>를 참고하세요.
           </li>
           <li>
             링크 구역 목록의 링크 카드나 <strong>수정</strong>을 눌러도 고치거나 지울 수 있어요. 지운 링크는 되돌릴 수

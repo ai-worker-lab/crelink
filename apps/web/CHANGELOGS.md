@@ -5,9 +5,12 @@
 ## 2026-10-12
 
 - 첫 크리링 완성 챌린지(0169)를 별도 `/docs/first-crelink-challenge`에 구현했습니다. 기존 공개 문서 표현과 네이티브 목적별 안내를 사용해 본인 실제 링크 직접 저장·공개 확인·단축 주소 복사 준비로 연결하며 참가/완료 수집·추가 보상·외부 게시 의무는 없습니다. `PUBLIC_DOCS` 등록으로 문서 목록·메뉴·sitemap에 연결하고 슬롯 이벤트는 기존 공개 API를 요청마다 조회해 열림·시작 전·종료·없음·오류를 구분합니다. `0168` 편집기·`0164` CTA·기존 슬롯 신청 계약은 변경하지 않았습니다. 근거: `docs/work/orchestrator/0169-slot-event-growth-experiment.md`, `src/app/(public)/docs/first-crelink-challenge/page.tsx`, `src/lib/docs.ts`.
+- `0168` 새 링크 편집기에 `링크 목적 (선택)`을 추가해 협업 문의/대표 작업/주요 채널의 제목을 trim 기준 빈 표시 이름에만 제안합니다. 기존 제목·다른 필드·수정 폼·명시 저장·오류·한도·권한 계약과 0164 CTA는 유지합니다. 협업 가이드·사용 안내·관리 동선과 무료·광고 안내를 보완했습니다. PM 승인 디자인 재사용 후 localhost verify 8·smoke 5, 실제 production 빌드의 두 폭 목적 선택/입력 보존/수동 저장/차단 422 시나리오 2·기존 전체 E2E 19와 PNG를 확인했습니다. 개발 모드 `/me` 계측 오류와 출시 대기는 티켓에 구분해 기록했습니다. 근거: `src/components/manage/LinkForm.tsx`, `src/app/(public)/docs/creator-portfolio-page/page.tsx`, `src/app/(public)/docs/guide/page.tsx`, `design/preview-direct-edit/handoff.md`, `docs/work/orchestrator/0168-creator-starter-kit.md`.
+- `0168` 협업 가이드에 첫 대표 작업 선택·역할 제목 예시·로그아웃한 방문자의 외부 주소 접근 확인·비공개 정보 제외·기존 링크 직접 수정 안내를 구현했습니다. 기존 문서 URL·Server Component·스타일·CTA를 재사용하고 새 계정/추적/외부 공개 권한 변경은 하지 않습니다. 근거: `src/app/(public)/docs/creator-portfolio-page/page.tsx`, `docs/work/orchestrator/0168-creator-starter-kit.md`.
 
 ## 2026-10-11
 
+- 협업 가이드 `/docs/creator-portfolio-page`에 가상의 3목적 구성 예시와 첫 링크 직접 작성 안내를 추가했습니다(0168). 현재 `prose`·Server Component·CTA·메타데이터를 유지하고 예시 URL/외부 클릭·새 수집·새 컨트롤 없이 사용자 소유 HTTP(S) 주소와 명시 저장을 안내합니다. localhost 390px/1280px DOM·내부 탐색 확인, 이미지 캡처 timeout·운영 미출시. 근거: `src/app/(public)/docs/creator-portfolio-page/page.tsx`, `docs/work/orchestrator/0168-creator-starter-kit.md`.
 - AI 실행 기록 화면의 주기 표기를 20분으로 맞췄습니다. 자동화 주기와 실행 호스트 안내의 원본은 `scripts/ai-operator.mjs`·`docs/ops/ai-operator.md`입니다.
 - AI 실행 기록 상세에 실행 에이전트·호스트·모델을 표시해 실행 주체와 실행 환경을 함께 확인할 수 있게 했습니다.
 - 이용약관 초안 페이지(`/terms`, 0140)를 추가하고 홈·공개 랜딩·문서 목록·문서 하단에서 연결했습니다. 서비스·계정 정지·금지 행위·광고 블록·외부 링크 +5 이벤트·AI 운영자·약관 변경·문의 방법을 명시했으며 법률 검토 전 문안임을 표시했습니다. 근거 `docs/work/web/0140-terms-of-service-page.md`.

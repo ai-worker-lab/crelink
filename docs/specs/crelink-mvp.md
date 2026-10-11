@@ -142,6 +142,15 @@ migration은 `apps/api/migrations/`의 SQL 파일(기존 실행기). 모든 시�
 
 외부 링크 아이콘(R5): 방문자 브라우저가 `https://{host}/favicon.ico`를 직접 불러오고 실패하면 기본 아이콘을 씁니다. 서버가 임의 URL을 대신 가져오는 SSRF 위험을 피하는 대신, 방문자 브라우저가 링크된 사이트에 아이콘 요청을 보냅니다.
 
+## R25 협업 시작 키트
+
+- 입력: [R25](../product/crelink.md#협업-문의용-시작-키트r25), [기존 승인 디자인 재사용 인계](../../design/preview-direct-edit/handoff.md#0168-협업-시작-키트-재사용-인계). 2026-10-12 PM 승인으로 기존 컴포넌트만 확장하며 새 API·DB·인증·추적·디자인 토큰은 없습니다.
+- 요구 대응: R25 ①②⑤는 기존 `/docs/creator-portfolio-page`의 가상 구성·직접 작성·무료 범위·가입 안내, `/docs` 목록과 `/docs/guide` 내부 링크로 제공합니다. R25 ③④는 `LinkForm` 새 링크 폼의 선택 도움말, ⑥은 0168의 PM 최종 QA/출시 기록입니다.
+- native select의 목적 값은 제안 제목입니다. `onChange`는 `draft.title.trim()`이 비었고 선택 값이 있을 때만 기존 `editLinkDraft(key, { title })`를 호출합니다. 기존 제목·URL·설명·썸네일·hidden·프로필은 수정하지 않습니다. 목적 자체는 서버 payload/지표에 보내지 않습니다.
+- 명시 submit의 `CreateLinkRequest`·POST/PATCH·BFF·reload·`ActionStatus`는 기존 구현 그대로입니다. pending은 select도 잠그고, 실패는 기존 초안/오류, 취소는 기존 초안 폐기, 한도는 기존 추가 진입/서버 검사, 권한은 기존 세션/소유자 검사입니다. 편집 폼에는 목적 select가 없습니다.
+- 검증 계획: 390px/1280px 가이드→홈→기존 Google 가입 안내/관리 연결, 새 링크 세 목적·직접 입력·공백 제목·수동/제안 제목 보존·다른 필드 보존·메뉴 이동/취소·pending을 확인합니다. 사용자 입력 URL의 실제 저장/공개와 차단422·한도409·세션401·타인수정404·실패 초안 보존은 localhost 실제 API/DB에서 `metricsExcluded: true` 합성 계정만 사용합니다. 예시 열람/선택에 저장 요청·활성화 집계가 없음을 확인하며 운영 시험은 하지 않습니다.
+- 구현 후 검증/CI·guard·main·Deploy·운영 주소 검사·T0/T0+7일·롤백 판정은 PM 소유입니다. 이번 워커는 실행하지 않은 QA를 통과로 표시하지 않습니다.
+
 ## 권한·보안·개인정보
 
 - **세션**: `cl_session`(httpOnly, SameSite=Lax, 운영은 Secure)은 본 도메인. 상태 변경 요청은 같은 출처 BFF만 받고 BFF가 `Origin`을 확인합니다.
