@@ -36,7 +36,7 @@
 
 ## 한 실행의 순서
 
-한 실행은 25분 안에 끝냅니다(30분 주기, 진행 중 실행은 90분 뒤 `abandoned`로 닫힘).
+한 실행은 15분 안에 끝냅니다(20분 주기, 진행 중 실행은 90분 뒤 `abandoned`로 닫힘).
 
 1. **기록 열기**: `node scripts/ai-operator.mjs start`. 멈춤이면 종료 코드 1이며 아무것도 하지 않고 끝냅니다. `agent_run_in_progress`면 다른 실행이 있으므로 끝냅니다.
 2. **읽기**: `node scripts/ai-operator.mjs context`(직전 실행 5개의 요약·다음 할 일·PR, 지표, 멈춤 상태), `pnpm work:next --all`, 열린 PR(`gh pr list`), 최근 Deploy 실행(`gh run list --workflow deploy.yml -L 3`), 실행 호스트에 Sentry 토큰이 있으면 새 이슈·의견. 직전 실행이 남긴 `다음 할 일`부터 봅니다.
@@ -64,7 +64,7 @@
 
 | 항목 | 상한 |
 | --- | --- |
-| 실행 시간 | 25분 |
+| 실행 시간 | 15분 |
 | main 머지 | 실행당 1개, 하루 8개 |
 | 운영 쓰기 | 실행당 20건. 크리에이터 여러 명에게 같은 쓰기(정지·차단 등)는 실행당 5명 |
 | 새 work item | 실행당 3개 |
@@ -89,9 +89,9 @@
    ```
 
 2. **확인**: `node scripts/ai-operator.mjs precheck`가 종료 코드 0이면 준비가 된 것입니다. Cloudflare 차단으로 나오면 VPN·exit node를 끄고 집 회선으로 나가게 합니다.
-3. **자동화 생성**: `node scripts/ai-operator.mjs automation-command`가 출력한 `orca automations create …` 명령을 그대로 실행합니다. 30분마다(`*/30 * * * *`, `Asia/Seoul`) 프리체크를 돌리고 통과하면 omp 에이전트를 `origin/main` 기준 새 worktree에서 실행합니다.
+3. **자동화 생성**: `node scripts/ai-operator.mjs automation-command`가 출력한 `orca automations create …` 명령을 그대로 실행합니다. 20분마다(`*/20 * * * *`, `Asia/Seoul`) 프리체크를 돌리고 통과하면 omp 에이전트를 `origin/main` 기준 새 worktree에서 실행합니다.
 4. **GitHub 신원**: AI 전용 GitHub 계정(machine user)은 사람이 만들어야 합니다. 만들기 전까지 실행 호스트의 `gh` 자격을 쓰고 커밋 트레일러로 구별합니다. 만든 뒤에는 저장소 협업자로 추가하고 실행 호스트의 `gh auth`를 그 계정으로 바꿉니다.
-5. **실행 호스트**: 30분 실행은 운영자 Mac에서 돕니다. Mac이 꺼져 있거나 잠자기·네트워크 변경 중이면 그 주기는 빠지고 다음 주기에 이어 갑니다(Orca `--missed-run-grace-minutes 10`).
+5. **실행 호스트**: 20분 실행은 운영자 Mac에서 돕니다. Mac이 꺼져 있거나 잠자기·네트워크 변경 중이면 그 주기는 빠지고 다음 주기에 이어 갑니다(Orca `--missed-run-grace-minutes 10`).
 6. **실행 계정 분리(권장, 사람 선행 조건)**: Orca 자동화를 SSH 키·`sudo`·관리자 `gh` 자격·키체인 접근이 없는 별도 macOS 사용자(또는 VM·컨테이너)로 돌리고, `~/.config/crelink/ai-operator.env`는 그 사용자만 읽게 둡니다. 이것이 되기 전에는 AI 세션이 사람 자격을 쓸 수 있어 지킬 규칙 10이 지시로만 지켜집니다([ADR 0015](../adr/0015-ai-operator.md) 위험 수용).
 7. **CODEOWNERS·브랜치 보호(권장, 사람 선행 조건)**: `apps/api/src/auth/**`, `apps/api/src/ai-operator/**`, `apps/api/migrations/**`, `apps/web/src/app/api/agent/**`, `apps/web/src/lib/api/agent-proxy.ts`, `docs/ops/**`, `docs/adr/0015-*`, `.github/**` 변경에 사람 승인을 요구합니다. AI 전용 GitHub 계정(4)이 생긴 뒤에 효과가 있습니다(같은 계정이면 스스로 승인할 수 없도록).
 

@@ -427,7 +427,7 @@ function automationCommand(args) {
   const parts = [
     'orca automations create',
     `--name ${shellQuote('crelink-ai-operator')}`,
-    `--trigger ${shellQuote('*/30 * * * *')}`,
+    `--trigger ${shellQuote('*/20 * * * *')}`,
     '--timezone Asia/Seoul',
     '--provider omp',
     `--repo ${shellQuote(`path:${repo}`)}`,

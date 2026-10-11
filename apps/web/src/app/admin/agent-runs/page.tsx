@@ -87,7 +87,7 @@ function EmptyRuns({ first }: { first: boolean }) {
     <>
       <p className="empty-text">아직 AI 실행 기록이 없어요.</p>
       <p className="section-help">
-        실행 호스트에 AI 운영자 헌장(<code>docs/ops/ai-operator.md</code>)의 설치 절차대로 토큰과 30분 주기 자동화를
+        실행 호스트에 AI 운영자 헌장(<code>docs/ops/ai-operator.md</code>)의 설치 절차대로 토큰과 20분 주기 자동화를
         두면 실행마다 여기에 기록이 남아요.
       </p>
     </>

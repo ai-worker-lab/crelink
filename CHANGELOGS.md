@@ -4,6 +4,12 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-10-11
+
+- AI 운영자 주기를 20분(`*/20 * * * *`)으로 조정하고 한 실행 상한을 15분으로 줄였습니다. 실행 호스트 도구, 헌장·프롬프트·설계·ADR·PRD·운영자 화면·관련 운영 문서를 같은 계약으로 맞췄습니다. 기존 Orca 자동화는 `node scripts/ai-operator.mjs automation-command` 출력으로 갱신해야 합니다. 근거: 사용자 결정, `scripts/ai-operator.mjs`, `docs/ops/ai-operator.md`.
+- 현재 실행 호스트에는 AI 토큰 설정과 `crelink-ai-operator` Orca 자동화가 없어 실제 20분 운영을 시작할 수 없습니다. 사람이 런북 17-2의 토큰 발급과 헌장 설치 절차의 자동화 생성을 완료해야 합니다. 관련 절차를 `docs/ops/human-todo.md`에 추가했습니다.
+- 단일 운영 작업 `docs/work/orchestrator/0156-ai-operator-cadence-deploy.md`를 만들었습니다. localhost 검증 → PR CI → main Deploy → `links.shaul.kr` 운영 주소 검사까지의 수용 기준을 한 항목으로 추적합니다.
+
 ## 2026-10-10
 
 - 사람이 할 일 목록 `docs/ops/human-todo.md`(사용자 요청)를 만들었습니다. 절은 보안·운영 기반(AI 전용 GitHub 계정, 실행 계정 분리, CODEOWNERS, 시험 계정 지표 제외, 기본 Node 24, Mac 켜 두기), 실사용자 모집 H1~H5, 결정 대기(0152, 법률 검토), 정기(토큰 회전, 주 1회 실행 훑어보기)입니다. 헌장 `사람에게 알리기`에는 AI 운영자가 사람 작업을 이 목록에 더하고, 끝낸 항목의 결과를 확인하라는 규칙을 넣었습니다. `docs/README.md` 색인에도 넣었습니다. 근거 `docs/work/orchestrator/0155-human-todo-list.md`.

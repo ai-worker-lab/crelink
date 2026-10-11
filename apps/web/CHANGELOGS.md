@@ -2,6 +2,10 @@
 
 내부 참고용으로 웹 클라이언트의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-10-11
+
+- AI 실행 기록 화면의 주기 표기를 20분으로 맞췄습니다. 자동화 주기와 실행 호스트 안내의 원본은 `scripts/ai-operator.mjs`·`docs/ops/ai-operator.md`입니다.
+
 ## 2026-10-10
 
 - 로그인 전 홈 소개 화면(0154, 디자인 `design/home-intro/` 상태 A~E, PRD `목표`·R24 ④). `src/app/(public)/page.tsx`를 로그인한 홈(`SignedInHome`, 지금 `.landing` 한 열 그대로)과 로그인 전·로그인 확인 오류 소개(`HomeIntro`)로 나눔. 소개: 첫 화면(`.home-hero`, 글자 표시·제목·설명·이벤트 카드(있을 때)·오류 줄(오류일 때)·`구글로 시작하기`, 1024px 이상은 오른쪽 예시), 새 `components/HomeExampleLanding.tsx`(가상 `예시 크리에이터` 고정 마크업, `.preview-device` 틀·`예시 화면` 표시·캡션, 틀 안은 `aria-hidden`+`inert`, 제목·링크 요소 없음), `이렇게 시작해요` 단계 카드 3개(`ol role="list"`)와 `사용 안내 자세히 보기`(`CRELINK_WEB_PATHS.docsGuide`), `무료로 쓸 수 있어요` 카드 3개(숫자는 `CRELINK_LIMITS.freeVisibleLinks`·`slugChangeIntervalDays`·`retiredSlugGraceDays`)와 광고 안내 한 줄, 마지막 `구글로 시작하기`. 두 버튼 모두 `/auth/google`(쿼리 없음). `styles.css`에 `.home-intro`·`.home-hero*`·`.home-example*`·`.home-section`·`.home-cards`·`.home-card`·`.home-step*`·`.home-more`·`.home-free-note`·`.home-final`(701px 이상 구획 사이 48·제목 27, 1024px 이상 두 열·카드 3열). E2E `tests/e2e/slot-event.spec.ts` 홈 `구글로 시작하기` 단언을 첫 링크로 좁힘. 새 API·DB·개인정보 수집 없음.

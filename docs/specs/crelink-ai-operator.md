@@ -16,7 +16,7 @@
 4. **AI 실행 기록**: `agent_runs`에 실행마다 시작·끝·상태·요약·한 일·다음 할 일·관련 PR/work item·모델/비용을 남깁니다. 실행 중 AI 쓰기는 `X-Crelink-Agent-Run` 헤더(진행 중인 자기 실행 id)가 있어야 합니다. 다음 실행은 직전 실행 기록을 읽어 이어 갑니다.
 5. **멈춤 스위치**: `ai_operator_settings.paused`. 사람 운영자만 바꿉니다. 켜져 있으면 실행 시작이 `paused` 기록만 남기고 끝나며, 진행 중인 실행의 크리링 API 쓰기도 즉시 409 `ai_operator_paused`입니다(실행 닫기만 허용). API를 거치지 않는 main 머지·외부 공개는 실행이 그 직전에 `guard`로 다시 확인해 멈춥니다(헌장 지시). 확실히 막으려면 Orca 자동화를 끕니다.
 6. **겹침 금지**: 실행 시작이 DB에서 원자적으로 확인합니다(진행 중 실행은 부분 유니크 인덱스로 최대 1개). 진행 중 실행이 있으면 409 `agent_run_in_progress`, 시작 뒤 90분이 지난 진행 중 실행은 `abandoned`로 닫습니다. 실행 호스트의 프리체크도 같은 상태를 먼저 봅니다.
-7. **30분 트리거**: 운영자 Mac의 Orca 자동화가 `*/30 * * * *`(`Asia/Seoul`)에 프리체크(`scripts/ai-operator.mjs precheck`)를 돌리고, 통과하면 omp 에이전트를 `origin/main` 기준 새 worktree에서 실행합니다. 프롬프트는 [AI 운영자 헌장](../ops/ai-operator.md)을 읽게 합니다. 자동화 생성 명령은 스크립트가 출력합니다(`automation-command`). 기존 작업 실행기(`pnpm work:run`)는 work item을 하나씩 맡기는 도구이고, AI 운영자는 그 위에서 무엇을 할지 고르는 주기 실행입니다. AI 운영자가 실행기를 부를 필요는 없습니다. `[AI 결정]`
+7. **20분 트리거**: 운영자 Mac의 Orca 자동화가 `*/20 * * * *`(`Asia/Seoul`)에 프리체크(`scripts/ai-operator.mjs precheck`)를 돌리고, 통과하면 omp 에이전트를 `origin/main` 기준 새 worktree에서 실행합니다. 프롬프트는 [AI 운영자 헌장](../ops/ai-operator.md)을 읽게 합니다. 자동화 생성 명령은 스크립트가 출력합니다(`automation-command`). 기존 작업 실행기(`pnpm work:run`)는 work item을 하나씩 맡기는 도구이고, AI 운영자는 그 위에서 무엇을 할지 고르는 주기 실행입니다. AI 운영자가 실행기를 부를 필요는 없습니다. `[AI 결정]`
 8. **지표**: `GET /api/admin/metrics`가 실사용자 수(PRD `목표` 정의)와 가입·방문·클릭·광고 배너 성과를 돌려줍니다. 이벤트 수치(0089)는 `events` 배열에 붙입니다.
 9. **정책**: AI 운영자는 저장소 정책의 "배포·외부 공개 명시 요청", "main 머지 전 알림", "제품 방향은 사용자 결정", "운영 확인 전 알림"에서 헌장 범위만큼 예외입니다([ADR 0015](../adr/0015-ai-operator.md)). 사용자 데이터 파기·비밀값 노출·법·약관 위반은 예외가 없습니다.
 10. **통합 브랜치**: 모든 티켓을 `work/0091-ai-operator-design` 한 브랜치·PR로 통합합니다([작업 관리](../work/README.md) `여러 역할을 한 브랜치에 묶을 때`).
@@ -29,7 +29,7 @@
 | R23 ② 권한 위임·AI 승인 근거 | — | — | — | 헌장·ADR(0108, 0091) |
 | R23 ③ 행동 기록 | `/admin/actions`, 실행 상세의 행동 목록 | 모든 `/api/admin/*` 쓰기, `GET /api/admin/actions` | `operator_actions` | 0100, 0102, 0106 |
 | R23 ④ 실행 기록(390px) | `/admin/agent-runs`, `/admin/agent-runs/{id}` | `POST·PATCH·GET /api/admin/agent-runs` | `agent_runs` | 0100, 0103, 0105, 0108 |
-| R23 ⑤ 30분 트리거·겹침 금지 | — | `POST /api/admin/agent-runs` 409 | `agent_runs_one_running_idx` | 0103, 0108 |
+| R23 ⑤ 20분 트리거·겹침 금지 | — | `POST /api/admin/agent-runs` 409 | `agent_runs_one_running_idx` | 0103, 0108 |
 | R23 ⑥ 멈춤 스위치 | `/admin/agent-runs` 멈춤 스위치 | `PUT /api/admin/ai-operator/pause`, 쓰기 409 `ai_operator_paused` | `ai_operator_settings` | 0101, 0103, 0105, 0108 |
 | R23 ⑦ 법·약관 | — | — | — | 헌장(0108) |
 | R23 ⑧ 실사용자 지표 | `/admin/agent-runs` 지표 카드, 크리에이터 상세 `지표 제외` | `GET /api/admin/metrics`, `PUT /api/admin/creators/{id}/metrics-exclusion` | `users.metrics_excluded_at` | 0100, 0102, 0103, 0105, 0106 |
@@ -39,7 +39,7 @@
 ## 구성과 흐름
 
 ```text
-Orca(운영자 Mac, */30, Asia/Seoul)
+Orca(운영자 Mac, */20, Asia/Seoul)
   ├─ precheck: git -C <기준 checkout> fetch → git show origin/main:scripts/ai-operator.mjs > 임시 파일 → node 임시 파일 precheck
   │     토큰 파일(600) 확인 → GET /api/agent/api/admin/ai-operator
   │       멈춤 → POST agent-runs(=paused 기록) → 종료 1(Orca가 건너뜀으로 기록)
