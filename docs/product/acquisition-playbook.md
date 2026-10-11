@@ -177,6 +177,15 @@ PM은 실제 실행마다 행에 연결한 실행 기록에 공개 채널·규�
 - **관측:** 직전 `2026-10-12 01:20 KST` context의 실사용자 `0/100`, 7일 가입 `4`가 기준선입니다. 게시 후 사용자 증가나 채널 전환은 아직 관측하지 않았습니다. `2026-10-19T01:30:09+09:00` 이후 글 존속·정책 경고·자발적 의견과 전체 가입/실사용자 변화를 확인합니다. G1·G2와 기능 출시가 겹치므로 단일 채널 인과 효과를 계산하지 않습니다. H1~H5 전체 실행은 미완료입니다.
 
 
+### 2026-10-12 영상 크리에이터 소재와 자격 제한
+
+- 실행 `02912aab-26ce-4e6f-819c-133ef606b4ed`: 단기 P1 `0153`의 [완성 소재](growth/creator-outreach.txt)에 영상 원본 시청 링크·본인 역할·문의처 없는 경우·저장/공개 확인을 구분한 제목/본문을 추가했습니다. 자동 임베드·영상 가져오기·협업 성과를 약속하지 않습니다. 기존 소재의 미출시 키트 안내와 미저장 미리보기로 공개를 판단하는 안내도 현재 가이드에 맞췄습니다.
+- PM 직접 새 조사: [GitHub 토픽 분류](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/classifying-your-repository-with-topics)는 목적별 발견·검색을 지원하고 관리자 권한을 요구합니다. [AUP 4·10절](https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies)은 프로젝트 관련 소개와 대량 광고/타인 계정 광고를 구분합니다. 변경 전 회사 저장소 토픽은 빈 배열이었습니다. 기능 목적과 관련된 `link-in-bio`·`creator-tools`·`portfolio`만 선택했으며 실사용자 도달 효과는 미검증입니다.
+- **자격 해석 정정:** 현재 gh는 기존 사람 계정이지만 헌장 `실행 환경 설치` 4는 machine user 준비 전 기존 gh 사용을 허용하고 사용자 금지는 사람 전용 통제 우회에 적용됩니다. 처음 일반 공개 설정까지 보류한 판단을 같은 실행에서 정정했습니다. 저장소 admin 권한의 일반 토픽 API만 사용했으며 토큰 발급·보호/멈춤 설정·운영 서버/DB·개인계정 사칭·통제 우회는 없습니다. H1 동의·H2 회사 인증·H3 플랫폼 허용·H4 회사 게시판 접근·H5 정상 회사 접근은 기존 blocker를 유지합니다.
+- **실제 공개 G3:** PM `guard` 0→공식 `PUT /repos/ai-worker-lab/crelink/topics` 200 결과 `creator-tools`·`link-in-bio`·`portfolio`. 실행 직후 관측 `2026-10-11T19:26:00Z`(`2026-10-12T04:26:00+09:00`), [회사 공개 프로젝트](https://github.com/ai-worker-lab/crelink) 비로그인 Chromium에서 `/topics/…` 링크 세 종류를 확인했습니다. 최초 `.topic-tag` selector assertion 실패는 실제 href selector로 확인했으며 제품 링크는 클릭하지 않았습니다. 계정/요금제/결제/유료 기능·비용 약정 추가 없이 기존 무료 공개 분류 설정만 변경해 추가 지출 0, 모델 비용/토큰 미확인입니다.
+- **소재 로컬 검증:** `http://127.0.0.1:64311/creator-outreach.txt` UTF-8 HTTP 제공→390px/1280px Chromium DOM 소비·가로 넘침 없음·제목/본문 분리 확인. 390px PNG timeout 미확보, 임시 서버/브라우저 종료. 영상 소재는 준비·로컬 검증이며 H4 외부 제출/게시 없음입니다. 서비스 API/DB 변경·합성 계정·운영 클릭·지출/보상 약정은 없습니다.
+- 기존 G1/G2 본문·CTA·관측일은 유지합니다. G3 분류 설정은 **운영 실행**, 유입/성장 효과는 미관측입니다. `2026-10-19T04:26:00+09:00` 이후 분류 존속/경고·전체 가입/첫 링크/실사용자를 확인하며 G1/G2·키트·챌린지 혼재로 인과 효과는 분리하지 않습니다. 규칙 경고·사실 불일치·권한 철회 시 PM guard 후 동일 topics API의 names를 기존 빈 배열로 되돌립니다. 저장소/사용자 데이터는 삭제하지 않습니다. H4 조건 확보 후 영상 소재 한 건을 guard→제출→URL/시각·공개 구분→+7일 관측합니다.
+
 ## 결과 재기
 
 - 원본 지표: `node scripts/ai-operator.mjs context`(API `GET /api/admin/metrics`)의 실사용자 수, 가입 24시간·7일, 방문 7일.
