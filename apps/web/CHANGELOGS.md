@@ -2,6 +2,10 @@
 
 내부 참고용으로 웹 클라이언트의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-10-12
+
+- `0168` 협업 가이드에 첫 대표 작업 선택·역할 제목 예시·로그아웃한 방문자의 외부 주소 접근 확인·비공개 정보 제외·기존 링크 직접 수정 안내를 구현했습니다. 기존 문서 URL·Server Component·스타일·CTA를 재사용하고 새 계정/추적/외부 공개 권한 변경은 하지 않습니다. 근거: `src/app/(public)/docs/creator-portfolio-page/page.tsx`, `docs/work/orchestrator/0168-creator-starter-kit.md`.
+
 ## 2026-10-11
 
 - 협업 가이드 `/docs/creator-portfolio-page`에 가상의 3목적 구성 예시와 첫 링크 직접 작성 안내를 추가했습니다(0168). 현재 `prose`·Server Component·CTA·메타데이터를 유지하고 예시 URL/외부 클릭·새 수집·새 컨트롤 없이 사용자 소유 HTTP(S) 주소와 명시 저장을 안내합니다. localhost 390px/1280px DOM·내부 탐색 확인, 이미지 캡처 timeout·운영 미출시. 근거: `src/app/(public)/docs/creator-portfolio-page/page.tsx`, `docs/work/orchestrator/0168-creator-starter-kit.md`.

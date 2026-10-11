@@ -4,6 +4,10 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-10-12
+
+- `0168`의 Research 순환7/8에서 Notion 공식 공개 페이지의 방문자용 주소·하위 페이지/기여자 정보 공개 경계를 확인하고, 기존 협업 가이드에 대표 작업 선택·방문자 접근/공개 권한 점검 소재를 실제 구현했습니다. localhost 390px/1280px 렌더·내부 탐색·가로 넘침을 확인했고 시각 캡처는 timeout입니다. 전체 키트는 진행, 출시는 미수행·성장 효과는 미관측입니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`, [웹 변경 기록](apps/web/CHANGELOGS.md).
+
 ## 2026-10-11
 
 - `0168` 기존 협업 가이드에 가상 구성·목적별 제목 예시·직접 HTTP(S) 주소 입력/저장·자발적 공유 안내를 실제 코드로 반영했습니다. localhost 390px/1280px DOM 가로 넘침·문서 목록과 사용 안내 이동을 확인했으며 이미지 캡처는 timeout으로 미확보입니다. 새 프리셋·운영 출시·성장 효과는 미완료/미관측입니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`, [웹 변경 기록](apps/web/CHANGELOGS.md).

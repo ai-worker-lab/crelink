@@ -392,3 +392,45 @@ Node24.18.0에서 원본 `parseHttpUrl`만 타입 제거해 실행했습니다. 
 
 - 공통 측정: 실제배포T0 없음·T0+7일 미정,가입5미만 표본부족·5이상도 인과아님。0164는2026-10-18T10:25Z이후·이번 글 출시시교란기록. 페이지/홈/키트/동일코호트 분모없음。비용/토큰 미확인;외부게시·사람계정·보상·개인정보·구매 승인 없음,기존0148/0153/0152/0147/0087 유지. 새공급자·금액요청없음.
 - SRE 안전정리: Orca repo `828cfee2-9609-4dae-a7fa-86c7811b8f93`의8 worktree와 automation `5e45d3d1-05e7-4051-ab77-71b3d78e9f30` runs를 정확한 id/provenance로 대조. run27 `1bd63b20-a5c4-45b4-89ca-e8ad830c91e8`은completed·clean·HEAD53564eb이origin/main ancestor·terminal `term_11c1e2cb-dc50-4129-a5a0-4cd8cc841687` tui-idle satisfied이나 Orca 결과에완료시각 필드가없어20분경과의독립근거 불충분으로보존. run28 `a1531c32-d0cc-49de-8f7c-0f09a9dcfcb5`도완료시각미제공·직전실행으로보존. 주checkout·현재run29·PR103/104/106 미병합·출처다른activation worktree보존. terminal close/rm·instance-destroy 실행없음·삭제0. 다음 완료시각의검증가능근거를확보한뒤재판정,카드/시작시각으로삭제금지.
+
+## 2026-10-12 대표 작업·방문자 접근 점검 소재 실행
+
+- 실행 `0a67138d-68da-47d4-a0b3-ccbfb5951c51`, 단일 `orchestrator`·`openai-codex/gpt-6.1-sol`. **초단기 0~48시간 P1 0168**의 기존 협업 가이드에 따라 할 수 있는 소재를 실제 추가했습니다. 전체 키트 수용 기준/프리셋 UI는 진행을 유지합니다.
+- 완료 조건: 첫 대표 작업 선택·역할 제목·방문자용 주소·공개 권한 확인 안내를 기존 글에 구현하고 localhost 390px/1280px 렌더와 내부 이동을 확인. 시각 캡처/전체 폼·API 검증은 미완료이며 운영 출시는 하지 않았습니다.
+- 새 심층 **Research, 순환7/8**. 질문: 편집 주소와 방문자 주소는 같은가? 링크 저장이 외부 공개 권한을 바꾸는가? 대체 도구를 권하면 공개 범위를 과하게 넓힐 위험이 있는가? 실제 수요/효과 근거가 있는가?
+- 새 출처: [Notion 공식 공개 페이지 안내](https://www.notion.com/help/public-pages-and-web-publishing), 확인일 2026-10-12. 공개 Site는 누구나 열 수 있고 하위 페이지도 기본 공개, 페이지 기여자의 이름/사진/이메일이 metadata에 포함될 수 있으며 workspace 편집 URL 대신 published URL을 공유하라고 설명합니다. 기능/공개 위험 사실이지 수요·성장 효과 증거가 아닙니다. 외부 계정 로그인/공개 설정 변경은 하지 않았습니다.
+- 결정: 새 Notion 계정/템플릿·일괄 공개 안내 대신 **현재 공개할 권한이 있는 작업 하나와 방문자용 주소를 고르는 자사 소재**를 선택했습니다. 문의/작업 링크 이용 준비를 돕는다는 것은 [INFERENCE]. 새 페이지·복제 SEO·0169 캠페인은 중복/승인/관측 이유로 보류합니다. 기존 CTA/0164 문구는 그대로입니다.
+- 코드: `apps/web/src/app/(public)/docs/creator-portfolio-page/page.tsx`에 `pf-choose-work` section·의미 있는 목록·가상 제목 고지를 추가. 기존 Server Component/prose/내부 링크/CTA/메타데이터와 디자인을 재사용, 새 컨트롤/토큰/URL 예시/수집/API/계정 생성 없음. 새 프리셋 디자인 인계 gate를 대체하지 않습니다.
+- 실제 실행: 기존 설치 의존성을 임시 symlink로 연결, Node24.18.0 `tsc -p apps/web/tsconfig.json --noEmit` 통과. webpack localhost `127.0.0.1:5299`에서 390px 새 4단계 소재 렌더·scrollWidth390, 1280px scrollWidth1280·기존 CTA href `/` 확인. 문서 목록→협업 글→사용 안내 실제 클릭 후 URL 도달 확인. 최초 비동기 이동의 완료 전 DOM 조회는 실패했고 `waitForUrl`로 완료 뒤 확인했습니다. 브라우저 오류에 이동 중 RSC 요청 `net::ERR_ABORTED` 1건이 남았으며 앱 예외는 관측되지 않았습니다. 실제 가입/저장/권한/DB 시험·합성 계정 생성은 미수행입니다.
+- 시각 한계: 기존 managed Chromium selector screenshot20초·CDP capture8초 timeout, 기존 Playwright Chromium1248을 독립 실행하고 GPU 비활성화해도 viewport screenshot20초 timeout. 도구 오류 보고 완료. 이미지 증거를 확보하지 못했으므로 시각 검증 완료/출시 완료를 주장하지 않습니다.
+
+### 8팀 보고·승인·측정
+
+기준은 이번 context 00:01 KST: 실사용자0/100·가입7일4·방문3·링크클릭0·신청1, 직전과 동일. P0 실제 장애/보안 사고는 이번 근거에서 발견하지 않았으며 Sentry 토큰/이슈는 미조회입니다. 주 지표는 기존 실사용자·첫 보이는 링크 생성자, 글/검색/소재 이용/동일 가입 코호트 분모와 사용자 수요는 미관측. T0는 아직 없고 실제 배포T0+7일 관측, 대상 가입5미만 표본 부족·5이상도 인과 아님. 0164는 `2026-10-18T10:25Z` 이후 점검, 그전 출시 시 교란을 기록합니다.
+
+| 책임·마지막 조사/변화 | 후보·추천/보류와 이번 실제 상태 | 측정·승인·다음 행동 |
+| --- | --- | --- |
+| Product/Activation: 10/11 23:41 심층 재검토, 지표 동일 | 기존 글 실행/0169 챌린지 비교. 첫 작업 접근 점검 소재 추천, 중복 챌린지 보류. 새 제품 기능 실행 없음 | 실제 저장만 가치 완료, 소재 노출은 활성화 아님. 프리셋 디자인/설계 뒤 구현, 자동 저장 금지 |
+| Research: 이번 10/12 새 심층7/8 | Notion 공개 안내/승인된 인터뷰 비교. 방문자 주소·공개 경계 근거로 소재 구현 추천, 외부 인터뷰 승인 전 보류. 조사/설계; 수요 새 관측 없음 | 경쟁사 기능/합성 persona는 수요 아님. 다음 정상 실행 Web/UX8/8, 실제 피드백 경로는0153 승인 뒤 |
+| Growth/Marketing: 10/11 22:01 심층·23:41 코드 재검토, 소재 추가 | 기존 가이드의 작업 선택/새 SEO 페이지/0153 모집 비교. 기존 글 추천, 복제·외부 게시 보류. 이번 page.tsx 실제 구현·로컬 검증 | 글/검색 분모 없음. 시각 증거·CI 뒤 배포 gate,0148/0153 사람 승인 유지 |
+| Events/Lifecycle: 10/11 22:21 심층 재검토, 신청1 동일 | 0169/완성 후 자발적 점검 비교. 소재에서 기존 링크 점검 추천, 중복 챌린지/새 보상 보류. 새 실행 없음 | 신청자 활성화/재방문 미관측.0168 T0+7일·새 장벽 근거 뒤0169 재판단, 외부 발송 없음 |
+| Web/UX: 10/11 23:41 렌더 보고 재검토, 이번 새 소재 렌더 | 기존 prose 목록/새 interactive checklist 비교. Server Component 목록 추천, 새 상태/컨트롤 보류. 이번 로컬 검증, 이미지 증거 미확보 | 390/1280 DOM·내부 이동 확인; 시각 캡처 문제 해소와 프리셋 승인 인계 뒤 정상/edge 실제 저장 검증 |
+| API/Data: 10/11 22:42 심층 재검토, 계약 변화 없음 | 기존 링크 계약/0087 추적 비교. 기존 계약 추천, 새 추적/참여DB 보류. 새 실행 없음 | 실제 첫링크 집계만 사용, 가입으로 나누지 않음. 합성 QA는 localhost·기본metricsExcluded=true·실제API/DB에서만 |
+| SRE/Release: 이번 PR103/104/106·최근Deploy3건success 조회 | 성장 소재 PR/오래된 유지보수 병합 비교. PR106 추천, 유지보수 자동 우선 보류. main 병합/Deploy 새 실행 없음, PR106 DIRTY·CI 목록0건 확인 | 기존 plan-only success를 이번 출시로 쓰지 않음. 최신main 충돌 보존 통합→최종CI→상한/guard→실제Deploy 주소검사 |
+| Security/QA: 10/11 23:01 심층 재검토·이번 소재 검토 | 가상 고지/일괄 공개 권한 확대 비교. 기존 공개 가능 작업·제목 역할 정확성 추천, 타인 자료/권한 확대 보류. 새 독립 시험 실행 없음 | 수집/법률 위험 수용 없음. 시각/전체 폼 검증 전 전체 출시완료 금지. 저장실패/권한/예시오인 시 코드revert·고객데이터 삭제 금지 |
+
+비용·승인: 비용 없는 저장소 소재 구현/localhost만 사용자 위임(2026-10-10, ADR0015)에 따른 AI 승인. 구매·광고·유료API/인프라·외부 게시/발송·사람 계정/권한·새 보상·법률/개인정보 위험 수용·운영 쓰기 없음. 기존0148/0153/0152/0147/0087 사람 요청 유지, 새 공급자/금액 요청 없음. 모델 비용/입출력 토큰 미확인.
+
+### SRE/Release 주기적 안전정리
+
+- automation `5e45d3d1-05e7-4051-ab77-71b3d78e9f30`의 runs와 repo `828cfee2-9609-4dae-a7fa-86c7811b8f93` worktree exact id/provenance를 대조했습니다.
+- run27 `1bd63b20-a5c4-45b4-89ca-e8ad830c91e8`, checkout `/Users/shaul/orca/workspaces/crelink/auto-crelink-ai-operator-2-run-27-20261011T1400`: completed, clean·HEAD53564eb이origin/main ancestor, terminal `term_11c1e2cb-dc50-4129-a5a0-4cd8cc841687` tui-idle satisfied.
+- run28 `a1531c32-d0cc-49de-8f7c-0f09a9dcfcb5`, checkout `/Users/shaul/orca/workspaces/crelink/auto-crelink-ai-operator-2-run-28-20261011T1420`: completed, clean·HEAD0a89bc4가origin/main ancestor, terminal `term_dbabad65-2a7c-4f6a-b560-57545bd2febd` tui-idle satisfied.
+- run29 `5ba7a638-e7b8-4a2e-aaa1-f0d09b15627b`도completed지만 23:51 종료의 직전 실행, 20분 미경과로 보존. run30 현재·주checkout·PR103/104/106 미병합·출처다른activation worktree는 보존.
+- Orca runs는completedAt을 제공하지 않아 run27/28의 독립 완료시각 증거를 이번에도 확정하지 못했습니다. **이번 00:03 KST에 completed 상태를 실제 관측했다는 상한 증거**를 남깁니다. 다음 실행 00:23 KST 이후 같은 exact id가 여전히completed이면 이 관측 이후20분을 경과한 것으로 재판정 가능하며, 시작시각·카드 상태만으로 삭제하지 않습니다. 이번 삭제0·terminalclose/instance-destroy/rm 미실행, 관련 자격/볼륨에 접근하지 않았습니다.
+
+### 검증 추가와 인계
+
+- 깨끗한 desktop reload의 브라우저 errors는 빈 목록이었습니다. work139개·docs247개·design29개·scope7경로와 tsc 통과, OpenDesign lint는 미설치 skip입니다.
+- `next build --webpack` 컴파일·타입·14개 정적 페이지 생성 통과. 임시 worktree 밖 의존성 symlink 때문에 standalone 출력의27개 traced file 제외 경고가 있어 운영 이미지 빌드/전체 `pnpm verify` 통과로 해석하지 않습니다.
+- 로컬 서버·독립 Chromium 종료, 임시 의존 연결은 커밋 전 제거합니다. 새 가입/폼/API/DB·전체 smoke/e2e는 미수행입니다.
