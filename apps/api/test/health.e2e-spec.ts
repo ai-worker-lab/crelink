@@ -148,7 +148,7 @@ describe('readiness', () => {
 
   it('실행 중 DB가 사라지면 readiness는 503과 ApiError를 반환하고 liveness는 200을 유지한다', async () => {
     // 데이터베이스를 강제로 지워 API의 기존 연결을 끊고 새 연결도 실패하게 만듭니다.
-    await database.drop();
+    await database.drop({ force: true });
 
     const ready = await fetch(`${baseUrl}/api/health/ready`);
     expect(ready.status).toBe(503);
