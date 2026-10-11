@@ -2,22 +2,22 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 진행
+- 상태: 검증
 - 종류: 운영
 - 우선순위: P1
 - 작성일: 2026-10-11
 
 ## 목적
 
-Crelink 운영·활성화를 Product, Growth, Web, API/Data, SRE/Release, Security/QA 에이전트로 분해하고, 제2 AI 운영자를 총괄 실행자로 사용해 비용 없는 첫 실행 작업을 진행합니다.
+Crelink 운영·활성화를 Product, Growth, Web, API/Data, SRE/Release, Security/QA 책임 영역으로 나누어 단일 `orchestrator`가 직접 진단·실행하고, 제2 AI 운영자를 총괄 실행자로 사용해 비용 없는 첫 실행 작업을 진행합니다.
 
 ## 수용 기준
 
 - [x] 팀 역할·권한 단계·비용 지출 사람 승인 게이트가 운영 문서에 기록됩니다.
 - [x] Product, SRE, Security/QA 진단 결과와 근거가 수집됩니다.
-- [ ] Growth/SEO 진단은 Orca 워커 trust workspace 차단을 해소한 뒤 수집하거나 사람 선행 작업으로 남깁니다.
-- [ ] 진단에서 선택한 비용 없는 활성화 작업을 work item으로 만들고 localhost·CI·prod까지 완료합니다.
-- [ ] 각 실행에 work item·PR·Deploy·다음 할 일이 연결됩니다.
+- [x] Growth/SEO 진단은 별도 워커를 호출하지 않고 단일 `orchestrator`가 공식 자료·현재 지표·기존 SEO 작업을 직접 확인해 수집합니다.
+- [x] 진단에서 선택한 비용 없는 활성화 작업 `0164`를 work item으로 만들고 localhost·CI·prod까지 완료합니다.
+- [x] 이번 실행 기록에 work item·기존 PR·Deploy·다음 할 일을 연결합니다.
 
 ## 권한·비용 경계
 
@@ -35,3 +35,7 @@ Crelink 운영·활성화를 Product, Growth, Web, API/Data, SRE/Release, Securi
 - 2026-10-11: `run_e94fde343af2`를 생성하고 Product & Activation, SRE & Release, Growth & SEO, Security & QA 1차 진단을 배정했습니다. Product·SRE·Security/QA는 읽기 전용 보고를 제출했고, Growth/SEO는 `agent-trust-workspace`에서 세 번 시작이 차단되어 자원을 해제했습니다.
 - 2026-10-11: 진단 기준선은 크리에이터 4명, 실사용자 0명, 최근 7일 가입 4명·방문 3건·외부 링크 클릭 0건입니다. 코호트 전환율·재방문율은 현재 지표에 없어 추정하지 않습니다.
 - 2026-10-11: 첫 파동을 토대로 비용 없는 활성화 작업을 선정해 다음 작업으로 인계합니다.
+- 2026-10-11: 실행 `35510a21-92c5-4d88-b0a0-b46c74695833`에서 별도 Growth/SEO 워커 대신 단일 `orchestrator`가 직접 확인했습니다. 사실은 실사용자 0/100, 크리에이터 4명(지표 제외 0명), 최근 7일 가입 4명·방문 3건·외부 링크 클릭 0건·크리링 배너 노출 4·클릭 1·슬롯 이벤트 신청 1건입니다. `0141` 검색 기본기와 `0146` 활용 가이드는 배포되어 있고, Google SEO Starter Guide는 유용한 사람 중심 콘텐츠·설명적인 제목/URL·내부 링크를 권하지만 검색 반영은 수 시간~수개월 걸릴 수 있으며 sitemap 제출은 필수가 아니라고 설명합니다. 검색엔진 소유 확인·sitemap 제출(`0148`)과 외부 모집(`0153`)은 사람 계정이 필요해 실행하지 않습니다.
+- 2026-10-11: 위 사실에서 즉시 병목은 가입 후 화면보다 외부 유입 부족으로 판단했습니다(추론). 비용·외부 계정 없이 실행 가능한 선택은 `0163`이 연결한 `0164` 공개 랜딩→첫 공개 링크 활성화 실험이며, PR [#99](https://github.com/ai-worker-lab/crelink/pull/99)·Deploy [38131910719](https://github.com/ai-worker-lab/crelink/actions/runs/38131910719)로 localhost·CI·prod 경로를 완료했습니다. `0164`의 배포 후 7일 측정(2026-10-18T10:25Z 이후)과 지표 대상 가입자 5명 미만 시 표본 부족 기록은 다음 실행으로 넘깁니다.
+- 2026-10-11: `0158` 수용 기준을 실제 진단·연결 근거에 맞춰 `검증`으로 인계합니다. 다음은 `0164`를 0161 정의로 재측정하고, 사람 결정 필요 항목 `0148`·`0153`을 외부 계정·게시 없이 대기하는 것입니다.
+- 2026-10-11: 이 문서 변경은 [PR #101](https://github.com/ai-worker-lab/crelink/pull/101)로 연결했습니다. main 머지와 운영 배포는 CI 완료 후 `guard`를 다시 확인하고 다음 실행에서 처리합니다.

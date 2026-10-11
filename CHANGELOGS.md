@@ -21,6 +21,7 @@
 - AI 운영자가 무변경으로 멈추지 않고 공개 자료·현재 지표·사용자 피드백을 조사해 가설과 비용 없는 가역적 실험을 연결하도록 능동 연구 루프를 운영 헌장·실행 프롬프트·팀 역할에 추가했습니다. `docs/work/orchestrator/0163-autonomous-research-loop.md`에 출처, 측정, 중단 조건과 사람 승인 경계를 기록했습니다.
 - 20분 자동화 담당자를 단일 `orchestrator` 에이전트로 고정하고, 전문 역할별 agent spawn·dispatch를 금지했습니다. Orca `crelink-ai-operator-2`에 `--model GPT-5.6-Luna`를 설정하고 제2 운영자 환경의 `CRELINK_AI_MODEL`도 같은 값으로 맞췄습니다. work item `0165`와 운영 헌장·프롬프트에 기록했습니다.
 - AI 실행 기록에 `agent` 필드를 추가했습니다. `scripts/ai-operator.mjs`는 기본 담당자 `orchestrator`, 실행 호스트, 모델, 비용·입출력 토큰 수를 시작·종료 기록에 남기고 `/admin/agent-runs`에서 함께 표시합니다. 기존 실행은 확정할 수 없는 에이전트를 `NULL`로 보존합니다.
+- `0158` AI 운영팀의 Growth/SEO 진단을 단일 `orchestrator`가 직접 수행하도록 현재 실행 정책에 맞췄습니다. 실사용자 0/100·최근 7일 방문 3건 기준 외부 유입 부족을 병목으로 기록하고, 이미 배포된 `0164` 활성화 실험의 PR #99·Deploy 38131910719와 2026-10-18T10:25Z 이후 측정 다음 일을 연결했습니다. 검색엔진 등록·외부 모집은 사람 계정 필요로 유지합니다. 근거: `docs/work/orchestrator/0158-ai-operations-team.md`.
 
 ## 2026-10-10
 
