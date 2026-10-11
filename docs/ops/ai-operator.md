@@ -39,12 +39,12 @@
 한 실행은 15분 안에 끝냅니다(20분 주기, 진행 중 실행은 90분 뒤 `abandoned`로 닫힘).
 
 1. **기록 열기**: `node scripts/ai-operator.mjs start`. 멈춤이면 종료 코드 1이며 아무것도 하지 않고 끝냅니다. `agent_run_in_progress`면 다른 실행이 있으므로 끝냅니다.
-2. **읽기**: `node scripts/ai-operator.mjs context`(직전 실행 5개의 요약·다음 할 일·PR, 지표, 멈춤 상태), `pnpm work:next --all`, 열린 PR(`gh pr list`), 최근 Deploy 실행(`gh run list --workflow deploy.yml -L 3`), 실행 호스트에 Sentry 토큰이 있으면 새 이슈·의견. 직전 실행이 남긴 `다음 할 일`부터 봅니다.
-3. **고르기**: 목표(실사용자 100명)에 가장 가치가 큰 일 **1개**를 고릅니다. 순서: 운영 장애·배포 실패 복구 → 직전 실행이 이어 달라고 한 일 → 사용자 의견·오류 → 목표 지표를 움직일 개선. 고른 이유를 한 줄로 남깁니다.
-4. **실행**: 운영 쓰기는 `node scripts/ai-operator.mjs api <METHOD> <경로> [JSON]`(실행 헤더가 자동으로 붙음). 개발은 [긴 작업 이어 가기](#긴-작업-이어-가기). 검증은 저장소의 [검증 루프](../development/verification.md)를 따릅니다. main 머지, 외부 공개(게시·공지·외부 서비스 등록 등), 운영 쓰기 여러 건을 잇달아 하기 직전에는 `node scripts/ai-operator.mjs guard`를 부르고 종료 코드가 0일 때만 합니다(멈춤은 API 쓰기만 서버에서 막고, 머지·외부 공개는 이 확인으로만 멈춥니다).
-5. **기록 닫기**: `node scripts/ai-operator.mjs finish --status succeeded|failed --summary "<한두 문장>" --action "<한 일>"… --next "<다음 할 일>"… --ref pr=<이름>=<URL>…`. 실패해도 닫습니다(멈춤 중에도 닫을 수 있음).
-
-할 일이 없으면(지표·의견·오류·work item에 새 것이 없음) 읽기 뒤 바로 `finish --status succeeded --summary "할 일 없음: <근거>"`로 끝냅니다.
+2. **읽기**: `node scripts/ai-operator.mjs context`(직전 실행 5개의 요약·다음 할 일·PR, 지표, 멈춤 상태), `node scripts/work.mjs --next --all --json`, 열린 PR(`gh pr list`), 최근 Deploy 실행(`gh run list --workflow deploy.yml -L 3`), 실행 호스트에 Sentry 토큰이 있으면 새 이슈·의견. `pnpm work:next`가 실행되지 않으면 `node scripts/work.mjs`를 사용하고, 명령 실패를 "착수 가능한 일이 없음"으로 해석하지 않습니다. 직전 실행이 남긴 `다음 할 일`부터 봅니다.
+3. **백로그 판정**: `work:next --all`의 `eligible: false` 목록은 전체 미완료 백로그이지 빈 목록이 아닙니다. `진행`·`검증` work item에 현재 브랜치·PR·Deploy 연결이 있으면 먼저 상태와 다음 작업을 확인하고 이어 갑니다. 연결된 진행 작업이 없으면 우선순위가 가장 높은 `분류 대기` 중 비용·사람 승인·외부 계정이 필요 없는 항목 하나를 골라 `진행 기록`에 분류 근거를 남기고 `상태: 준비`로 바꾼 뒤 같은 실행에서 착수하거나 다음 실행의 명확한 `다음 할 일`로 남깁니다. 사람 결정·비용·외부 실행이 필요한 항목은 상태를 유지하고 `사람 결정 필요`로 기록합니다.
+4. **고르기**: 목표(실사용자 100명)에 가장 가치가 큰 일 **1개**를 고릅니다. 순서: 운영 장애·배포 실패 복구 → 직전 실행이 이어 달라고 한 일 → 현재 `진행`·`검증` 작업 → 사용자 의견·오류 → 목표 지표를 움직일 개선. 고른 이유를 한 줄로 남깁니다.
+5. **실행**: 운영 쓰기는 `node scripts/ai-operator.mjs api <METHOD> <경로> [JSON]`(실행 헤더가 자동으로 붙음). 개발은 [긴 작업 이어 가기](#긴-작업-이어-가기). 검증은 저장소의 [검증 루프](../development/verification.md)를 따릅니다. main 머지, 외부 공개(게시·공지·외부 서비스 등록 등), 운영 쓰기 여러 건을 잇달아 하기 직전에는 `node scripts/ai-operator.mjs guard`를 부르고 종료 코드가 0일 때만 합니다(멈춤은 API 쓰기만 서버에서 막고, 머지·외부 공개는 이 확인으로만 멈춥니다).
+6. **기록 닫기**: `node scripts/ai-operator.mjs finish --status succeeded|failed --summary "<한두 문장>" --action "<한 일>"… --next "<다음 할 일>"… --ref pr=<이름>=<URL>…`. 실패해도 닫습니다(멈춤 중에도 닫을 수 있음).
+7. **무변경 판정**: 모든 미완료 work item이 사람 결정·비용·외부 계정에 막혔고 운영 장애·실패 배포·열린 PR·지표 개선 후보가 없을 때만 무변경으로 닫습니다. 요약에 미완료 work item 번호와 각 blocker를 적습니다.
 
 ## 긴 작업 이어 가기
 
