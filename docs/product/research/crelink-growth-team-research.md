@@ -244,3 +244,22 @@
 | QA 10/12 06:24 PM 공개 소비 확인, 서비스심층10/12 출시 근거 재사용 | 비로그인390/1280 실제 본문·링크·페이지폭 확인 추천 / 미확보 이미지·운영 사용자 시험·성장 추정 보류 | PM G6 실제4셀·3링크·회사AI/무료/광고 고지 확인; 서비스/전문 QA 워커 새 실행 없음 | page390/390·1280/1280; JPEG20초timeout 신고·이미지 미확보·탭 종료; 7일 효과 미관측 |
 
 작은 단일 회사 콘텐츠 게시여서 새 Orca Run/Task/Dispatch/전문 워커는 열지 않았습니다. `check` Delivery0, 기존 accepted/released 작업은 재시작하지 않았고 legacy `task_4794a89c6e03`/`ctx_9f2c6510908d`는 user_owned·retained·start_unknown·unverifiable라 보존합니다. PM 자동화 provider `omp`·명시Sol 인자/PM 신원과 현재 터미널 GPT-6.1-Sol 표시는 확인했으나 구조화 실효 모델 receipt·비용/입출력 토큰은 미확인입니다. 공유 OS credential 경계는 지침 기반입니다. 비용 발생 시 공급자·예상 금액·취소 방법을 사람 승인 전에 남기며 무료 홍보 재승인은 요청하지 않습니다. 다음 순환은 오래된 SRE 새 근거이며 성장 과제의 실제 실행을 반복 유지보수로 대체하지 않습니다.
+## 2026-10-12 06:40 PM: 사진 타깃 소재·신규 채널과 SRE 심층
+
+- 실행 `79c74dc1-cc3e-49d7-98c9-3aafa118fcfb`. 단기3~7일 P1 `0153` 사진 타깃 실행 문안/preflight를 선택했습니다. 실사용자0/100·7일가입4·방문3·클릭0·신청누적1은 이번 context 값이며 채널분모/인과는 미관측입니다. P0 신규 장애/실패배포/보안사고 근거 없음, Sentry 접근 미확인으로 장애 부재 보증 없음. `0168` 실제 출시 완료와 `0169` 배포 후 관측을 재설계하지 않습니다. 새점검 기능·업데이트 이벤트는 실제 피드백/동기 공백, 같은 GitHub 소개 반복은 신규 도달 공백으로 보류합니다.
+- 새 심층은 **SRE PM 직접**입니다. `.github/workflows/deploy.yml:67-109,168-258`에서 영역 regex·ready/release/image gate·주소검사 실패에만 자동롤백·태그 조건을 읽고 실제 Actions jobs를 조회했습니다. 문서 경로의 `.txt`는 docs CI 대상으로 서비스 이미지에 포함되지 않습니다. 인계 PR와 서비스 웹 공개를 구분해야 합니다. 기존 Deploy38165056346은 web 실제빌드·home-server배포·주소검사 success/롤백skipped이며 이번 재배포가 아닙니다. 당일병합8건으로 새main/Deploy를 하지 않습니다.
+- Research/Growth PM 추가 새 근거: [Adobe 메타데이터 원문](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/metadata-basics-actions.html)은 EXIF GPS·IPTC contact/copyright를 설명합니다. 크리링 제거 기능 검증이나 수요 근거가 아닙니다. [Pixelfed.social 약관](https://pixelfed.social/site/terms)·[규칙](https://pixelfed.social/site/kb/community-guidelines)의 excessive advertising/무동의 개인정보 공개 제한과 정상가입 Cloudflare 장벽을 확인했습니다. 실행방식/무료/철회 미확인으로 그 인스턴스만 보류하며 다른 무료 경로를 찾습니다. 사람 홍보 재승인 대기가 아닙니다.
+- 실제 산출물/검증/한계/철회는 [원본 실행안](../acquisition-playbook.md#2026-10-12-사진-타깃-소재와-신규-채널-preflight)과 [완성 문안](../growth/photographer-outreach.txt) 한 곳에 둡니다. 외부 제출/공개·새 T0 없음; 준비를 성장으로 쓰지 않습니다.
+
+| 팀·마지막 확인/변화 | 후보2개·추천/보류 | 실제 주체·상태 | 측정·승인·다음 |
+| --- | --- | --- | --- |
+| Product 10/12 05:01 보고 재사용·제품계약 변화 없음 | 공개가능 대표작+문의 작성 추천 / 새점검기능은 실제막힌단계 공백 보류 | 전문워커 새실행 없음, PM0168/0169 수용기준 확인 | R25 10/19 02:44:02·R26 03:47:11 유지; 공개동의/권한 충족, 비용발생만 사전승인 |
+| Research 10/12 04:42 보고 재사용+이번 Adobe/Pixelfed PM 새원문 | 메타데이터/공개권한 점검 추천 / 사진 타깃 수요·과도광고허용 추정 보류 | PM 조사/설계·새인터뷰/워커 없음 | 수요·채널분모 미관측; 정상접근 가능한 다른 인스턴스/채널 규칙 확인 |
+| Growth 10/12 05:21 보고 재사용+이번 신규채널확인 | 사진 타깃 완성소재 추천 / GitHub유사재게시와 인증막힌Pixelfed 제출 보류 | PM 소재제작·로컬검증, 외부새실행 없음 | T0 없음; 실제공개 뒤+7일 전체가입/실사용자·분모부재. 무료/AI허용/철회 확인 후guard |
+| Events 10/12 05:41 보고 재사용·보상변화 없음 | 기존자율챌린지 유지 / 업데이트주간은 동기공백·혼재 보류 | 새실행 없음 | R26기존리뷰·신청누적1은전체집계. 참가자활성화/재방문 미관측·새보상연락 없음 |
+| Web 10/12 06:03 보고 재사용+PM PortfolioForm 직접읽기 | 제목/선택링크/설명/이미지·명시저장 안내 추천 / CTA재변경 보류 | 서비스UI/전문워커 새실행 없음 | 원본입력계약 변화없음·자동메타데이터제거 약속 없음; 실제피드백으로 다음UI판단 |
+| API 10/12 06:22 보고 재사용·수집변화 없음 | 기존동일정의 집계 추천 /0087은 제품개인정보 선행 보류 | context읽기, API/DB/합성/운영시험 새실행 없음 | 첫링크/가입코호트/포트폴리오 구분·채널전환율금지; localhost합성 기본제외 유지 |
+| SRE 10/12 이번 PM 새심층 | 문서/외부소재 인계 지원 추천 / 병합=서비스출시 주장·상한초과병합 보류 | 조사/실제Actions읽기·exact자동화/worktree보존판정, 새배포/삭제0 | 미병합43~49·현재50·main·userowned보존; 다음허용일 기록보존통합→CI→guard→1머지·실제job분리 |
+| QA 10/12 출시 서비스심층 재사용+이번 PM 소재검증 | 실제UTF8두폭소비/고지 추천 / 미확보이미지·합성성장·운영시험 보류 | PM localhost390/1280 확인, PNGtimeout미확보, 전문워커 새실행 없음 | 서비스DB시험 아님·T0없음; 경고/사실불일치면안내철회만, 사용자데이터삭제금지 |
+
+작은 단일 소재는 PM 직접 수행·새Orca Run/Task/Dispatch/워커 없음·Delivery0. legacy task_4794a89c6e03/ctx_9f2c6510908d user_owned/retained/start_unknown/unverifiable는 보존하고 중복편집/삭제하지 않습니다. 자동화provideromp·명시Sol·PM신원/터미널Sol표시 확인, 구조화 실효receipt·비용/토큰미확인·공유OS지침경계. 다음 정상 순환은 오래된 QA 새근거이며 실제 성장행동을 유지보수 반복으로 대체하지 않습니다.
