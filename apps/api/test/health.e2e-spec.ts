@@ -113,6 +113,7 @@ describe('API 기동과 health', () => {
         { version: '0003_ad_banner' },
         { version: '0004_ai_operator' },
         { version: '0005_slot_event' },
+        { version: '0006_agent_run_agent' },
       ]);
     } finally {
       await client.end();

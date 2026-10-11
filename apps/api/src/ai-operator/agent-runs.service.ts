@@ -22,6 +22,7 @@ interface RunRow {
   actor_user_id: string | null;
   status: AgentRunStatus;
   trigger: AgentRunTrigger;
+  agent: string | null;
   host: string | null;
   started_at: Date;
   ended_at: Date | null;
@@ -42,7 +43,7 @@ interface RunRow {
 
 /** `r`(agent_runs)의 view 컬럼. 실행 계정 이메일과 이 실행의 행동 기록 수를 함께 읽습니다. */
 const RUN_SELECT = `
-  SELECT r.id, r.actor_user_id, r.status, r.trigger, r.host, r.started_at, r.ended_at, r.paused_count, r.summary,
+  SELECT r.id, r.actor_user_id, r.status, r.trigger, r.agent, r.host, r.started_at, r.ended_at, r.paused_count, r.summary,
          r.actions, r.next_steps, r.refs, r.model, r.cost_usd, r.input_tokens, r.output_tokens,
          ${cursorAtSql('r.started_at')} AS cursor_at, u.email AS actor_email,
          (SELECT count(*)::int FROM operator_actions a WHERE a.run_id = r.id) AS operator_action_count
@@ -60,6 +61,7 @@ function runView(row: RunRow): AgentRunView {
     id: row.id,
     status: row.status,
     trigger: row.trigger,
+    agent: row.agent,
     host: row.host,
     startedAt: row.started_at.toISOString(),
     endedAt: row.ended_at?.toISOString() ?? null,
@@ -182,6 +184,7 @@ export class AgentRunsService {
       throw invalid('trigger는 schedule 또는 manual이어야 합니다.');
     }
     const trigger = input.trigger as AgentRunTrigger;
+    const agent = optionalText(input.agent, '에이전트(agent)', AI_OPERATOR_LIMITS.agentMax) ?? null;
     const host = optionalText(input.host, '실행 호스트(host)', AI_OPERATOR_LIMITS.hostMax) ?? null;
     const model = optionalText(input.model, '모델(model)', AI_OPERATOR_LIMITS.modelMax) ?? null;
     const inProgress = () =>
@@ -201,8 +204,8 @@ export class AgentRunsService {
           'SELECT paused, updated_at FROM ai_operator_settings FOR UPDATE',
         );
         const runId = settings.rows[0]?.paused
-          ? await this.recordPaused(client, actor, { trigger, host, model }, settings.rows[0].updated_at)
-          : await this.startRunning(client, actor, { trigger, host, model }, inProgress);
+          ? await this.recordPaused(client, actor, { trigger, agent, host, model }, settings.rows[0].updated_at)
+          : await this.startRunning(client, actor, { trigger, agent, host, model }, inProgress);
         return this.one(client, runId);
       });
     } catch (error) {
@@ -215,7 +218,7 @@ export class AgentRunsService {
   private async recordPaused(
     client: PoolClient,
     actor: RequestActor,
-    input: { trigger: AgentRunTrigger; host: string | null; model: string | null },
+    input: { trigger: AgentRunTrigger; agent: string | null; host: string | null; model: string | null },
     pausedSince: Date,
   ): Promise<string> {
     const merged = await client.query<{ id: string }>(
@@ -227,9 +230,9 @@ export class AgentRunsService {
     );
     if (merged.rows[0]) return merged.rows[0].id;
     const inserted = await client.query<{ id: string }>(
-      `INSERT INTO agent_runs (actor_user_id, status, trigger, host, model, ended_at)
-       VALUES ($1, 'paused', $2, $3, $4, now()) RETURNING id`,
-      [actor.userId, input.trigger, input.host, input.model],
+      `INSERT INTO agent_runs (actor_user_id, status, trigger, agent, host, model, ended_at)
+       VALUES ($1, 'paused', $2, $3, $4, $5, now()) RETURNING id`,
+      [actor.userId, input.trigger, input.agent, input.host, input.model],
     );
     return inserted.rows[0].id;
   }
@@ -237,14 +240,14 @@ export class AgentRunsService {
   private async startRunning(
     client: PoolClient,
     actor: RequestActor,
-    input: { trigger: AgentRunTrigger; host: string | null; model: string | null },
+    input: { trigger: AgentRunTrigger; agent: string | null; host: string | null; model: string | null },
     inProgress: () => Error,
   ): Promise<string> {
     const running = await client.query("SELECT 1 FROM agent_runs WHERE status = 'running'");
     if (running.rowCount) throw inProgress();
     const inserted = await client.query<{ id: string }>(
-      `INSERT INTO agent_runs (actor_user_id, status, trigger, host, model) VALUES ($1, 'running', $2, $3, $4) RETURNING id`,
-      [actor.userId, input.trigger, input.host, input.model],
+      `INSERT INTO agent_runs (actor_user_id, status, trigger, agent, host, model) VALUES ($1, 'running', $2, $3, $4, $5) RETURNING id`,
+      [actor.userId, input.trigger, input.agent, input.host, input.model],
     );
     return inserted.rows[0].id;
   }
@@ -269,6 +272,8 @@ export class AgentRunsService {
       changes.next_steps = JSON.stringify(textList(input.nextSteps, '다음 할 일(nextSteps)'));
     }
     if (input.refs !== undefined) changes.refs = JSON.stringify(refList(input.refs));
+    const agent = optionalText(input.agent, '에이전트(agent)', AI_OPERATOR_LIMITS.agentMax);
+    if (agent !== undefined) changes.agent = agent;
     const model = optionalText(input.model, '모델(model)', AI_OPERATOR_LIMITS.modelMax);
     if (model !== undefined) changes.model = model;
     if (input.costUsd !== undefined) {

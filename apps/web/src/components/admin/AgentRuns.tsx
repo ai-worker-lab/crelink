@@ -125,6 +125,10 @@ export function AgentRunBody({ run }: { run: AgentRunView }) {
           <dd>{run.actorEmail ?? '—'}</dd>
         </div>
         <div>
+          <dt>실행 에이전트</dt>
+          <dd>{run.agent ?? '—'}</dd>
+        </div>
+        <div>
           <dt>실행 호스트</dt>
           <dd>{run.host ?? '—'}</dd>
         </div>

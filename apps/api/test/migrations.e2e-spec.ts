@@ -519,4 +519,38 @@ describe('runMigrations', () => {
       expect((await pool.query('SELECT 1 FROM slot_events')).rowCount).toBe(0);
     });
   });
+  describe('0006_agent_run_agent', () => {
+    const source = join(__dirname, '../migrations');
+    const earlier = readdirSync(source)
+      .filter((name) => name.endsWith('.sql') && name < '0006_agent_run_agent.sql')
+      .sort();
+
+    beforeEach(async () => {
+      for (const name of earlier) copyFileSync(join(source, name), join(directory, name));
+      await runMigrations(pool, directory);
+      copyFileSync(join(source, '0006_agent_run_agent.sql'), join(directory, '0006_agent_run_agent.sql'));
+      await runMigrations(pool, directory);
+    });
+
+    it('기존 실행은 agent가 NULL이고 새 실행은 식별자를 저장하며 길이 제한을 지킨다', async () => {
+      const old = await pool.query<{ id: string }>(
+        "INSERT INTO agent_runs (status, trigger, ended_at) VALUES ('succeeded', 'schedule', now()) RETURNING id",
+      );
+      expect((await pool.query('SELECT agent FROM agent_runs WHERE id = $1', [old.rows[0].id])).rows).toEqual([
+        { agent: null },
+      ]);
+
+      const created = await pool.query<{ agent: string }>(
+        "INSERT INTO agent_runs (status, trigger, agent, ended_at) VALUES ('succeeded', 'manual', $1, now()) RETURNING agent",
+        ['orchestrator'],
+      );
+      expect(created.rows).toEqual([{ agent: 'orchestrator' }]);
+      await expect(
+        pool.query(
+          "INSERT INTO agent_runs (status, trigger, agent, ended_at) VALUES ('succeeded', 'manual', $1, now())",
+          ['a'.repeat(101)],
+        ),
+      ).rejects.toMatchObject({ code: '23514' });
+    });
+  });
 });

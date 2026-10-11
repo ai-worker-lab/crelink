@@ -70,7 +70,7 @@
 | main 머지 | 실행당 1개, 하루 8개 |
 | 운영 쓰기 | 실행당 20건. 크리에이터 여러 명에게 같은 쓰기(정지·차단 등)는 실행당 5명 |
 | 새 work item | 실행당 3개 |
-| 비용 | 실행 기록에 모델·비용(알 수 있으면)을 남기고, 7일 합계가 직전 7일의 2배를 넘으면 할 일을 줄입니다 |
+| 비용 | 실행 기록에 에이전트·모델·호스트·계정·트리거·시각·비용·입출력 토큰 수를 남깁니다. 비용을 알 수 있으면 기록하고, 7일 합계가 직전 7일의 2배를 넘으면 할 일을 줄입니다 |
 
 상한에 닿으면 남은 일을 `다음 할 일`로 넘깁니다.
 
@@ -87,9 +87,10 @@
    ```sh
    CRELINK_AI_BASE_URL=https://links.shaul.kr/api/agent
    CRELINK_AI_TOKEN=<런북 17 명령이 쓴 값>
+   CRELINK_AI_AGENT=orchestrator
    CRELINK_AI_HOST=operator-mac
+   CRELINK_AI_MODEL=GPT-5.6-Luna
    ```
-
 2. **확인**: `node scripts/ai-operator.mjs precheck`가 종료 코드 0이면 준비가 된 것입니다. Cloudflare 차단으로 나오면 VPN·exit node를 끄고 집 회선으로 나가게 합니다.
 3. **자동화 생성**: `node scripts/ai-operator.mjs automation-command`가 출력한 `orca automations create …` 명령을 그대로 실행합니다. 20분마다(`*/20 * * * *`, `Asia/Seoul`) 프리체크를 돌리고 통과하면 omp 에이전트를 `origin/main` 기준 새 worktree에서 실행합니다.
 4. **GitHub 신원**: AI 전용 GitHub 계정(machine user)은 사람이 만들어야 합니다. 만들기 전까지 실행 호스트의 `gh` 자격을 쓰고 커밋 트레일러로 구별합니다. 만든 뒤에는 저장소 협업자로 추가하고 실행 호스트의 `gh auth`를 그 계정으로 바꿉니다.
