@@ -7,8 +7,9 @@
 ## 2026-10-11
 
 - AI 운영자 주기를 20분(`*/20 * * * *`)으로 조정하고 한 실행 상한을 15분으로 줄였습니다. 실행 호스트 도구, 헌장·프롬프트·설계·ADR·PRD·운영자 화면·관련 운영 문서를 같은 계약으로 맞췄습니다. 기존 Orca 자동화는 `node scripts/ai-operator.mjs automation-command` 출력으로 갱신해야 합니다. 근거: 사용자 결정, `scripts/ai-operator.mjs`, `docs/ops/ai-operator.md`.
-- 현재 실행 호스트에는 AI 토큰 설정과 `crelink-ai-operator` Orca 자동화가 없어 실제 20분 운영을 시작할 수 없습니다. 사람이 런북 17-2의 토큰 발급과 헌장 설치 절차의 자동화 생성을 완료해야 합니다. 관련 절차를 `docs/ops/human-todo.md`에 추가했습니다.
+- 초기 상태에는 실행 호스트에 토큰과 `crelink-ai-operator` 자동화가 없었지만, 0157에서 제2 AI 계정·토큰과 `crelink-ai-operator-2` 20분 자동화를 설치해 첫 예약 실행과 `agent_runs` 기록을 확인했습니다. 제1 계정과 자동화는 중복 실행 방지를 위해 건드리지 않았습니다.
 - 단일 운영 작업 `docs/work/orchestrator/0156-ai-operator-cadence-deploy.md`를 만들었습니다. localhost 검증 → PR CI → main Deploy → `links.shaul.kr` 운영 주소 검사까지의 수용 기준을 한 항목으로 추적합니다.
+- 제2 AI 운영자 운영 변경을 `docs/work/orchestrator/0157-second-ai-operator.md`에 기록했습니다. 토큰 원문은 기록하지 않습니다.
 
 ## 2026-10-10
 
