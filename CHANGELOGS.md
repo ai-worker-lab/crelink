@@ -6,6 +6,7 @@
 
 ## 2026-10-12
 
+- PR #103 최신 main 통합에서 드러난 시험 DB 정리 경합을 제거했습니다. 정상 fixture 종료는 강제 연결 종료 없는 DROP을 사용하고, readiness의 실제 DB 장애 시험만 FORCE를 명시합니다. 실패를 무시하거나 테스트를 건너뛰지 않습니다. 근거: `apps/api/test/test-database.ts`, `apps/api/test/health.e2e-spec.ts`, `docs/work/orchestrator/0109-pm2-socket-path-length.md`.
 - `0153` 단기 P1 무료 모집을 실제 실행했습니다. Research/Growth의 Sol Orca 워커 결과로 현행 플랫폼/접근 blocker와 협업 문의용 제출 텍스트를 분리하고, PM은 `guard` 0 뒤 공식 GitHub 회사 프로젝트 About 소개·홈페이지 연결을 공개했습니다. localhost 텍스트 소비·공개 GitHub 표시를 확인했으며 디스콰이엇/커뮤니티 제출·성장 효과는 미관측입니다. 이전 완료 자동화 run27~30의 보존/idle/인스턴스 조건을 확인해 정확한 네 checkout만 정리했습니다. 근거: `docs/work/product/0153-acquisition-human-requests.md`, `docs/product/acquisition-playbook.md`, `docs/product/growth/creator-outreach.txt`.
 - 사용자가 무료 외부 홍보를 AI 자율 실행으로 위임하고 사람 승인 필수 범위를 지출·결제로 한정했습니다. PM·실행팀·운영 프롬프트·모집 실행안·팀별 계획의 과거 홍보 승인 대기를 실행/접근 조건으로 전환합니다. 법·플랫폼 규칙·수신동의·개인정보·사칭/스팸·인증/멈춤·데이터 보호 금지는 유지합니다. 실제 URL/시각·제출/공개/실패·철회·측정과 문안 준비를 구분하며 과거 기록은 보존합니다. 근거: `docs/work/orchestrator/0171-autonomous-public-promotion.md`, `docs/ops/ai-operator.md`, `docs/ops/ai-operations-team.md`.
 
