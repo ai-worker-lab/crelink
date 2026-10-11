@@ -18,6 +18,8 @@
 - 최근 실행이 `work:next --all`의 `eligible: false` 목록을 빈 백로그로 오인한 원인을 수정했습니다. `pnpm` 실패를 빈 작업으로 해석하지 않고 `node scripts/work.mjs`를 사용하며, `진행`·`검증` 연결 작업과 비용 없는 `분류 대기` 후보를 다음 작업으로 선택하도록 헌장·프롬프트와 `0162` work item을 추가했습니다.
 - AI 운영자 능동 연구 루프를 실행해 PostHog 활성화·퍼널 문서와 Google SEO Starter Guide를 확인했습니다. 기준선(실사용자 0/100, 지표 제외 0명, 7일 방문 3건·링크 클릭 0건)에서 `0164` 공개 랜딩→첫 공개 링크 활성화 실험을 `준비`로 등록하고, 검색엔진 계정·외부 모집은 사람 승인 대기로 유지했습니다. 근거: `docs/work/orchestrator/0163-autonomous-research-loop.md`, `docs/work/orchestrator/0164-first-link-activation-experiment.md`.
 - 0164 공개 랜딩→첫 공개 링크 활성화 실험을 구현했습니다. 정상 랜딩·관리 화면 미리보기 CTA가 첫 링크 추가 행동을 설명하도록 바뀌었고, CTA의 `/`→`구글로 시작하기` 흐름과 오류 랜딩 바닥글 동작을 E2E로 고정했습니다. 디자인 구조·API·DB·개인정보 처리에는 변경이 없습니다. 근거 `docs/work/orchestrator/0164-first-link-activation-experiment.md`.
+- AI 운영자가 무변경으로 멈추지 않고 공개 자료·현재 지표·사용자 피드백을 조사해 가설과 비용 없는 가역적 실험을 연결하도록 능동 연구 루프를 운영 헌장·실행 프롬프트·팀 역할에 추가했습니다. `docs/work/orchestrator/0163-autonomous-research-loop.md`에 출처, 측정, 중단 조건과 사람 승인 경계를 기록했습니다.
+- 20분 자동화 담당자를 단일 `orchestrator` 에이전트로 고정하고, 전문 역할별 agent spawn·dispatch를 금지했습니다. Orca `crelink-ai-operator-2`에 `--model GPT-5.6-Luna`를 설정하고 제2 운영자 환경의 `CRELINK_AI_MODEL`도 같은 값으로 맞췄습니다. work item `0165`와 운영 헌장·프롬프트에 기록했습니다.
 
 ## 2026-10-10
 
