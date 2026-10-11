@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 import pg from 'pg';
 import { readInstanceEnv } from './lib/instance.mjs';
+import { assertLocalE2ETargets } from './lib/e2e-local.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const fail = (message) => {
@@ -23,8 +24,14 @@ if (missing.length > 0) {
   fail(
     `E2E 대상 설정(${missing.join(', ')})이 없습니다.\n` +
       '- 이 작업공간의 서비스를 띄우세요: make up (값은 인스턴스 설정 .local/instance.env를 씁니다. 설정 확인: pnpm instance)\n' +
-      '- 다른 인스턴스를 검사하려면 네 값을 모두 환경변수로 넘기세요(tests/e2e/README.md).',
+      '- 다른 로컬 인스턴스를 검사하려면 네 값을 모두 루프백 주소의 환경변수로 넘기세요(tests/e2e/README.md).',
   );
+}
+
+try {
+  assertLocalE2ETargets(env);
+} catch (error) {
+  fail(error.message);
 }
 
 // 테스트 전에 세 서비스가 연결을 받는지 확인합니다. 응답 내용은 테스트가 검사합니다.

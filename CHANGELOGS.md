@@ -28,6 +28,9 @@
 - AI 실행 기록에 `agent` 필드를 추가했습니다. `scripts/ai-operator.mjs`는 기본 담당자 `orchestrator`, 실행 호스트, 모델, 비용·입출력 토큰 수를 시작·종료 기록에 남기고 `/admin/agent-runs`에서 함께 표시합니다. 기존 실행은 확정할 수 없는 에이전트를 `NULL`로 보존합니다.
 - 사용자 지적에 따라 Luna 최상위 설명을 정정하고 20분 단일 운영자의 모델을 `openai-codex/gpt-6.1-sol`로 전환했습니다. 자동화 실행 인자·프롬프트·프리체크·제2 운영자 모델 기록 설정을 일치시켰으며 실제 모델 요청의 `SOL_SMOKE_OK` 응답을 확인했습니다. 기존 실행 기록은 당시 모델을 유지합니다.
 - `0158` AI 운영팀의 Growth/SEO 진단을 단일 `orchestrator`가 직접 수행하도록 현재 실행 정책에 맞췄습니다. 실사용자 0/100·최근 7일 방문 3건 기준 외부 유입 부족을 병목으로 기록하고, 이미 배포된 `0164` 활성화 실험의 PR #99·Deploy 38131910719와 2026-10-18T10:25Z 이후 측정 다음 일을 연결했습니다. 검색엔진 등록·외부 모집은 사람 계정 필요로 유지합니다. 근거: `docs/work/orchestrator/0158-ai-operations-team.md`.
+- 정상 AI 운영을 유지보수 우선에서 신규 기능·마케팅·이벤트 **그로스 우선**으로 전환했습니다. 단일 `orchestrator`가 8개 팀의 근거·대안·추천 과제·선택/보류·측정·승인·다음 행동을 실행마다 구분 보고하며, 새 근거 조사는 팀별 순환합니다. 공식 자료와 현재 지표로 팀별 조사 보고를 작성하고 `0168` 협업 문의용 프로필 시작 키트, `0169` 첫 크리링 완성 챌린지를 계획했습니다. 기능/캠페인은 아직 출시하지 않았고 비용·외부 홍보·보상 승인 gate는 유지합니다. 근거: `docs/work/orchestrator/0167-growth-team-research.md`, `docs/product/research/crelink-growth-team-research.md`.
+- 8개 운영 책임 팀 각각의 초단기(0~48시간)·단기(3~7일)·중기(2~4주)·장기(2~3개월)와 P0/P1/P2를 96개 계획 셀로 문서화했습니다. 단계별 산출물·완료 조건·지표·첫 행동·승인/중단 조건을 정의하고 기존 성장 과제와 연결했습니다. 근거: `docs/ops/crelink-growth-roadmap.md`.
+- localhost 가상 사용자 시나리오를 추가하고 E2E 사용자를 기본 지표 제외로 생성하도록 바꿨습니다. 원격/혼합 URL·DB는 runner와 직접 fixture 모두 연결/정리 전에 거부합니다. 지표 포함 합성 대조군은 별도 personas 프로젝트에서 마지막에 실행하고, 기존 제외 토글 시나리오는 명시 대조군으로 유지합니다. 실사용자/시험 계정 관리·모의 시나리오·수명은 `docs/development/user-simulation.md`, 구현은 `tests/e2e/personas.spec.ts`·`fixtures.ts`·`scripts/lib/e2e-local.mjs`입니다. 안전 회귀는 기본 `pnpm test`에 포함됩니다. 운영 계정 생성·지표 재분류·API/schema 변경은 없습니다.
 
 ## 2026-10-10
 

@@ -42,7 +42,7 @@
 
 ## 연결
 
-- [팀별 그로스 조사(0167 읽기 전용 원본)](https://github.com/ai-worker-lab/crelink/blob/work/0167-growth-team-research/docs/product/research/crelink-growth-team-research.md)
+- [팀별 그로스 조사](../../product/research/crelink-growth-team-research.md)
 - [제품 요구](../../product/crelink.md)
 - [운영팀 연구·보고 계약](../../ops/ai-operations-team.md)
 - [기존 모집 문안](../../product/acquisition-playbook.md)
@@ -367,3 +367,5 @@ Node24.18.0에서 원본 `parseHttpUrl`만 타입 제거해 실행했습니다. 
 주 지표·분모·T0·7일 관측·안전/롤백은 PRD의 R25 관측 조건과 기존 측정 카드를 따릅니다. T0 없음(미출시),0164는 `2026-10-18T10:25Z` 이후 측정,가입5명 미만 표본부족. 연구/CI/로컬QA 성공은 성장성과가 아닙니다. 전 팀의 다음 측정일은 실제배포 T0+7일, 배포 전에는 미정입니다.
 
 승인: 무료 저장소 제품결정/연구만 AI 승인. 비용/외부게시·발송/사람계정/새보상/법률·개인정보위험·운영DB 변경은 승인 없음·실행 없음. 기존0148/0153/0152/0147/0087 요청 유지,신규 공급자/예상금액 요청 없음. 모델 비용/입출력토큰 미확인.
+
+통합 인계: `04e91b6` push 후 PR106이 `CONFLICTING/DIRTY`·검사0건으로 확인돼 이번 실행에서 최신 `origin/main`을 실제 통합했습니다. 0168의 add/add 충돌은 진행 상태·전체 연구/원고/시나리오 기록을 보존하고 초기 보고 링크는 main의 로컬 원본으로 연결했습니다. PR105의 로드맵·기본 제외·localhost 가드가 브랜치에 들어왔습니다. 앞선 “통합 전”은 당시 관측이며 현재 다음 행동은 Product 순환6/8·확정 R25의 디자인/기술 설계입니다. 이 통합은 새 기능 시험/출시를 뜻하지 않습니다.
