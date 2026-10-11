@@ -3,7 +3,7 @@
 import { createHash } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const script = fileURLToPath(import.meta.url);
@@ -12,4 +12,4 @@ const key = createHash('sha256').update(root).digest('hex').slice(0, 16);
 const temporaryRoot = process.platform === 'win32' ? tmpdir() : '/tmp';
 export const pm2Home = process.env.PM2_HOME || join(temporaryRoot, `crelink-pm2-${process.getuid?.() ?? 'user'}`, key);
 
-if (process.argv[1] && resolve(process.argv[1]) === script) console.log(pm2Home);
+if (process.argv[1] && realpathSync(process.argv[1]) === script) console.log(pm2Home);

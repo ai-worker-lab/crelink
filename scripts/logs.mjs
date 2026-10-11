@@ -65,7 +65,8 @@ if (service === 'infra') {
   const files = ['out', 'error']
     .map((stream) => join(pm2Home, 'logs', `crelink-${service}-${stream}.log`))
     .filter((file) => existsSync(file));
-  if (files.length === 0) fail(`${service} 로그가 없습니다(${join(pm2Home, 'logs')}/). make ${service}-up으로 시작하세요.`);
+  if (files.length === 0)
+    fail(`${service} 로그가 없습니다(${join(pm2Home, 'logs')}/). make ${service}-up으로 시작하세요.`);
   command = ['tail', ['-n', String(lines), ...(values.follow ? ['-F'] : []), ...files]];
 }
 
