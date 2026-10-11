@@ -148,6 +148,7 @@ describe('AI 실행 기록과 멈춤 스위치 (R23 ④⑤⑥)', () => {
       status: 'running',
       agent: 'orchestrator',
       summary: '첫 요약',
+      actions: ['추가 슬롯 조정'],
       nextSteps: ['지표 확인'],
       refs: [
         { kind: 'pr', label: 'PR #70', url: 'https://github.com/example/repo/pull/70' },

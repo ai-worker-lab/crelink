@@ -101,6 +101,7 @@ CREATE TABLE agent_runs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   actor_user_id uuid REFERENCES users (id) ON DELETE SET NULL,
   status text NOT NULL CHECK (status IN ('running', 'succeeded', 'failed', 'paused', 'abandoned')),
+  trigger text NOT NULL CHECK (trigger IN ('schedule', 'manual')),
   agent text CHECK (char_length(agent) <= 100),
   host text CHECK (char_length(host) <= 60),
   started_at timestamptz NOT NULL DEFAULT now(),
