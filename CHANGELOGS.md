@@ -6,6 +6,7 @@
 
 ## 2026-10-11
 
+- `0168` Security/QA 심층에서 실제 URL host와 차단 도메인 경계를 원본 파서8건·고립 PostgreSQL 차단5/허용3으로 확인했습니다. 정상/edge/모의 시나리오와 8팀 초단기 P1·출시 선행 P0·완료 조건·승인/측정 한계를 기존 티켓에 연결했습니다. 새 기능·HTTP/UI 시험·출시는 아직 수행하지 않았습니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`.
 - `0168` API/Data 심층 조사에서 기존 URL·소유자·한도·저장 계약 재사용을 확인하고, 실제 원본 URL 파서 11건과 PostgreSQL17 합성 데이터의 원본 집계 SQL 3상태를 실행했습니다. 현재 보이는 링크의 최소 생성시각·정지·포트폴리오에 따른 지표 차이, 키트 측정 카드·8팀 추천/보류를 기존 티켓에 기록했습니다. API·추적·기능 출시 변경은 없습니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`.
 - `0168`에서 Events/Lifecycle의 기존 3단계 안내·슬롯 신청 코드와 Notion 공식 온보딩 자료를 심층 조사했습니다. 별도 `0169` 체크리스트 시행은 중복 가치가 확인될 때까지 보류하고, 목적을 하나 정하는 자사 소재·출시 순서·측정 한계·8개 팀 보고를 기존 티켓에 갱신했습니다. 기능·캠페인 출시는 하지 않았습니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`.
 - `0168` 협업 문의용 시작 키트의 기존 가이드 중복을 조사하고 새 페이지 대신 기존 `/docs/creator-portfolio-page` 보강을 선택했습니다. 기존 URL 입력 계약에 맞는 자사 원고·제목 제안 요구·8개 팀 보고·순환 조사 순서를 기존 티켓에 기록했습니다. 연구·원고 단계이며 기능 출시·성장 효과는 미관측입니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`.
