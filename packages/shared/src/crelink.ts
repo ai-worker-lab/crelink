@@ -727,6 +727,7 @@ export const AI_OPERATOR_LIMITS = {
   refsMax: 20,
   refLabelMax: 100,
   pausedReasonMax: 200,
+  agentMax: 100,
   hostMax: 60,
   modelMax: 100,
   tokenLabelMax: 60,
@@ -778,6 +779,7 @@ export interface AgentRunView {
   id: string;
   status: AgentRunStatus;
   trigger: AgentRunTrigger;
+  agent: string | null;
   host: string | null;
   startedAt: string;
   /** `running`이면 null. `paused`는 같은 멈춤 동안 마지막으로 합친 시각입니다. */
@@ -816,6 +818,7 @@ export interface AgentRunDetail extends AgentRunView {
  */
 export interface StartAgentRunRequest {
   trigger: AgentRunTrigger;
+  agent?: string | null;
   host?: string | null;
   model?: string | null;
 }
@@ -831,11 +834,13 @@ export interface UpdateAgentRunRequest {
   actions?: string[];
   nextSteps?: string[];
   refs?: Array<{ kind: AgentRunRefKind; label: string; url?: string | null }>;
+  agent?: string | null;
   model?: string | null;
   costUsd?: number | null;
   inputTokens?: number | null;
   outputTokens?: number | null;
 }
+
 
 /** `GET /api/admin/ai-operator` 응답. `PUT …/pause`·`PUT …/tokens/{id}/revoke`도 같은 형식을 돌려줍니다. */
 export interface AiOperatorStatus {

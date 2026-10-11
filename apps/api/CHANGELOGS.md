@@ -2,6 +2,10 @@
 
 내부 참고용으로 백엔드 API의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-10-11
+
+- AI 실행 기록 `agent_runs`에 실행 에이전트 식별자(`agent`)를 추가했습니다. API·공유 계약·`0006_agent_run_agent` migration·실행 기록 테스트가 함께 갱신되며, 기존 행은 미확인 값을 `NULL`로 유지합니다.
+
 ## 2026-10-10
 
 - AI 운영자 보안 검토 반영과 링크 슬롯 이벤트 통합(0091 진행 기록). `PUT /api/admin/slot-event`(`setPeriod(actor, body)`)가 트랜잭션 안에서 이전 기간을 `FOR UPDATE`로 읽고 행동 기록 `slot_event.period_update`(targetType `slot_event`, 바뀐 필드만)를 남김. 지표 `events`에 `slot_event_applications`(신청 행 수). AI 행위자의 운영자·AI 계정 소유 링크·크리에이터 배너 차단은 403(`assertAiMayChange`, `creator.*`와 같은 규칙). 새 시험 `test/operator-audit-coverage.e2e-spec.ts`: Nest 라우트 메타데이터로 `OperatorGuard` 아래 POST·PUT·PATCH·DELETE를 모두 찾아 행동 기록 대상(부르면 1건)이나 이유 있는 예외(`agent-runs` 시작·갱신)인지, `/api/admin` 아래가 모두 `OperatorGuard`인지 확인. `operator-actions.e2e-spec.ts`에 소유 콘텐츠 차단 403·이벤트 기간 기록, `agent-runs.e2e-spec.ts` 지표 기대값.

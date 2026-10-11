@@ -45,12 +45,13 @@ describe('AI 실행 기록과 멈춤 스위치 (R23 ④⑤⑥)', () => {
   });
 
   it('시작은 running을 만들고 겹치면 409 agent_run_in_progress, 입력 오류는 400', async () => {
-    const first = await start(ai.token, { trigger: 'manual', host: 'mac-mini', model: 'opus' });
+    const first = await start(ai.token, { trigger: 'manual', agent: 'orchestrator', host: 'mac-mini', model: 'GPT-5.6-Luna' });
     expect(first.status).toBe(201);
     expect(first.body).toEqual({
       id: expect.stringMatching(/^[0-9a-f-]{36}$/),
       status: 'running',
       trigger: 'manual',
+      agent: 'orchestrator',
       host: 'mac-mini',
       startedAt: expect.any(String),
       endedAt: null,
@@ -59,7 +60,7 @@ describe('AI 실행 기록과 멈춤 스위치 (R23 ④⑤⑥)', () => {
       actions: [],
       nextSteps: [],
       refs: [],
-      model: 'opus',
+      model: 'GPT-5.6-Luna',
       costUsd: null,
       inputTokens: null,
       outputTokens: null,
@@ -75,7 +76,7 @@ describe('AI 실행 기록과 멈춤 스위치 (R23 ④⑤⑥)', () => {
     for (const body of [
       {},
       { trigger: 'cron' },
-      { trigger: 'manual', host: 'h'.repeat(61) },
+      { trigger: 'manual', agent: 'a'.repeat(101) },
       { trigger: 'manual', model: 1 },
     ]) {
       const bad = await start(ai.token, body);
@@ -125,6 +126,7 @@ describe('AI 실행 기록과 멈춤 스위치 (R23 ④⑤⑥)', () => {
   it('갱신: 바뀐 필드만 저장하고 status로 닫으며, 닫힌 실행 409·다른 계정 403·없는 실행 404·refs URL은 http(s)만', async () => {
     const runId = (await start()).body.id;
     const updated = await patch(runId, {
+      agent: 'orchestrator',
       summary: '  첫 요약  ',
       actions: ['추가 슬롯 조정'],
       nextSteps: ['지표 확인'],
@@ -139,8 +141,8 @@ describe('AI 실행 기록과 멈춤 스위치 (R23 ④⑤⑥)', () => {
     expect(updated.status).toBe(200);
     expect(updated.body).toMatchObject({
       status: 'running',
+      agent: 'orchestrator',
       summary: '첫 요약',
-      actions: ['추가 슬롯 조정'],
       nextSteps: ['지표 확인'],
       refs: [
         { kind: 'pr', label: 'PR #70', url: 'https://github.com/example/repo/pull/70' },

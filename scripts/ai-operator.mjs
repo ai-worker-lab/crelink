@@ -22,13 +22,14 @@ const USAGE = `사용법: node scripts/ai-operator.mjs <명령> [옵션]
                                 운영자·크리에이터 API 호출(예: api GET /api/admin/creators). 쓰기는 실행 헤더가 자동으로 붙습니다.
                                 file=@<이미지>는 POST /api/me/files multipart 업로드. 2xx 0, 그 밖 1.
   finish --status succeeded|failed --summary <글> [--action <한 일>]... [--next <다음 할 일>]...
-         [--ref <kind>=<이름>[=<URL>]]... [--model <이름>] [--cost <USD>] [--input-tokens N] [--output-tokens N]
+         [--ref <kind>=<이름>[=<URL>]...] [--model <이름>] [--cost <USD>] [--input-tokens N] [--output-tokens N]
                                 실행 기록을 닫습니다. kind: pr|work_item|commit|deploy|other
   automation-command [--repo <기준 checkout 경로>]
                                 Orca 자동화 생성 명령을 출력합니다(실행하지 않음).
 
 설정: ~/.config/crelink/ai-operator.env(권한 600, CRELINK_AI_ENV_FILE로 바꿈)의
-  CRELINK_AI_BASE_URL(예: https://links.shaul.kr/api/agent), CRELINK_AI_TOKEN, 선택 CRELINK_AI_HOST·CRELINK_AI_MODEL.
+  CRELINK_AI_BASE_URL(예: https://links.shaul.kr/api/agent), CRELINK_AI_TOKEN, 선택 CRELINK_AI_AGENT·CRELINK_AI_HOST·CRELINK_AI_MODEL.
+  CRELINK_AI_AGENT를 생략하면 고정 담당자 'orchestrator'를 기록합니다.
   같은 이름의 환경변수가 파일보다 우선합니다. 진행 중 실행 id: ~/.local/state/crelink/ai-operator/current-run
   (CRELINK_AI_STATE_DIR로 바꿈).`;
 
@@ -76,7 +77,13 @@ function loadConfig() {
       `CRELINK_AI_BASE_URL과 CRELINK_AI_TOKEN이 필요합니다(${file} 또는 환경변수). 발급: infra/docs/prod-runbook.md 16`,
     );
   }
-  return { baseUrl, token, host: read('CRELINK_AI_HOST') || null, model: read('CRELINK_AI_MODEL') || null };
+  return {
+    baseUrl,
+    token,
+    agent: read('CRELINK_AI_AGENT') || 'orchestrator',
+    host: read('CRELINK_AI_HOST') || null,
+    model: read('CRELINK_AI_MODEL') || null,
+  };
 }
 
 // ---------- 진행 중 실행 id ----------
@@ -181,6 +188,7 @@ function formatRun(run) {
   const lines = [
     `- [${run.status}] ${at(run.startedAt)} ~ ${at(run.endedAt)} (${run.id})${run.pausedCount > 1 ? ` 멈춤 ${run.pausedCount}회` : ''}`,
   ];
+  lines.push(`  에이전트: ${run.agent ?? '—'} · 모델: ${run.model ?? '—'} · 호스트: ${run.host ?? '—'}`);
   if (run.summary) lines.push(`  요약: ${run.summary}`);
   for (const action of run.actions ?? []) lines.push(`  한 일: ${action}`);
   for (const next of run.nextSteps ?? []) lines.push(`  다음: ${next}`);
@@ -196,7 +204,7 @@ async function precheck() {
   const status = await expectOk(config, 'GET', '/api/admin/ai-operator', { timeoutMs: 15000 });
   if (status.paused) {
     const result = await call(config, 'POST', '/api/admin/agent-runs', {
-      body: { trigger: 'schedule', host: config.host, model: config.model },
+      body: { trigger: 'schedule', agent: config.agent, host: config.host, model: config.model },
       timeoutMs: 15000,
     });
     if (!result.ok) fail(`멈춤 상태이고 멈춤 기록도 남기지 못했습니다: ${describeError(result)}`);
@@ -240,7 +248,7 @@ async function start(args) {
   const config = loadConfig();
   const previous = readCurrentRun();
   const result = await call(config, 'POST', '/api/admin/agent-runs', {
-    body: { trigger: values.trigger, host: config.host, model: config.model },
+    body: { trigger: values.trigger, agent: config.agent, host: config.host, model: config.model },
   });
   if (result.status === 409) {
     console.log(`시작하지 않습니다: ${describeError(result)}`);
@@ -379,6 +387,7 @@ async function finish(args) {
     actions: values.action,
     nextSteps: values.next,
     refs: values.ref.map(parseRef),
+    agent: config.agent,
     model: values.model ?? config.model ?? undefined,
     costUsd: optionalNumber(values.cost, '--cost'),
     inputTokens: optionalNumber(values['input-tokens'], '--input-tokens'),

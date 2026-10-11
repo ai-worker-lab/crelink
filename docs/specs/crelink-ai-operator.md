@@ -101,7 +101,7 @@ CREATE TABLE agent_runs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   actor_user_id uuid REFERENCES users (id) ON DELETE SET NULL,
   status text NOT NULL CHECK (status IN ('running', 'succeeded', 'failed', 'paused', 'abandoned')),
-  trigger text NOT NULL CHECK (trigger IN ('schedule', 'manual')),
+  agent text CHECK (char_length(agent) <= 100),
   host text CHECK (char_length(host) <= 60),
   started_at timestamptz NOT NULL DEFAULT now(),
   ended_at timestamptz,
@@ -206,7 +206,7 @@ INSERT INTO ai_operator_settings DEFAULT VALUES;
 export type AccountKind = 'human' | 'ai';
 export type OperatorActorKind = 'human' | 'ai' | 'system';
 export const AI_OPERATOR_LIMITS = { staleRunMinutes: 90, runPageSize: 20, actionPageSize: 50, summaryMax: 2000,
-  listItemMax: 300, listItemsMax: 30, refsMax: 20, refLabelMax: 100, pausedReasonMax: 200, hostMax: 60,
+  listItemMax: 300, listItemsMax: 30, refsMax: 20, refLabelMax: 100, pausedReasonMax: 200, agentMax: 100, hostMax: 60,
   modelMax: 100, tokenLabelMax: 60, realUserGoal: 100 } as const;
 export const AGENT_RUN_HEADER = 'X-Crelink-Agent-Run';
 export const AI_TOKEN_PREFIX = 'crl_ai_';
@@ -221,15 +221,15 @@ export type AgentRunStatus = 'running' | 'succeeded' | 'failed' | 'paused' | 'ab
 export type AgentRunTrigger = 'schedule' | 'manual';
 export type AgentRunRefKind = 'pr' | 'work_item' | 'commit' | 'deploy' | 'other';
 export interface AgentRunRef { kind: AgentRunRefKind; label: string; url: string | null }
-export interface AgentRunView { id; status; trigger; host: string | null; startedAt; endedAt: string | null;
+export interface AgentRunView { id; status; trigger; agent: string | null; host: string | null; startedAt; endedAt: string | null;
   pausedCount: number; summary: string | null; actions: string[]; nextSteps: string[]; refs: AgentRunRef[];
   model: string | null; costUsd: number | null; inputTokens: number | null; outputTokens: number | null;
   actorEmail: string | null; operatorActionCount: number }
 export interface AgentRunPage { items: AgentRunView[]; nextCursor: string | null }
 export interface AgentRunDetail extends AgentRunView { operatorActions: OperatorActionView[] }
-export interface StartAgentRunRequest { trigger: AgentRunTrigger; host?: string | null; model?: string | null }
+export interface StartAgentRunRequest { trigger: AgentRunTrigger; agent?: string | null; host?: string | null; model?: string | null }
 export interface UpdateAgentRunRequest { status?: 'succeeded' | 'failed'; summary?; actions?; nextSteps?;
-  refs?: Array<{ kind; label; url?: string | null }>; model?; costUsd?; inputTokens?; outputTokens? }
+  refs?: Array<{ kind; label; url?: string | null }>; agent?; model?; costUsd?; inputTokens?; outputTokens? }
 
 export type OperatorActionType = 'creator.extra_slots' | 'creator.suspension' | 'creator.banner_slot'
   | 'creator.metrics_exclusion' | 'link.block' | 'banner.block' | 'blocked_domain.add' | 'blocked_domain.remove'
@@ -297,7 +297,7 @@ export interface SetMetricsExclusionRequest { excluded: boolean }
 
 ## 실행 호스트 도구 `scripts/ai-operator.mjs`
 
-Node 내장 모듈만 쓰는 단일 파일입니다(프리체크가 `git show origin/main:scripts/ai-operator.mjs`로 꺼내 실행). 설정은 `~/.config/crelink/ai-operator.env`(`CRELINK_AI_BASE_URL`(예: `https://links.shaul.kr/api/agent`), `CRELINK_AI_TOKEN`, 선택 `CRELINK_AI_HOST`·`CRELINK_AI_MODEL`)이고 환경변수가 우선합니다. 파일 권한이 600이 아니면 실패합니다. 진행 중 실행 id는 `~/.local/state/crelink/ai-operator/current-run`에 둡니다. User-Agent는 `crelink-ai-operator/1`입니다. 응답에 `cf-mitigated` 헤더가 있거나 403인데 JSON이 아니면 "실행 호스트가 Cloudflare에 차단됨(VPN·exit node 확인)"으로 종료 1입니다.
+Node 내장 모듈만 쓰는 단일 파일입니다(프리체크가 `git show origin/main:scripts/ai-operator.mjs`로 꺼내 실행). 설정은 `~/.config/crelink/ai-operator.env`(`CRELINK_AI_BASE_URL`(예: `https://links.shaul.kr/api/agent`), `CRELINK_AI_TOKEN`, 선택 `CRELINK_AI_AGENT`·`CRELINK_AI_HOST`·`CRELINK_AI_MODEL`)이고 환경변수가 우선합니다. `CRELINK_AI_AGENT`를 생략하면 고정 담당자 `orchestrator`를 기록합니다. 파일 권한이 600이 아니면 실패합니다. 진행 중 실행 id는 `~/.local/state/crelink/ai-operator/current-run`에 둡니다. User-Agent는 `crelink-ai-operator/1`입니다. 응답에 `cf-mitigated` 헤더가 있거나 403인데 JSON이 아니면 "실행 호스트가 Cloudflare에 차단됨(VPN·exit node 확인)"으로 종료 1입니다.
 
 | 명령 | 동작 | 종료 코드 |
 | --- | --- | --- |
@@ -319,7 +319,7 @@ Node 내장 모듈만 쓰는 단일 파일입니다(프리체크가 `git show or
 | 화면 | 상태 | 조건(API) | 웹 |
 | --- | --- | --- | --- |
 | `/admin/agent-runs` | 로딩 | 서버 렌더 | 기존 `app/admin/loading.tsx` |
-| | 정상(첫 쪽) | `AiOperatorStatus`·`AiOperatorMetrics`·`AgentRunPage` | 위: 멈춤 스위치(상태·사유·바꾼 사람(null이면 `—`)·시각), 진행 중 실행 표시(90분이 지났으면 "다음 실행 때 포기 처리됨"). 지표 카드(`stat-tiles`, 실사용자 `n / 100`, 가입·첫 공개 링크 생성자·방문·클릭·광고, 이벤트). 실행 카드 목록(상태 배지·시작 시각·걸린 시간·요약, 펼치면 한 일·다음 할 일·관련 링크·모델·비용·토큰 수·행동 수, 상세 링크). 아래 `AI 계정` 절 |
+| | 정상(첫 쪽) | `AiOperatorStatus`·`AiOperatorMetrics`·`AgentRunPage` | 위: 멈춤 스위치(상태·사유·바꾼 사람(null이면 `—`)·시각), 진행 중 실행 표시(90분이 지났으면 "다음 실행 때 포기 처리됨"). 지표 카드(`stat-tiles`, 실사용자 `n / 100`, 가입·첫 공개 링크 생성자·방문·클릭·광고, 이벤트). 실행 카드 목록(상태 배지·시작 시각·걸린 시간·요약, 펼치면 한 일·다음 할 일·관련 링크·에이전트·호스트·모델·비용·토큰 수·행동 수, 상세 링크). 아래 `AI 계정` 절 |
 | | 둘째 쪽부터 | `?cursor=` | 실행 목록만 그림(멈춤·지표·AI 계정 절 없음) |
 | | 빈 상태 | `items` 0개 | "아직 AI 실행 기록이 없어요" + 헌장 설치 안내 |
 | | 오류 | 상태·목록 실패 | `AdminShell` 오류(`retryHref='/admin/agent-runs'`). 잘못된 커서(400)도 커서 없는 주소로 |
