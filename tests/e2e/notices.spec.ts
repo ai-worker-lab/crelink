@@ -11,8 +11,16 @@ test('빈 랜딩은 크리링 표시와 함께 열리고, 없는 단축 주소�
   // 프로필 사진이 없으면 기본 프로필(PRD R17)
   await expect(page.locator('.profile-head .default-avatar')).toBeVisible();
   const footer = page.getByRole('contentinfo');
-  await expect(footer.getByRole('link', { name: '나도 크리링 만들기', exact: true })).toHaveAttribute('href', '/');
-  await expect(page.locator('.link-card')).toHaveCount(0);
+  const cta = footer.getByRole('link', { name: '나도 크리링 만들고 첫 링크 추가하기', exact: true });
+  await expect(cta).toHaveAttribute('href', '/');
+  await cta.click();
+  await expect(page).toHaveURL(`${WEB_URL}/`);
+  await expect(
+    page.getByRole('region', { name: '인스타그램 프로필 링크 하나로 나를 소개하세요' }).getByRole('link', {
+      name: '구글로 시작하기',
+      exact: true,
+    }),
+  ).toHaveAttribute('href', '/auth/google');
   await expectMobileFits(page, '빈 /p/{publicId}');
 
   await page.goto(`${SHORT_URL}/${data.unique('nope')}`);
