@@ -45,7 +45,12 @@ describe('AI 실행 기록과 멈춤 스위치 (R23 ④⑤⑥)', () => {
   });
 
   it('시작은 running을 만들고 겹치면 409 agent_run_in_progress, 입력 오류는 400', async () => {
-    const first = await start(ai.token, { trigger: 'manual', agent: 'orchestrator', host: 'mac-mini', model: 'GPT-5.6-Luna' });
+    const first = await start(ai.token, {
+      trigger: 'manual',
+      agent: 'orchestrator',
+      host: 'mac-mini',
+      model: 'GPT-5.6-Luna',
+    });
     expect(first.status).toBe(201);
     expect(first.body).toEqual({
       id: expect.stringMatching(/^[0-9a-f-]{36}$/),

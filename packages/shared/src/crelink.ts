@@ -841,7 +841,6 @@ export interface UpdateAgentRunRequest {
   outputTokens?: number | null;
 }
 
-
 /** `GET /api/admin/ai-operator` 응답. `PUT …/pause`·`PUT …/tokens/{id}/revoke`도 같은 형식을 돌려줍니다. */
 export interface AiOperatorStatus {
   paused: boolean;

@@ -546,9 +546,10 @@ describe('runMigrations', () => {
       );
       expect(created.rows).toEqual([{ agent: 'orchestrator' }]);
       await expect(
-        pool.query("INSERT INTO agent_runs (status, trigger, agent, ended_at) VALUES ('succeeded', 'manual', $1, now())", [
-          'a'.repeat(101),
-        ]),
+        pool.query(
+          "INSERT INTO agent_runs (status, trigger, agent, ended_at) VALUES ('succeeded', 'manual', $1, now())",
+          ['a'.repeat(101)],
+        ),
       ).rejects.toMatchObject({ code: '23514' });
     });
   });
