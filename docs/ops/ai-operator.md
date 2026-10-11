@@ -89,10 +89,11 @@
    CRELINK_AI_TOKEN=<런북 17 명령이 쓴 값>
    CRELINK_AI_AGENT=orchestrator
    CRELINK_AI_HOST=operator-mac
-   CRELINK_AI_MODEL=GPT-5.6-Luna
+   CRELINK_AI_MODEL=openai-codex/gpt-6.1-sol
    ```
 2. **확인**: `node scripts/ai-operator.mjs precheck`가 종료 코드 0이면 준비가 된 것입니다. Cloudflare 차단으로 나오면 VPN·exit node를 끄고 집 회선으로 나가게 합니다.
 3. **자동화 생성**: `node scripts/ai-operator.mjs automation-command`가 출력한 `orca automations create …` 명령을 그대로 실행합니다. 20분마다(`*/20 * * * *`, `Asia/Seoul`) 프리체크를 돌리고 통과하면 omp 에이전트를 `origin/main` 기준 새 worktree에서 실행합니다.
+   현재 운영 자동화 `crelink-ai-operator-2`는 `omp` provider와 `--model openai-codex/gpt-6.1-sol`을 명시합니다. 자동화를 새로 만들거나 갱신할 때 같은 extra agent argument를 추가하고, 프롬프트·프리체크·`CRELINK_AI_MODEL`도 일치시킵니다. 하위 모델로 자동 대체하지 않으며 모델 사용이 실패하면 실패로 기록합니다.
 4. **GitHub 신원**: AI 전용 GitHub 계정(machine user)은 사람이 만들어야 합니다. 만들기 전까지 실행 호스트의 `gh` 자격을 쓰고 커밋 트레일러로 구별합니다. 만든 뒤에는 저장소 협업자로 추가하고 실행 호스트의 `gh auth`를 그 계정으로 바꿉니다.
 5. **실행 호스트**: 20분 실행은 운영자 Mac에서 돕니다. Mac이 꺼져 있거나 잠자기·네트워크 변경 중이면 그 주기는 빠지고 다음 주기에 이어 갑니다(Orca `--missed-run-grace-minutes 10`).
 6. **실행 계정 분리(권장, 사람 선행 조건)**: Orca 자동화를 SSH 키·`sudo`·관리자 `gh` 자격·키체인 접근이 없는 별도 macOS 사용자(또는 VM·컨테이너)로 돌리고, `~/.config/crelink/ai-operator.env`는 그 사용자만 읽게 둡니다. 이것이 되기 전에는 AI 세션이 사람 자격을 쓸 수 있어 지킬 규칙 10이 지시로만 지켜집니다([ADR 0015](../adr/0015-ai-operator.md) 위험 수용).
