@@ -16,10 +16,12 @@
 4. **AI 실행 기록**: `agent_runs`에 실행마다 시작·끝·상태·요약·한 일·다음 할 일·관련 PR/work item·모델/비용을 남깁니다. 실행 중 AI 쓰기는 `X-Crelink-Agent-Run` 헤더(진행 중인 자기 실행 id)가 있어야 합니다. 다음 실행은 직전 실행 기록을 읽어 이어 갑니다.
 5. **멈춤 스위치**: `ai_operator_settings.paused`. 사람 운영자만 바꿉니다. 켜져 있으면 실행 시작이 `paused` 기록만 남기고 끝나며, 진행 중인 실행의 크리링 API 쓰기도 즉시 409 `ai_operator_paused`입니다(실행 닫기만 허용). API를 거치지 않는 main 머지·외부 공개는 실행이 그 직전에 `guard`로 다시 확인해 멈춥니다(헌장 지시). 확실히 막으려면 Orca 자동화를 끕니다.
 6. **겹침 금지**: 실행 시작이 DB에서 원자적으로 확인합니다(진행 중 실행은 부분 유니크 인덱스로 최대 1개). 진행 중 실행이 있으면 409 `agent_run_in_progress`, 시작 뒤 90분이 지난 진행 중 실행은 `abandoned`로 닫습니다. 실행 호스트의 프리체크도 같은 상태를 먼저 봅니다.
-7. **20분 트리거**: 운영자 Mac의 Orca 자동화가 `*/20 * * * *`(`Asia/Seoul`)에 프리체크(`scripts/ai-operator.mjs precheck`)를 돌리고, 통과하면 omp 에이전트를 `origin/main` 기준 새 worktree에서 실행합니다. 프롬프트는 [AI 운영자 헌장](../ops/ai-operator.md)과 [AI 운영팀 헌장](../ops/ai-operations-team.md)을 읽게 합니다. 자동화 생성 명령은 스크립트가 출력합니다(`automation-command`). 기존 작업 실행기(`pnpm work:run`)는 work item을 하나씩 맡기는 도구이고, AI 운영자는 그 위에서 무엇을 할지 고르는 주기 실행입니다. AI 운영자가 실행기를 부를 필요는 없습니다. `[AI 결정]`
+7. **20분 프로젝트 트리거**: 기존 `crelink-ai-operator-2` 자동화의 `*/20 * * * *`(`Asia/Seoul`)·`new_per_run`·`origin/main`을 유지합니다. 프리체크(`scripts/ai-operator.mjs precheck`) 통과 뒤 provider `omp`, 명시 모델 `openai-codex/gpt-6.1-sol`로 `crelink-pm` 역할 파일과 [헌장](../ops/ai-operator.md)·[운영팀 계약](../ops/ai-operations-team.md)을 읽습니다. 중앙 `orchestrator`는 회사/포트폴리오 우선순위·승인·충돌을 조정하고 PM이 프로젝트의 단일 `agent_run`과 필요 시 실제 전문 워커를 감독합니다. 자동화/팀 스케줄러를 추가하지 않습니다. 생성 명령은 `automation-command`가 출력하며 기존 작업 실행기(`pnpm work:run`)는 전문 work item 도구이지 별도 주기 운영자가 아닙니다. `[AI 결정]`
 8. **지표**: `GET /api/admin/metrics`가 실사용자 수(PRD `목표` 정의), 가입·첫 공개 링크 생성자·방문·클릭·광고 배너 성과를 돌려줍니다. 이벤트 수치(0089)는 `events` 배열에 붙입니다.
 9. **정책**: AI 운영자는 저장소 정책의 "배포·외부 공개 명시 요청", "main 머지 전 알림", "제품 방향은 사용자 결정", "운영 확인 전 알림"에서 헌장 범위만큼 예외입니다([ADR 0015](../adr/0015-ai-operator.md)). 사용자 데이터 파기·비밀값 노출·법·약관 위반은 예외가 없습니다.
 10. **통합 브랜치**: 모든 티켓을 `work/0091-ai-operator-design` 한 브랜치·PR로 통합합니다([작업 관리](../work/README.md) `여러 역할을 한 브랜치에 묶을 때`).
+
+현행 프로젝트 운영 분리는 [운영팀 헌장](../ops/ai-operations-team.md)의 팀 매핑·PM 감독과 Task/Dispatch 계약이 원본입니다. 8팀은 실제 역할을 필요할 때 호출하며 상시 fleet이 아닙니다. PM만 운영 자격·운영 쓰기·병합/배포·서버 `start`/`finish`를 소유합니다. 토큰 없는 전문 워커는 같은 provider/명시 Sol 모델로 로컬 과제만 수행하고 별도 서버 실행을 열지 않습니다. 독립·소유 경로 비중첩인 활성 전문 워커 최대 2명, 실제 선행 조건, 관측 가능한 수용 기준을 적용합니다. API의 전역 lease·pause/guard·상한과 사람 승인 경계는 바뀌지 않습니다.
 
 ## 요구 대응
 
@@ -46,11 +48,12 @@ Orca(운영자 Mac, */20, Asia/Seoul)
   │       진행 중 실행(90분 안) → 종료 1
   │       연결 실패·Cloudflare 차단·설정 오류 → 종료 1
   │       그 밖 → 종료 0
-  └─ omp 에이전트(새 worktree, origin/main 기준)
-        헌장 읽기 → ai-operator.mjs start(POST agent-runs → run id 저장)
-        → ai-operator.mjs context(직전 실행·지표) + work item·PR·Deploy 확인
-        → 일 1개(운영 API는 ai-operator.mjs api …, 개발은 work 브랜치·PR·머지)
-        → ai-operator.mjs finish(PATCH agent-runs: 상태·요약·한 일·다음 할 일·PR)
+  └─ omp / openai-codex/gpt-6.1-sol (new_per_run, origin/main)
+        crelink-pm 역할·헌장 읽기 → PM start(POST agent-runs → run id 저장)
+        → context(직전 실행·지표) + 기존 Task/Dispatch·work item·PR·Deploy 확인
+        → 성장 과제 1개: PM이 실제 역할 파일 지정, 토큰 없는 전문 워커 최대 2명 감독
+        → Task/Dispatch 결과·질문·accepted settlement 확인 → 재사용/보존/release·Delivery ack
+        → PM만 guard·운영 API·병합/Deploy, finish(근거·팀별 상태·다음 행동·미정산 문맥)
 
 토큰 요청: ai-operator.mjs ─HTTPS─▶ Cloudflare ─▶ cloudflared(Tunnel) ─▶ edge Caddy ─▶ web `/api/agent/…`
            (Authorization·X-Crelink-Agent-Run만 전달) ─▶ api-<색> `/api/…` ─▶ PostgreSQL
@@ -68,7 +71,7 @@ Orca(운영자 Mac, */20, Asia/Seoul)
 
 ### 실행 사이 기억
 
-`agent_runs`(요약·다음 할 일·관련 링크)가 원본이고, 긴 개발 작업의 상태는 work item `진행 기록`과 `work/NNNN-*` 브랜치에 둡니다. `context` 명령이 직전 실행 5개, 지표, 멈춤 상태를 한 번에 출력합니다.
+`agent_runs`(요약·다음 할 일·관련 링크)가 프로젝트 실행의 원본이고, 긴 개발 작업은 work item `상태`/`진행 기록`·`work/NNNN-*` 브랜치·Orca Task/Dispatch를 연결합니다. `context`는 직전 실행 5개, 지표, 멈춤 상태를 출력합니다. 서버 `finish`/90분 lease 만료는 Orca 워커 종료·settlement가 아닙니다. 15분 cycle 후 미정산 live/blocked 워커는 ID·소유 경로·변경 보존 위치·재확인 조건을 기록하고 중복 dispatch/편집을 금지합니다. settled 워커 release와 일반 완료 자동화 worktree 삭제는 별도이며 기존 정리 안전 조건을 유지합니다.
 
 ## 데이터 모델
 
@@ -298,7 +301,7 @@ export interface SetMetricsExclusionRequest { excluded: boolean }
 
 ## 실행 호스트 도구 `scripts/ai-operator.mjs`
 
-Node 내장 모듈만 쓰는 단일 파일입니다(프리체크가 `git show origin/main:scripts/ai-operator.mjs`로 꺼내 실행). 설정은 `~/.config/crelink/ai-operator.env`(`CRELINK_AI_BASE_URL`(예: `https://links.shaul.kr/api/agent`), `CRELINK_AI_TOKEN`, 선택 `CRELINK_AI_AGENT`·`CRELINK_AI_HOST`·`CRELINK_AI_MODEL`)이고 환경변수가 우선합니다. `CRELINK_AI_AGENT`를 생략하면 고정 담당자 `orchestrator`를 기록합니다. 파일 권한이 600이 아니면 실패합니다. 진행 중 실행 id는 `~/.local/state/crelink/ai-operator/current-run`에 둡니다. User-Agent는 `crelink-ai-operator/1`입니다. 응답에 `cf-mitigated` 헤더가 있거나 403인데 JSON이 아니면 "실행 호스트가 Cloudflare에 차단됨(VPN·exit node 확인)"으로 종료 1입니다.
+Node 내장 모듈만 쓰는 단일 파일입니다(프리체크가 `git show origin/main:scripts/ai-operator.mjs`로 꺼내 실행). 설정은 `~/.config/crelink/ai-operator.env`(`CRELINK_AI_BASE_URL`(예: `https://links.shaul.kr/api/agent`), `CRELINK_AI_TOKEN`, 선택 `CRELINK_AI_AGENT`·`CRELINK_AI_HOST`·`CRELINK_AI_MODEL`)이고 환경변수가 우선합니다. 현행 `scripts/ai-operator.mjs`의 `CRELINK_AI_AGENT` 생략 기본값은 `crelink-pm`이며 자동화 프롬프트도 PM 신원·Sol 모델을 명시합니다. PM만 이 자격을 사용하고 워커에게 전달하지 않습니다. 파일 권한이 600이 아니면 실패합니다. 진행 중 실행 id는 `~/.local/state/crelink/ai-operator/current-run`에 둡니다. User-Agent는 `crelink-ai-operator/1`입니다. 응답에 `cf-mitigated` 헤더가 있거나 403인데 JSON이 아니면 "실행 호스트가 Cloudflare에 차단됨(VPN·exit node 확인)"으로 종료 1입니다.
 
 | 명령 | 동작 | 종료 코드 |
 | --- | --- | --- |
@@ -408,7 +411,7 @@ Node 내장 모듈만 쓰는 단일 파일입니다(프리체크가 `git show or
 
 ## 미정
 
-없음. 사용자 위임에 따라 이 설계의 선택은 모두 `[AI 결정]`으로 확정합니다.
+최초 API 설계 선택은 `[AI 결정]`으로 확정했습니다. 현행 PM/팀 운영 적용에서는 실행 호스트 자격 격리, 자동화의 실제 PM 신원/실효 Sol 모델, 전문 워커별 비용·토큰 수집 범위를 확인해야 합니다. 문서의 감독 계약은 설정 적용/실행 검증을 대신하지 않으며 미확인값·차단 조건을 [헌장](../ops/ai-operator.md)에 따라 기록합니다.
 
 ## 검토 기록
 

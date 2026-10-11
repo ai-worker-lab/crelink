@@ -12,11 +12,21 @@ import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import pg from 'pg';
+import { assertLocalE2ETargets } from '../../scripts/lib/e2e-local.mjs';
+
+// 직접 Playwright 실행도 fixture를 읽는 즉시 검사합니다. DB pool·stale 정리·API/브라우저 요청보다 먼저 실패합니다.
+const targets = {
+  WEB_URL: process.env.WEB_URL,
+  API_URL: process.env.API_URL,
+  SHORT_LINK_BASE_URL: process.env.SHORT_LINK_BASE_URL,
+  DATABASE_URL: process.env.DATABASE_URL,
+};
+assertLocalE2ETargets(targets);
 
 const trimSlash = (value: string | undefined) => (value ?? '').replace(/\/$/, '');
-export const WEB_URL = trimSlash(process.env.WEB_URL);
-export const API_URL = trimSlash(process.env.API_URL);
-export const SHORT_URL = trimSlash(process.env.SHORT_LINK_BASE_URL);
+export const WEB_URL = trimSlash(targets.WEB_URL);
+export const API_URL = trimSlash(targets.API_URL);
+export const SHORT_URL = trimSlash(targets.SHORT_LINK_BASE_URL);
 
 // Playwright가 테스트 파일을 CommonJS로 변환하므로 __dirname을 씁니다.
 const root = join(__dirname, '../..');
@@ -25,7 +35,7 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR?.trim()
   ? resolve(root, 'apps/api', process.env.UPLOAD_DIR.trim())
   : join(root, '.local/uploads');
 
-/** 테스트가 만드는 이메일·차단 도메인의 꼬리. 이 꼬리가 붙은 데이터만 지웁니다. */
+/** `.test` 이메일은 가상 주소·정리 소유권 표식입니다. 지표 제외 여부는 metrics_excluded_at으로 별도 관리합니다. */
 export const TEST_EMAIL_DOMAIN = 'e2e.crelink.test';
 export const TEST_HOST_SUFFIX = 'e2e.test';
 /** 중단된 이전 실행이 남긴 테스트 데이터를 이 시간이 지나면 지웁니다(동시에 도는 다른 실행의 데이터는 건드리지 않음). */
@@ -78,6 +88,8 @@ export interface SeededUser {
 
 export interface SeedOptions {
   role?: 'creator' | 'operator';
+  /** 기본 true: 테스트 사용자를 지표에서 제외. false는 루프백 DB의 실사용자 지표 대조군에만 명시합니다. */
+  metricsExcluded?: boolean;
   displayName?: string;
   bio?: string;
   links?: SeedLink[];
@@ -133,8 +145,8 @@ export class E2EData {
     try {
       await client.query('BEGIN');
       const { rows: users } = await client.query<{ id: string }>(
-        'INSERT INTO users (email, role) VALUES ($1, $2) RETURNING id',
-        [email, role],
+        'INSERT INTO users (email, role, metrics_excluded_at) VALUES ($1, $2, CASE WHEN $3 THEN now() END) RETURNING id',
+        [email, role, options.metricsExcluded ?? true],
       );
       const userId = users[0].id;
       this.users.push(userId);
@@ -348,7 +360,7 @@ export const test = base.extend<{ data: E2EData }, { db: pg.Pool }>({
   db: [
     // eslint-disable-next-line no-empty-pattern -- Playwright fixture는 첫 인자를 구조 분해해야 합니다.
     async ({}, use) => {
-      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 4 });
+      const pool = new pg.Pool({ connectionString: targets.DATABASE_URL, max: 4 });
       // 중단된 이전 실행이 남긴 테스트 데이터만 정리합니다.
       await removeUsers(pool, `u.email LIKE $1 AND u.created_at < now() - $2::interval`, [
         `%@${TEST_EMAIL_DOMAIN}`,

@@ -4,9 +4,16 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-10-12
+
+- `0153` 단기 P1 무료 모집을 실제 실행했습니다. Research/Growth의 Sol Orca 워커 결과로 현행 플랫폼/접근 blocker와 협업 문의용 제출 텍스트를 분리하고, PM은 `guard` 0 뒤 공식 GitHub 회사 프로젝트 About 소개·홈페이지 연결을 공개했습니다. localhost 텍스트 소비·공개 GitHub 표시를 확인했으며 디스콰이엇/커뮤니티 제출·성장 효과는 미관측입니다. 이전 완료 자동화 run27~30의 보존/idle/인스턴스 조건을 확인해 정확한 네 checkout만 정리했습니다. 근거: `docs/work/product/0153-acquisition-human-requests.md`, `docs/product/acquisition-playbook.md`, `docs/product/growth/creator-outreach.txt`.
+- 사용자가 무료 외부 홍보를 AI 자율 실행으로 위임하고 사람 승인 필수 범위를 지출·결제로 한정했습니다. PM·실행팀·운영 프롬프트·모집 실행안·팀별 계획의 과거 홍보 승인 대기를 실행/접근 조건으로 전환합니다. 법·플랫폼 규칙·수신동의·개인정보·사칭/스팸·인증/멈춤·데이터 보호 금지는 유지합니다. 실제 URL/시각·제출/공개/실패·철회·측정과 문안 준비를 구분하며 과거 기록은 보존합니다. 근거: `docs/work/orchestrator/0171-autonomous-public-promotion.md`, `docs/ops/ai-operator.md`, `docs/ops/ai-operations-team.md`.
+
 ## 2026-10-11
 
 - 0109의 PM2 홈을 사용자·checkout 실제 경로별 짧은 임시 경로로 바꾸고, `make`와 `pnpm logs`가 같은 원본 및 `PM2_HOME` 재정의를 사용하도록 맞췄습니다. 로컬 개발 안내·FAQ에 전환 절차를 기록하고 중복 결함 0127을 0109로 통합했습니다. 근거: `scripts/pm2-home.mjs`, `docs/work/orchestrator/0109-pm2-socket-path-length.md`.
+- 사용자 선택에 따라 Crelink 전담 `crelink-pm`과 프로젝트 실행팀을 구성합니다. 기존 역할을 재사용하고 Research·Growth·Events·QA 역할을 추가하며 중앙 오케스트레이터는 회사/프로젝트 간 조정, PM은 과제 배정·Orca 감독·통합·검증·출시를 책임집니다. 단일 20분 스케줄·제2 계정·Sol 모델·운영 lease/멈춤/guard·비용 승인 경계를 유지하고 실행 담당자 기본값·자동화 생성 명령을 PM 계약으로 맞춥니다. 과거 실행은 재분류하지 않습니다. 근거: `docs/work/orchestrator/0170-crelink-project-team.md`, `.omp/agents/crelink-pm.md`, `docs/ops/ai-operations-team.md`, `scripts/ai-operator.mjs`.
+- 사람의 명시적 지시로 #105를 main에 병합했습니다. 매 20분 운영 실행에 이전 완료 워크트리의 provenance·유예·변경/커밋 보존·터미널 idle·인스턴스 안전 확인 후 정리하는 절차를 추가했습니다. 조사/계획과 실제 구현·로컬 검증·출시·활동·효과를 구분하고, 구현 가능한 그로스 과제는 조사 순환 대신 실제 산출물과 실행 검증을 우선합니다. 비용/외부 집행 승인과 일반 자동 병합 상한은 유지합니다. 근거: `docs/ops/ai-operator-prompt.md`, `docs/work/orchestrator/0167-growth-team-research.md`.
 - AI 운영자 주기를 20분(`*/20 * * * *`)으로 조정하고 한 실행 상한을 15분으로 줄였습니다. 실행 호스트 도구, 헌장·프롬프트·설계·ADR·PRD·운영자 화면·관련 운영 문서를 같은 계약으로 맞췄습니다. 기존 Orca 자동화는 `node scripts/ai-operator.mjs automation-command` 출력으로 갱신해야 합니다. 근거: 사용자 결정, `scripts/ai-operator.mjs`, `docs/ops/ai-operator.md`.
 - 초기 상태에는 실행 호스트에 토큰과 `crelink-ai-operator` 자동화가 없었지만, 0157에서 제2 AI 계정·토큰과 `crelink-ai-operator-2` 20분 자동화를 설치해 첫 예약 실행과 `agent_runs` 기록을 확인했습니다. 제1 계정과 자동화는 중복 실행 방지를 위해 건드리지 않았습니다.
 - 단일 운영 작업 `docs/work/orchestrator/0156-ai-operator-cadence-deploy.md`를 만들었습니다. localhost 검증 → PR CI → main Deploy → `links.shaul.kr` 운영 주소 검사까지의 수용 기준을 한 항목으로 추적합니다.
@@ -24,6 +31,9 @@
 - AI 실행 기록에 `agent` 필드를 추가했습니다. `scripts/ai-operator.mjs`는 기본 담당자 `orchestrator`, 실행 호스트, 모델, 비용·입출력 토큰 수를 시작·종료 기록에 남기고 `/admin/agent-runs`에서 함께 표시합니다. 기존 실행은 확정할 수 없는 에이전트를 `NULL`로 보존합니다.
 - 사용자 지적에 따라 Luna 최상위 설명을 정정하고 20분 단일 운영자의 모델을 `openai-codex/gpt-6.1-sol`로 전환했습니다. 자동화 실행 인자·프롬프트·프리체크·제2 운영자 모델 기록 설정을 일치시켰으며 실제 모델 요청의 `SOL_SMOKE_OK` 응답을 확인했습니다. 기존 실행 기록은 당시 모델을 유지합니다.
 - `0158` AI 운영팀의 Growth/SEO 진단을 단일 `orchestrator`가 직접 수행하도록 현재 실행 정책에 맞췄습니다. 실사용자 0/100·최근 7일 방문 3건 기준 외부 유입 부족을 병목으로 기록하고, 이미 배포된 `0164` 활성화 실험의 PR #99·Deploy 38131910719와 2026-10-18T10:25Z 이후 측정 다음 일을 연결했습니다. 검색엔진 등록·외부 모집은 사람 계정 필요로 유지합니다. 근거: `docs/work/orchestrator/0158-ai-operations-team.md`.
+- 정상 AI 운영을 유지보수 우선에서 신규 기능·마케팅·이벤트 **그로스 우선**으로 전환했습니다. 단일 `orchestrator`가 8개 팀의 근거·대안·추천 과제·선택/보류·측정·승인·다음 행동을 실행마다 구분 보고하며, 새 근거 조사는 팀별 순환합니다. 공식 자료와 현재 지표로 팀별 조사 보고를 작성하고 `0168` 협업 문의용 프로필 시작 키트, `0169` 첫 크리링 완성 챌린지를 계획했습니다. 기능/캠페인은 아직 출시하지 않았고 비용·외부 홍보·보상 승인 gate는 유지합니다. 근거: `docs/work/orchestrator/0167-growth-team-research.md`, `docs/product/research/crelink-growth-team-research.md`.
+- 8개 운영 책임 팀 각각의 초단기(0~48시간)·단기(3~7일)·중기(2~4주)·장기(2~3개월)와 P0/P1/P2를 96개 계획 셀로 문서화했습니다. 단계별 산출물·완료 조건·지표·첫 행동·승인/중단 조건을 정의하고 기존 성장 과제와 연결했습니다. 근거: `docs/ops/crelink-growth-roadmap.md`.
+- localhost 가상 사용자 시나리오를 추가하고 E2E 사용자를 기본 지표 제외로 생성하도록 바꿨습니다. 원격/혼합 URL·DB는 runner와 직접 fixture 모두 연결/정리 전에 거부합니다. 지표 포함 합성 대조군은 별도 personas 프로젝트에서 마지막에 실행하고, 기존 제외 토글 시나리오는 명시 대조군으로 유지합니다. 실사용자/시험 계정 관리·모의 시나리오·수명은 `docs/development/user-simulation.md`, 구현은 `tests/e2e/personas.spec.ts`·`fixtures.ts`·`scripts/lib/e2e-local.mjs`입니다. 안전 회귀는 기본 `pnpm test`에 포함됩니다. 운영 계정 생성·지표 재분류·API/schema 변경은 없습니다.
 
 ## 2026-10-10
 
