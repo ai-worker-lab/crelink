@@ -37,7 +37,7 @@
 - [ADR 0015 AI 운영자에게 운영·개발·배포 권한 위임](adr/0015-ai-operator.md) — AI 전용 계정(API 토큰), 운영자 행동 기록·실행 기록, 멈춤 스위치, 20분 실행, 저장소 정책 예외와 예외가 아닌 규칙(승인)
 - [AI 운영자 헌장](ops/ai-operator.md) — AI 운영자가 실행마다 읽는 목표·권한·지킬 법·약관 규칙·한 실행의 순서·배포와 롤백·상한·설치·멈추기, [실행 프롬프트](ops/ai-operator-prompt.md)
 - [사람이 할 일](ops/human-todo.md) — AI 운영자가 할 수 없어 사람이 해야 하는 일(보안·운영 기반, 실사용자 모집, 결정 대기, 정기)
-- [AI 운영팀 헌장](ops/ai-operations-team.md) — Orchestrator와 Product·Growth·Web·API/Data·SRE·Security/QA 에이전트의 책임, 작업 계약, 비용 지출 사람 승인 게이트
+- [AI 운영팀 헌장](ops/ai-operations-team.md) — 단일 Orchestrator의 Product·Research·Growth/Marketing·Events/Lifecycle·Web·API/Data·SRE·Security/QA 책임, 그로스 우선 연구·보고·선택 계약, 비용/외부 게시 사람 승인 게이트
 - [외부 서비스·도구 의존](architecture/external-dependencies.md) — 현재 사용 중이거나 계획된 외부 SaaS·도구와 기준 위치
 - [자주 묻는 질문](faq.md) — 저장소 구조, 개발 도구, 로컬 실행, 배포 목표, 언어 정책
 - [배포 대상 아키텍처](architecture/deployment-target.md) — 운영 배치(배포 대상 서버·Supabase·Cloudflare Tunnel)와 운영상 경계
@@ -51,6 +51,8 @@
 제품 문서: [크리링 PRD](product/crelink.md)(확정, MVP 범위)와 [크리링 MVP 기술 설계](specs/crelink-mvp.md)(승인). 참고 자료: [크리링 서비스 기획 및 MVP Handoff](product/crelink-mvp-handoff.md)(PDF 사본 `product/crelink-mvp-handoff.pdf`) — AI가 제안한 검토 재료이며 확정된 결정이 아닙니다. 작성 절차는 [제품 탐색과 PRD](product/README.md), 제품 소개는 [루트 README](../README.md)에 둡니다.
 
 제품 조사(`product/research/`): [링크 인 바이오 유사 서비스 벤치마킹](product/research/link-in-bio-benchmark.md)(인포크링크·인링크·리틀리 화면·기능, 광고 블록), [광고 수익 배분과 정산 방식 조사](product/research/ad-revenue-share.md)·[크리에이터에게 광고 수익 보여 주기 조사](product/research/creator-ad-revenue-reporting.md)(R22 철회로 사실 기록), [초기 사용자 모집 조사](product/research/initial-user-acquisition.md)(실사용자 100명 목표: Linktree·리틀리·인포크 초기 확보 방식, 국내 합법 채널, 정보통신망법 제50조·제50조의7과 인스타그램·Meta 약관, 단계별 지표, AI 운영자가 혼자 할 수 있는 일).
+
+- [팀별 그로스 조사와 수행 과제](product/research/crelink-growth-team-research.md) — 운영 지표·공식 자료 기반 팀별 대안/추천, 협업 문의용 시작 키트·첫 크리링 완성 챌린지·승인 대기 외부 모집, 측정과 미관측 범위
 
 AI 운영자: [AI 운영자 기술 설계](specs/crelink-ai-operator.md) — 전용 계정·토큰 인증·웹 토큰 경로 `/api/agent`·행동 기록·실행 기록·멈춤·지표의 데이터·계약과 티켓 분해(승인, 에픽 0088).
 
