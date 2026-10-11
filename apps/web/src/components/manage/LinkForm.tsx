@@ -1,8 +1,10 @@
 'use client';
 
 import { CRELINK_API_PATHS, CRELINK_LIMITS, type CreateLinkRequest, type LinkView } from '@crelink/shared';
+import Link from 'next/link';
 import { useId, type FormEvent } from 'react';
 import { browserApi } from '../../lib/api/browser';
+import { GUIDE_ARTICLES } from '../../lib/docs';
 import { draftKey, type LinkDraft } from '../../lib/landing-preview';
 import type { ActionState } from '../../lib/use-action';
 import { ActionStatus } from '../ActionStatus';
@@ -79,6 +81,35 @@ export function LinkForm({
         }
       }}
     >
+      {!link ? (
+        <div className="field">
+          <label htmlFor={`${baseId}-purpose`}>링크 목적 (선택)</label>
+          <select
+            id={`${baseId}-purpose`}
+            className="input"
+            defaultValue=""
+            disabled={pending}
+            aria-describedby={`${baseId}-purpose-help`}
+            onChange={(event) => {
+              if (!pending && !draft.title.trim() && event.target.value) {
+                update({ title: event.target.value });
+              }
+            }}
+          >
+            <option value="">직접 작성</option>
+            <option value="협업 문의하기">협업 문의 · 협업 문의하기</option>
+            <option value="대표 작업 보기">대표 작업 · 대표 작업 보기</option>
+            <option value="주요 채널 보기">주요 채널 · 주요 채널 보기</option>
+          </select>
+          <p id={`${baseId}-purpose-help`} className="field-help">
+            표시 이름이 비어 있을 때만 제목을 제안해요. 제안한 제목도 자유롭게 고칠 수 있어요. 다른 제목을 제안받으려면
+            표시 이름을 비우고 목적을 다시 골라 주세요. 실제 주소는 직접 입력하고 저장을 눌러야 공개돼요.{' '}
+            <Link href={GUIDE_ARTICLES[1].href} target="_blank" rel="noopener noreferrer">
+              협업 문의용 구성 예시 보기 (새 창)
+            </Link>
+          </p>
+        </div>
+      ) : null}
       <div className="field">
         <label htmlFor={`${baseId}-title`}>표시 이름 (필수)</label>
         <input
