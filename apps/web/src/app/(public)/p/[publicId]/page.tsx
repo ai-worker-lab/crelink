@@ -72,7 +72,7 @@ export default async function PublicLandingPage(props: Props) {
           // 정상 랜딩만 가입 유도 문구. 유입 경로 쿼리는 0087 결정 전이라 붙이지 않는다(design/landing-footer-cta/handoff.md).
           <Link className="footer-cta" href="/">
             <span>
-              나도 <strong className="brand">크리링</strong> 만들기
+              나도 <strong className="brand">크리링</strong> 만들고 첫 링크 추가하기
             </span>
           </Link>
         ) : (

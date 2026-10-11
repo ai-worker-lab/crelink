@@ -208,7 +208,7 @@ export function PreviewLanding({ mode, framed }: { mode: PreviewMode; framed: bo
       <p className="profile-footer">
         <span className="footer-cta">
           <span>
-            나도 <span className="brand">크리링</span> 만들기
+            나도 <span className="brand">크리링</span> 만들고 첫 링크 추가하기
           </span>
         </span>
         <span aria-hidden="true">·</span>
