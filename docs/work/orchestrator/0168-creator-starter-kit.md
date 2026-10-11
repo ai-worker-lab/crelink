@@ -434,3 +434,7 @@ Node24.18.0에서 원본 `parseHttpUrl`만 타입 제거해 실행했습니다. 
 - 깨끗한 desktop reload의 브라우저 errors는 빈 목록이었습니다. work139개·docs247개·design29개·scope7경로와 tsc 통과, OpenDesign lint는 미설치 skip입니다.
 - `next build --webpack` 컴파일·타입·14개 정적 페이지 생성 통과. 임시 worktree 밖 의존성 symlink 때문에 standalone 출력의27개 traced file 제외 경고가 있어 운영 이미지 빌드/전체 `pnpm verify` 통과로 해석하지 않습니다.
 - 로컬 서버·독립 Chromium 종료, 임시 의존 연결은 커밋 전 제거합니다. 새 가입/폼/API/DB·전체 smoke/e2e는 미수행입니다.
+- 실제 인계: 소재 커밋 `ada035f`, 최신main의 CHANGELOGS additive 충돌을 양쪽 보존해 `bb08e16`으로 통합·push했습니다. guard0, PR106을 갱신했습니다.
+- CI [38150128840](https://github.com/ai-worker-lab/crelink/actions/runs/38150128840)를 끝까지 watch했고 **실패**했습니다. Node24/26은 `page.tsx` Prettier 서식만 실패, 나머지7단계는 통과; CI smoke·work scope·API/웹 이미지 빌드도 통과했습니다. 전체 키트 저장 경로/성장 효과 근거는 아닙니다.
+- 실패 로그의 해당 파일을 기존 설치 Prettier `--write`로 수정한 뒤 `--check`가 통과했습니다. 동작 변경 없는 서식 수정과 이 기록을 새 커밋으로 push하며 **새 head의 최종CI는 다음 실행에서 확인**합니다. 이번 main/Deploy 없음, 시각 캡처도 미해결이므로 실행은 `failed`로 닫고 실제 소재·검증 통과/실패를 구분합니다.
+- 다음: Web/UX 순환8/8은 프리셋 디자인/기술설계·시각 증거와 실제 저장 경로로 진행합니다. Growth는 같은 원고를 반복 수정하지 않고 현재 자산의 최종CI/출시 gate를 우선합니다. SRE는 새 headCI 확인 후에도 전체 출시 수용 기준·상한·guard·실제Deploy 검사 없이는 병합하지 않습니다.
