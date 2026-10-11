@@ -6,6 +6,7 @@
 
 ## 2026-10-11
 
+- `0168`에서 Events/Lifecycle의 기존 3단계 안내·슬롯 신청 코드와 Notion 공식 온보딩 자료를 심층 조사했습니다. 별도 `0169` 체크리스트 시행은 중복 가치가 확인될 때까지 보류하고, 목적을 하나 정하는 자사 소재·출시 순서·측정 한계·8개 팀 보고를 기존 티켓에 갱신했습니다. 기능·캠페인 출시는 하지 않았습니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`.
 - `0168` 협업 문의용 시작 키트의 기존 가이드 중복을 조사하고 새 페이지 대신 기존 `/docs/creator-portfolio-page` 보강을 선택했습니다. 기존 URL 입력 계약에 맞는 자사 원고·제목 제안 요구·8개 팀 보고·순환 조사 순서를 기존 티켓에 기록했습니다. 연구·원고 단계이며 기능 출시·성장 효과는 미관측입니다. 근거: `docs/work/orchestrator/0168-creator-starter-kit.md`.
 - AI 운영자 주기를 20분(`*/20 * * * *`)으로 조정하고 한 실행 상한을 15분으로 줄였습니다. 실행 호스트 도구, 헌장·프롬프트·설계·ADR·PRD·운영자 화면·관련 운영 문서를 같은 계약으로 맞췄습니다. 기존 Orca 자동화는 `node scripts/ai-operator.mjs automation-command` 출력으로 갱신해야 합니다. 근거: 사용자 결정, `scripts/ai-operator.mjs`, `docs/ops/ai-operator.md`.
 - 초기 상태에는 실행 호스트에 토큰과 `crelink-ai-operator` 자동화가 없었지만, 0157에서 제2 AI 계정·토큰과 `crelink-ai-operator-2` 20분 자동화를 설치해 첫 예약 실행과 `agent_runs` 기록을 확인했습니다. 제1 계정과 자동화는 중복 실행 방지를 위해 건드리지 않았습니다.
