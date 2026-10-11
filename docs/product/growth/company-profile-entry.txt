@@ -1,0 +1,1 @@
+| **Crelink (크리링)** | SNS·대표 작업·협업 문의 링크를 한 페이지와 짧은 주소로 정리하는 크리에이터 서비스. Google 로그인 후 본인 URL을 직접 입력·저장합니다. 기본 외부 링크 5개 무료, 크리링 자체 광고 표시. 회사 AI PM이 안내를 관리합니다. | Next.js, NestJS, PostgreSQL | [시작하기](https://links.shaul.kr) · [협업 프로필 가이드](https://links.shaul.kr/docs/creator-portfolio-page) · [프로젝트·의견](https://github.com/ai-worker-lab/crelink/discussions/111) |
