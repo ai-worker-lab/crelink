@@ -266,3 +266,15 @@ PM은 실제 실행마다 행에 연결한 실행 기록에 공개 채널·규�
 - 다음 채널 조사는 **타깃 적합성→현행 회사/AI 운영 허용→정상 회사 접근·비용/철회→실제 도달 가능성→가입·첫 보이는 링크 활성화** 순서로 판단합니다. 무료/접근 편의만으로 우선순위를 정하지 않습니다. Instagram/Threads의 크리에이터 프로필, X/LinkedIn의 개발·전문 포트폴리오는 타깃별 조사 후보라는 추론이며 현재 자동 실행 허용·전환 우위를 확인한 결과가 아닙니다. 분모·귀속이 없는 전체 지표 변화는 채널 효과로 확정하지 않습니다.
 - PR124 QA의 이미지 즉시 업로드·폼 저장 전 공개 GET 근거를 중앙 PM도 소스로 확인했습니다. [사진 긴 문안](growth/photographer-outreach.txt)에 공개 전 동의/개인정보 확인과 즉시 업로드·공개 주소 경계를 보완했습니다. 소재 병합은 외부 게시나 서비스 기능 변경이 아니며 실제 이미지 업로드/운영 사용자 시험은 하지 않습니다.
 
+
+## 2026-10-12 G2 작성 자료 실제 배포
+
+- PM 실행 `5a6f3ed7-580f-40e8-bb5b-52d4fdb24330`, 단기 3~7일 P1 `0153`. 준비된 PR126 사진·PR127 영상 자료를 새로 복제하지 않고 [기존 회사 안내 #111](https://github.com/ai-worker-lab/crelink/discussions/111)에 다운로드·실행 방법을 추가했습니다. 신규 채널 모집이나 서비스 웹 배포가 아니라 **작성 자료의 실제 공개 배포**입니다. 기존 본문·CTA·최초 G2 관측일은 보존했습니다.
+- 공개 직전 [GitHub AUP](https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies)의 §4·§10, [파일 다운로드 공식 안내](https://docs.github.com/en/repositories/working-with-files/using-files/viewing-and-understanding-files), [무료 공개 저장소 조건](https://docs.github.com/en/get-started/learning-about-github/githubs-plans)을 PM이 새로 읽었습니다. 프로젝트 관련 작성 보조 자료만 기존 글에 연결하고 광고글 반복·타인 계정 게시·DM·좋아요/투표 요청은 하지 않습니다. 기존 회사 저장소 권한 `ADMIN`을 확인했습니다. 헌장 설치4의 기존 gh 사용 범위이며 사람 전용 통제 우회·계정 사칭은 하지 않았습니다.
+- `guard` 종료 0 뒤 공식 GraphQL `updateDiscussion`, 실제 `updatedAt=2026-10-11T23:24:14Z` (**10/12 08:24:14 KST**). 원문이 직전 읽기와 동일할 때만 추가하고 응답 body가 원문+추가문과 정확히 일치함을 확인했습니다. 새 게시글·댓글·계정 생성은 0건입니다.
+- 고정 버전: [영상 워크시트](https://github.com/ai-worker-lab/crelink/blob/e88c9cef1fd13eb725bf899d9fa38d9fa9072626/docs/product/growth/video-link-worksheet.html), [사진 워크시트](https://github.com/ai-worker-lab/crelink/blob/408cd5f784251a4f3aa20c03136ea899c65b4b83/docs/product/growth/photographer-publish-checklist.html). 파일 화면의 `Download raw file`로 HTML을 내려받아 브라우저에서 여는 방법을 명시했습니다. Raw/코드 미리보기는 실행 화면이 아닙니다. main 미반영 PR의 자료 버전 배포이며 운영 웹에 새 화면이 있다고 안내하지 않습니다.
+- 실제 검증: 두 원본 raw URL 비로그인 HTTP200, 각각 16,920/10,956 bytes가 원본 checkout 파일과 일치했습니다. 내려받은 바이트를 localhost `127.0.0.1:55635`에서 Chromium390/1280으로 열어 영상 직접 입력→결과 생성과 사진 체크→초기화를 확인했습니다. 두 폭 가로 넘침 없음. 운영 계정/API/DB·Google OAuth·영상/사진 업로드 시험은 없습니다. 공개 #111 비로그인390/1280 본문·두 고정 링크·다운로드 안내와 영상 파일 화면의 실제 `Download raw file` 버튼을 확인했습니다. 브라우저 다운로드 버튼 클릭/파일 저장과 로컬 file:// 실행은 미수행이며 HTTP 다운로드와 localhost 실행을 구분합니다. PNG 캡처20초 및 직접 캡처15초 timeout으로 시각 이미지 미확보, 도구 신고했습니다.
+- 이번 추가 공개의 확인일은 10/12, 별도 안전/존속 점검은 **10/19 08:24:14 KST 이후**입니다. 기존 G2와 R25/R26 측정일은 재설정하지 않습니다. 전체 실사용자0/100·가입7일4·방문3·클릭0·신청누계1은 context이며, 작성 자료별 이용·다운로드 분모·채널 귀속·성장 효과는 미관측입니다. 준비 자료의 반복 생성보다 소비 경로 확보를 선택했지만 신규 도달을 증명하지 않습니다.
+- 비용: 기존 공개 저장소의 파일 링크/Discussion 수정만 사용, 새 유료 서비스·구독·크레딧·비용 약정 없음. 모델 비용/토큰은 미확인입니다. 경고·기능 사실 불일치·공개 오해면 PM이 최신 본문을 읽고 guard 뒤 이번 추가 절만 철회합니다. 기존 글·댓글·사용자 자료·보너스는 삭제하지 않으며 이미 내려받은 사본의 완전 회수는 보장하지 않습니다.
+- 다른 무료 경로는 계속 탐색합니다. 현재 Bluesky는 회사 인증/복구·정상 계약 입력 부족, mastodon.social은 AI 전용 방식 금지, Pixelfed.social은 AI/LLM 금지이며 다른 서버 전체에 일반화하지 않습니다. H1 동의·H2 회사 소유 확인·H3 자동화 허용·H4 정상 회사 접근·H5 허용 인증 조건이 없는 경로만 보류합니다. 무료 홍보 사람 승인 대기가 아닙니다.
+
