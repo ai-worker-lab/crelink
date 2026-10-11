@@ -19,7 +19,7 @@
 - [x] 실제 지표와 공식 출처로 초기 팀별 보고를 작성하고 기능/마케팅 `0168`, 이벤트 `0169`의 계획과 수용 기준을 등록합니다. 팀별 독립 agent가 조사했다고 주장하지 않습니다.
 - [x] 실제 Orca 자동화 프롬프트를 같은 계약으로 갱신하고 모델/스케줄/단일 담당자 설정을 확인합니다.
 - [x] 실제 모델의 정상 상태 시나리오 응답에서 팀별 추천과 유지보수 대신 성장 선택을 확인합니다. 시나리오 검증은 실제 운영/배포 성과로 보고하지 않습니다.
-- [ ] work/docs/format 검증과 PR CI를 확인해 기록합니다.
+- [x] work/docs/format 검증과 PR CI를 확인해 기록합니다.
 - [ ] main에 반영하고 최종 PR 참조를 기록합니다. 자동화 병합 상한을 우회하지 않습니다.
 
 ## 연결
@@ -38,3 +38,4 @@
 - 2026-10-11T12:54:07Z: Orca `crelink-ai-operator-2` 프롬프트에 그로스 우선·8개 팀 보고·순환 연구 계약을 실제 적용했습니다. 조회 결과 저장한 프롬프트 일치, `--model openai-codex/gpt-6.1-sol`, `*/20 * * * *`, `enabled: true`, `new_per_run`, Sol 프리체크를 확인했습니다. 이미 시작한 실행의 입력이 바뀐 것으로 주장하지 않으며 다음 시작 실행부터 적용됩니다. main 반영 전 보고 자료는 이 작업 브랜치를 읽도록 안내했습니다.
 - 2026-10-11: 설치된 Prettier 3.9.9로 대상 문서를 정리하고 `node scripts/work.mjs --check`(139개)와 `node scripts/docs-check.mjs`(Markdown 245개)가 통과했습니다. `pnpm`은 PATH에 없고 Corepack 경유는 90초 timeout이어서 기존 `node_modules/.bin/prettier`를 사용했습니다. `work --next --all --json`에서 0168은 `eligible: true`, 0169는 조사가 필요한 `분류 대기`로 확인했습니다.
 - 2026-10-11: `gh pr list --state merged --base main --search merged:2026-10-11`에서 당일 main 병합 18건(#85~#102)을 확인했습니다. 현행 하루 8건 자동 병합 상한을 넘었으므로 이 변경의 main 병합은 다음 허용 시간까지 대기합니다. 자동화 프롬프트는 적용됐고 보고와 계획은 작업 브랜치를 참조할 수 있습니다.
+- 2026-10-11: [PR #105](https://github.com/ai-worker-lab/crelink/pull/105)를 등록하고 커밋 `80282b2`의 [CI 38141321232](https://github.com/ai-worker-lab/crelink/actions/runs/38141321232)에서 work scope·docs·CI 통과를 확인했습니다. 문서 전용 변경으로 애플리케이션 smoke·이미지 빌드는 CI에서 건너뛰었습니다. 원격 작업 브랜치의 조사 보고 접근도 확인했습니다. main 병합은 상한 대기이며 다음 허용 실행에서 최신 main/CI/guard를 확인하고 병합합니다. 그동안 동일 배포 점검 대신 `0168` 설계/기획 조사를 진행합니다.
