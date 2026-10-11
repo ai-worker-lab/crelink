@@ -8,7 +8,7 @@ INSTANCE_ENV := .local/instance.env
 # Compose 포트 변수는 셸 환경이 --env-file보다 우선하므로 infra/local/.env의 포트보다 인스턴스 값이 쓰입니다.
 export POSTGRES_PORT VALKEY_PORT
 
-export PM2_HOME := $(CURDIR)/.local/pm2
+export PM2_HOME := $(or $(PM2_HOME),$(shell node scripts/pm2-home.mjs))
 PM2 := pnpm exec pm2
 COMPOSE = $(if $(COMPOSE_PROJECT_NAME),docker compose --project-name $(COMPOSE_PROJECT_NAME) --project-directory "$(CURDIR)/infra/local" --env-file "$(CURDIR)/infra/local/.env" -f "$(CURDIR)/infra/local/compose.yaml",$(error $(INSTANCE_ENV)에 COMPOSE_PROJECT_NAME이 없습니다. pnpm instance로 다시 만드세요))
 
