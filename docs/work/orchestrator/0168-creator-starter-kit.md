@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-11
@@ -20,7 +20,7 @@
 - [x] 프리셋 없이 기존 편집도 그대로 가능하며, 기존 URL 안전 검사·링크 한도·권한·저장 오류 처리 계약을 재사용합니다. 예시 링크는 사용자에게 자동 저장하지 않습니다.
 - [x] 문서 목록/기존 안내에서 공개 가이드를 찾을 수 있고 기존 Google 가입·관리 화면 흐름과 연결됩니다. `0164` CTA 측정 대상 문구는 별도 근거 없이 재변경하지 않습니다.
 - [x] localhost에서 390px·1280px 실제 가이드·예시·목적 선택·사용자 URL 저장과 실패/한도 상태를 확인합니다. 실제 링크 저장만 기존 활성화 집계에 반영되고 예시 열람은 성과에 포함되지 않습니다.
-- [ ] CI→guard→main→Deploy→운영 주소 검사 근거를 기록하고 배포 시각·7일 뒤 점검일·되돌림 방법을 남깁니다.
+- [x] CI→guard→main→Deploy→운영 주소 검사 근거를 기록하고 배포 시각·7일 뒤 점검일·되돌림 방법을 남깁니다.
 
 ## 팀별 소유 과제
 
@@ -63,12 +63,14 @@
 - 2026-10-12 PM QA: 최신 main `2a633a5`를 통합하고 실제 API 3420·웹 5593에서 `pnpm verify` 8단계·smoke 5건을 통과했습니다. 배포와 같은 standalone production 빌드에서 폐기용 실제 Playwright 시나리오 2건과 기존 전체 E2E 19건이 통과했습니다. 새 두 시나리오는 세 제목·수동 제목/URL/설명 보존·선택만으로 POST/DB 링크 없음·취소 후 초안 폐기·실제 요청 대기 중 비활성·명시적 저장/DB 영속/공개 표시·지표 제외 합성 계정·실제 차단 URL의 422와 실패 초안 보존을 확인했고 390px/1280px 가이드/폼 PNG를 직접 확인한 뒤 임시 스크립트를 제거했습니다. 기존 19건은 첫 링크·지표 제외/로컬 포함 대조군·401/403/404/위험 URL·만료 세션·슬롯 한도·멱등 신청·기간 종료/보너스 유지·기존 편집/썸네일·모바일을 검증했습니다. 운영 사용자/DB나 실제 Google OAuth로 시험한 것은 아닙니다.
 - 2026-10-12 QA 한계: 최초 임시 harness는 취소 뒤 기존 외부 링크 시트로 돌아가는 정상 상태에서 배경의 추가 버튼/`main` 안 region을 기다려 timeout했습니다. 실제 `PageEditor`의 `{ kind: 'links' }` 반환과 보이는 시트 제어를 확인해 harness만 수정했습니다. 별도로 개발 모드 `/me` soft navigation에서 `MePage cannot have a negative time stamp` 콘솔 오류를 관찰했습니다. [upstream 유사 보고 #99032](https://github.com/vercel/next.js/issues/99032)가 dev RSC 시간 계측을 설명하며 설치/레지스트리 최신은 둘 다 Next 16.4.0, 참고 PR #88688은 미병합입니다. 완전한 원인 수정으로 주장하지 않고 계측 무시·예외 suppression·호환 패치를 추가하지 않았습니다. 실제 production 모드의 같은 동선·전체 19건은 콘솔 오류 없이 통과했습니다. 개발 모드 문제와 운영 출시 검증은 구분합니다.
 - 2026-10-12 실행 신원: `crelink-pm`이 `omp` / `openai-codex/gpt-6.1-sol` 요청·실효 receipt를 확인했습니다. 워커 Task `task_597620ef968c`, Dispatch `ctx_95bf5127b367`, 완료 메시지 `msg_dcd31213b715`의 일치·succeeded를 인수했고 native `worker-release`가 `released`·`closed_agent_terminal`·transcript `captured`로 종료됐습니다. 전달 batch를 ack했고 live 중복 작업은 없습니다. CI·main·실제 Deploy는 다음 출시 gate이며 모델 비용/토큰은 미확인입니다.
+- 2026-10-12 실제 출시: PM 실행 `d9cb996c-58b0-48f9-ad27-b40302750cd3`에서 PR #106 head `7b0c9fe77916b8cc43b6a5875deb2fc77c450d69`의 [CI 38160407070](https://github.com/ai-worker-lab/crelink/actions/runs/38160407070)(Node24/26·API/Web image·smoke·scope·최종 gate)을 확인하고 직전 guard 0 뒤 main `a511e5c315b8da3aa45278b871af7963d2f08436`에 병합했습니다. [Deploy 38160634324](https://github.com/ai-worker-lab/crelink/actions/runs/38160634324)의 실제 web image·home-server 배포·운영 주소 검사가 성공했습니다. 주소 검사 완료 **T0 `2026-10-12T02:44:02+09:00`**, 첫 7일 점검 **`2026-10-19T02:44:02+09:00`**입니다. [실제 공개 가이드](https://links.shaul.kr/docs/creator-portfolio-page)의 새 목적/가상 예시/수동 저장 고지를 HTTP와 실제 390px 브라우저로 확인했고 가로 넘침은 없습니다. 저장/실패는 localhost에서 검증했으며 운영 시험 계정이나 사용자 링크를 만들지 않았습니다.
+- 2026-10-12 출시 직후 기준: 실제 `GET /api/admin/metrics`의 `generatedAt=2026-10-11T17:56:05.428Z`는 실사용자 0/100·가입7일4·`activation.firstVisibleLinkCreatorsLast7Days=0`·누적 이벤트 신청1입니다. 0/4와 소표본으로 효과/실패를 판단하지 않습니다. 0164 CTA(T0 10/11 19:28:53 KST), G1·G2 홍보 및 R26 문서 노출과 겹치므로 개별 기능/채널 귀속은 미관측입니다. 종료시 보너스·링크 삭제 없이 UI/가이드 변경만 revert합니다. 이 티켓의 구현·출시 수용 기준은 완료이며 7일 관측은 정해진 날짜 이후 수행합니다.
 
 ### 2026-10-12 PM 최종 QA 인계
 
 - 변경 흐름: 기존 `/docs` 목록→협업 가이드의 가상 구성/무료 범위/실제 주소 준비→기존 홈/Google 가입 또는 `/me`→페이지 편집의 새 링크→선택 목적/직접 제목→사용자 URL→기존 저장. 예시/목적 자체의 API/추적/가입/링크 생성은 없습니다.
 - 시작: 고정 pnpm10.10.0으로 `pnpm install --frozen-lockfile`, `pnpm instance`, `make up`, `make status`. PATH에 pnpm이 없으면 `npm exec --yes --package=pnpm@10.10.0 -- pnpm <명령>`을 사용하고 make 실행 시 같은 고정 pnpm을 PATH에 제공해야 합니다. 주소는 `pnpm instance`의 checkout 값을 사용합니다. 이번 워커는 서버를 띄우지 않았습니다.
-- 최종 명령: PM이 `pnpm work:scope 0168 --base origin/main`, `pnpm verify`, `pnpm smoke`, 기존 `pnpm e2e`를 수행하고 실제 화면을 390px/1280px에서 확인합니다. 기존 [가상 사용자 절차](../../development/user-simulation.md)의 네 localhost 대상 가드와 `metricsExcluded: true`만 사용하며 지표 포함 대조군·운영 사용자/DB는 사용하지 않습니다.
+- 최종 명령: PM이 `pnpm work:scope 0168 --base origin/main`, `pnpm verify`, `pnpm smoke`, 기존 `pnpm e2e`를 수행하고 실제 화면을 390px/1280px에서 확인합니다. 기존 [가상 사용자 절차](../../development/user-simulation.md)의 네 localhost 대상 가드를 유지합니다. 새 키트 시나리오는 `metricsExcluded: true`만 사용하며 기존 전체 suite의 SIM-02 지표 포함 대조군은 localhost에만 한정합니다. 운영 사용자/DB에는 시험하지 않습니다.
 - 수동 QA: 세 목적을 각각 빈 제목에서 선택; 수동/제안 제목을 둔 채 목적 변경 시 보존; 제목을 비운 뒤 새 목적 재선택; 주소/설명/썸네일 보존; 프리셋 없이 저장; 기존 수정·취소·메뉴 이동 후 초안; pending; 실제 HTTP(S) URL 저장 후 공개 표시; 주소 없음·비HTTP URL·차단422·한도409·세션401·타인수정404·네트워크 실패의 기존 오류/초안 보존. 예시 열람/선택에 저장 요청이 없고 실제 저장만 기존 집계 경로를 사용함을 확인합니다.
 - 불확실성: native select의 선택 표시 자체는 폼 재마운트 시 초기화될 수 있으나 제목/주소 초안은 기존 Manager 계약으로 유지합니다. React 격리 smoke는 하단 시트 초점·가로 넘침·실제 브라우저 검증/URL 안전/HTTP 상태·집계를 입증하지 않습니다. 이러한 경계는 출시 차단 QA 항목입니다.
 - 출시: PM이 QA/CI→guard→main→Deploy→운영 주소 검사를 기록하기 전 출시 완료가 아닙니다. T0/7일 뒤 점검일은 실제 배포 때 채우며, 0164 관측 기간과 겹치면 교란을 기록합니다. 롤백은 이번 0168 UI/가이드 변경 커밋의 revert로 기존 직접 편집으로 복구하며 사용자 링크/보너스는 삭제·회수하지 않습니다.
