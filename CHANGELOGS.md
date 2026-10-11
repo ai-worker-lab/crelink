@@ -10,6 +10,8 @@
 - 초기 상태에는 실행 호스트에 토큰과 `crelink-ai-operator` 자동화가 없었지만, 0157에서 제2 AI 계정·토큰과 `crelink-ai-operator-2` 20분 자동화를 설치해 첫 예약 실행과 `agent_runs` 기록을 확인했습니다. 제1 계정과 자동화는 중복 실행 방지를 위해 건드리지 않았습니다.
 - 단일 운영 작업 `docs/work/orchestrator/0156-ai-operator-cadence-deploy.md`를 만들었습니다. localhost 검증 → PR CI → main Deploy → `links.shaul.kr` 운영 주소 검사까지의 수용 기준을 한 항목으로 추적합니다.
 - 제2 AI 운영자 운영 변경을 `docs/work/orchestrator/0157-second-ai-operator.md`에 기록했습니다. 토큰 원문은 기록하지 않습니다.
+- AI 운영팀 헌장 `docs/ops/ai-operations-team.md`를 추가했습니다. Orchestrator 중심 팀 역할, L0~L4 권한 단계, 비용 지출·외부 홍보·사람 계정·법률 위험의 사람 승인 게이트를 기록했습니다.
+- 1차 운영 진단 Run `run_e94fde343af2`를 실행했습니다. Product·SRE·Security/QA 보고를 수집했고, Growth/SEO 워커는 Orca `agent-trust-workspace` 차단으로 자원을 해제했습니다. 기준선은 크리에이터 4명·실사용자 0명·최근 7일 가입 4명·방문 3건·외부 링크 클릭 0건입니다. 상세 `docs/work/orchestrator/0158-ai-operations-team.md`.
 
 ## 2026-10-10
 
