@@ -6,6 +6,7 @@
 
 ## 2026-10-11
 
+- 사용자 선택에 따라 Crelink 전담 `crelink-pm`과 프로젝트 실행팀을 구성합니다. 기존 역할을 재사용하고 Research·Growth·Events·QA 역할을 추가하며 중앙 오케스트레이터는 회사/프로젝트 간 조정, PM은 과제 배정·Orca 감독·통합·검증·출시를 책임집니다. 단일 20분 스케줄·제2 계정·Sol 모델·운영 lease/멈춤/guard·비용 승인 경계를 유지하고 실행 담당자 기본값·자동화 생성 명령을 PM 계약으로 맞춥니다. 과거 실행은 재분류하지 않습니다. 근거: `docs/work/orchestrator/0170-crelink-project-team.md`, `.omp/agents/crelink-pm.md`, `docs/ops/ai-operations-team.md`, `scripts/ai-operator.mjs`.
 - 사람의 명시적 지시로 #105를 main에 병합했습니다. 매 20분 운영 실행에 이전 완료 워크트리의 provenance·유예·변경/커밋 보존·터미널 idle·인스턴스 안전 확인 후 정리하는 절차를 추가했습니다. 조사/계획과 실제 구현·로컬 검증·출시·활동·효과를 구분하고, 구현 가능한 그로스 과제는 조사 순환 대신 실제 산출물과 실행 검증을 우선합니다. 비용/외부 집행 승인과 일반 자동 병합 상한은 유지합니다. 근거: `docs/ops/ai-operator-prompt.md`, `docs/work/orchestrator/0167-growth-team-research.md`.
 - AI 운영자 주기를 20분(`*/20 * * * *`)으로 조정하고 한 실행 상한을 15분으로 줄였습니다. 실행 호스트 도구, 헌장·프롬프트·설계·ADR·PRD·운영자 화면·관련 운영 문서를 같은 계약으로 맞췄습니다. 기존 Orca 자동화는 `node scripts/ai-operator.mjs automation-command` 출력으로 갱신해야 합니다. 근거: 사용자 결정, `scripts/ai-operator.mjs`, `docs/ops/ai-operator.md`.
 - 초기 상태에는 실행 호스트에 토큰과 `crelink-ai-operator` 자동화가 없었지만, 0157에서 제2 AI 계정·토큰과 `crelink-ai-operator-2` 20분 자동화를 설치해 첫 예약 실행과 `agent_runs` 기록을 확인했습니다. 제1 계정과 자동화는 중복 실행 방지를 위해 건드리지 않았습니다.

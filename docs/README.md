@@ -37,7 +37,7 @@
 - [ADR 0015 AI 운영자에게 운영·개발·배포 권한 위임](adr/0015-ai-operator.md) — AI 전용 계정(API 토큰), 운영자 행동 기록·실행 기록, 멈춤 스위치, 20분 실행, 저장소 정책 예외와 예외가 아닌 규칙(승인)
 - [AI 운영자 헌장](ops/ai-operator.md) — AI 운영자가 실행마다 읽는 목표·권한·지킬 법·약관 규칙·한 실행의 순서·배포와 롤백·상한·설치·멈추기, [실행 프롬프트](ops/ai-operator-prompt.md)
 - [사람이 할 일](ops/human-todo.md) — AI 운영자가 할 수 없어 사람이 해야 하는 일(보안·운영 기반, 실사용자 모집, 결정 대기, 정기)
-- [AI 운영팀 헌장](ops/ai-operations-team.md) — 단일 Orchestrator의 Product·Research·Growth/Marketing·Events/Lifecycle·Web·API/Data·SRE·Security/QA 책임, 그로스 우선 연구·보고·선택 계약, 비용/외부 게시 사람 승인 게이트
+- [Crelink PM·실행팀 헌장](ops/ai-operations-team.md) — 회사 중앙 조정과 프로젝트 PM 책임 분리, Product·Research·Growth/Marketing·Events/Lifecycle·Web·API/Data·SRE·Security/QA 실행팀, Orca 감독·실행 증거·비용/외부 게시 사람 승인 게이트
 - [팀별 성장 로드맵](ops/crelink-growth-roadmap.md) — 8팀 × 초단기·단기·중기·장기 × P0/P1/P2의 과제·산출물·완료 조건·지표·승인·첫 행동
 - [가상 사용자와 실사용자 분리](development/user-simulation.md) — localhost 페르소나 생성·정상/edge/모의 시나리오·지표 제외/대조군·실행·결과·정리
 - [외부 서비스·도구 의존](architecture/external-dependencies.md) — 현재 사용 중이거나 계획된 외부 SaaS·도구와 기준 위치
