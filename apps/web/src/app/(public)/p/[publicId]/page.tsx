@@ -81,6 +81,8 @@ export default async function PublicLandingPage(props: Props) {
           </Link>
         )}
         <span aria-hidden="true">·</span>
+        <Link href="/terms">이용약관</Link>
+        <span aria-hidden="true">·</span>
         <Link href={CRELINK_WEB_PATHS.privacy}>개인정보 처리방침</Link>
       </footer>
     </div>

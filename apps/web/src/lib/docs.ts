@@ -22,6 +22,11 @@ export const PUBLIC_DOCS = [
     title: '개인정보 처리방침',
     description: '수집하는 항목과 보관 기간, 국외 이전.',
   },
+  {
+    href: '/terms',
+    title: '이용약관',
+    description: '서비스 이용, 계정·링크·이벤트 조건.',
+  },
 ] as const;
 
 /**

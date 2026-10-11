@@ -16,6 +16,11 @@ export default function DocsLayout({ children }: Readonly<{ children: React.Reac
       </p>
       <DocsNav />
       {children}
+      <footer className="site-footer">
+        <Link href="/">홈</Link>
+        <Link href="/terms">이용약관</Link>
+        <Link href="/privacy">개인정보 처리방침</Link>
+      </footer>
     </main>
   );
 }
