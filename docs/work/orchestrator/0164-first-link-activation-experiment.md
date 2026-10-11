@@ -46,3 +46,5 @@
 
 - 2026-10-11: 검증했습니다. `node ../../node_modules/.bin/next typegen && node ../../node_modules/.bin/tsc --noEmit -p tsconfig.json`(apps/web), 웹 단위 시험 76건, `node scripts/work.mjs --check`, `node scripts/docs-check.mjs`, `node scripts/design.mjs check`, ESLint, Prettier, `git diff --check`가 통과했습니다. 로컬 API·웹·PostgreSQL에서 `tests/e2e/notices.spec.ts` 2건이 통과해 새 CTA의 `/` 이동→`구글로 시작하기` 연결과 오류 랜딩의 `크리링` 바닥글을 확인했습니다.
 - 2026-10-11: 브라우저로 로컬 빈 랜딩을 390px·1280px에서 확인했습니다. CTA 문구·`href="/"`·1280px 바닥글 높이 61px·가로 넘침 없음(`390/390`, `1280/1280`)·콘솔 오류 없음이며, 390px과 1280px 모두 접근성 트리에서 CTA가 하나의 링크 이름으로 읽혔습니다. 로컬 검증 데이터는 삭제했고 운영 공개 주소는 열지 않았습니다.
+
+- 2026-10-11: 검증 가드가 계속해도 된다고 확인한 뒤 커밋 `ae63e25`를 `work/0164-first-link-activation-experiment`에 push하고 [PR #99](https://github.com/ai-worker-lab/crelink/pull/99)를 열었습니다. 현재 CI는 `work scope`·`변경 종류`가 pending이라 main 머지·배포는 하지 않았습니다.
