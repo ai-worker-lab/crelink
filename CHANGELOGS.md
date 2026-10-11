@@ -6,6 +6,7 @@
 
 ## 2026-10-12
 
+- 무료 회사 채널에 실제 서비스 소개와 자발적 첫 사용 의견 모집 글을 게시했습니다([Discussion #111](https://github.com/ai-worker-lab/crelink/discussions/111)). Google·네이버 검색 콘솔은 실제 로그인 화면까지 확인했고 정상 회사 인증·확인 값 부족을 기술 선행 조건으로 기록합니다. 홍보 승인 대기로 되돌리지 않으며 게시·접근 확인을 사용자 성장이나 검색 등록 완료로 표현하지 않습니다. 근거: `docs/work/product/0153-acquisition-human-requests.md`, `docs/work/orchestrator/0148-search-console-registration.md`, `docs/product/acquisition-playbook.md`.
 - `0153` 단기 P1 무료 모집을 실제 실행했습니다. Research/Growth의 Sol Orca 워커 결과로 현행 플랫폼/접근 blocker와 협업 문의용 제출 텍스트를 분리하고, PM은 `guard` 0 뒤 공식 GitHub 회사 프로젝트 About 소개·홈페이지 연결을 공개했습니다. localhost 텍스트 소비·공개 GitHub 표시를 확인했으며 디스콰이엇/커뮤니티 제출·성장 효과는 미관측입니다. 이전 완료 자동화 run27~30의 보존/idle/인스턴스 조건을 확인해 정확한 네 checkout만 정리했습니다. 근거: `docs/work/product/0153-acquisition-human-requests.md`, `docs/product/acquisition-playbook.md`, `docs/product/growth/creator-outreach.txt`.
 - 사용자가 무료 외부 홍보를 AI 자율 실행으로 위임하고 사람 승인 필수 범위를 지출·결제로 한정했습니다. PM·실행팀·운영 프롬프트·모집 실행안·팀별 계획의 과거 홍보 승인 대기를 실행/접근 조건으로 전환합니다. 법·플랫폼 규칙·수신동의·개인정보·사칭/스팸·인증/멈춤·데이터 보호 금지는 유지합니다. 실제 URL/시각·제출/공개/실패·철회·측정과 문안 준비를 구분하며 과거 기록은 보존합니다. 근거: `docs/work/orchestrator/0171-autonomous-public-promotion.md`, `docs/ops/ai-operator.md`, `docs/ops/ai-operations-team.md`.
 
