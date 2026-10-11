@@ -12,6 +12,7 @@
 - 제2 AI 운영자 운영 변경을 `docs/work/orchestrator/0157-second-ai-operator.md`에 기록했습니다. 토큰 원문은 기록하지 않습니다.
 - AI 운영팀 헌장 `docs/ops/ai-operations-team.md`를 추가했습니다. Orchestrator 중심 팀 역할, L0~L4 권한 단계, 비용 지출·외부 홍보·사람 계정·법률 위험의 사람 승인 게이트를 기록했습니다.
 - 1차 운영 진단 Run `run_e94fde343af2`를 실행했습니다. Product·SRE·Security/QA 보고를 수집했고, Growth/SEO 워커는 Orca `agent-trust-workspace` 차단으로 자원을 해제했습니다. 기준선은 크리에이터 4명·실사용자 0명·최근 7일 가입 4명·방문 3건·외부 링크 클릭 0건입니다. 상세 `docs/work/orchestrator/0158-ai-operations-team.md`.
+- AI 운영자 실행 프롬프트가 매 실행 `docs/ops/ai-operations-team.md`를 읽고, 비용이 0원이어도 결제·광고·유료 도구·외부 홍보·사람 계정 변경·법률/개인정보 위험 수용·되돌릴 수 없는 운영 DB 변경을 사람 승인 전 금지하도록 했습니다. 상세 `docs/work/orchestrator/0160-runtime-cost-gate.md`.
 
 ## 2026-10-10
 
