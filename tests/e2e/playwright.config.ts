@@ -26,8 +26,10 @@ export default defineConfig({
   // 남습니다. 그래서 광고 배너 시나리오는 나머지가 끝난 뒤 따로 돕니다(tests/e2e/README.md `fixture 원리`).
   // 링크 슬롯 이벤트도 전역 데이터(이벤트 기간)를 바꾸므로 그 뒤에 따로 돕니다(한 파일이라 테스트는 차례로).
   projects: [
-    { name: 'main', testIgnore: /(ad-banner|slot-event)\.spec\.ts$/ },
+    { name: 'main', testIgnore: /(ad-banner|slot-event|personas)\.spec\.ts$/ },
     { name: 'ad-banner', testMatch: /ad-banner\.spec\.ts$/, dependencies: ['main'] },
     { name: 'slot-event', testMatch: /slot-event\.spec\.ts$/, dependencies: ['ad-banner'] },
+    // 지표 포함 대조군이 기본 제외 계정/다른 전역 시나리오의 관측에 섞이지 않도록 마지막에 실행합니다.
+    { name: 'personas', testMatch: /personas\.spec\.ts$/, dependencies: ['slot-event'], workers: 1 },
   ],
 });

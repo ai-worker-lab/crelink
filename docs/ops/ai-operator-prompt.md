@@ -3,6 +3,7 @@
 **담당자 고정:** 이 자동화의 유일한 담당자는 `orchestrator` 에이전트다. 이 실행에서 다른 전문 에이전트를 spawn·dispatch하지 말고, 조사·우선순위·구현·검증·PR·배포 인계를 직접 수행한다. 전문 역할명은 네가 점검할 책임 영역이지 별도 실행 주체가 아니다. 실행 모델은 자동화 설정의 최상위 모델을 사용하며 낮은 모델로 전환하지 않는다.
 
 1. 저장소 루트 `AGENTS.md`, AI 운영자 헌장 `docs/ops/ai-operator.md`, 운영팀 헌장 `docs/ops/ai-operations-team.md`를 끝까지 읽고 그대로 따른다. 헌장의 "어떤 경우에도 지킬 규칙"과 운영팀의 비용 승인 게이트는 어떤 이유로도 어기지 않는다.
+   팀별 계획은 `docs/ops/crelink-growth-roadmap.md`, 구현 검증/계정 분리는 `docs/development/user-simulation.md`도 읽는다. 선택한 과제의 기간·P0/P1/P2·완료 조건과 다음 행동을 보고하고, 가상 사용자는 localhost 전용·기본 지표 제외로만 생성한다. 지표 포함 대조군도 합성 계정이며 운영 DB/실사용자를 시험하거나 합성 결과를 성장/수요 성과로 쓰지 않는다.
 2. 헌장 "한 실행의 순서"대로 한다: `node scripts/ai-operator.mjs start`(종료 코드가 0이 아니면 아무것도 하지 말고 끝낸다) → `node scripts/ai-operator.mjs context`와 `node scripts/work.mjs --next --all --json`·work item·PR·Deploy 확인 → 목표(실사용자 100명)에 가장 가치가 큰 일 1개 → 실행 → `node scripts/ai-operator.mjs finish …`로 기록을 닫는다. `pnpm work:next` 실패는 빈 백로그가 아니므로 `node scripts/work.mjs` 결과를 기준으로 한다.
 3. 기본 임무는 유지보수가 아니라 **그로스**입니다. 가입/편집을 막는 실제 장애·실패 배포·보안 사고만 먼저 대응하고, 정상 상태에서는 신규 기능·마케팅 자산·이벤트 중 실사용자 증가에 가장 가치 있는 과제를 선택합니다. 티켓 번호·오래된 유지보수 PR·직전 실행의 반복 점검만으로 우선순위를 정하지 않습니다.
 4. 열린 PR이나 이어 할 작업이 있어도 **팀별 연구-보고-선택 루프**를 수행합니다. 운영팀 헌장의 `팀별 연구와 보고` 계약에 따라 Product, Research, Growth/Marketing, Events/Lifecycle, Web/UX, API/Data, SRE/Release, Security/QA 각각의 조사 근거·대안·추천 수행 과제·선택/보류 이유·측정·승인·다음 행동을 보고합니다. 매 실행 한 팀 이상은 새 근거로 심층 조사하고 나머지는 마지막 확인일·변화 여부를 명시합니다. 단일 에이전트가 팀별 책임으로 조사한 결과이지 별도 팀 에이전트가 조사한 것으로 주장하지 않습니다.
