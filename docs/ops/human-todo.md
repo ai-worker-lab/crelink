@@ -14,7 +14,7 @@ AI 운영자에게 모든 권한을 위임하면서 받아들인 위험([ADR 001
 - [ ] **CODEOWNERS와 사람 승인**: 인증·AI 운영자·migration·`docs/ops/**`·`.github/**` 변경에 사람 승인을 요구합니다. AI 전용 GitHub 계정을 만든 뒤에 효과가 있습니다. 근거: 헌장 실행 환경 설치 7.
 - [ ] **시험 계정 지표 제외**: 운영자 화면 `/admin` → 크리에이터 상세에서 본인·지인 시험 계정에 `지표 제외`를 켭니다. 이 스위치는 사람 운영자만 바꿀 수 있습니다. 실사용자 지표(PRD `목표`)를 정확하게 셉니다.
 - [ ] **운영자 Mac 기본 Node를 24로**: 지금 기본은 v22라 AI 실행이 매번 우회합니다(첫 실행 기록 `1827dbad`의 다음 할 일). `nvm alias default 24.20.0`으로 바꿉니다. Node 버전 기준은 [로컬 개발 환경](../development/local-environment.md)에 있습니다.
-- [ ] **AI 운영자 토큰과 20분 Orca 자동화 설치**: 사람이 런북 [17-2](../../infra/docs/prod-runbook.md#17-2-발급)로 운영 토큰을 발급해 `~/.config/crelink/ai-operator.env`(권한 600)에 저장하고, `node scripts/ai-operator.mjs precheck`를 통과시킨 뒤 `node scripts/ai-operator.mjs automation-command` 출력 명령을 실행합니다. 토큰 원문은 화면·로그·저장소에 남기지 않습니다.
+- [x] **AI 운영자 토큰과 20분 Orca 자동화 설치**(2026-10-11): 제2 AI 계정 `ai-operator-2@crelink.invalid`의 토큰을 `~/.config/crelink/ai-operator-2.env`(권한 600)에 저장하고 `crelink-ai-operator-2` 자동화를 `Asia/Seoul` `*/20 * * * *`로 활성화했습니다. precheck와 첫 예약 실행·실행 기록을 확인했습니다. 토큰 원문은 남기지 않았습니다. 상세: [0157](../work/orchestrator/0157-second-ai-operator.md).
 - [ ] **운영자 Mac 켜 두기**: 20분 실행은 운영자 Mac에서 돕니다. 꺼지거나 잠자거나 VPN·exit node로 나가면 그 주기는 빠집니다(Cloudflare 차단). 노트북이면 뚜껑을 닫았을 때 잠자지 않게 하거나 전원에 연결해 둡니다. 근거: 헌장 실행 환경 설치 2·5.
 
 ## 2. 실사용자 모집(목표 100명)
