@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-11
@@ -37,3 +37,9 @@
 - `../../node_modules/.bin/tsc --noEmit -p tsconfig.json` (apps/api): passed.
 - `../../node_modules/.bin/next typegen && ../../node_modules/.bin/tsc --noEmit` (apps/web): passed.
 - `node scripts/work.mjs --check && node scripts/docs-check.mjs`: passed.
+
+## CI·운영 검증
+
+- PR [#90](https://github.com/ai-worker-lab/crelink/pull/90): work scope·변경 종류·Node 24·Node 26·smoke·API/Web 이미지 빌드·CI 통과가 모두 성공했습니다.
+- main Deploy [#38122253755](https://github.com/ai-worker-lab/crelink/actions/runs/38122253755): `home-server` 배포와 운영 주소 검사가 성공했습니다.
+- `https://links.shaul.kr/` HTTP 200, `https://links.shaul.kr/privacy` HTTP 200, `/admin/agent-runs` HTTP 200을 확인했습니다.
