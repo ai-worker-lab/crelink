@@ -1,137 +1,384 @@
 <!doctype html>
 <html lang="ko">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; font-src 'none'; form-action 'none'; base-uri 'none'">
-  <meta name="referrer" content="no-referrer">
-  <title>사진 작업 공개 전 체크 워크시트 | 크리링</title>
-  <style>
-    :root { color-scheme: light; font-family: system-ui, -apple-system, sans-serif; color: #202d31; background: #f5f4ee; line-height: 1.65; }
-    * { box-sizing: border-box; }
-    body { margin: 0; }
-    main { max-width: 1024px; margin: 0 auto; padding: 48px 32px; }
-    .eyebrow { margin: 0 0 12px; color: #466459; font-size: .85rem; font-weight: 700; letter-spacing: .08em; }
-    h1 { max-width: 760px; margin: 0 0 16px; font-size: clamp(1.9rem, 4vw, 3rem); line-height: 1.2; letter-spacing: -.04em; word-break: keep-all; }
-    .intro { max-width: 760px; margin: 0; font-size: 1.06rem; }
-    .disclosure { margin: 18px 0 24px; font-size: .88rem; color: #4c5a5e; }
-    .route { padding: 20px 24px; border-left: 4px solid #456953; background: #e8eee5; }
-    .route h2 { margin: 0 0 6px; font-size: 1.05rem; }
-    .route p { margin: 0; }
-    .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 24px 0 12px; }
-    button { min-height: 44px; padding: 8px 18px; border: 1px solid #465b4d; border-radius: 6px; background: white; color: #243a2b; font: inherit; cursor: pointer; }
-    button:first-child { background: #304b39; color: white; }
-    button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid #896017; outline-offset: 4px; }
-    .local-note { margin: 0 0 24px; color: #4c5a5e; font-size: .85rem; }
-    fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-    legend { padding: 0; margin-bottom: 14px; font-size: 1.1rem; font-weight: 700; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .item { display: block; border: 1px solid #c9cfca; border-radius: 8px; background: #fff; padding: 20px; cursor: pointer; break-inside: avoid; }
-    .heading { display: flex; align-items: flex-start; gap: 12px; font-weight: 700; font-size: 1.05rem; }
-    input[type="checkbox"] { flex: 0 0 22px; width: 22px; height: 22px; margin: 3px 0 0; accent-color: #304b39; }
-    .detail { display: block; margin: 12px 0 0 34px; font-size: .92rem; }
-    .write-line { display: block; height: 25px; margin: 12px 0 0 34px; border-bottom: 1px solid #c9cfca; }
-    .warning { margin-top: 24px; padding: 18px 22px; border: 1px solid #af8c56; border-radius: 6px; background: #fff8e9; font-size: .92rem; }
-    .warning p { margin: 0; }
-    footer { margin-top: 24px; border-top: 1px solid #c9cfca; padding-top: 18px; font-size: .88rem; }
-    footer p { margin: 8px 0; }
-    a { color: #284f3a; text-underline-offset: 3px; overflow-wrap: anywhere; }
-    .print-note { margin-top: 12px; font-size: .83rem; color: #4c5a5e; }
-    @media (max-width: 640px) {
-      main { padding: 28px 18px; }
-      .grid { grid-template-columns: 1fr; }
-      .route { padding: 16px; }
-      .item { padding: 18px 16px; }
-      .detail { margin-left: 0; }
-    }
-    @page { size: A4; margin: 12mm; }
-    @media print {
-      :root { background: white; color: black; font-size: 9pt; }
-      main { max-width: none; margin: 0; padding: 0; }
-      h1 { font-size: 23pt; }
-      .toolbar, .local-note { display: none; }
-      .grid { grid-template-columns: 1fr 1fr; gap: 3mm; }
-      .item { padding: 3mm; border-radius: 0; }
-      .detail { margin: 2mm 0 0; }
-      .write-line { margin-left: 0; height: 6mm; }
-      .route, .warning { background: white; padding: 3mm; break-inside: avoid; }
-      .disclosure { margin: 3mm 0; }
-      footer { margin-top: 4mm; padding-top: 2mm; break-inside: avoid; }
-      a { color: black; }
-      a::after { content: " — " attr(href); font-size: 8pt; }
-    }
-  </style>
-</head>
-<body>
-  <main>
-    <header>
-      <p class="eyebrow">CRELINK / 사진 작업 공개 준비</p>
-      <h1>대표작을 공개하기 전,<br>여섯 가지를 직접 확인하세요.</h1>
-      <p class="intro">공개 가능한 사진 작업이 있는 크리에이터를 위한 자율 워크시트입니다. 확인한 항목만 체크하고, 불확실한 항목은 비워 두세요. 인쇄한 빈 줄에는 보완할 일을 적을 수 있습니다.</p>
-      <p class="disclosure">크리링 회사의 AI 운영자(PM)가 제작한 자사 안내입니다. 고객 사례·후기·촬영 의뢰 성과를 제시하는 자료가 아니며, 실제 수요와 성장 효과는 아직 관측되지 않았습니다.</p>
-    </header>
-    <section class="route" aria-labelledby="route-title">
-      <h2 id="route-title">먼저, 이미 공개한 갤러리 링크로 시작하세요</h2>
-      <p>공개 권한을 확인한 기존 갤러리에서 대표작을 고르고, 그 주소와 본인의 역할을 정리하세요. 새 이미지 업로드는 필수가 아닙니다. 갤러리가 비공개라면 이 워크시트를 위해 권한을 넓히지 마세요.</p>
-    </section>
-    <div class="toolbar">
-      <button type="button" id="print">워크시트 인쇄</button>
-      <button type="button" id="clear">체크 지우기</button>
-    </div>
-    <p class="local-note">체크 상태는 이 페이지의 메모리에만 있습니다. 새로 열거나 새로고침하면 초기화됩니다. 이 페이지는 체크로 인한 추가 네트워크 요청·쿠키·localStorage·분석을 사용하지 않으며, 아래 안내 링크를 직접 누르면 외부 서비스로 이동합니다.</p>
-    <form id="worksheet" autocomplete="off">
-      <fieldset>
-        <legend>내가 확인한 항목 · 확인이 어려우면 멈추고 보완하기</legend>
-        <div class="grid">
-          <label class="item">
-            <span class="heading"><input type="checkbox" name="rights"><span>01 · 갤러리 공개 권한</span></span>
-            <span class="detail">계약과 의뢰인·등장 인물의 공개 동의, 장소 정보의 공개 범위를 확인했다. 본인이 촬영했다는 이유만으로 공개 가능한 것은 아니다. 권한을 확인할 수 없는 작업은 제외한다.</span>
-            <span class="write-line" aria-hidden="true"></span>
-          </label>
-          <label class="item">
-            <span class="heading"><input type="checkbox" name="role"><span>02 · 실제 촬영 역할</span></span>
-            <span class="detail">제목과 설명에 작업 종류와 내가 맡은 촬영·보정 등 실제 역할을 적었다. 함께 작업한 사람의 기여를 내 성과로 쓰지 않았다.</span>
-            <span class="write-line" aria-hidden="true"></span>
-          </label>
-          <label class="item">
-            <span class="heading"><input type="checkbox" name="metadata"><span>03 · GPS·IPTC와 사진 속 정보</span></span>
-            <span class="detail">공개용 사본의 파일명, GPS 위치·촬영 시각·IPTC 작성자/연락 정보와 얼굴·주소·차량 번호를 확인했다. 필요한 저작권·출처 표시는 보존한다. 외부 갤러리의 정보도 별도로 확인한다.</span>
-            <span class="write-line" aria-hidden="true"></span>
-          </label>
-          <label class="item">
-            <span class="heading"><input type="checkbox" name="contact"><span>04 · 공개용 문의 웹페이지</span></span>
-            <span class="detail">문의 경로를 넣는다면 본인이 운영하는 공개용 HTTP(S) 웹페이지 주소와 제목을 준비했다. 이메일 주소만 입력하거나 mailto:를 사용하는 방식은 지원하지 않는다. 문의 페이지가 없으면 대표작만 정리해도 된다.</span>
-            <span class="write-line" aria-hidden="true"></span>
-          </label>
-          <label class="item">
-            <span class="heading"><input type="checkbox" name="saved"><span>05 · 관리 화면에서 직접 저장</span></span>
-            <span class="detail">관리 화면에서 링크·제목·설명을 직접 입력하고 저장 버튼으로 완료했다. 미리보기에는 저장 전 입력도 보일 수 있다. 이 워크시트의 체크는 크리링의 저장이나 공개 동작을 대신하지 않는다.</span>
-            <span class="write-line" aria-hidden="true"></span>
-          </label>
-          <label class="item">
-            <span class="heading"><input type="checkbox" name="public"><span>06 · 비로그인 결과 확인</span></span>
-            <span class="detail">저장 후 ‘공개 페이지 열기’에서 결과를 확인하고, 로그아웃 상태 또는 비로그인 창에서도 대표작·원본 갤러리·문의 페이지가 열리는지 직접 확인했다. 원본 권한이 바뀌면 다시 확인한다.</span>
-            <span class="write-line" aria-hidden="true"></span>
-          </label>
-        </div>
-      </fieldset>
-    </form>
-    <aside class="warning" aria-label="이미지 업로드 주의">
-      <p><strong>새 파일을 선택하기 전에:</strong> 이미지 파일은 선택 즉시 서버로 업로드됩니다. 폼 저장 전에도 공개 주소를 아는 사람은 공개 GET으로 파일을 읽을 수 있어 <strong>비공개 초안이 아닙니다.</strong> 이미지 업로드와 링크·제목·설명 저장은 별도 동작입니다. 크리링은 메타데이터 자동 제거나 공개 권한을 보증하지 않습니다. 권한·개인정보를 먼저 확인한 파일만 선택하고, 판단이 어렵다면 기존 공개 갤러리 링크만 사용하세요.</p>
-    </aside>
-    <footer>
-      <p><strong>서비스 조건:</strong> 기본 무료 범위는 보이는 외부 링크 5개이며, 무료 랜딩에는 지울 수 없는 크리링 자체 배너 자리 1개가 있습니다.</p>
-      <p><strong>체크는 판단 보조일 뿐입니다.</strong> 자동 점수·권리 인증·자동 저장·자동 공개 기능이 아니며, 문의 수집·협업 성사·성장 성과를 보장하지 않습니다. 외부 프로필 공유도 선택입니다.</p>
-      <p><a href="https://links.shaul.kr/docs/guide" rel="noreferrer">크리링 기본 사용 안내</a></p>
-      <p class="print-note">인쇄본은 체크와 메모를 직접 보관하세요. 개인 연락처·의뢰인 이름·원본 사진 등 민감한 정보는 메모하지 않아도 됩니다.</p>
-    </footer>
-  </main>
-  <script>
-    const worksheet = document.getElementById('worksheet');
-    window.addEventListener('pageshow', () => worksheet.reset());
-    worksheet.addEventListener('submit', event => event.preventDefault());
-    document.getElementById('clear').addEventListener('click', () => worksheet.reset());
-    document.getElementById('print').addEventListener('click', () => window.print());
-  </script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; font-src 'none'; form-action 'none'; base-uri 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <title>사진 작업 공개 전 체크 워크시트 | 크리링</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        color: #202d31;
+        background: #f5f4ee;
+        line-height: 1.65;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      main {
+        max-width: 1024px;
+        margin: 0 auto;
+        padding: 48px 32px;
+      }
+      .eyebrow {
+        margin: 0 0 12px;
+        color: #466459;
+        font-size: 0.85rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+      }
+      h1 {
+        max-width: 760px;
+        margin: 0 0 16px;
+        font-size: clamp(1.9rem, 4vw, 3rem);
+        line-height: 1.2;
+        letter-spacing: -0.04em;
+        word-break: keep-all;
+      }
+      .intro {
+        max-width: 760px;
+        margin: 0;
+        font-size: 1.06rem;
+      }
+      .disclosure {
+        margin: 18px 0 24px;
+        font-size: 0.88rem;
+        color: #4c5a5e;
+      }
+      .route {
+        padding: 20px 24px;
+        border-left: 4px solid #456953;
+        background: #e8eee5;
+      }
+      .route h2 {
+        margin: 0 0 6px;
+        font-size: 1.05rem;
+      }
+      .route p {
+        margin: 0;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin: 24px 0 12px;
+      }
+      button {
+        min-height: 44px;
+        padding: 8px 18px;
+        border: 1px solid #465b4d;
+        border-radius: 6px;
+        background: white;
+        color: #243a2b;
+        font: inherit;
+        cursor: pointer;
+      }
+      button:first-child {
+        background: #304b39;
+        color: white;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible {
+        outline: 3px solid #896017;
+        outline-offset: 4px;
+      }
+      .local-note {
+        margin: 0 0 24px;
+        color: #4c5a5e;
+        font-size: 0.85rem;
+      }
+      fieldset {
+        border: 0;
+        padding: 0;
+        margin: 0;
+        min-width: 0;
+      }
+      legend {
+        padding: 0;
+        margin-bottom: 14px;
+        font-size: 1.1rem;
+        font-weight: 700;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .item {
+        display: block;
+        border: 1px solid #c9cfca;
+        border-radius: 8px;
+        background: #fff;
+        padding: 20px;
+        cursor: pointer;
+        break-inside: avoid;
+      }
+      .heading {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        font-weight: 700;
+        font-size: 1.05rem;
+      }
+      input[type='checkbox'] {
+        flex: 0 0 22px;
+        width: 22px;
+        height: 22px;
+        margin: 3px 0 0;
+        accent-color: #304b39;
+      }
+      .detail {
+        display: block;
+        margin: 12px 0 0 34px;
+        font-size: 0.92rem;
+      }
+      .write-line {
+        display: block;
+        height: 25px;
+        margin: 12px 0 0 34px;
+        border-bottom: 1px solid #c9cfca;
+      }
+      .warning {
+        margin-top: 24px;
+        padding: 18px 22px;
+        border: 1px solid #af8c56;
+        border-radius: 6px;
+        background: #fff8e9;
+        font-size: 0.92rem;
+      }
+      .warning p {
+        margin: 0;
+      }
+      footer {
+        margin-top: 24px;
+        border-top: 1px solid #c9cfca;
+        padding-top: 18px;
+        font-size: 0.88rem;
+      }
+      footer p {
+        margin: 8px 0;
+      }
+      a {
+        color: #284f3a;
+        text-underline-offset: 3px;
+        overflow-wrap: anywhere;
+      }
+      .print-note {
+        margin-top: 12px;
+        font-size: 0.83rem;
+        color: #4c5a5e;
+      }
+      @media (max-width: 640px) {
+        main {
+          padding: 28px 18px;
+        }
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .route {
+          padding: 16px;
+        }
+        .item {
+          padding: 18px 16px;
+        }
+        .detail {
+          margin-left: 0;
+        }
+      }
+      @page {
+        size: A4;
+        margin: 12mm;
+      }
+      @media print {
+        :root {
+          background: white;
+          color: black;
+          font-size: 9pt;
+        }
+        main {
+          max-width: none;
+          margin: 0;
+          padding: 0;
+        }
+        h1 {
+          font-size: 23pt;
+        }
+        .toolbar,
+        .local-note {
+          display: none;
+        }
+        .grid {
+          grid-template-columns: 1fr 1fr;
+          gap: 3mm;
+        }
+        .item {
+          padding: 3mm;
+          border-radius: 0;
+        }
+        .detail {
+          margin: 2mm 0 0;
+        }
+        .write-line {
+          margin-left: 0;
+          height: 6mm;
+        }
+        .route,
+        .warning {
+          background: white;
+          padding: 3mm;
+          break-inside: avoid;
+        }
+        .disclosure {
+          margin: 3mm 0;
+        }
+        footer {
+          margin-top: 4mm;
+          padding-top: 2mm;
+          break-inside: avoid;
+        }
+        a {
+          color: black;
+        }
+        a::after {
+          content: ' — ' attr(href);
+          font-size: 8pt;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">CRELINK / 사진 작업 공개 준비</p>
+        <h1>대표작을 공개하기 전,<br />여섯 가지를 직접 확인하세요.</h1>
+        <p class="intro">
+          공개 가능한 사진 작업이 있는 크리에이터를 위한 자율 워크시트입니다. 확인한 항목만 체크하고, 불확실한 항목은
+          비워 두세요. 인쇄한 빈 줄에는 보완할 일을 적을 수 있습니다.
+        </p>
+        <p class="disclosure">
+          크리링 회사의 AI 운영자(PM)가 제작한 자사 안내입니다. 고객 사례·후기·촬영 의뢰 성과를 제시하는 자료가 아니며,
+          실제 수요와 성장 효과는 아직 관측되지 않았습니다.
+        </p>
+      </header>
+      <section class="route" aria-labelledby="route-title">
+        <h2 id="route-title">먼저, 이미 공개한 갤러리 링크로 시작하세요</h2>
+        <p>
+          공개 권한을 확인한 기존 갤러리에서 대표작을 고르고, 그 주소와 본인의 역할을 정리하세요. 새 이미지 업로드는
+          필수가 아닙니다. 갤러리가 비공개라면 이 워크시트를 위해 권한을 넓히지 마세요.
+        </p>
+      </section>
+      <div class="toolbar">
+        <button type="button" id="print">워크시트 인쇄</button>
+        <button type="button" id="clear">체크 지우기</button>
+      </div>
+      <p class="local-note">
+        체크 상태는 이 페이지의 메모리에만 있습니다. 새로 열거나 새로고침하면 초기화됩니다. 이 페이지는 체크로 인한 추가
+        네트워크 요청·쿠키·localStorage·분석을 사용하지 않으며, 아래 안내 링크를 직접 누르면 외부 서비스로 이동합니다.
+      </p>
+      <form id="worksheet" autocomplete="off">
+        <fieldset>
+          <legend>내가 확인한 항목 · 확인이 어려우면 멈추고 보완하기</legend>
+          <div class="grid">
+            <label class="item">
+              <span class="heading"><input type="checkbox" name="rights" /><span>01 · 갤러리 공개 권한</span></span>
+              <span class="detail"
+                >계약과 의뢰인·등장 인물의 공개 동의, 장소 정보의 공개 범위를 확인했다. 본인이 촬영했다는 이유만으로
+                공개 가능한 것은 아니다. 권한을 확인할 수 없는 작업은 제외한다.</span
+              >
+              <span class="write-line" aria-hidden="true"></span>
+            </label>
+            <label class="item">
+              <span class="heading"><input type="checkbox" name="role" /><span>02 · 실제 촬영 역할</span></span>
+              <span class="detail"
+                >제목과 설명에 작업 종류와 내가 맡은 촬영·보정 등 실제 역할을 적었다. 함께 작업한 사람의 기여를 내
+                성과로 쓰지 않았다.</span
+              >
+              <span class="write-line" aria-hidden="true"></span>
+            </label>
+            <label class="item">
+              <span class="heading"
+                ><input type="checkbox" name="metadata" /><span>03 · GPS·IPTC와 사진 속 정보</span></span
+              >
+              <span class="detail"
+                >공개용 사본의 파일명, GPS 위치·촬영 시각·IPTC 작성자/연락 정보와 얼굴·주소·차량 번호를 확인했다. 필요한
+                저작권·출처 표시는 보존한다. 외부 갤러리의 정보도 별도로 확인한다.</span
+              >
+              <span class="write-line" aria-hidden="true"></span>
+            </label>
+            <label class="item">
+              <span class="heading"
+                ><input type="checkbox" name="contact" /><span>04 · 공개용 문의 웹페이지</span></span
+              >
+              <span class="detail"
+                >문의 경로를 넣는다면 본인이 운영하는 공개용 HTTP(S) 웹페이지 주소와 제목을 준비했다. 이메일 주소만
+                입력하거나 mailto:를 사용하는 방식은 지원하지 않는다. 문의 페이지가 없으면 대표작만 정리해도 된다.</span
+              >
+              <span class="write-line" aria-hidden="true"></span>
+            </label>
+            <label class="item">
+              <span class="heading"
+                ><input type="checkbox" name="saved" /><span>05 · 관리 화면에서 직접 저장</span></span
+              >
+              <span class="detail"
+                >관리 화면에서 링크·제목·설명을 직접 입력하고 저장 버튼으로 완료했다. 미리보기에는 저장 전 입력도 보일
+                수 있다. 이 워크시트의 체크는 크리링의 저장이나 공개 동작을 대신하지 않는다.</span
+              >
+              <span class="write-line" aria-hidden="true"></span>
+            </label>
+            <label class="item">
+              <span class="heading"><input type="checkbox" name="public" /><span>06 · 비로그인 결과 확인</span></span>
+              <span class="detail"
+                >저장 후 ‘공개 페이지 열기’에서 결과를 확인하고, 로그아웃 상태 또는 비로그인 창에서도 대표작·원본
+                갤러리·문의 페이지가 열리는지 직접 확인했다. 원본 권한이 바뀌면 다시 확인한다.</span
+              >
+              <span class="write-line" aria-hidden="true"></span>
+            </label>
+          </div>
+        </fieldset>
+      </form>
+      <aside class="warning" aria-label="이미지 업로드 주의">
+        <p>
+          <strong>새 파일을 선택하기 전에:</strong> 이미지 파일은 선택 즉시 서버로 업로드됩니다. 폼 저장 전에도 공개
+          주소를 아는 사람은 공개 GET으로 파일을 읽을 수 있어 <strong>비공개 초안이 아닙니다.</strong> 이미지 업로드와
+          링크·제목·설명 저장은 별도 동작입니다. 크리링은 메타데이터 자동 제거나 공개 권한을 보증하지 않습니다.
+          권한·개인정보를 먼저 확인한 파일만 선택하고, 판단이 어렵다면 기존 공개 갤러리 링크만 사용하세요.
+        </p>
+      </aside>
+      <footer>
+        <p>
+          <strong>서비스 조건:</strong> 기본 무료 범위는 보이는 외부 링크 5개이며, 무료 랜딩에는 지울 수 없는 크리링
+          자체 배너 자리 1개가 있습니다.
+        </p>
+        <p>
+          <strong>체크는 판단 보조일 뿐입니다.</strong> 자동 점수·권리 인증·자동 저장·자동 공개 기능이 아니며, 문의
+          수집·협업 성사·성장 성과를 보장하지 않습니다. 외부 프로필 공유도 선택입니다.
+        </p>
+        <p><a href="https://links.shaul.kr/docs/guide" rel="noreferrer">크리링 기본 사용 안내</a></p>
+        <p class="print-note">
+          인쇄본은 체크와 메모를 직접 보관하세요. 개인 연락처·의뢰인 이름·원본 사진 등 민감한 정보는 메모하지 않아도
+          됩니다.
+        </p>
+      </footer>
+    </main>
+    <script>
+      const worksheet = document.getElementById('worksheet');
+      window.addEventListener('pageshow', () => worksheet.reset());
+      worksheet.addEventListener('submit', (event) => event.preventDefault());
+      document.getElementById('clear').addEventListener('click', () => worksheet.reset());
+      document.getElementById('print').addEventListener('click', () => window.print());
+    </script>
+  </body>
 </html>
