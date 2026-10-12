@@ -3,7 +3,7 @@
 - 단계: 티켓
 - 역할: orchestrator
 - 선행: 0175
-- 상태: 검증
+- 상태: 완료
 - 종류: 제품 결정
 - 우선순위: P2
 - 작성일: 2026-10-12
@@ -21,7 +21,7 @@
 - [x] `/privacy`가 이벤트 신청 기록을 더는 수집·보관 항목으로 고지하지 않고, 지운 사실을 적습니다.
 - [x] PRD `목표`에 우선 방향(진입·사용 허들 낮추기, 광고 수익 쉐어 보류)이 `[사용자 확정, 2026-10-12]`로 있고, R20 참고와 설계 `미정`의 수익 배분이 `[보류]`입니다.
 - [x] 관련 설계·API 문서·사람 할 일 목록에서 "지우지 않고 보관" 서술을 고칩니다.
-- [ ] main 머지 뒤 Deploy가 성공합니다(`운영 주소 검사` 포함).
+- [x] main 머지 뒤 Deploy가 성공합니다(`운영 주소 검사` 포함).
 
 ## 범위
 
@@ -40,3 +40,4 @@ migration은 운영 데이터를 지우고 되돌릴 수 없습니다. 백업과
 
 - 2026-10-12: 생성·착수(브랜치 `work/0180-retired-data-drop-and-entry-focus`, 기준 origin/main `c7824d2`).
 - 2026-10-12: 검증(Node 24.20.0, 이 worktree 인스턴스 DB). `pnpm verify` 8단계 통과(API 28 suites·223 tests, 실제 PostgreSQL). `make api-up web-up` 기동 시 migration 적용 확인: 마지막 적용 `0008_drop_retired_link_slot_data`, `slot_event%` 테이블 0개, `users.extra_link_slots` 컬럼 0개. `pnpm smoke` 5건, `pnpm e2e` 17건 통과. 로컬 `/privacy`에 "끝난 외부 링크 +5 이벤트의 신청 기록은 2026년 10월 12일에 모두 지웠어요." 노출, 옛 수집 문구 없음. `검증`으로 넘깁니다.
+- 2026-10-12: 완료. PR [#134](https://github.com/ai-worker-lab/crelink/pull/134) CI 통과 후 squash 머지(`7cd5962`), Deploy [38197227467](https://github.com/ai-worker-lab/crelink/actions/runs/38197227467) success(plan·이미지 api·web·배포 home-server(`운영 주소 검사` 포함)·배포 기록 태그). 운영 DB 읽기 전용 확인: 마지막 migration `0008_drop_retired_link_slot_data`, `slot_event%` 테이블 0개, `users.extra_link_slots` 컬럼 0개, 사용자 7행 그대로, 지난 행동 기록(`creator.extra_slots`·`slot_event.period_update`) 1행 유지.
