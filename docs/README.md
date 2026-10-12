@@ -62,7 +62,7 @@ AI 운영자: [AI 운영자 기술 설계](specs/crelink-ai-operator.md) — 전
 
 광고 블록·배너 슬롯: [광고 블록과 크리에이터 배너 슬롯 기술 설계](specs/crelink-ad-banner.md) — PRD R20·R21의 데이터·계약·노출 기록·티켓 분해(초안, 에픽 0063).
 
-링크 슬롯 +5 이벤트: [링크 슬롯 +5 이벤트 기술 설계](specs/crelink-slot-event.md) — PRD R24의 데이터(migration 0005)·계약·화면 상태·티켓 분해·운영 적용 절차(승인, 에픽 0089).
+외부 링크 50개·광고 블록 켜고 끄기: [외부 링크 50개 기본 제공과 광고 블록 켜고 끄기 기술 설계](specs/crelink-link-limit-ad-toggle.md) — PRD R13 변경·R20 ⑩·R24 철회의 계약·migration 0007·화면 상태·검증 계획(승인, 에픽 0175). 이 설계가 대체한 [링크 슬롯 +5 이벤트 기술 설계](specs/crelink-slot-event.md)는 과거 기록입니다(대체됨, 에픽 0089).
 
 ## 문서 위치
 

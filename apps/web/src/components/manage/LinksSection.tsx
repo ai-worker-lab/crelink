@@ -21,14 +21,13 @@ import {
 } from '@dnd-kit/sortable';
 import { useId, useRef } from 'react';
 import { browserApi } from '../../lib/api/browser';
-import { mixedOrder, SLOT_ROW_ID, slotRowName, splitOrder, withParticle } from '../../lib/slot-order';
+import { mixedOrder, SLOT_ROW_ID, slotEditable, slotRowName, splitOrder, withParticle } from '../../lib/slot-order';
 import { useAction } from '../../lib/use-action';
 import { ActionStatus } from '../ActionStatus';
 import { EditableLinkCard } from './EditableLinkCard';
 import { useManager } from './ManagerContext';
-import { SlotEventPanelRow } from './SlotEventOffer';
 import { SlotOrderRow } from './SlotOrderRow';
-import { linkLimitNotice } from './limits';
+import { linkLimitLabel, linkLimitNotice } from './limits';
 
 /** 끄는 동안 카드가 세로로만 움직이게 합니다(리스트형 구역). */
 const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
@@ -36,12 +35,13 @@ const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
 /**
  * `페이지 편집` 외부 링크 구역 패널(PRD R18·R20 ②): 숨긴·차단 링크를 포함한 전체 목록, 한도 배지, `링크 추가`.
  * 링크 행 사이에 광고 블록(또는 배너 슬롯) 행이 섞여 같은 손잡이로 끌어 정렬합니다(디자인 design/ad-banner-block/handoff.md).
+ * 광고 블록 행은 운영자 플랫폼 스위치가 켜졌을 때만 있고(`slotEditable`, R20 ⑩), 행 안에 `광고 블록 표시` 스위치가 있습니다.
  * 행의 `수정`·카드 누르기와 `링크 추가`는 그 링크를 골라 패널을 폼으로 바꿉니다. 순서는 끌어 놓기로 바로 저장하고 실패하면 되돌립니다.
- * 링크를 옮기든 슬롯 행을 옮기든 늘 `PUT /api/me/links/order { ids, slotIndex }`를 보내 화면 순서와 저장 순서를 맞추고, 보낸 `slotIndex`
- * (링크 수 이상이면 null)를 편집 상태에 그대로 둡니다(설계 docs/specs/crelink-ad-banner.md `위치 모델`).
+ * 슬롯 행이 있으면 무엇을 옮기든 `PUT /api/me/links/order { ids, slotIndex }`를 보내 화면 순서와 저장 순서를 맞추고, 보낸 `slotIndex`
+ * (링크 수 이상이면 null)를 편집 상태에 그대로 둡니다(설계 docs/specs/crelink-ad-banner.md `위치 모델`). 슬롯 행이 없으면 `slotIndex`를 빼서
+ * 저장된 광고 블록 위치를 그대로 둡니다.
  * 숨기기는 스위치(`PATCH hidden`)로 바로 저장하고 실패하면 되돌립니다. 저장 뒤에는 편집 상태를 다시 읽어 한도·순서를 서버 값과 맞춥니다.
- * 한도 배지는 슬롯 행을 세지 않습니다(R20 ⑦). 배지 바로 아래에는 링크 슬롯 이벤트 줄(신청 카드·`신청함` 줄, design/slot-event/handoff.md)이 옵니다.
- * `notice`는 폼에서 돌아올 때 보여 줄 결과 안내이고,
+ * 한도 배지는 숨긴·차단 링크를 포함한 전체 링크 수이고 슬롯 행은 세지 않습니다(R13). `notice`는 폼에서 돌아올 때 보여 줄 결과 안내이고,
  * `focusSlotHandle`이면 하단 시트가 슬롯 행 손잡이에 처음 초점을 둡니다(광고 블록 패널의 `외부 링크 목록에서 끌어 옮기기`).
  */
 export function LinksSection({
@@ -51,8 +51,8 @@ export function LinksSection({
   notice?: string | null;
   focusSlotHandle?: boolean;
 }) {
-  const { state, setState, reload, select, isLinkDirty } = useManager();
-  const { pending, error, notice, run, setNotice } = useAction();
+  const { state, setState, reload, select, isLinkDirty, adBlockAction } = useManager();
+  const { pending, error, notice, run } = useAction();
   const dndId = useId();
   /** 이번 끌기에서 한 번이라도 다른 자리로 옮겼는지(스크린리더 안내용). */
   const movedSinceStart = useRef(false);
@@ -62,17 +62,15 @@ export function LinksSection({
   );
 
   const { links, limits, slot } = state;
-  const visibleFull = limits.visibleUsed >= limits.visibleMax;
-  const limitNotice = linkLimitNotice(limits, state.slotEvent);
+  const limitNotice = linkLimitNotice(limits);
+  const slotShown = slotEditable(slot.kind, state.adBlock.platformEnabled);
   const slotName = slotRowName(slot.kind);
-  const mixed = mixedOrder(
-    links.map((link) => link.id),
-    slot.slotIndex,
-  );
+  const linkIds = links.map((link) => link.id);
+  const mixed = slotShown ? mixedOrder(linkIds, slot.slotIndex) : linkIds;
 
   async function toggleHidden(link: LinkView, hidden: boolean) {
     const payload: UpdateLinkRequest = { hidden };
-    // 스위치는 바로 바뀌고, 실패하면(예: 보이는 링크 한도 409) 원래대로 돌립니다.
+    // 스위치는 바로 바뀌고, 실패하면(예: 연결 오류) 원래대로 돌립니다. 다시 보이게 하는 것은 링크 한도와 관계없습니다.
     setState((current) => ({
       ...current,
       links: current.links.map((item) => (item.id === link.id ? { ...item, hidden } : item)),
@@ -105,12 +103,13 @@ export function LinksSection({
     const byId = new Map(links.map((link) => [link.id, link]));
     const nextLinks = order.ids.flatMap((id) => byId.get(id) ?? []);
     const nextSlotIndex = order.slotIndex >= nextLinks.length ? null : order.slotIndex;
+    // 슬롯 행이 없으면(광고 블록 플랫폼 스위치 꺼짐) 편집 상태의 위치를 건드리지 않고 `slotIndex`를 빼서 보냅니다.
     setState((current) => ({
       ...current,
       links: nextLinks,
-      slot: { ...current.slot, slotIndex: nextSlotIndex },
+      slot: slotShown ? { ...current.slot, slotIndex: nextSlotIndex } : current.slot,
     }));
-    const payload: LinkOrderRequest = { ids: order.ids, slotIndex: order.slotIndex };
+    const payload: LinkOrderRequest = slotShown ? { ids: order.ids, slotIndex: order.slotIndex } : { ids: order.ids };
     const saved = await run(async () => {
       const savedLinks = await browserApi<LinkView[]>(CRELINK_API_PATHS.meLinksOrder, {
         method: 'PUT',
@@ -154,17 +153,16 @@ export function LinksSection({
   return (
     <>
       <div className="panel-badges">
-        <p className={`limit-badge${visibleFull ? ' limit-full' : ''}`}>
-          보이는 링크 {limits.visibleUsed}/{limits.visibleMax}
-        </p>
+        <p className={`limit-badge${limitNotice ? ' limit-full' : ''}`}>{linkLimitLabel(limits)}</p>
       </div>
-      <SlotEventPanelRow onApplied={setNotice} />
       <p className="section-help">
-        카드를 누르면 고칠 수 있고, 손잡이를 끌면 순서가 바뀌어요. {slotName} 행도 같은 손잡이로 옮겨요. 숨긴 링크와
-        차단된 링크는 방문자에게 보이지 않고 한도에도 들어가지 않아요. 숨긴 링크 포함 전체 {limits.totalUsed}/
-        {limits.totalMax}개.
+        카드를 누르면 고칠 수 있고, 손잡이를 끌면 순서가 바뀌어요.
+        {slotShown ? ` ${slotName} 행도 같은 손잡이로 옮겨요.` : ''} 숨긴 링크와 차단된 링크는 방문자에게 보이지 않지만
+        링크 수에는 들어가요. 숨긴 링크를 포함해 {limits.totalMax}개까지 둘 수 있어요.
       </p>
       <ActionStatus error={error} notice={notice ?? doneNotice ?? null} />
+      {/* 광고 블록 행 스위치 결과. 409 `ad_block_unavailable`로 행이 사라져도 안내는 여기 남습니다. */}
+      <ActionStatus error={adBlockAction.error} notice={adBlockAction.notice} />
       <DndContext
         id={dndId}
         sensors={sensors}
@@ -174,7 +172,9 @@ export function LinksSection({
         accessibility={{
           announcements,
           screenReaderInstructions: {
-            draggable: `순서를 바꾸려면 스페이스 키나 엔터 키로 링크나 ${withParticle(slotName, '을', '를')} 든 뒤 위·아래 화살표 키로 옮기고, 스페이스 키나 엔터 키로 내려놓으세요. Esc 키를 누르면 취소돼요.`,
+            draggable: slotShown
+              ? `순서를 바꾸려면 스페이스 키나 엔터 키로 링크나 ${withParticle(slotName, '을', '를')} 든 뒤 위·아래 화살표 키로 옮기고, 스페이스 키나 엔터 키로 내려놓으세요. Esc 키를 누르면 취소돼요.`
+              : '순서를 바꾸려면 스페이스 키나 엔터 키로 링크를 든 뒤 위·아래 화살표 키로 옮기고, 스페이스 키나 엔터 키로 내려놓으세요. Esc 키를 누르면 취소돼요.',
           },
         }}
       >
@@ -187,6 +187,7 @@ export function LinksSection({
                     key={id}
                     kind={slot.kind}
                     visibleBanners={state.bannerLimits.visibleUsed}
+                    adEnabled={state.adBlock.enabled}
                     busy={pending}
                     alone={links.length === 0}
                     autoFocus={focusSlotHandle}

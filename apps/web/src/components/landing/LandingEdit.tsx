@@ -19,7 +19,7 @@ export interface LandingEditControl {
   canAddPortfolio: boolean;
   /**
    * 방문자에게 숨는 광고 블록·배너 슬롯(`resolveBannerSlot`의 `'no_banners'`)의 점선 자리. 링크 목록에서 보이는 링크 `afterLinkCount`개 다음에 둡니다.
-   * 그리지 않으면 null(보이는 슬롯이거나 `'no_content'`).
+   * 그리지 않으면 null(보이는 슬롯이거나 `'no_content'`·`'ad_off'`).
    */
   slotPlaceholder: { kind: BannerSlotKind; afterLinkCount: number } | null;
 }

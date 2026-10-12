@@ -10,7 +10,6 @@ import { AdminShell } from '../../../../components/admin/AdminShell';
 import {
   BannerSlotControl,
   BlockControl,
-  ExtraSlotsForm,
   MetricsExclusionToggle,
   SuspensionToggle,
 } from '../../../../components/admin/CreatorControls';
@@ -104,32 +103,18 @@ function CreatorDetail({
           </dd>
         </div>
         <div>
-          <dt>이벤트 신청일</dt>
-          <dd>
-            {creator.slotEvent ? (
-              <>
-                <time dateTime={creator.slotEvent.appliedAt}>{formatDate(creator.slotEvent.appliedAt)}</time> · 보이는
-                링크 +{creator.slotEvent.bonusLinks}
-              </>
-            ) : (
-              '신청 안 함'
-            )}
-          </dd>
+          {/* 크리에이터의 광고 블록 스위치(R20 ⑩). 공개 랜딩 노출은 플랫폼 스위치(`/admin/ad-banners`)와 함께 정해집니다. */}
+          <dt>광고 블록</dt>
+          <dd>{creator.adBlockEnabled ? '켬' : '꺼짐'}</dd>
         </div>
       </dl>
 
       <section className="card" aria-labelledby="account-title">
         <h2 id="account-title">계정 관리</h2>
         <p className="section-help">
-          보이는 링크 {creator.limits.visibleUsed}/{creator.limits.visibleMax} · 전체 링크 {creator.limits.totalUsed}/
-          {creator.limits.totalMax}
+          링크 {creator.limits.totalUsed}/{creator.limits.totalMax}(숨긴·차단 링크 포함)
         </p>
         <div className="control-grid">
-          <ExtraSlotsForm
-            userId={creator.userId}
-            extraSlots={creator.extraLinkSlots}
-            eventBonus={creator.slotEvent?.bonusLinks ?? null}
-          />
           <SuspensionToggle userId={creator.userId} suspended={creator.suspended} accountKind={creator.accountKind} />
           <BannerSlotControl
             userId={creator.userId}

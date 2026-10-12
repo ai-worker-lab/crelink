@@ -8,7 +8,7 @@ async function growthMetrics(page: Page) {
   const response = await page.request.get(`${API_URL}/api/admin/metrics`);
   expect(response.status()).toBe(200);
   const metrics: AiOperatorMetrics = await response.json();
-  // 전체 계정 수·광고·이벤트 신청은 현행 계약상 전체 집계이므로 성장 대상 집계와 혼동하지 않습니다.
+  // 전체 계정 수·광고는 현행 계약상 전체 집계이므로 성장 대상 집계와 혼동하지 않습니다.
   return {
     realUsers: metrics.realUsers,
     signups: metrics.signups,

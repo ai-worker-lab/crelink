@@ -82,12 +82,13 @@ function state(patch: Partial<CreatorLandingState> = {}): CreatorLandingState {
     links: [link('a'), link('h', { hidden: true }), link('b', { blocked: true, blockedReason: '피싱' }), link('c')],
     socials: [{ platform: 'youtube', url: 'https://youtube.com/@haru' }],
     portfolio: [item('p1'), item('p2')],
-    limits: { visibleMax: 5, visibleUsed: 2, totalMax: 50, totalUsed: 4 },
+    limits: { totalMax: 50, totalUsed: 4 },
     slot: { kind: 'ad', slotIndex: null, grantedAt: null },
     adBanners: [],
     banners: [],
     bannerLimits: { visibleMax: 5, visibleUsed: 0, totalMax: 20, totalUsed: 0 },
-    slotEvent: { event: null, entry: null },
+    // 광고 블록 기존 시험은 두 스위치가 모두 켜진 상태에서 봅니다(꺼진 경우는 `ad_off` 시험).
+    adBlock: { platformEnabled: true, enabled: true },
     ...patch,
   };
 }
@@ -265,6 +266,29 @@ test('광고는 보이는 링크·포트폴리오가 없으면 no_content, 새 �
   assert.equal(drafted.afterLinkCount, 1);
   const portfolioOnly = previewBannerSlot(bare, { portfolio: [{ ...portfolioDraftOf(null), title: '새 작업' }] });
   assert.equal(portfolioOnly.hidden, null);
+});
+
+test('광고 블록 스위치(R20 ⑩): 플랫폼·크리에이터 중 하나라도 꺼지면 ad_off로 아무것도 그리지 않고, 배너 슬롯은 영향 없음', () => {
+  const saved = { adBanners: [adBanner('x')], slot: { kind: 'ad' as const, slotIndex: 1, grantedAt: null } };
+  for (const adBlock of [
+    { platformEnabled: false, enabled: false },
+    { platformEnabled: false, enabled: true },
+    { platformEnabled: true, enabled: false },
+  ]) {
+    const off = state({ ...saved, adBlock });
+    const slot = previewBannerSlot(off);
+    assert.equal(slot.hidden, 'ad_off');
+    assert.equal(slot.afterLinkCount, 1);
+    assert.equal(toLandingPreview(off).blocks[0].slot, null);
+  }
+  // 게시 0장이어도 꺼져 있으면 점선 자리(no_banners)가 아니라 ad_off.
+  assert.equal(previewBannerSlot(state({ adBlock: { platformEnabled: true, enabled: false } })).hidden, 'ad_off');
+  const granted = state({
+    slot: { kind: 'creator', slotIndex: null, grantedAt: '2026-10-01T00:00:00.000Z' },
+    banners: [creatorBanner('k')],
+    adBlock: { platformEnabled: false, enabled: false },
+  });
+  assert.equal(previewBannerSlot(granted).hidden, null);
 });
 
 test('배너 슬롯은 숨김·차단 배너를 빼고 저장된 URL·정지 이미지를 싣고, 빈 랜딩에서도 보인다', () => {

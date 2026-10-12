@@ -6,9 +6,7 @@
 
 /** 설계의 `[임시값]`. MVP 이후 사용자 결정으로 바꿉니다. */
 export const CRELINK_LIMITS = {
-  /** 무료 계정이 보이게 둘 수 있는 외부 링크 수(R13). 운영자 부여 슬롯만큼 늘어납니다. */
-  freeVisibleLinks: 5,
-  /** 숨긴 링크 포함 계정당 전체 외부 링크 상한(R13 안전 장치). */
+  /** 계정당 외부 링크 상한(R13). 숨긴 링크도 셉니다. 모든 크리에이터가 같은 값이며 유료로 늘리는 한도는 없습니다. */
   totalLinks: 50,
   portfolioItems: 20,
   socialLinks: 10,
@@ -105,7 +103,6 @@ export type CrelinkErrorCode =
   | 'link_not_found'
   | 'link_url_invalid'
   | 'link_domain_blocked'
-  | 'link_limit_reached'
   | 'link_total_limit_reached'
   | 'order_mismatch'
   | 'portfolio_item_not_found'
@@ -125,10 +122,8 @@ export type CrelinkErrorCode =
   | 'banner_slot_not_granted'
   | 'ad_banner_not_found'
   | 'banner_period_invalid'
-  // 링크 슬롯 이벤트(R24)
-  | 'slot_event_not_found'
-  | 'slot_event_closed'
-  | 'slot_event_period_invalid'
+  // 광고 블록 켜고 끄기(R20 ⑩)
+  | 'ad_block_unavailable'
   // AI 운영자(R23). 근거: docs/specs/crelink-ai-operator.md `오류 코드`.
   | 'agent_run_not_found'
   | 'agent_run_in_progress'
@@ -229,12 +224,11 @@ export interface PortfolioItemView {
   position: number;
 }
 
+/** 외부 링크 한도(R13). 숨긴·차단 링크도 셉니다. */
 export interface LinkLimits {
-  /** 지금 보이게 둘 수 있는 최대 수 = min(freeVisibleLinks + extraLinkSlots + 링크 슬롯 이벤트 보너스 합, totalLinks). */
-  visibleMax: number;
-  /** 숨기지 않고 차단되지 않은 링크 수. */
-  visibleUsed: number;
+  /** `CRELINK_LIMITS.totalLinks`. */
   totalMax: number;
+  /** 숨김·차단 포함 이 계정의 링크 수. */
   totalUsed: number;
 }
 
@@ -293,8 +287,27 @@ export interface CreatorLandingState {
   /** 이 랜딩의 크리에이터 배너 전체(숨김·차단 포함, 순서대로). 회수 뒤에도 보관분이 들어 있고, 웹은 slot.kind = 'creator'일 때만 씁니다. */
   banners: CreatorBannerView[];
   bannerLimits: BannerLimits;
-  /** 링크 슬롯 이벤트(R24)와 이 계정의 신청. `limits.visibleMax`에는 받은 보너스가 이미 들어 있습니다. */
-  slotEvent: CreatorSlotEventState;
+  /** 광고 블록 켜고 끄기(R20 ⑩). slot.kind = 'ad'일 때만 뜻이 있습니다. 배너 슬롯이 부여된 계정에는 쓰지 않습니다. */
+  adBlock: CreatorAdBlockState;
+}
+
+/**
+ * 광고 블록 스위치 두 개(R20 ⑩). 공개 랜딩은 platformEnabled와 enabled가 모두 true이고 배너 슬롯이 부여되지 않았을 때만 광고 블록을 그립니다.
+ * platformEnabled가 false면 웹은 편집 화면에 광고 블록 줄·패널·스위치를 그리지 않습니다.
+ */
+export interface CreatorAdBlockState {
+  /** 운영자 플랫폼 스위치(`platform_settings.ad_block_enabled`, 기본 false). */
+  platformEnabled: boolean;
+  /** 이 계정의 크리에이터 스위치(`users.ad_block_enabled`, 기본 false). */
+  enabled: boolean;
+}
+
+/**
+ * `PUT /api/me/ad-block`(크리에이터 스위치, 응답 `CreatorLandingState`)과 `PUT /api/admin/ad-block`(운영자 플랫폼 스위치, 응답 `AdBlockSettingView`).
+ * 둘 다 400 `validation_failed`. 크리에이터 스위치는 플랫폼 스위치가 꺼져 있으면 409 `ad_block_unavailable`.
+ */
+export interface SetAdBlockRequest {
+  enabled: boolean;
 }
 
 /** `PATCH /api/me/landing`. 빈 문자열·null은 비움입니다. 응답은 `CreatorLandingState`. */
@@ -432,8 +445,11 @@ export interface PublicBlockView {
   slot: PublicBannerSlotView | null;
 }
 
-/** `resolveBannerSlot`의 숨김 사유. 'no_content' = 광고인데 보이는 링크·포트폴리오가 없음, 'no_banners' = 보일 배너가 없음. */
-export type BannerSlotHiddenReason = 'no_banners' | 'no_content';
+/**
+ * `resolveBannerSlot`의 숨김 사유. 'ad_off' = 광고인데 플랫폼·크리에이터 스위치 중 하나가 꺼짐(R20 ⑩),
+ * 'no_content' = 광고인데 보이는 링크·포트폴리오가 없음, 'no_banners' = 보일 배너가 없음.
+ */
+export type BannerSlotHiddenReason = 'ad_off' | 'no_banners' | 'no_content';
 
 export interface ResolveBannerSlotInput<B> {
   /** 계정에 배너 슬롯이 부여됐는지(R21 ①). */
@@ -443,6 +459,8 @@ export interface ResolveBannerSlotInput<B> {
   /** 전체 순서의 링크마다 방문자에게 보이는지. */
   linkVisible: readonly boolean[];
   hasPortfolio: boolean;
+  /** 광고 블록 스위치(R20 ⑩): 플랫폼 스위치와 크리에이터 스위치가 모두 켜졌는지. 배너 슬롯(granted)에는 영향이 없습니다. */
+  adBlockEnabled: boolean;
   /** 게시 중 크리링 배너(순서대로). */
   adBanners: readonly B[];
   /** 보이는(숨김·차단 아님) 크리에이터 배너(순서대로). */
@@ -469,7 +487,8 @@ export function resolveBannerSlot<B>(input: ResolveBannerSlotInput<B>): Resolved
   for (let index = 0; index < before; index += 1) if (input.linkVisible[index]) afterLinkCount += 1;
   const hasVisibleLink = input.linkVisible.some(Boolean);
   let hidden: BannerSlotHiddenReason | null = null;
-  if (kind === 'ad' && !hasVisibleLink && !input.hasPortfolio) hidden = 'no_content';
+  if (kind === 'ad' && !input.adBlockEnabled) hidden = 'ad_off';
+  else if (kind === 'ad' && !hasVisibleLink && !input.hasPortfolio) hidden = 'no_content';
   else if (banners.length === 0) hidden = 'no_banners';
   return { kind, afterLinkCount, banners, hidden };
 }
@@ -585,7 +604,8 @@ export interface OperatorCreatorListResponse {
 
 /** `GET /api/admin/creators/{userId}` 응답. */
 export interface OperatorCreatorDetail extends OperatorCreatorSummary {
-  extraLinkSlots: number;
+  /** 크리에이터의 광고 블록 스위치(R20 ⑩, 기본 false). 공개 랜딩 노출은 플랫폼 스위치와 함께 정해집니다. */
+  adBlockEnabled: boolean;
   limits: LinkLimits;
   links: LinkView[];
   /** 배너 슬롯 부여 시각(R21 ①). null이면 부여되지 않음(광고 블록). */
@@ -593,8 +613,6 @@ export interface OperatorCreatorDetail extends OperatorCreatorSummary {
   /** 크리에이터 배너 전체(회수 뒤 보관분·숨김·차단 포함, 순서대로). */
   banners: CreatorBannerView[];
   bannerLimits: BannerLimits;
-  /** 링크 슬롯 이벤트 신청(R24). 신청하지 않았으면 null. 보너스는 extraLinkSlots와 따로 limits.visibleMax에 더해집니다. */
-  slotEvent: SlotEventEntryView | null;
 }
 
 export interface CountByValue {
@@ -619,11 +637,6 @@ export interface OperatorCreatorStats {
    * `totals.linkClicks`·`daily`에는 넣지 않습니다.
    */
   bannerClicks: Array<{ bannerId: string; alt: string | null; clicks: number }>;
-}
-
-/** `PUT /api/admin/creators/{userId}/extra-slots`. 응답은 `OperatorCreatorDetail`. */
-export interface SetExtraSlotsRequest {
-  extraSlots: number;
 }
 
 /** `PUT /api/admin/creators/{userId}/suspension`. 응답은 `OperatorCreatorDetail`. */
@@ -706,8 +719,19 @@ export interface AdBannerRequest {
  */
 export type UpdateAdBannerRequest = Partial<AdBannerRequest>;
 
+/**
+ * 플랫폼 광고 블록 스위치(R20 ⑩). `GET /api/admin/ad-block`, `PUT /api/admin/ad-block`(`SetAdBlockRequest`) 응답.
+ * 행은 항상 1개(`platform_settings`)이고 기본 false입니다. 바꾸면 운영자 행동 기록 `platform.ad_block`이 남습니다.
+ */
+export interface AdBlockSettingView {
+  enabled: boolean;
+  updatedAt: string;
+  /** 마지막으로 바꾼 운영자(사람·AI) 이메일. 없으면 null. */
+  updatedBy: string | null;
+}
+
 // ---------- AI 운영자 (R23) ----------
-// 근거: docs/specs/crelink-ai-operator.md (API 계약 초안). 0089(슬롯 이벤트)는 지표 `events`와 행동 이름만 더합니다.
+// 근거: docs/specs/crelink-ai-operator.md (API 계약 초안).
 
 /** 계정 종류. AI 계정은 Google 신원 없이 API 토큰(Bearer)으로만 로그인하는 운영자입니다. */
 export type AccountKind = 'human' | 'ai';
@@ -863,7 +887,6 @@ export interface SetAiOperatorPauseRequest {
 
 /** 운영자 행동 이름. 다른 에픽이 더한 행동도 기록에 오므로 화면은 모르는 값을 원래 키로 보여 줍니다. */
 export type OperatorActionType =
-  | 'creator.extra_slots'
   | 'creator.suspension'
   | 'creator.banner_slot'
   | 'creator.metrics_exclusion'
@@ -878,11 +901,23 @@ export type OperatorActionType =
   | 'ai_operator.pause'
   | 'ai_operator.token_issue'
   | 'ai_operator.token_revoke'
-  // 링크 슬롯 이벤트(R24 ⑤) 기간 저장
+  // 플랫폼 광고 블록 스위치(R20 ⑩)
+  | 'platform.ad_block'
+  // 지난 기록에만 있는 행동(2026-10-12 기능 제거, 더 이상 만들지 않음): 운영자 추가 슬롯, 링크 슬롯 이벤트 기간 저장
+  | 'creator.extra_slots'
   | 'slot_event.period_update';
 
+/** 'slot_event'는 지난 기록에만 있습니다(2026-10-12 링크 슬롯 이벤트 제거). */
 export type OperatorActionTargetType =
-  'user' | 'link' | 'creator_banner' | 'blocked_domain' | 'ad_banner' | 'ai_operator' | 'api_token' | 'slot_event';
+  | 'user'
+  | 'link'
+  | 'creator_banner'
+  | 'blocked_domain'
+  | 'ad_banner'
+  | 'ai_operator'
+  | 'api_token'
+  | 'platform_setting'
+  | 'slot_event';
 
 export interface OperatorActionView {
   id: string;
@@ -910,13 +945,6 @@ export interface OperatorActionPage {
   nextCursor: string | null;
 }
 
-/** 지표 확장 지점(R24 이벤트 등). */
-export interface AiOperatorMetricEvent {
-  key: string;
-  label: string;
-  value: number;
-}
-
 /**
  * `GET /api/admin/metrics` 응답. 실사용자 정의는 PRD `목표`(설계 `지표 정의`). 기간은 지금부터 거꾸로 센 시간이고,
  * 광고 배너 노출·클릭만 서울 날짜 오늘 포함 7일입니다.
@@ -933,7 +961,6 @@ export interface AiOperatorMetrics {
   visits: { last7Days: number; last30Days: number };
   linkClicks: { last7Days: number; last30Days: number };
   adBanners: { live: number; impressionsLast7Days: number; clicksLast7Days: number };
-  events: AiOperatorMetricEvent[];
 }
 
 /** `PUT /api/admin/creators/{userId}/metrics-exclusion`(사람 운영자만). 응답은 `OperatorCreatorDetail`. */
@@ -970,7 +997,6 @@ export const CRELINK_API_PATHS = {
   adminCreators: '/api/admin/creators',
   adminCreator: (userId: string) => `/api/admin/creators/${encodeURIComponent(userId)}`,
   adminCreatorStats: (userId: string) => `/api/admin/creators/${encodeURIComponent(userId)}/stats`,
-  adminCreatorExtraSlots: (userId: string) => `/api/admin/creators/${encodeURIComponent(userId)}/extra-slots`,
   adminCreatorSuspension: (userId: string) => `/api/admin/creators/${encodeURIComponent(userId)}/suspension`,
   adminLinkBlock: (linkId: string) => `/api/admin/links/${encodeURIComponent(linkId)}/block`,
   adminBlockedDomains: '/api/admin/blocked-domains',
@@ -981,11 +1007,9 @@ export const CRELINK_API_PATHS = {
   adminAdBanner: (id: string) => `/api/admin/ad-banners/${encodeURIComponent(id)}`,
   adminAdBannerEnd: (id: string) => `/api/admin/ad-banners/${encodeURIComponent(id)}/end`,
   adminAdBannersOrder: '/api/admin/ad-banners/order',
-  /** 링크 슬롯 이벤트(R24). */
-  publicSlotEvent: '/api/public/slot-event',
-  meSlotEventEntry: '/api/me/slot-event/entry',
-  /** `GET ?page=`(1부터), `PUT`은 `SetSlotEventPeriodRequest`. */
-  adminSlotEvent: '/api/admin/slot-event',
+  /** 광고 블록 스위치(R20 ⑩). `PUT`은 `SetAdBlockRequest`. */
+  meAdBlock: '/api/me/ad-block',
+  adminAdBlock: '/api/admin/ad-block',
   /** `cursor`: 이전 응답의 `GuestbookPage.nextCursor`. */
   landingGuestbook: (publicId: string, cursor?: string | null) =>
     `/api/landings/${encodeURIComponent(publicId)}/guestbook${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
@@ -1041,64 +1065,3 @@ export const CRELINK_WEB_PATHS = {
   adminAgentRun: (runId: string) => `/admin/agent-runs/${encodeURIComponent(runId)}`,
   adminActions: '/admin/actions',
 } as const;
-
-// ---------- 링크 슬롯 이벤트 (R24) ----------
-// 근거: docs/specs/crelink-slot-event.md. 신청한 계정만 보이는 외부 링크 한도가 bonusLinks만큼 늘어납니다(R13 운영자 추가 슬롯과 따로 합산).
-
-/** 'scheduled' = 시작 전, 'open' = 신청 받는 중, 'ended' = 끝남. API가 DB 시각으로 정합니다. 열림 = startsAt <= 지금 < endsAt. */
-export type SlotEventStatus = 'scheduled' | 'open' | 'ended';
-
-export interface SlotEventView {
-  /** 신청하면 늘어나는 보이는 외부 링크 수. */
-  bonusLinks: number;
-  startsAt: string;
-  /** null이면 운영자가 끝을 정할 때까지 계속. */
-  endsAt: string | null;
-  status: SlotEventStatus;
-}
-
-/** `GET /api/public/slot-event`. 이벤트가 없으면 event: null. */
-export interface PublicSlotEventResponse {
-  event: SlotEventView | null;
-}
-
-export interface SlotEventEntryView {
-  appliedAt: string;
-  /** 신청 때 받은 보너스(이벤트 설정이 바뀌어도 그대로, 회수 없음). */
-  bonusLinks: number;
-}
-
-/**
- * `CreatorLandingState.slotEvent`, `POST /api/me/slot-event/entry` 응답(201 새로 신청, 200 이미 신청 — 멱등).
- * 신청 오류: 404 `slot_event_not_found`, 409 `slot_event_closed`(시작 전·끝남).
- */
-export interface CreatorSlotEventState {
-  event: SlotEventView | null;
-  entry: SlotEventEntryView | null;
-}
-
-export interface OperatorSlotEventEntry {
-  userId: string;
-  email: string;
-  displayName: string | null;
-  slug: string;
-  appliedAt: string;
-}
-
-/**
- * `GET /api/admin/slot-event?page=`, `PUT /api/admin/slot-event` 응답. entries는 신청 최신순, page는 1부터,
- * pageSize는 `CRELINK_LIMITS.operatorPageSize`. 이벤트가 없으면 404 `slot_event_not_found`.
- */
-export interface OperatorSlotEventResponse {
-  event: SlotEventView;
-  entryCount: number;
-  entries: OperatorSlotEventEntry[];
-  page: number;
-  pageSize: number;
-}
-
-/** `PUT /api/admin/slot-event`. ISO 8601. endsAt null = 끝 없음. 끝 ≤ 시작이면 400 `slot_event_period_invalid`. */
-export interface SetSlotEventPeriodRequest {
-  startsAt: string;
-  endsAt: string | null;
-}

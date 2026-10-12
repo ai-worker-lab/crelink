@@ -34,6 +34,13 @@ export class CreatorController {
     return this.creator.landingState(user.id);
   }
 
+  /** 광고 블록 켜고 끄기(R20 ⑩). 400 `validation_failed`, 플랫폼 스위치가 꺼져 있으면 409 `ad_block_unavailable`. */
+  @Put('ad-block')
+  async setAdBlock(@CurrentUser() user: SessionUser, @Body() body: unknown): Promise<CreatorLandingState> {
+    await this.profile.setAdBlock(user.id, body);
+    return this.creator.landingState(user.id);
+  }
+
   @Get('short-link/availability')
   availability(@CurrentUser() user: SessionUser, @Query('slug') slug: unknown): Promise<SlugAvailabilityResponse> {
     return this.slugs.availability(user.id, slug);

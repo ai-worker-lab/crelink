@@ -23,7 +23,7 @@
 | R10 | `/admin`, `/admin/creators/{id}` | `GET /api/admin/creators…`, `…/stats` | 집계 질의 | 0016, 0017 |
 | R11 | — | 일 단위 보존 작업 | `visit_daily_rollups`, `visit_dimension_rollups` | 0016 |
 | R12 | `/me` 프로필·SNS·포트폴리오, `/p/{publicId}` | `PATCH /api/me/landing`, `PUT /api/me/socials`, 포트폴리오 API | `landings`, `social_links`, `portfolio_items` | 0016, 0017 |
-| R13 | `/me` 한도 안내, `/admin/creators/{id}` 슬롯 | `PUT /api/admin/creators/{id}/extra-slots` | `users.extra_link_slots` | 0016, 0017 |
+| R13 | `/me` 한도 안내 | `POST /api/me/links` 409 `link_total_limit_reached` | `links` 수 | 0016, 0017 (2026-10-12 운영자 추가 슬롯 제거, `변경 기록`) |
 | R14 | `/me` 차단 표시, `/admin/blocked-domains`, `/admin/creators/{id}` 링크 차단 | 차단 목록·링크 차단 API | `blocked_domains`, `links.blocked_at` | 0016, 0017 |
 | R15 | `/` 로그인 버튼, `/auth/google/callback` | `GET /api/auth/google/start`, `POST /api/auth/google/callback`, `POST /api/auth/logout`, `GET /api/me` | `users`, `user_identities`, `sessions` | 0016, 0017 |
 | R16 | 모든 화면 390px·1280px | — | — | 0017, 0018 |
@@ -100,11 +100,11 @@ migration은 `apps/api/migrations/`의 SQL 파일(기존 실행기). 모든 시�
 | `POST /api/auth/google/callback` | 누구나 | `{ code, state }` | `{ user }` + `cl_session` 쿠키 | 400 `oauth_state_invalid`, 401 `oauth_failed`, 403 `account_suspended`, 503 `auth_not_configured` |
 | `POST /api/auth/logout` | 로그인 | — | 204, 쿠키 삭제 | — |
 | `GET /api/me` | 로그인 | — | `{ id, email, role }` | 401 `unauthenticated` |
-| `GET /api/me/landing` | 크리에이터 | — | 편집 화면 전체 상태(프로필, 단축 URL·랜딩 URL·다음 변경 가능일, 링크(숨김·차단 상태 포함), SNS, 포트폴리오, 한도 `{ visibleMax, visibleUsed, totalMax }`) | 401 |
+| `GET /api/me/landing` | 크리에이터 | — | 편집 화면 전체 상태(프로필, 단축 URL·랜딩 URL·다음 변경 가능일, 링크(숨김·차단 상태 포함), SNS, 포트폴리오, 한도 `{ totalMax, totalUsed }`) | 401 |
 | `PATCH /api/me/landing` | 크리에이터 | `{ displayName?, bio?, avatarFileId? }` | 편집 상태 | 400 `validation_failed`, 404 `file_not_found` |
 | `GET /api/me/short-link/availability?slug=` | 크리에이터 | — | `{ available, reason? }` | — |
 | `PUT /api/me/short-link/slug` | 크리에이터 | `{ slug }` | 편집 상태 | 400 `slug_invalid`·`slug_reserved`, 409 `slug_taken`, 429 `slug_change_too_soon` |
-| `POST /api/me/links` | 크리에이터 | `{ title, url, description?, thumbnailFileId?, hidden? }` | 링크 | 400 `validation_failed`·`link_url_invalid`, 422 `link_domain_blocked`, 409 `link_limit_reached`·`link_total_limit_reached` |
+| `POST /api/me/links` | 크리에이터 | `{ title, url, description?, thumbnailFileId?, hidden? }` | 링크 | 400 `validation_failed`·`link_url_invalid`, 422 `link_domain_blocked`, 409 `link_total_limit_reached` |
 | `PATCH /api/me/links/{id}` | 소유자 | 같은 필드 일부 | 링크 | 위와 같음, 404 `link_not_found` |
 | `DELETE /api/me/links/{id}` | 소유자 | — | 204 | 404 |
 | `PUT /api/me/links/order` | 크리에이터 | `{ ids }` | 링크 목록 | 400 `order_mismatch` |
@@ -118,13 +118,12 @@ migration은 `apps/api/migrations/`의 SQL 파일(기존 실행기). 모든 시�
 | `GET /api/admin/creators?query=&page=` | 운영자 | — | 목록(이메일, 이름, 단축 주소, 최근 30일 방문 수) | 403 `forbidden` |
 | `GET /api/admin/creators/{userId}` | 운영자 | — | 상세(랜딩, 링크 전체, 슬롯, 정지 여부) | 404 |
 | `GET /api/admin/creators/{userId}/stats?from=&to=` | 운영자 | 날짜 `YYYY-MM-DD` | 합계(방문·순 방문자·클릭), 일별 추이, 분포(유입 경로·기기·브라우저·OS·국가), 링크별 클릭 | 400 `date_range_invalid` |
-| `PUT /api/admin/creators/{userId}/extra-slots` | 운영자 | `{ extraSlots }` | 상세 | 400 |
 | `PUT /api/admin/creators/{userId}/suspension` | 운영자 | `{ suspended }` | 상세 | — |
 | `PUT /api/admin/links/{linkId}/block` | 운영자 | `{ blocked, reason? }` | 링크 | 404 |
 | `GET·POST /api/admin/blocked-domains`, `DELETE /api/admin/blocked-domains/{domain}` | 운영자 | `{ domain, reason? }` | 목록 | 400 `domain_invalid`, 409 `domain_exists` |
 
 - 도메인을 차단 목록에 넣으면 그 도메인과 하위 도메인의 기존 링크도 `blocked_at`이 채워집니다. 목록에서 빼도 이미 차단된 링크는 운영자가 개별로 풉니다.
-- 한도(R13): 보이는(숨기지 않은·차단 안 된) 링크 수 ≤ 5 + `extra_link_slots`. 숨긴 링크 포함 전체 50개 `[임시값]`(R13 숨긴 링크 상한 미정에 대한 안전 장치).
+- 한도(R13): 숨긴·차단 링크 포함 계정당 50개(`CRELINK_LIMITS.totalLinks`). 모든 크리에이터가 같고 보이는 링크 한도는 따로 없습니다(2026-10-12 사용자 결정, `변경 기록`).
 - 입력 길이 `[임시값]`: 링크 제목 60자, 설명 120자, URL 2048자(`http`·`https`만), 표시 이름 40자, 소개 300자, 포트폴리오 제목 60자·설명 200자.
 
 ## 화면 상태와 API 대응
@@ -199,9 +198,9 @@ migration은 `apps/api/migrations/`의 SQL 파일(기존 실행기). 모든 시�
 
 E2E(Playwright, 0018). 구글 로그인은 키가 들어오기 전에는 테스트 전용 세션 발급(테스트 DB에 직접 세션 행을 넣는 fixture)으로 대신하고, 실제 구글 로그인은 키가 들어온 뒤 수동으로 확인합니다.
 
-1. 크리에이터: 로그인 → `/me`에서 단축 URL 확인·복사 → 프로필·SNS·포트폴리오 입력 → 외부 링크 6개 추가 시도(5개 뒤 한도 안내) → 숨기기·순서 변경·삭제 → 주소 변경(즉시 가능) → 다시 변경 시 30일 제한.
+1. 크리에이터: 로그인 → `/me`에서 단축 URL 확인·복사 → 프로필·SNS·포트폴리오 입력 → 외부 링크 추가(숨김 포함 50개 뒤 한도 안내) → 숨기기·순서 변경·삭제 → 주소 변경(즉시 가능) → 다시 변경 시 30일 제한.
 2. 방문자: 단축 URL 열기 → 랜딩 표시·주소창이 `/p/{publicId}`(통과 표시 없음) → 외부 링크 클릭 → 외부 URL 도착. 옛 주소로도 같은 랜딩. 랜딩 주소를 바로 열면 단축 주소를 거쳐 방문 1건이 기록되고, 관리 화면 미리보기는 기록되지 않음.
-3. 운영자: `/admin`에서 크리에이터 통계(방문·순 방문자·클릭·분포) 확인 → 슬롯 1개 부여 후 크리에이터가 6번째 링크 추가 가능 → 도메인 차단 후 해당 링크가 랜딩에서 사라지고 편집 화면에 차단 표시 → 같은 도메인 링크 저장 거부.
+3. 운영자: `/admin`에서 크리에이터 통계(방문·순 방문자·클릭·분포) 확인 → 도메인 차단 후 해당 링크가 랜딩에서 사라지고 편집 화면에 차단 표시 → 같은 도메인 링크 저장 거부.
 4. 빈 랜딩·없는 주소·정지 크리에이터 안내 화면.
 
 API 통합 테스트(0016): 가입 트랜잭션, 주소 규칙(예약어·중복·30일·90일 연결), 한도, 차단, 방문·클릭 기록 항목, 보존 작업(366일 전 원본이 집계로 옮겨지고 삭제됨), 권한(타인 링크 404, 크리에이터의 admin 403).
@@ -221,3 +220,4 @@ API 통합 테스트(0016): 가입 트랜잭션, 주소 규칙(예약어·중복
 - 2026-10-07: 외부에서 랜딩 주소로 들어와도 단축 주소를 거치게 함(PRD R7 사용자 결정). 단축 주소 302에 통과 표시, 공개 랜딩 API에 `passAccepted`·`shortUrl`, 웹 진입 판정과 루트 `loading.tsx` 이동(`docs/work/orchestrator/0038-landing-entry-via-short-link.md`).
 - 2026-10-08: 크리에이터 관리 화면을 랜딩별 관리 화면 하나로 합치고 편집·보기 모드를 실시간 미리보기로 대체(PRD R18 사용자 결정, 디자인 `design/desktop-landing-manager/`). `/me`는 이동만 하고, 화면 상태 표의 `/me` 행을 관리 화면 행으로 옮김. API 변경 없음(`docs/work/orchestrator/0053-desktop-landing-manager.md`).
 - 2026-10-08: 관리 화면 `페이지 편집`을 미리보기 직접 편집으로 바꾸고 프로필·SNS 채널을 `프로필` 메뉴(`/profile`)로 옮김(PRD R18 사용자 결정, 디자인 `design/preview-direct-edit/`). API 변경 없음(`docs/work/orchestrator/0058-preview-direct-edit.md`).
+- 2026-10-12: 유료 링크 한도 없음(사용자 결정). 보이는 링크 한도(5 + `extra_link_slots`)와 운영자 추가 슬롯 경로를 없애고 숨김 포함 50개만 남김. 오류 `link_limit_reached` 제거, 한도 응답 `{ totalMax, totalUsed }`. `users.extra_link_slots`는 지우지 않고 읽지 않음(삭제 결정 `docs/work/api/0179-drop-retired-link-slot-data.md`). 설계 [외부 링크 50개 기본 제공과 광고 블록 켜고 끄기](crelink-link-limit-ad-toggle.md), 에픽 `docs/work/epics/0175-link-limit-ad-block-toggle.md`.

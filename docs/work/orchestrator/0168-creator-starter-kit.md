@@ -167,7 +167,7 @@
 | --- | --- | --- |
 | `context` 2026-10-11 22:21 KST | 실사용자 0/100, 크리에이터 4(제외 0), 7일 가입 4·공개 랜딩 방문 3·링크 클릭 0, 이벤트 신청 1. 직전 실행 대비 동일 | 홈 유입과 사용자별 작성 중단 이유 없음. 신청 1명이 링크를 만들었는지는 미관측. 신청 증가를 활성화로 간주하지 않음 |
 | [기존 시작 안내](../../../apps/web/src/components/manage/FirstRunGuide.tsx), [판정 함수](../../../apps/web/src/lib/first-run-guide.ts) | 링크/포트폴리오 1개→주소 복사→인스타그램에 붙여 넣기라는 3단계가 이미 구현됨. 1단계는 보이는 항목 수, 나머지는 이 기기의 진행 표시 | 챌린지용 두 번째 체크리스트는 중복. 복사/자기 확인은 외부 도달·재방문 증거가 아님 |
-| [기존 신청 UI](../../../apps/web/src/components/manage/SlotEventOffer.tsx), [서버 신청](../../../apps/api/src/slot-event/slot-event.service.ts), [설계](../../specs/crelink-slot-event.md) | 신청 버튼의 명시적 행동, 진행/오류/신청함 상태와 계정당 한 번의 멱등 처리 코드 존재. 기본 한도는 신청 없이도 첫 링크 작성 가능 | 실제 운영 이벤트 열림/종료 시각은 이번에 조회하지 않음. 소재에서 “지금 신청 가능”·마감 시각을 고정하지 않음. DB 동시성 동작은 이번 실행 미검증 |
+| 기존 신청 UI `apps/web/src/components/manage/SlotEventOffer.tsx`, 서버 신청 `apps/api/src/slot-event/slot-event.service.ts`(둘 다 2026-10-12 0175에서 삭제), [설계](../../specs/crelink-slot-event.md) | 신청 버튼의 명시적 행동, 진행/오류/신청함 상태와 계정당 한 번의 멱등 처리 코드 존재. 기본 한도는 신청 없이도 첫 링크 작성 가능 | 실제 운영 이벤트 열림/종료 시각은 이번에 조회하지 않음. 소재에서 “지금 신청 가능”·마감 시각을 고정하지 않음. DB 동시성 동작은 이번 실행 미검증 |
 | [Notion 첫 페이지](https://www.notion.com/help/create-your-first-page), [템플릿 시작](https://www.notion.com/help/start-with-a-template) | 첫 페이지 제목·작성부터 시작하고 필요하면 템플릿/구조를 선택하는 안내. 온보딩 답변에 따른 시작 템플릿을 사용자가 선택·수정 가능 | 간접 대체 도구의 온보딩 예시이지 캠페인 효과 연구가 아님. 유료 템플릿 구매·계정 생성·콘텐츠 복사는 하지 않음 |
 | [기존 모집 소재](../../product/acquisition-playbook.md) | 사용 3단계와 +5 이벤트 문안이 이미 있음 | 세 단계라는 형식만 새 캠페인으로 반복하면 새 가치가 없다는 판단은 추론. 외부 모집 승인은 기존 0153 유지 |
 

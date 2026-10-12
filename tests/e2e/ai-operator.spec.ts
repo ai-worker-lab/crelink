@@ -72,19 +72,19 @@ test('AI 운영자: 토큰 인증·실행 기록·겹침 금지·행동 기록·
     expect(await cli(env, ['precheck'])).toMatchObject({ code: 1 });
 
     // 2. 행동 기록: 실행 헤더 없는 쓰기는 409, 실행 안의 쓰기는 기록됨. AI는 사람 운영자를 정지하거나 멈춤을 바꾸지 못함
-    const withoutRun = await agentFetch(`/api/admin/creators/${creator.userId}/extra-slots`, {
+    const withoutRun = await agentFetch(`/api/admin/creators/${creator.userId}/banner-slot`, {
       method: 'PUT',
-      body: JSON.stringify({ extraSlots: 2 }),
+      body: JSON.stringify({ granted: true }),
     });
     expect(withoutRun.status).toBe(409);
     expect((await withoutRun.json()).code).toBe('agent_run_required');
-    const slots = await cli(env, [
+    const grant = await cli(env, [
       'api',
       'PUT',
-      `/api/admin/creators/${creator.userId}/extra-slots`,
-      JSON.stringify({ extraSlots: 2 }),
+      `/api/admin/creators/${creator.userId}/banner-slot`,
+      JSON.stringify({ granted: true }),
     ]);
-    expect(slots.code, slots.stderr).toBe(0);
+    expect(grant.code, grant.stderr).toBe(0);
     const suspendHuman = await cli(env, [
       'api',
       'PUT',
@@ -115,7 +115,7 @@ test('AI 운영자: 토큰 인증·실행 기록·겹침 금지·행동 기록·
       '--summary',
       summary,
       '--action',
-      `추가 슬롯 2개 부여 ${data.run}`,
+      `배너 슬롯 부여 ${data.run}`,
       '--next',
       `다음 할 일 ${data.run}`,
       '--ref',
@@ -148,14 +148,14 @@ test('AI 운영자: 토큰 인증·실행 기록·겹침 금지·행동 기록·
       .click();
     await expect(page).toHaveURL(new RegExp(`/admin/agent-runs/${runId}$`));
     await expect(page.getByRole('heading', { name: '이 실행의 운영 기록' })).toBeVisible();
-    await expect(page.getByText('추가 링크 슬롯 변경')).toBeVisible();
+    await expect(page.getByText('배너 슬롯 부여·회수')).toBeVisible();
     await expectMobileFits(page, 'AI 실행 상세');
 
     // 운영 기록: AI 걸러보기에 이 행동이 실행 링크와 함께 보임
     await page.goto('/admin/actions?actor=ai');
     await expect(page.getByRole('heading', { name: '운영 기록', level: 1 })).toBeVisible();
     const actionRow = page.getByRole('row').filter({ hasText: ai.email });
-    await expect(actionRow.first()).toContainText('추가 링크 슬롯 변경');
+    await expect(actionRow.first()).toContainText('배너 슬롯 부여·회수');
     await expectMobileFits(page, '운영 기록');
     const { rows: actions } = await data.db.query<{
       actor_kind: string;
@@ -163,10 +163,12 @@ test('AI 운영자: 토큰 인증·실행 기록·겹침 금지·행동 기록·
       before: unknown;
       after: unknown;
     }>(
-      `SELECT actor_kind, run_id, before, after FROM operator_actions WHERE actor_user_id = $1 AND action = 'creator.extra_slots'`,
+      `SELECT actor_kind, run_id, before, after FROM operator_actions WHERE actor_user_id = $1 AND action = 'creator.banner_slot'`,
       [ai.userId],
     );
-    expect(actions).toEqual([{ actor_kind: 'ai', run_id: runId, before: { extraSlots: 0 }, after: { extraSlots: 2 } }]);
+    expect(actions).toEqual([
+      { actor_kind: 'ai', run_id: runId, before: { bannerSlotGranted: false }, after: { bannerSlotGranted: true } },
+    ]);
 
     // 사람 운영자가 시험 계정을 지표에서 뺌 → 배지와 사람 행위자 행동 기록. AI 계정 상세는 조작 대신 안내
     await page.goto(`/admin/creators/${creator.userId}`);
@@ -193,9 +195,9 @@ test('AI 운영자: 토큰 인증·실행 기록·겹침 금지·행동 기록·
     expect(pausedCheck.code).toBe(1);
     expect(pausedCheck.stdout).toContain('멈춤');
     expect((await cli(env, ['start'])).code).toBe(1);
-    const pausedWrite = await agentFetch(`/api/admin/creators/${creator.userId}/extra-slots`, {
+    const pausedWrite = await agentFetch(`/api/admin/creators/${creator.userId}/banner-slot`, {
       method: 'PUT',
-      body: JSON.stringify({ extraSlots: 3 }),
+      body: JSON.stringify({ granted: false }),
     });
     expect(pausedWrite.status).toBe(409);
     expect((await pausedWrite.json()).code).toBe('ai_operator_paused');

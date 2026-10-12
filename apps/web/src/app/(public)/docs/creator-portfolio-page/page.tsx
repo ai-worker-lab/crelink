@@ -67,11 +67,11 @@ export default function CreatorPortfolioPage() {
         </p>
         <p>
           저장한 링크가 미리보기에 보이는지 확인하고 내 크리링 링크를 복사해요. 어디에 공유할지는 내가 정해요. 공유·홍보
-          게시나 이벤트 신청이 링크 작성의 필수 조건은 아니에요.
+          게시가 링크 작성의 필수 조건은 아니에요.
         </p>
         <p>
-          기본 무료 범위에서는 짧은 주소 1개와 보이는 외부 링크 {CRELINK_LIMITS.freeVisibleLinks}개를 쓸 수 있어요. 배너
-          슬롯이 없는 페이지에는 크리링 광고 블록이 표시돼요. 현재 한도와 이벤트 조건은{' '}
+          기본 무료 범위에서는 짧은 주소 1개와 외부 링크 {CRELINK_LIMITS.totalLinks}개(숨긴 링크 포함)를 쓸 수 있어요.
+          크리링 광고 블록은 기본으로 꺼져 있어요. 자세한 한도와 광고 블록 안내는{' '}
           <Link href={CRELINK_WEB_PATHS.docsGuide}>사용 안내</Link>에서 확인해요. 협업 문의나 방문 증가를 보장하는
           기능은 아니에요.
         </p>
@@ -129,9 +129,8 @@ export default function CreatorPortfolioPage() {
             적어요. 순서는 포트폴리오 구역에서 올리고 내려요. 보여 주고 싶은 작업을 위에 둬요.
           </li>
           <li>
-            <strong>+ 링크 추가</strong>로 문의처·스토어 같은 외부 링크를 넣어요. 방문자에게 보이는 링크는{' '}
-            {CRELINK_LIMITS.freeVisibleLinks}개까지라, 지금 보여 줄 필요가 없는 링크는 지우지 말고 숨기기 스위치로 숨겨
-            둬요.
+            <strong>+ 링크 추가</strong>로 문의처·스토어 같은 외부 링크를 넣어요. 지금 보여 줄 필요가 없는 링크는 지우지
+            말고 숨기기 스위치로 숨겨 둬요. 숨긴 링크를 포함해 {CRELINK_LIMITS.totalLinks}개까지 둘 수 있어요.
           </li>
         </ol>
       </section>

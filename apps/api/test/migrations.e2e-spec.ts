@@ -406,7 +406,7 @@ describe('runMigrations', () => {
       );
       await pool.query(
         `INSERT INTO operator_actions (actor_kind, actor_user_id, actor_email, action, target_type, target_id, subject_user_id, run_id)
-         VALUES ('ai', $1, 'ai@crelink.invalid', 'creator.extra_slots', 'user', $2, $3, $4)`,
+         VALUES ('ai', $1, 'ai@crelink.invalid', 'creator.suspension', 'user', $2, $3, $4)`,
         [ai, creator, creator, run.rows[0].id],
       );
       await expect(
@@ -551,6 +551,70 @@ describe('runMigrations', () => {
           ['a'.repeat(101)],
         ),
       ).rejects.toMatchObject({ code: '23514' });
+    });
+  });
+
+  describe('0007_ad_block_toggle', () => {
+    const source = join(__dirname, '../migrations');
+    const earlier = readdirSync(source)
+      .filter((name) => name.endsWith('.sql') && name < '0007_ad_block_toggle.sql')
+      .sort();
+    const insertUser = async (email: string) =>
+      (await pool.query<{ id: string }>('INSERT INTO users (email) VALUES ($1) RETURNING id', [email])).rows[0].id;
+    const apply = async () => {
+      copyFileSync(join(source, '0007_ad_block_toggle.sql'), join(directory, '0007_ad_block_toggle.sql'));
+      await runMigrations(pool, directory);
+    };
+
+    beforeEach(async () => {
+      for (const name of earlier) copyFileSync(join(source, name), join(directory, name));
+      await runMigrations(pool, directory);
+    });
+
+    it('플랫폼 설정 1행(꺼짐)과 사용자 스위치(꺼짐)만 더하고, 옛 링크 슬롯 데이터는 그대로 두며 lock_timeout은 그 파일 안에서만 쓴다', async () => {
+      // 더 쓰지 않는 추가 슬롯·이벤트 신청 행이 있어도 지우거나 바꾸지 않습니다(삭제 결정: work item 0179).
+      const existing = await insertUser('old@example.com');
+      await pool.query('UPDATE users SET extra_link_slots = 3 WHERE id = $1', [existing]);
+      await pool.query(
+        "INSERT INTO slot_event_entries (event_id, user_id, bonus_links) SELECT id, $1, 5 FROM slot_events WHERE code = 'link-slots-plus-5'",
+        [existing],
+      );
+
+      await apply();
+
+      expect(await versions()).toEqual([...earlier.map((name) => name.replace(/\.sql$/, '')), '0007_ad_block_toggle']);
+      expect(
+        (await pool.query('SELECT ad_block_enabled, extra_link_slots FROM users WHERE id = $1', [existing])).rows,
+      ).toEqual([{ ad_block_enabled: false, extra_link_slots: 3 }]);
+      expect((await pool.query('SELECT 1 FROM slot_events')).rowCount).toBe(1);
+      expect((await pool.query('SELECT user_id FROM slot_event_entries')).rows).toEqual([{ user_id: existing }]);
+      const fresh = await insertUser('new@example.com');
+      expect((await pool.query('SELECT ad_block_enabled FROM users WHERE id = $1', [fresh])).rows).toEqual([
+        { ad_block_enabled: false },
+      ]);
+      const settings = await pool.query(
+        'SELECT id, ad_block_enabled, updated_by, updated_at <= now() AS updated_at_set FROM platform_settings',
+      );
+      expect(settings.rows).toEqual([{ id: true, ad_block_enabled: false, updated_by: null, updated_at_set: true }]);
+      expect((await pool.query('SHOW lock_timeout')).rows[0].lock_timeout).toBe('0');
+    });
+
+    it('플랫폼 설정은 1행뿐이고(CHECK id), 바꾼 계정을 지우면 updated_by만 NULL이 된다', async () => {
+      await apply();
+      await expect(pool.query('INSERT INTO platform_settings DEFAULT VALUES')).rejects.toMatchObject({ code: '23505' });
+      await expect(pool.query('INSERT INTO platform_settings (id) VALUES (false)')).rejects.toMatchObject({
+        code: '23514',
+        constraint: 'platform_settings_id_check',
+      });
+      await expect(pool.query('UPDATE platform_settings SET ad_block_enabled = NULL')).rejects.toMatchObject({
+        code: '23502',
+      });
+      const operator = await insertUser('operator@example.com');
+      await pool.query('UPDATE platform_settings SET ad_block_enabled = true, updated_by = $1', [operator]);
+      await pool.query('DELETE FROM users WHERE id = $1', [operator]);
+      expect((await pool.query('SELECT ad_block_enabled, updated_by FROM platform_settings')).rows).toEqual([
+        { ad_block_enabled: true, updated_by: null },
+      ]);
     });
   });
 });

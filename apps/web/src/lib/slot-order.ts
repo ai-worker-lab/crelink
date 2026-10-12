@@ -7,6 +7,14 @@ import type { BannerSlotKind } from '@crelink/shared';
 export const SLOT_ROW_ID = 'banner-slot-row';
 
 /**
+ * 관리 화면이 광고 블록·배너 슬롯 행과 패널을 보이는지. 배너 슬롯은 늘 보이고, 광고 블록은 운영자 플랫폼 스위치가 켜졌을 때만 보입니다(R20 ⑩).
+ * 보이지 않으면 링크 순서 저장에서 `slotIndex`를 빼 저장된 위치(`landing_blocks.slot_position`)를 그대로 둡니다.
+ */
+export function slotEditable(kind: BannerSlotKind, adBlockPlatformEnabled: boolean): boolean {
+  return kind === 'creator' || adBlockPlatformEnabled;
+}
+
+/**
  * 링크 id(숨김·차단 포함 전체 순서)와 슬롯 위치로 섞인 목록을 만듭니다. `slotIndex`가 null(맨 뒤에 붙어 있음)이거나 링크 수 이상이면 맨 뒤입니다.
  */
 export function mixedOrder(linkIds: readonly string[], slotIndex: number | null): string[] {

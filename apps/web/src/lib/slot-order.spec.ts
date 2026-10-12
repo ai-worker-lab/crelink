@@ -1,7 +1,22 @@
 // 외부 링크 패널의 광고 블록·배너 슬롯 행 정렬(설계 docs/specs/crelink-ad-banner.md `위치 모델`). 실행: pnpm --filter @crelink/web test
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mixedOrder, SLOT_ROW_ID, slotPositionLabel, slotRowName, splitOrder, withParticle } from './slot-order.ts';
+import {
+  mixedOrder,
+  SLOT_ROW_ID,
+  slotEditable,
+  slotPositionLabel,
+  slotRowName,
+  splitOrder,
+  withParticle,
+} from './slot-order.ts';
+
+test('slotEditable: 배너 슬롯은 늘, 광고 블록은 플랫폼 스위치가 켜졌을 때만 행·패널을 보임(R20 ⑩)', () => {
+  assert.equal(slotEditable('creator', false), true);
+  assert.equal(slotEditable('creator', true), true);
+  assert.equal(slotEditable('ad', true), true);
+  assert.equal(slotEditable('ad', false), false);
+});
 
 test('mixedOrder: null·링크 수 이상은 맨 뒤, k는 k개 링크 다음', () => {
   assert.deepEqual(mixedOrder(['a', 'b', 'c'], null), ['a', 'b', 'c', SLOT_ROW_ID]);

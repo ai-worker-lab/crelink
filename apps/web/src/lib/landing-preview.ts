@@ -276,7 +276,8 @@ export function visibleItemCount(state: CreatorLandingState): number {
 
 /**
  * 미리보기의 광고 블록·배너 슬롯 자리. 공개 랜딩 API와 같은 `resolveBannerSlot`(packages/shared)으로 종류·위치·숨김을 정합니다.
- * 숨김(`hidden`)이어도 위치를 돌려주므로, 관리 화면은 `'no_banners'`일 때 그 자리에 점선 자리를 그립니다(`'no_content'`는 그리지 않음).
+ * 숨김(`hidden`)이어도 위치를 돌려주므로, 관리 화면은 `'no_banners'`일 때 그 자리에 점선 자리를 그립니다(`'no_content'`·`'ad_off'`는 그리지 않음).
+ * - 광고 블록은 공개 랜딩과 같이 플랫폼 스위치와 크리에이터 스위치가 모두 켜졌을 때만 보입니다(R20 ⑩, `adBlockEnabled`).
  * - 링크가 보이는지는 저장 상태(숨김·차단)로 보고, 표시 이름이 있는 새 링크 초안은 맨 끝에 보이는 링크로 붙입니다(슬롯이 맨 뒤면 초안도 슬롯 앞).
  * - 포트폴리오는 저장된 항목이나 제목이 있는 새 초안이 있으면 있는 것으로 봅니다.
  * - 크리링 배너는 `adBanners`(게시 중, 저장된 URL), 크리에이터 배너는 숨김·차단이 아닌 `banners`(id는 uuid, 주소는 저장된 URL)입니다.
@@ -296,6 +297,7 @@ export function previewBannerSlot(
     slotIndex: state.slot.slotIndex,
     linkVisible,
     hasPortfolio: state.portfolio.length > 0 || Boolean(newPortfolio?.title.trim()),
+    adBlockEnabled: state.adBlock.platformEnabled && state.adBlock.enabled,
     adBanners: state.adBanners,
     creatorBanners: creatorBannersOf(state.banners, drafts.banners ?? []),
   });

@@ -30,7 +30,7 @@ export const PUBLIC_DOCS = [
   {
     href: '/terms',
     title: '이용약관',
-    description: '서비스 이용, 계정·링크·이벤트 조건.',
+    description: '서비스 이용, 계정·링크·광고 블록 조건.',
   },
 ] as const;
 

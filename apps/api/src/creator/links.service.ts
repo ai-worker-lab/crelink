@@ -53,17 +53,6 @@ export class LinksService {
     }
   }
 
-  private async assertVisibleSlot(client: PoolClient, userId: string): Promise<void> {
-    const limits = await this.creator.limits(client, userId);
-    if (limits.visibleUsed >= limits.visibleMax) {
-      throw apiError(
-        HttpStatus.CONFLICT,
-        'link_limit_reached',
-        `보이는 링크는 ${limits.visibleMax}개까지 둘 수 있습니다. 다른 링크를 숨기거나 지운 뒤 다시 시도해 주세요.`,
-      );
-    }
-  }
-
   async create(userId: string, body: unknown): Promise<LinkView> {
     const input = bodyObject(body);
     const title = requiredText(input.title, '링크 제목', CRELINK_LIMITS.linkTitleMax);
@@ -82,7 +71,6 @@ export class LinksService {
           `링크는 숨긴 링크를 포함해 ${limits.totalMax}개까지 만들 수 있습니다.`,
         );
       }
-      if (!hidden) await this.assertVisibleSlot(client, userId);
       const { blockId } = await this.creator.context(client, userId);
       const row = await insertWithRandomId(LINK_PUBLIC_ID_LENGTH, async (publicId) => {
         const inserted = await client.query<LinkRow>(
@@ -110,12 +98,10 @@ export class LinksService {
     if (hidden !== undefined) changes.hidden = hidden;
     return this.database.transaction(async (client) => {
       await this.lockUser(client, userId);
-      const existing = await this.ownLink(client, userId, linkId);
+      await this.lockOwnLink(client, userId, linkId);
       const thumbnail = await this.files.ownedFileId(client, userId, input.thumbnailFileId);
       if (thumbnail !== undefined) changes.thumbnail_file_id = thumbnail;
       if (typeof changes.host === 'string') await this.assertDomainAllowed(client, changes.host);
-      // 숨김을 풀어 보이는 링크가 늘어나는 경우에만 한도를 확인합니다. 차단된 링크는 숨김을 풀어도 보이지 않습니다.
-      if (existing.hidden && hidden === false && !existing.blocked) await this.assertVisibleSlot(client, userId);
       const columns = Object.keys(changes);
       const updated = await client.query<LinkRow>(
         `UPDATE links SET ${[...columns.map((column, index) => `${column} = $${index + 2}`), 'updated_at = now()'].join(', ')}
@@ -126,15 +112,12 @@ export class LinksService {
     });
   }
 
-  private async ownLink(client: PoolClient, userId: string, linkId: string): Promise<LinkRow> {
+  /** 이 사용자의 링크를 잠급니다. 없거나 형식이 틀리면 404 `link_not_found`. 숨김 해제에는 한도 검사가 없습니다(R13). */
+  private async lockOwnLink(client: PoolClient, userId: string, linkId: string): Promise<void> {
     const found = UUID_PATTERN.test(linkId)
-      ? await client.query<LinkRow>(`SELECT ${LINK_COLUMNS} FROM links WHERE id = $1 AND user_id = $2 FOR UPDATE`, [
-          linkId,
-          userId,
-        ])
+      ? await client.query('SELECT 1 FROM links WHERE id = $1 AND user_id = $2 FOR UPDATE', [linkId, userId])
       : null;
     if (!found?.rowCount) throw apiError(HttpStatus.NOT_FOUND, 'link_not_found', '링크를 찾을 수 없습니다.');
-    return found.rows[0];
   }
 
   async remove(userId: string, linkId: string): Promise<void> {

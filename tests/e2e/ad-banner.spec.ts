@@ -1,5 +1,7 @@
 // 광고 블록·배너 슬롯 E2E(검증 계획 1~9). 기준: docs/specs/crelink-ad-banner.md#검증-계획, 화면: design/ad-banner-block/handoff.md
-// 크리링 배너(`ad_banners`)는 모든 무료 랜딩이 함께 쓰는 전역 데이터라, 이 파일의 테스트는 한 워커에서 차례로 돕니다(파일 안 병렬 없음).
+// 광고 블록 스위치(R20 ⑩): docs/specs/crelink-link-limit-ad-toggle.md#검증-계획 (b)~(e).
+// 크리링 배너(`ad_banners`)와 플랫폼 스위치(`platform_settings`)는 모든 무료 랜딩이 함께 쓰는 전역 데이터라, 이 파일의 테스트는 한 워커에서
+// 차례로 돌고(파일 안 병렬 없음) 시작과 끝에 플랫폼 스위치를 기본값(꺼짐)으로 되돌립니다.
 // 시험마다 자기 운영자가 만든 배너만 게시하고, 정리 때 운영자보다 배너를 먼저 지웁니다(fixtures.ts `removeUsers`).
 import type { APIResponse, Locator, Page } from '@playwright/test';
 import {
@@ -93,6 +95,16 @@ async function adStats(data: E2EData, bannerId: string, landingPublicId: string)
   return rows[0];
 }
 
+/** 플랫폼 광고 블록 스위치(전역, R20 ⑩)를 운영자 세션으로 바꿉니다. */
+async function setPlatformAdBlock(page: Page, enabled: boolean) {
+  await ok(page, 'PUT', '/api/admin/ad-block', { enabled });
+}
+
+/** 크리에이터 세션으로 자기 광고 블록 스위치를 바꿉니다. 플랫폼 스위치가 켜져 있어야 합니다(아니면 409). */
+async function setCreatorAdBlock(page: Page, enabled: boolean) {
+  await ok(page, 'PUT', '/api/me/ad-block', { enabled });
+}
+
 /**
  * 외부 링크 패널(또는 다른 dnd-kit 목록)의 손잡이를 키보드로 옮깁니다. 스페이스로 들고 화살표로 한 칸씩(안내 문장으로 확인) 옮긴 뒤
  * 스페이스로 놓고, 저장 응답(`PUT …order`)을 기다립니다. `name`은 조사까지 붙인 안내 속 이름입니다(예: `크리링 광고 블록을`).
@@ -140,9 +152,16 @@ test.beforeAll(async ({ db }) => {
     `DELETE FROM ad_banners WHERE created_by IN (SELECT id FROM users WHERE email LIKE $1 AND role = 'operator')`,
     [`%@${TEST_EMAIL_DOMAIN}`],
   );
+  // 플랫폼 스위치는 기본(꺼짐)에서 시작합니다. 중단된 이전 실행이 켜 둔 값도 되돌립니다.
+  await db.query('UPDATE platform_settings SET ad_block_enabled = false');
 });
 
-test('무료 랜딩: 광고 블록 맨 뒤·맨 앞·사이, 넘기기(버튼·키보드, 자동 넘김 없음), 숨김, 노출·클릭 기록과 서비스 화면 제외', async ({
+test.afterAll(async ({ db }) => {
+  // 다음 시나리오(`personas`)와 다음 실행이 기본값을 보도록 되돌립니다.
+  await db.query('UPDATE platform_settings SET ad_block_enabled = false');
+});
+
+test('무료 랜딩: 광고 블록 스위치(플랫폼·크리에이터), 맨 뒤·맨 앞·사이, 넘기기(버튼·키보드, 자동 넘김 없음), 숨김, 노출·클릭 기록과 서비스 화면 제외', async ({
   data,
 }) => {
   const operator = await data.user({ role: 'operator' });
@@ -160,9 +179,65 @@ test('무료 랜딩: 광고 블록 맨 뒤·맨 앞·사이, 넘기기(버튼·�
   const second = await createAdBanner(admin.page, `E2E 광고 둘째 ${data.run}`, data.externalUrl('ad-second'));
   const firstPublicId = await publicIdOf(data, 'ad_banners', first.id);
 
-  // 1. 단축 주소로 연 공개 랜딩: 맨 뒤 광고 블록, `광고` 배지, 1 / 2, 5초 동안 자동으로 넘어가지 않음
+  // R20 ⑩ (b) 플랫폼 스위치 꺼짐(기본): 공개 랜딩에 광고·노출 기록 없음, 편집 화면에 광고 블록 줄·스위치 없음, 크리에이터 스위치 API는 409
   const visitor = await data.session();
   const page = visitor.page;
+  const owner = await data.session(creator);
+  const me = owner.page;
+  const main = me.getByRole('main');
+  const stage = me.getByRole('region', { name: '미리보기', exact: true });
+  const links = main.getByRole('region', { name: '외부 링크', exact: true });
+  const adHandle = links.getByRole('button', { name: '크리링 광고 블록 순서 바꾸기' });
+  const adSwitch = links.getByRole('switch', { name: '광고 블록 표시' });
+  const adChip = stage.getByRole('button', { name: '광고 블록 위치 안내' });
+  await page.goto(creator.shortUrl);
+  await expect(page).toHaveURL(creator.landingUrl);
+  await expect(page.getByRole('link', { name: '링크 1' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '크리링 광고', exact: true })).toHaveCount(0);
+  await expect.poll(() => listOrder(page)).toEqual(['링크 1', '링크 2', '링크 3']);
+  await me.goto(`/me/landings/${creator.publicId}`);
+  await expect(stage.getByRole('button', { name: '외부 링크 구역 편집', exact: true })).toBeVisible();
+  await expect(adChip).toHaveCount(0);
+  await expect(main.locator('[data-section="ad-slot"]')).toHaveCount(0);
+  await stage.getByRole('button', { name: '외부 링크 구역 편집', exact: true }).click();
+  await expect(links.getByText('링크 3/50')).toBeVisible();
+  await expect(adHandle).toHaveCount(0);
+  await expect(me.getByRole('switch', { name: '광고 블록 표시' })).toHaveCount(0);
+  const closed = await send(me, 'PUT', '/api/me/ad-block', { enabled: true });
+  expect(closed.status()).toBe(409);
+  expect((await closed.json()).code).toBe('ad_block_unavailable');
+
+  // 운영자가 `광고 배너` 화면에서 플랫폼 스위치를 켬 → 운영 기록 `platform.ad_block`
+  await admin.page.goto('/admin/ad-banners');
+  const platformSwitch = admin.page.getByRole('switch', { name: '광고 블록 사용' });
+  await expect(platformSwitch).toHaveAttribute('aria-checked', 'false');
+  await platformSwitch.click();
+  await expect(admin.page.getByText('광고 블록을 켰어요.', { exact: false })).toBeVisible();
+  await expect(platformSwitch).toHaveAttribute('aria-checked', 'true');
+  const { rows: platformActions } = await data.db.query<{ before: unknown; after: unknown }>(
+    `SELECT before, after FROM operator_actions WHERE actor_user_id = $1 AND action = 'platform.ad_block'`,
+    [operator.userId],
+  );
+  expect(platformActions).toEqual([{ before: { enabled: false }, after: { enabled: true } }]);
+
+  // (c) 플랫폼 켬 + 크리에이터 끔(기본): 공개 랜딩에 광고 없음, 편집 화면에는 광고 줄과 꺼진 스위치, 미리보기에 광고 없음
+  await page.goto(creator.shortUrl);
+  await expect(page.getByRole('link', { name: '링크 1' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '크리링 광고', exact: true })).toHaveCount(0);
+  expect(await adStats(data, first.id, creator.publicId)).toEqual({ impressions: 0, clicks: 0 });
+  await me.reload();
+  await stage.getByRole('button', { name: '외부 링크 구역 편집', exact: true }).click();
+  await expect(adHandle).toBeVisible();
+  await expect(adSwitch).toHaveAttribute('aria-checked', 'false');
+  await expect(adChip).toHaveCount(0);
+
+  // (d) 크리에이터가 켬 → 미리보기에 광고, 공개 랜딩에 광고
+  await adSwitch.click();
+  await expect(main.getByText('광고 블록을 켰어요. 공개 페이지의 이 자리에 크리링 광고 배너가 보여요.')).toBeVisible();
+  await expect(adSwitch).toHaveAttribute('aria-checked', 'true');
+  await expect(adChip).toBeVisible();
+
+  // 1. 단축 주소로 연 공개 랜딩: 맨 뒤 광고 블록, `광고` 배지, 1 / 2, 5초 동안 자동으로 넘어가지 않음
   await page.goto(creator.shortUrl);
   await expect(page).toHaveURL(creator.landingUrl);
   const ad = page.getByRole('region', { name: '크리링 광고', exact: true });
@@ -217,26 +292,20 @@ test('무료 랜딩: 광고 블록 맨 뒤·맨 앞·사이, 넘기기(버튼·�
   await internal.close();
 
   // 1. 관리 화면: 외부 링크 패널의 광고 행을 키보드로 맨 앞 → 2번째 링크 다음, 링크 하나를 슬롯 너머로
-  const owner = await data.session(creator);
-  const me = owner.page;
-  await me.goto(`/me/landings/${creator.publicId}`);
-  const main = me.getByRole('main');
-  const stage = me.getByRole('region', { name: '미리보기', exact: true });
+  await me.reload();
   // 관리 미리보기는 공개 API를 부르지 않으므로 노출이 늘지 않습니다.
-  await expect(stage.getByRole('button', { name: '광고 블록 위치 안내' })).toBeVisible();
+  await expect(adChip).toBeVisible();
   await stage.getByRole('button', { name: '외부 링크 구역 편집', exact: true }).click();
-  const links = main.getByRole('region', { name: '외부 링크', exact: true });
-  await expect(links.getByText('보이는 링크 3/5')).toBeVisible();
-  const adHandle = links.getByRole('button', { name: '크리링 광고 블록 순서 바꾸기' });
+  await expect(links.getByText('링크 3/50')).toBeVisible();
   const adRow = links
     .getByRole('listitem')
     .filter({ has: me.getByRole('button', { name: '크리링 광고 블록 순서 바꾸기' }) });
-  await expect(adRow.getByText('지울 수 없고 위치만 바꿀 수 있어요')).toBeVisible();
-  await expect(adRow.getByRole('switch')).toHaveCount(0);
+  await expect(adRow.getByText('방문자에게 보여요 · 위치를 바꿀 수 있어요')).toBeVisible();
+  await expect(adRow.getByRole('switch')).toHaveCount(1);
   await expect(adRow.getByRole('button', { name: /삭제|수정/ })).toHaveCount(0);
 
   await moveWithKeyboard(me, adHandle, '크리링 광고 블록을', 'ArrowUp', [3, 2, 1]);
-  await expect(links.getByText('보이는 링크 3/5')).toBeVisible();
+  await expect(links.getByText('링크 3/50')).toBeVisible();
   await expect.poll(() => listOrder(stage)).toEqual(['슬롯', '링크 1', '링크 2', '링크 3']);
   await page.goto(creator.shortUrl);
   await expect.poll(() => listOrder(page)).toEqual(['슬롯', '링크 1', '링크 2', '링크 3']);
@@ -312,6 +381,8 @@ test('운영자 크리링 배너: 등록 오류(주소 형식·차단 도메인�
   const operator = await data.user({ role: 'operator' });
   const { page } = await data.session(operator);
   const creator = await data.user({ links: [{ title: '링크 1', url: data.externalUrl('one') }] });
+  await setPlatformAdBlock(page, true);
+  await setCreatorAdBlock((await data.session(creator)).page, true);
   const blocked = data.blockedDomain();
   await ok(page, 'POST', '/api/admin/blocked-domains', { domain: blocked, reason: 'E2E 광고 차단' });
 
@@ -496,8 +567,10 @@ test('배너 슬롯: 부여 → 숨김(0장) → 추가(필수·차단 도메인
     ],
   });
   const ad = await createAdBanner(admin.page, `E2E 슬롯 광고 ${data.run}`, data.externalUrl('ad-slot'));
+  await setPlatformAdBlock(admin.page, true);
   const owner = await data.session(creator);
   const me = owner.page;
+  await setCreatorAdBlock(me, true);
   // 광고 블록을 1번째 링크 다음으로
   await ok(me, 'PUT', '/api/me/links/order', { ids: creator.links.map((link) => link.id), slotIndex: 1 });
   const visitor = await data.session();
@@ -687,6 +760,17 @@ test('배너 슬롯: 부여 → 숨김(0장) → 추가(필수·차단 도메인
   await expect(slot.getByText('1 / 4', { exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: '크리링 광고', exact: true })).toHaveCount(0);
 
+  // R20 ⑩ (e) 배너 슬롯이 부여된 계정은 광고 블록 스위치의 영향을 받지 않음: 플랫폼·크리에이터 스위치를 꺼도 배너 슬롯이 그대로
+  await setPlatformAdBlock(admin.page, false);
+  await page.goto(creator.shortUrl);
+  await expect(slot.getByText('1 / 4', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '크리링 광고', exact: true })).toHaveCount(0);
+  await setPlatformAdBlock(admin.page, true);
+  await setCreatorAdBlock(me, false);
+  await page.goto(creator.shortUrl);
+  await expect(slot.getByText('1 / 4', { exact: true })).toBeVisible();
+  await setCreatorAdBlock(me, true);
+
   // 7. 차단 도메인 추가: 그 도메인의 크리에이터 배너는 차단됨
   const lateDomain = data.blockedDomain();
   const lateBanner = await ok<CreatorBanner>(me, 'PATCH', `/api/me/banners/${extra[0].id}`, {
@@ -761,7 +845,9 @@ test('방명록·반응형: 방명록을 켠 랜딩에서 광고는 링크 탭�
   });
   const ad = await createAdBanner(admin.page, `E2E 반응형 광고 ${data.run}`, data.externalUrl('ad-wide'));
   await createAdBanner(admin.page, `E2E 반응형 광고 둘째 ${data.run}`, data.externalUrl('ad-wide-2'));
+  await setPlatformAdBlock(admin.page, true);
   const owner = await data.session(creator);
+  await setCreatorAdBlock(owner.page, true);
   await ok(owner.page, 'PATCH', '/api/me/landing', { guestbookEnabled: true });
 
   const { page } = await data.session();

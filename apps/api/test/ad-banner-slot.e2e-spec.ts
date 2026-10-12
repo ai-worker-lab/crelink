@@ -1,5 +1,5 @@
 import { setTimeout as sleep } from 'node:timers/promises';
-import { CreatorLandingState, LinkView, PublicLandingResponse, UploadFileResponse } from '@crelink/shared';
+import { ApiError, CreatorLandingState, LinkView, PublicLandingResponse, UploadFileResponse } from '@crelink/shared';
 import { LandingPassService } from '../src/short-link/landing-pass.service';
 import { api, createTestApp, login, SHORT_URL, TestApp, waitForRows, WEB_URL } from './test-app';
 
@@ -12,22 +12,28 @@ interface Creator {
   landingId: string;
 }
 
-/** 광고 블록·배너 슬롯 위치, 공개 응답 slot·clickUrl, 노출 기록, 편집 상태(0068, docs/specs/crelink-ad-banner.md). */
+/**
+ * 광고 블록·배너 슬롯 위치, 공개 응답 slot·clickUrl, 노출 기록, 편집 상태(0068, docs/specs/crelink-ad-banner.md),
+ * 광고 블록 스위치(R20 ⑩, docs/specs/crelink-link-limit-ad-toggle.md). 두 스위치는 기본 꺼짐이라 이 파일은 플랫폼 스위치를 켜 두고
+ * `newCreator()`도 크리에이터 스위치를 켠 계정을 만듭니다. 스위치 시험은 끝에 플랫폼 스위치를 다시 켭니다.
+ */
 describe('광고 블록·배너 슬롯 위치와 공개 랜딩 (R20, R21 ③, R7 ⑥)', () => {
   let t: TestApp;
   let n = 0;
   let imageFileId: string;
   let stillFileId: string;
 
-  const newCreator = async (): Promise<Creator> => {
+  const newCreator = async (adBlock = true): Promise<Creator> => {
     n += 1;
     const result = await login(t.baseUrl, `slot-${n}|slot${n}@example.com`);
     const cookie = result.cookie!;
+    const userId = result.body.user!.id;
+    if (adBlock) await t.pool.query('UPDATE users SET ad_block_enabled = true WHERE id = $1', [userId]);
     const state = (await api<CreatorLandingState>(t.baseUrl, 'GET', '/api/me/landing', { cookie })).body;
     const landingId = (
       await t.pool.query<{ id: string }>('SELECT id FROM landings WHERE public_id = $1', [state.landing.publicId])
     ).rows[0].id;
-    return { cookie, userId: result.body.user!.id, publicId: state.landing.publicId, landingId };
+    return { cookie, userId, publicId: state.landing.publicId, landingId };
   };
   const upload = async (cookie: string) => {
     const form = new FormData();
@@ -126,9 +132,14 @@ describe('광고 블록·배너 슬롯 위치와 공개 랜딩 (R20, R21 ③, R7
         'SELECT ad_banner_id, landing_public_id, impressions, clicks FROM ad_banner_daily_stats ORDER BY ad_banner_id',
       )
     ).rows;
+  const setPlatformAdBlock = (enabled: boolean) =>
+    t.pool.query('UPDATE platform_settings SET ad_block_enabled = $1', [enabled]);
+  const setAdBlock = (cookie: string, body: unknown) =>
+    api<CreatorLandingState & Partial<ApiError>>(t.baseUrl, 'PUT', '/api/me/ad-block', { cookie, body });
 
   beforeAll(async () => {
     t = await createTestApp();
+    await setPlatformAdBlock(true);
     const owner = await newCreator();
     imageFileId = await upload(owner.cookie);
     stillFileId = await upload(owner.cookie);
@@ -442,6 +453,86 @@ describe('광고 블록·배너 슬롯 위치와 공개 랜딩 (R20, R21 ③, R7
       kind: 'creator',
       slotIndex: null,
       grantedAt: grantedAt.toISOString(),
+    });
+  });
+
+  describe('광고 블록 스위치(R20 ⑩)', () => {
+    afterEach(async () => {
+      await setPlatformAdBlock(true);
+    });
+
+    it('공개 랜딩: 두 스위치가 모두 켜졌을 때만 광고 블록, 아니면 slot null이고 passAccepted여도 노출을 세지 않는다', async () => {
+      await insertAdBanner();
+      const passes = t.app.get(LandingPassService);
+      const off = await newCreator(false);
+      await addLink(off.cookie, 'a');
+      const on = await newCreator();
+      await addLink(on.cookie, 'a');
+
+      // 플랫폼 켜짐 + 크리에이터 꺼짐.
+      expect(await slotOf(off.publicId, passes.issue(off.publicId))).toBeNull();
+      // 플랫폼 꺼짐이면 크리에이터가 켜 두어도 그리지 않습니다.
+      await setPlatformAdBlock(false);
+      expect(await slotOf(on.publicId, passes.issue(on.publicId))).toBeNull();
+      expect(await slotOf(off.publicId, passes.issue(off.publicId))).toBeNull();
+      await sleep(200);
+      expect(await impressions()).toEqual([]);
+
+      // 둘 다 켜짐.
+      await setPlatformAdBlock(true);
+      expect((await slotOf(on.publicId, passes.issue(on.publicId)))?.kind).toBe('ad');
+      expect((await waitForRows(impressions)).map((row) => row.landing_public_id)).toEqual([on.publicId]);
+    });
+
+    it('배너 슬롯이 부여된 계정은 스위치와 관계없이 크리에이터 배너를 그린다', async () => {
+      await insertAdBanner();
+      const creator = await newCreator(false);
+      await grant(creator);
+      const banner = await insertCreatorBanner(creator, { position: 0 });
+      for (const platform of [false, true]) {
+        await setPlatformAdBlock(platform);
+        expect([platform, await slotOf(creator.publicId)]).toEqual([
+          platform,
+          expect.objectContaining({ kind: 'creator', banners: [expect.objectContaining({ id: banner.publicId })] }),
+        ]);
+      }
+    });
+
+    it('PUT /api/me/ad-block: 플랫폼 꺼짐이면 409 ad_block_unavailable, 켜짐이면 저장하고 편집 상태를 주며 슬롯 위치는 그대로다', async () => {
+      const creator = await newCreator(false);
+      const [a, b] = [await addLink(creator.cookie, 'a'), await addLink(creator.cookie, 'b')];
+      await order(creator.cookie, { ids: [a.id, b.id], slotIndex: 1 });
+      const stored = async () =>
+        (
+          await t.pool.query<{ enabled: boolean }>('SELECT ad_block_enabled AS enabled FROM users WHERE id = $1', [
+            creator.userId,
+          ])
+        ).rows[0].enabled;
+
+      await setPlatformAdBlock(false);
+      expect((await state(creator.cookie)).adBlock).toEqual({ platformEnabled: false, enabled: false });
+      const unavailable = await setAdBlock(creator.cookie, { enabled: true });
+      expect([unavailable.status, unavailable.body.code]).toEqual([409, 'ad_block_unavailable']);
+      expect(await stored()).toBe(false);
+
+      await setPlatformAdBlock(true);
+      for (const body of [{}, { enabled: 'true' }, { enabled: 1 }, { enabled: null }, []]) {
+        const invalid = await setAdBlock(creator.cookie, body);
+        expect([body, invalid.status, invalid.body.code]).toEqual([body, 400, 'validation_failed']);
+      }
+      const turnedOn = await setAdBlock(creator.cookie, { enabled: true });
+      expect(turnedOn.status).toBe(200);
+      expect(turnedOn.body.adBlock).toEqual({ platformEnabled: true, enabled: true });
+      expect(turnedOn.body.slot).toEqual({ kind: 'ad', slotIndex: 1, grantedAt: null });
+      expect(await stored()).toBe(true);
+      const turnedOff = await setAdBlock(creator.cookie, { enabled: false });
+      expect([turnedOff.status, turnedOff.body.adBlock]).toEqual([200, { platformEnabled: true, enabled: false }]);
+      expect(await slotPosition(creator)).toBe(1);
+
+      // 플랫폼을 다시 꺼도 크리에이터 값은 남습니다(다시 켜면 그대로 적용).
+      await setAdBlock(creator.cookie, { enabled: true });
+      await setPlatformAdBlock(false);
+      expect((await state(creator.cookie)).adBlock).toEqual({ platformEnabled: false, enabled: true });
     });
   });
 });

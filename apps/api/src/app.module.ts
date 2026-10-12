@@ -10,7 +10,6 @@ import { AdminModule } from './admin/admin.module';
 import { AiOperatorModule } from './ai-operator/ai-operator.module';
 import { RetentionModule } from './retention/retention.module';
 import { ShortLinkModule } from './short-link/short-link.module';
-import { SlotEventModule } from './slot-event/slot-event.module';
 
 // SentryModule은 공식 안내대로 맨 앞에 둡니다(SENTRY_DSN이 비면 아무것도 보내지 않음, src/instrument.ts).
 // ShortLinkModule의 `GET /:slug`가 다른 경로를 가리지 않게 마지막에 둡니다.
@@ -24,7 +23,6 @@ import { SlotEventModule } from './slot-event/slot-event.module';
     CreatorModule,
     GuestbookModule,
     AdminModule,
-    SlotEventModule,
     AiOperatorModule,
     RetentionModule,
     ShortLinkModule,

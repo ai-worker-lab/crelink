@@ -3,7 +3,15 @@ import { CRELINK_LIMITS, PortfolioItemView, SOCIAL_PLATFORMS, SocialLinkView } f
 import type { PoolClient } from 'pg';
 import { Database } from '../database';
 import { apiError, UUID_PATTERN } from '../common/http';
-import { bodyObject, optionalBoolean, optionalText, orderedIds, parseHttpUrl, requiredText } from '../common/input';
+import {
+  bodyObject,
+  booleanField,
+  optionalBoolean,
+  optionalText,
+  orderedIds,
+  parseHttpUrl,
+  requiredText,
+} from '../common/input';
 import { FilesService } from '../files/files.service';
 import { CreatorService, PORTFOLIO_COLUMNS, PortfolioRow } from './creator.service';
 
@@ -22,7 +30,7 @@ function optionalUrl(value: unknown, label: string): string | null | undefined {
   return url.href;
 }
 
-/** 프로필(R12), SNS, 포트폴리오. */
+/** 프로필(R12), 광고 블록 스위치(R20 ⑩), SNS, 포트폴리오. */
 @Injectable()
 export class ProfileService {
   constructor(
@@ -49,6 +57,23 @@ export class ProfileService {
        WHERE user_id = $1`,
       [userId, ...columns.map((column) => changes[column])],
     );
+  }
+
+  /**
+   * 크리에이터 광고 블록 스위치(R20 ⑩, 계정 단위). 플랫폼 스위치를 `FOR SHARE`로 읽어 운영자 쓰기(`FOR UPDATE`)와 줄 세우고,
+   * 꺼져 있으면 409 `ad_block_unavailable`입니다. 배너 슬롯이 부여된 계정도 값은 저장하지만 공개 랜딩에는 영향이 없습니다.
+   */
+  async setAdBlock(userId: string, body: unknown): Promise<void> {
+    const enabled = booleanField(body, 'enabled');
+    await this.database.transaction(async (client) => {
+      const platform = await client.query<{ enabled: boolean }>(
+        'SELECT ad_block_enabled AS enabled FROM platform_settings FOR SHARE',
+      );
+      if (!platform.rows[0]?.enabled) {
+        throw apiError(HttpStatus.CONFLICT, 'ad_block_unavailable', '지금은 광고 블록을 켜고 끌 수 없습니다.');
+      }
+      await client.query('UPDATE users SET ad_block_enabled = $2 WHERE id = $1', [userId, enabled]);
+    });
   }
 
   /** SNS 전체 교체. */

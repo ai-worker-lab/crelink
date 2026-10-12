@@ -1,7 +1,7 @@
-// 검증 계획 E2E 3: 운영자 흐름(통계, 추가 슬롯, 도메인 차단, 권한). 기준: docs/specs/crelink-mvp.md#검증-계획
+// 검증 계획 E2E 3: 운영자 흐름(통계, 도메인 차단, 권한). 기준: docs/specs/crelink-mvp.md#검증-계획
 import { expect, expectMobileFits, test, waitForCount } from './fixtures';
 
-test('운영자: 크리에이터 통계·분포, 슬롯 부여 후 6번째 링크, 도메인 차단 반영·저장 거부, 크리에이터의 /admin 접근 거부', async ({
+test('운영자: 크리에이터 통계·분포, 보이는 링크 6번째 추가(슬롯 부여 없음), 도메인 차단 반영·저장 거부, 크리에이터의 /admin 접근 거부', async ({
   data,
 }) => {
   const domain = data.blockedDomain();
@@ -74,7 +74,8 @@ test('운영자: 크리에이터 통계·분포, 슬롯 부여 후 6번째 링�
   ).toHaveCount(1);
   await expectMobileFits(page, '/admin/creators/{id}');
 
-  // 추가 슬롯 1개 → 크리에이터가 보이는 링크 6번째 추가(`페이지 편집` 미리보기에서 외부 링크 구역을 골라 외부 링크 패널로)
+  // 크리에이터는 슬롯 부여 없이 보이는 링크 6번째를 추가(유료 한도 없음, R13). `페이지 편집` 미리보기에서 외부 링크 구역을 골라 외부 링크 패널로
+  await expect(page.getByText('추가 링크 슬롯')).toHaveCount(0);
   const creatorSession = await data.session(creator);
   const me = creatorSession.page;
   await me.goto(`/me/landings/${creator.publicId}`);
@@ -84,18 +85,7 @@ test('운영자: 크리에이터 통계·분포, 슬롯 부여 후 6번째 링�
   const previewTitles = stage.locator('.link-title');
   const openLinks = stage.getByRole('button', { name: '외부 링크 구역 편집', exact: true });
   await openLinks.click();
-  await expect(links.getByText('보이는 링크 5/5')).toBeVisible();
-  await expect(links.getByRole('button', { name: '링크 추가' })).toHaveCount(0);
-  await expect(stage.getByRole('button', { name: '링크 추가' })).toHaveCount(0);
-
-  await page.getByLabel('추가 링크 슬롯').fill('1');
-  await page.getByRole('button', { name: '슬롯 저장' }).click();
-  await expect(page.getByText('추가 슬롯을 저장했어요.')).toBeVisible();
-  await expect(page.getByText('보이는 링크 5/6', { exact: false })).toBeVisible();
-
-  await me.reload();
-  await openLinks.click();
-  await expect(links.getByText('보이는 링크 5/6')).toBeVisible();
+  await expect(links.getByText('링크 5/50')).toBeVisible();
   await links.getByRole('button', { name: '링크 추가', exact: true }).click();
   await expect(manage.getByRole('heading', { name: '새 링크', level: 2, exact: true })).toBeFocused();
   const addForm = manage.getByRole('form', { name: '새 링크', exact: true });
@@ -104,7 +94,7 @@ test('운영자: 크리에이터 통계·분포, 슬롯 부여 후 6번째 링�
   await addForm.getByRole('button', { name: '저장', exact: true }).click();
   await expect(addForm).toHaveCount(0);
   await expect(links.getByText("'여섯 번째' 링크를 추가했어요.")).toBeVisible();
-  await expect(links.getByText('보이는 링크 6/6')).toBeVisible();
+  await expect(links.getByText('링크 6/50')).toBeVisible();
   await expect(previewTitles).toHaveText([shop.title, blog.title, '유튜브', '카페', '공지', '여섯 번째']);
 
   // 운영자 자신의 관리 화면 머리글에는 운영자 화면 링크
@@ -135,7 +125,7 @@ test('운영자: 크리에이터 통계·분포, 슬롯 부여 후 6번째 링�
   await expect(shopItem.getByText('차단됨', { exact: true })).toBeVisible();
   await expect(shopItem.getByText('크리링이 이 링크를 차단해 방문자에게 보이지 않아요. 사유: E2E 차단')).toBeVisible();
   await expect(shopItem.getByRole('switch', { name: `${shop.title} 숨기기` })).toHaveAttribute('aria-disabled', 'true');
-  await expect(links.getByText('보이는 링크 5/6')).toBeVisible();
+  await expect(links.getByText('링크 6/50')).toBeVisible();
   await expect(previewTitles).toHaveText([blog.title, '유튜브', '카페', '공지', '여섯 번째']);
   await links.getByRole('button', { name: '링크 추가', exact: true }).click();
   const blockedForm = manage.getByRole('form', { name: '새 링크', exact: true });

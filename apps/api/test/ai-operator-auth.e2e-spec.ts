@@ -20,14 +20,15 @@ describe('AI 운영자 토큰 인증과 행위자 규칙 (R23 ①⑥)', () => {
     expect(started.status).toBe(201);
     return started.body.id;
   };
-  const extraSlots = (options: { token?: string; runId?: string; cookie?: string }, extra = 1) =>
+  /** 운영자 쓰기 예시(배너 슬롯 부여·회수, 행동 기록 `creator.banner_slot`). */
+  const bannerSlot = (options: { token?: string; runId?: string; cookie?: string }, granted = true) =>
     api<OperatorCreatorDetail & Partial<ApiError>>(
       t.baseUrl,
       'PUT',
-      `/api/admin/creators/${creator.userId}/extra-slots`,
+      `/api/admin/creators/${creator.userId}/banner-slot`,
       {
         ...options,
-        body: { extraSlots: extra },
+        body: { granted },
       },
     );
   const lastUsed = async (tokenId: string) =>
@@ -136,9 +137,13 @@ describe('AI 운영자 토큰 인증과 행위자 규칙 (R23 ①⑥)', () => {
     );
     expect((await api(t.baseUrl, 'GET', '/api/me/landing', { token: ai.token })).status).toBe(200);
 
-    const missing = await extraSlots({ token: ai.token });
+    const missing = await bannerSlot({ token: ai.token });
     expect([missing.status, missing.body]).toMatchObject([409, { code: 'agent_run_required' }]);
     const meWrite = await api(t.baseUrl, 'PATCH', '/api/me/landing', { token: ai.token, body: { bio: 'AI' } });
+    for (const path of ['/api/me/ad-block', '/api/admin/ad-block']) {
+      const adBlock = await api(t.baseUrl, 'PUT', path, { token: ai.token, body: { enabled: true } });
+      expect([path, adBlock.status, adBlock.body.code]).toEqual([path, 409, 'agent_run_required']);
+    }
     expect([meWrite.status, meWrite.body.code]).toEqual([409, 'agent_run_required']);
     // 업로드도 본문을 읽기 전에 거절합니다(파일이 없어 400이 아니라 409).
     const upload = await fetch(`${t.baseUrl}/api/me/files`, {
@@ -146,19 +151,19 @@ describe('AI 운영자 토큰 인증과 행위자 규칙 (R23 ①⑥)', () => {
       headers: { authorization: `Bearer ${ai.token}` },
     });
     expect([upload.status, await upload.json()]).toMatchObject([409, { code: 'agent_run_required' }]);
-    const garbage = await extraSlots({ token: ai.token, runId: 'not-a-uuid' });
+    const garbage = await bannerSlot({ token: ai.token, runId: 'not-a-uuid' });
     expect(garbage.status).toBe(409);
 
     // 다른 AI 계정의 실행 id는 쓸 수 없습니다.
     const other = await createAiOperator(t.pool, 'other@crelink.invalid');
     const otherRun = await startRun(other.token);
-    const foreign = await extraSlots({ token: ai.token, runId: otherRun });
+    const foreign = await bannerSlot({ token: ai.token, runId: otherRun });
     expect([foreign.status, foreign.body]).toMatchObject([409, { code: 'agent_run_required' }]);
     await t.pool.query("UPDATE agent_runs SET status = 'succeeded', ended_at = now() WHERE id = $1", [otherRun]);
 
     const runId = await startRun();
-    const ok = await extraSlots({ token: ai.token, runId }, 2);
-    expect([ok.status, ok.body.extraLinkSlots]).toEqual([200, 2]);
+    const ok = await bannerSlot({ token: ai.token, runId });
+    expect([ok.status, ok.body.bannerSlot.grantedAt]).toEqual([200, expect.any(String)]);
     const meOk = await api<CreatorLandingState>(t.baseUrl, 'PATCH', '/api/me/landing', {
       token: ai.token,
       runId,
@@ -176,7 +181,7 @@ describe('AI 운영자 토큰 인증과 행위자 규칙 (R23 ①⑥)', () => {
 
     // 시작 뒤 90분이 지난 실행은 실행 헤더로 쓸 수 없습니다.
     await t.pool.query("UPDATE agent_runs SET started_at = now() - interval '91 minutes' WHERE id = $1", [runId]);
-    const stale = await extraSlots({ token: ai.token, runId });
+    const stale = await bannerSlot({ token: ai.token, runId });
     expect([stale.status, stale.body]).toMatchObject([409, { code: 'agent_run_required' }]);
 
     // 닫힌 실행도 안 됩니다.
@@ -184,7 +189,7 @@ describe('AI 운영자 토큰 인증과 행위자 규칙 (R23 ①⑥)', () => {
       "UPDATE agent_runs SET status = 'succeeded', ended_at = now(), started_at = now() WHERE id = $1",
       [runId],
     );
-    expect((await extraSlots({ token: ai.token, runId })).status).toBe(409);
+    expect((await bannerSlot({ token: ai.token, runId })).status).toBe(409);
   });
 
   it('멈춤이면 AI 상태 변경 요청은 409 ai_operator_paused(실행 헤더 검사보다 먼저), 실행 시작·갱신은 된다', async () => {
@@ -196,7 +201,7 @@ describe('AI 운영자 토큰 인증과 행위자 규칙 (R23 ①⑥)', () => {
     expect(paused.status).toBe(200);
 
     for (const options of [{ token: ai.token, runId }, { token: ai.token }]) {
-      const blocked = await extraSlots(options);
+      const blocked = await bannerSlot(options);
       expect([blocked.status, blocked.body]).toMatchObject([409, { code: 'ai_operator_paused' }]);
     }
     const meWrite = await api(t.baseUrl, 'PATCH', '/api/me/landing', { token: ai.token, runId, body: { bio: 'x' } });
@@ -209,7 +214,7 @@ describe('AI 운영자 토큰 인증과 행위자 규칙 (R23 ①⑥)', () => {
     });
     expect([closed.status, closed.body.status]).toEqual([200, 'failed']);
     // 사람 운영자 쓰기는 멈춤과 관계없습니다.
-    expect((await extraSlots({ cookie: operator }, 0)).status).toBe(200);
+    expect((await bannerSlot({ cookie: operator }, false)).status).toBe(200);
   });
 
   it('오류 우선순위: 401 → 403(운영자 아님) → 403(사람·AI 전용) → 409 멈춤 → 409 실행 헤더', async () => {
@@ -244,7 +249,7 @@ describe('AI 운영자 토큰 인증과 행위자 규칙 (R23 ①⑥)', () => {
     const anonymous = await api(t.baseUrl, 'POST', '/api/admin/agent-runs', { body: { trigger: 'manual' } });
     expect([anonymous.status, anonymous.body.code]).toEqual([401, 'unauthenticated']);
     // 멈춤이 실행 헤더보다 먼저입니다(헤더 없음 → 409 ai_operator_paused).
-    const paused = await extraSlots({ token: ai.token });
+    const paused = await bannerSlot({ token: ai.token });
     expect(paused.body.code).toBe('ai_operator_paused');
   });
 });

@@ -1,4 +1,4 @@
-import { AdBannerListResponse, AdBannerView, ApiError, UploadFileResponse } from '@crelink/shared';
+import { AdBannerListResponse, AdBannerView, AdBlockSettingView, ApiError, UploadFileResponse } from '@crelink/shared';
 import { AdBannersService } from '../src/admin/ad-banners.service';
 import { CreatorService } from '../src/creator/creator.service';
 import { GIF_ANIMATED, GIF_STILL, PNG_STILL } from './image-samples';
@@ -91,6 +91,8 @@ describe('운영자 크리링 배너 (R20 ④⑨, R14)', () => {
       ['PATCH', `/api/admin/ad-banners/${id}`],
       ['PUT', `/api/admin/ad-banners/${id}/end`],
       ['PUT', '/api/admin/ad-banners/order'],
+      ['GET', '/api/admin/ad-block'],
+      ['PUT', '/api/admin/ad-block'],
     ];
     for (const [method, path] of paths) {
       const body = method === 'GET' ? undefined : {};
@@ -396,5 +398,45 @@ describe('운영자 크리링 배너 (R20 ④⑨, R14)', () => {
     expect(created.map((result) => result.status)).toEqual([201, 201, 201]);
     const after = await t.pool.query<{ sort_order: number }>('SELECT sort_order FROM ad_banners ORDER BY sort_order');
     expect(after.rows.map((r) => r.sort_order)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
+
+  it('플랫폼 광고 블록 스위치: 기본 꺼짐, 켜고 끄면 바꾼 운영자·시각과 행동 기록 platform.ad_block, enabled가 boolean이 아니면 400', async () => {
+    const read = async () =>
+      (await api<AdBlockSettingView>(t.baseUrl, 'GET', '/api/admin/ad-block', { cookie: operator })).body;
+    const set = (body: unknown, cookie = operator) =>
+      api<AdBlockSettingView & Partial<ApiError>>(t.baseUrl, 'PUT', '/api/admin/ad-block', { cookie, body });
+    const initial = await read();
+    expect(initial).toEqual({ enabled: false, updatedAt: expect.any(String), updatedBy: null });
+
+    for (const body of [{}, { enabled: 'true' }, { enabled: 1 }, { enabled: null }, []]) {
+      const invalid = await set(body);
+      expect([body, invalid.status, invalid.body.code]).toEqual([body, 400, 'validation_failed']);
+    }
+    expect(await read()).toEqual(initial);
+
+    const on = await set({ enabled: true });
+    expect(on.status).toBe(200);
+    expect(on.body).toEqual({ enabled: true, updatedAt: expect.any(String), updatedBy: 'operator@example.com' });
+    expect(Date.parse(on.body.updatedAt)).toBeGreaterThanOrEqual(Date.parse(initial.updatedAt));
+    expect(await read()).toEqual(on.body);
+    const action = await t.pool.query(
+      `SELECT actor_kind, actor_user_id, action, target_type, target_id, subject_user_id, before, after
+       FROM operator_actions ORDER BY created_at DESC, id DESC LIMIT 1`,
+    );
+    expect(action.rows).toEqual([
+      {
+        actor_kind: 'human',
+        actor_user_id: operatorId,
+        action: 'platform.ad_block',
+        target_type: 'platform_setting',
+        target_id: 'ad_block',
+        subject_user_id: null,
+        before: { enabled: false },
+        after: { enabled: true },
+      },
+    ]);
+
+    const off = await set({ enabled: false }, operator2);
+    expect([off.status, off.body.enabled, off.body.updatedBy]).toEqual([200, false, 'operator2@example.com']);
   });
 });
