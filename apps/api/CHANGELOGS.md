@@ -4,6 +4,7 @@
 
 ## 2026-10-12
 
+- 쓰지 않는 링크 슬롯 데이터 삭제(0179, 통합 0180). migration `0008_drop_retired_link_slot_data`(첫 줄 `SET LOCAL lock_timeout = '5s'`): `DROP TABLE slot_event_entries`, `DROP TABLE slot_events`, `ALTER TABLE users DROP COLUMN extra_link_slots`. 0007 이후 코드는 셋을 읽지 않아 Blue/Green 겹침에 영향이 없고, 0007보다 앞선 릴리스로는 롤백할 수 없습니다. 운영 행은 적용 전에 백업했습니다(0179 진행 기록). 시험: `migrations.e2e-spec.ts` 0008 1건(삭제, 사용자·운영자 행동 기록 유지, lock_timeout 범위), `health.e2e-spec.ts` 테이블·적용 목록.
 - 링크 한도 단순화와 광고 블록 켜고 끄기(R13, R20 ⑩, 링크 슬롯 이벤트 R24 철회). 근거 `docs/work/api/0176-link-limit-ad-toggle-api.md`, 설계 `docs/specs/crelink-link-limit-ad-toggle.md`. 계약(`packages/shared`)은 0178이 먼저 확정한 그대로입니다.
   - migration `0007_ad_block_toggle`(첫 줄 `SET LOCAL lock_timeout = '5s'`, 머리 주석에 되돌리기): 새 테이블 `platform_settings`(1행, `id` CHECK, `ad_block_enabled` 기본 false, `updated_by` FK `SET NULL`)와 `users.ad_block_enabled`(기본 false). expand만이고 `users.extra_link_slots`·`slot_events`·`slot_event_entries`와 그 행은 그대로 둡니다(읽지 않음, 삭제 결정은 work item 0179).
   - 링크 한도: `CreatorService.limits`는 `{ totalMax: 50, totalUsed }`(숨김·차단 포함)만 돌려주고 `users`·`slot_event_entries`를 읽지 않습니다. 보이는 링크 검사와 409 `link_limit_reached`를 없앴고, 링크 추가만 409 `link_total_limit_reached`를 봅니다. 숨김 해제는 한도를 확인하지 않습니다.
