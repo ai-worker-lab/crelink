@@ -4,6 +4,7 @@
 
 ## 2026-10-12
 
+- 홈 검색 제목을 `크리링 - 크리에이터 링크인바이오·포트폴리오 랜딩페이지`로 바꾸고 홈에만 Google 사이트 이름용 `WebSite` JSON-LD(`크리링`, 대안 `Crelink`·`links.shaul.kr`)를 넣었습니다(0174). `크리링` 단독 검색이 동음 만화 인물 문서로 채워지는 관측에 따른 구별 보강이며 화면 문구·OG·다른 페이지 제목·공개 랜딩은 그대로입니다. 근거: `src/app/(public)/page.tsx`, `src/lib/site.ts`, `docs/work/web/0174-home-site-name-search.md`.
 - 첫 크리링 완성 챌린지(0169)를 별도 `/docs/first-crelink-challenge`에 구현했습니다. 기존 공개 문서 표현과 네이티브 목적별 안내를 사용해 본인 실제 링크 직접 저장·공개 확인·단축 주소 복사 준비로 연결하며 참가/완료 수집·추가 보상·외부 게시 의무는 없습니다. `PUBLIC_DOCS` 등록으로 문서 목록·메뉴·sitemap에 연결하고 슬롯 이벤트는 기존 공개 API를 요청마다 조회해 열림·시작 전·종료·없음·오류를 구분합니다. `0168` 편집기·`0164` CTA·기존 슬롯 신청 계약은 변경하지 않았습니다. 근거: `docs/work/orchestrator/0169-slot-event-growth-experiment.md`, `src/app/(public)/docs/first-crelink-challenge/page.tsx`, `src/lib/docs.ts`.
 - `0168` 새 링크 편집기에 `링크 목적 (선택)`을 추가해 세 목적의 제목을 빈 표시 이름에만 제안하고 기존 제목/URL/설명/썸네일·명시 저장/오류/한도/권한·0164 CTA를 유지했습니다. 실제 production localhost 시나리오2·E2E19·390/1280 PNG 후 Node24/26 CI·PR106 main·실제 Deploy/운영 주소 검사와 실서버390px 안내를 확인했습니다. T0 10/12 02:44:02 KST·7일 리뷰10/19 02:44:02 KST, 개발 `/me` 계측 오류와 성장 미관측은 티켓에 구분합니다. 근거: `src/components/manage/LinkForm.tsx`, `src/app/(public)/docs/creator-portfolio-page/page.tsx`, `src/app/(public)/docs/guide/page.tsx`, `docs/work/orchestrator/0168-creator-starter-kit.md`.
 - `0168` 협업 가이드에 첫 대표 작업 선택·역할 제목 예시·로그아웃한 방문자의 외부 주소 접근 확인·비공개 정보 제외·기존 링크 직접 수정 안내를 구현했습니다. 기존 문서 URL·Server Component·스타일·CTA를 재사용하고 새 계정/추적/외부 공개 권한 변경은 하지 않습니다. 근거: `src/app/(public)/docs/creator-portfolio-page/page.tsx`, `docs/work/orchestrator/0168-creator-starter-kit.md`.
