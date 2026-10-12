@@ -4,7 +4,7 @@
 - 역할: web
 - 상위: 0175
 - 선행: 0176
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-12
@@ -40,3 +40,4 @@
 - 2026-10-12: 생성.
 - 2026-10-12: 구현(web agent). `/admin/slot-event`·`SlotEventPeriodForm`·`HomeSlotEvent`·`SlotEventOffer`·`ExtraSlotsForm`·운영자 메뉴 `이벤트`·관련 BFF 허용 경로·스타일 제거. 한도 배지 `링크 n/50`(숨김 포함)과 한도 안내, `/admin/ad-banners` 카드 `광고 블록`의 `광고 블록 사용` 스위치(`AdBlockSetting`), 편집 화면 광고 줄·광고 블록 패널의 `광고 블록 표시` 스위치(`AdBlockSwitch`, 플랫폼 꺼짐이면 줄·패널·스위치 없음, 링크 순서 저장은 `slotIndex` 생략), 운영자 크리에이터 상세 `광고 블록` 켬/꺼짐, 운영 기록 이름 `플랫폼 광고 블록 변경`. 약관·개인정보 처리방침·안내 문서는 수익 약속 없이 "광고 노출은 선택, 수익 배분 미정"으로 고쳤습니다.
 - 2026-10-12: 검증(통합 0178). `pnpm verify`(웹 lint·typecheck·build·test 포함) 통과, 실제 API로 `pnpm e2e` 17건 통과, 로컬 브라우저에서 1280px·390px 가로 넘침 0(운영자 광고 배너·페이지 편집). `검증`으로 넘깁니다.
+- 2026-10-12: 완료. PR [#132](https://github.com/ai-worker-lab/crelink/pull/132) squash 머지(`66694c3`), Deploy [38195002415](https://github.com/ai-worker-lab/crelink/actions/runs/38195002415) success(`운영 주소 검사` 포함).

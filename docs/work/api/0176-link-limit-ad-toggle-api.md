@@ -3,7 +3,7 @@
 - 단계: 티켓
 - 역할: api
 - 상위: 0175
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-12
@@ -39,3 +39,4 @@ migration은 새 테이블·컬럼만 더합니다(expand). 옛 색 API는 새 �
 - 2026-10-12: 생성. 공유 계약은 통합 담당(0178)이 같은 브랜치에서 먼저 확정했고(설계 `API 계약`), 이 티켓이 그 계약으로 API를 구현합니다.
 - 2026-10-12: 구현(api agent). migration `0007_ad_block_toggle`(새 테이블 `platform_settings` 1행·`users.ad_block_enabled`, 둘 다 기본 false, expand만), `GET·PUT /api/admin/ad-block`(행동 기록 `platform.ad_block`), `PUT /api/me/ad-block`(플랫폼 꺼짐 409 `ad_block_unavailable`), 공개 랜딩 판정(두 스위치·배너 슬롯·R20 ⑥, 꺼지면 `slot: null`·노출 기록 없음), 한도는 전체 50개만(`link_limit_reached` 제거). `src/slot-event/`·`PUT …/extra-slots`·지표 `events` 제거. 남은 `users.extra_link_slots`·`slot_events`·`slot_event_entries`는 읽지 않고 보관(0179).
 - 2026-10-12: 검증(통합 0178, Node 24.20.0, 이 worktree 인스턴스 슬롯 1). `pnpm --filter @crelink/api test` 28 suites·222 tests 통과(실제 PostgreSQL), `pnpm verify` 전 단계 통과. `검증`으로 넘깁니다.
+- 2026-10-12: 완료. PR [#132](https://github.com/ai-worker-lab/crelink/pull/132) squash 머지(`66694c3`), Deploy [38195002415](https://github.com/ai-worker-lab/crelink/actions/runs/38195002415) success(`운영 주소 검사` 포함).

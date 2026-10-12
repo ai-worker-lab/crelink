@@ -4,7 +4,7 @@
 - 역할: orchestrator
 - 상위: 0175
 - 선행: 0176, 0177
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-10-12
@@ -41,3 +41,4 @@
 - 2026-10-12: 검증(Node 24.20.0, 인스턴스 슬롯 1 `make up`). `pnpm verify` 8단계 통과(첫 실행은 `docs:check` 0168 진행 기록의 지운 파일 링크 2건·`lint` Prettier 1건 실패 → 링크를 코드 표기로 바꾸고 서식 수정 뒤 통과), `pnpm smoke` 5건 통과, `pnpm e2e` 17건 통과(main 9·ad-banner 4·personas 4). 시스템 기본 Node 22.23에서는 API jest가 ESM `require` 오류로 돌지 않아 `.nvmrc`의 24로 실행했습니다.
 - 2026-10-12: 로컬 브라우저(Playwright, 1280px, 합성 계정 `@manual.crelink.test` 3개를 DB fixture로 만들고 끝에 지움): (b) 플랫폼 꺼짐 → `/p/manuala001` 광고 영역 0, 편집 화면 광고 행·`광고 블록 표시` 스위치·미리보기 광고 칩 0 / (a) 보이는 링크 5개에서 UI로 6번째 추가 `링크 6/50` → BFF로 7~50번째 44건 201 → 51번째 409 `link_total_limit_reached` → 편집 화면 `링크 50/50`·추가 버튼 0·한도 안내 1, 공개 랜딩 보이는 링크 50 / 운영자 `광고 블록 사용` 스위치 켬(카드에 바꾼 운영자 이메일) / (c) 크리에이터 꺼짐 → 공개 광고 0, 편집 화면 광고 행 1·스위치 `aria-checked=false`·미리보기 칩 0 / (d) 크리에이터 켬 → 미리보기 칩 1, 공개 랜딩 맨 뒤 `크리링 광고`(배너 alt `수동 확인 광고`) / (e) 배너 슬롯 부여 크리에이터 B: 플랫폼 켬·B 스위치 끔에서 크리에이터 배너 1·광고 0·편집 화면 광고 스위치 0, 플랫폼 끈 뒤에도 크리에이터 배너 1 / 플랫폼 끈 뒤 A(스위치 켬)도 공개 광고 0·편집 광고 행 0. 390px에서 `/admin/ad-banners`·페이지 편집 가로 넘침 0. DB: 그 배너 노출은 (d) 1회만(꺼진 동안 기록 없음), 행동 기록 `platform.ad_block` 2행(false→true, true→false). 콘솔 오류는 가짜 `.test` 링크 아이콘 로드 실패(설계상 기본 아이콘 대체)뿐입니다.
 - 2026-10-12: [PR #132](https://github.com/ai-worker-lab/crelink/pull/132), 커밋 `250b6fe`의 CI [38194497224](https://github.com/ai-worker-lab/crelink/actions/runs/38194497224) `CI 통과` 성공(check Node 24·26, smoke, 이미지 빌드 api·web, work scope). main 머지·배포는 하지 않았습니다(부모 세션 결정).
+- 2026-10-12: 완료(사용자 지시 "머지하라"). squash 머지 `66694c3`(11:14 KST), Deploy [38195002415](https://github.com/ai-worker-lab/crelink/actions/runs/38195002415) success: plan·이미지 api·이미지 web·배포 home-server(`운영 주소 검사` 포함)·배포 기록 태그.
