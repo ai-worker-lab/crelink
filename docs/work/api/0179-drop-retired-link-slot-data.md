@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: api
-- 상태: 검증
+- 상태: 완료
 - 종류: 유지보수
 - 우선순위: P2
 - 작성일: 2026-10-12
@@ -36,3 +36,4 @@
 - 2026-10-12 11:37 KST: 운영 DB 백업(읽기 전용 조회, 운영자 sops age 키로 `DATABASE_URL` 복호화, `postgres:17-alpine` 컨테이너의 `psql`·`pg_dump`, TLS `verify-full`). 지우기 전 행 수: `users.extra_link_slots <> 0` 2행(전체 사용자 7행), `slot_events` 1행, `slot_event_entries` 1행. 백업 위치: 운영자 Mac `~/orca/workspaces/crelink/_backup/0179-20261012T113721/`(저장소 밖, 폴더 700·파일 600) — `slot_event_tables.sql`(두 테이블 데이터), `slot_event_schema.sql`(두 테이블 정의·인덱스), `users_extra_link_slots.csv`(0이 아닌 사용자 id·값).
 - 2026-10-12: migration `0008_drop_retired_link_slot_data`(첫 줄 `lock_timeout` 5초, `DROP TABLE slot_event_entries`·`slot_events`, `ALTER TABLE users DROP COLUMN extra_link_slots`). 운영자 행동 기록은 그대로 둡니다. 시험: `test/migrations.e2e-spec.ts` 0008(컬럼·테이블 삭제, 사용자·행동 기록 유지, lock_timeout 범위), `test/health.e2e-spec.ts` 테이블·적용 목록. `/privacy` 수집 항목에서 이벤트 신청 기록을 빼고 보관 기간에 삭제 사실을 적었습니다.
 - 2026-10-12: 검증(통합 0180 진행 기록과 같음). `pnpm verify` 통과, 로컬 기동에서 0008 적용 뒤 테이블·컬럼 없음, `pnpm smoke`·`pnpm e2e` 통과. `검증`으로 넘깁니다.
+- 2026-10-12: 완료. PR [#134](https://github.com/ai-worker-lab/crelink/pull/134) 머지(`7cd5962`), Deploy [38197227467](https://github.com/ai-worker-lab/crelink/actions/runs/38197227467) success. 운영 DB에서 0008 적용과 테이블·컬럼 삭제를 읽기 전용으로 확인했습니다(근거 [0180](../orchestrator/0180-retired-data-drop-and-entry-focus.md) 진행 기록).
