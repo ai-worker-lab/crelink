@@ -400,3 +400,23 @@
 
 - PM 감독: Product `task_8d76e8d5ba1f`/`ctx_be37d490bc38`, Growth `task_ef6ab4eb9463`/`ctx_d8bca57d9143`의 Task/Dispatch·명시 succeeded·3문장 요약·실제 파일 근거를 대조해 accepted settlement 후 release `closed_agent_terminal`·transcript `captured`, Delivery ack 완료·reclaimable0입니다. launch 요청/실효 omp/Sol 확인, PM 서버신원 crelink-pm/Sol·자동화 provider/명시모델 확인, PM 구조화 실효 receipt·비용/입출력 토큰 미확인입니다. 공유 OS 경계는 지침 기반입니다.
 - legacy `task_4794a89c6e03`/`ctx_9f2c6510908d`는 user_owned/retained/start_unknown/unverifiable이며 소유권/종료 확정 전 중복편집·재시작·삭제금지, 보존 위치는 `crelink-activation-metric-claude`입니다. 자료의 사용자 입력은 메모리만·실제 영상/문의 URL 방문 없음·새 시험 계정 생성 없음입니다.
+
+## 2026-10-12 08:24 PM: 준비 자료의 실제 공개 배포
+
+- 실행 `5a6f3ed7-580f-40e8-bb5b-52d4fdb24330`. 단기3~7일 P1 `0153`의 다음 미완료 공개/실행 기록 기준 일부를 선택했습니다. 대상은 공개 가능한 대표 영상/사진 링크를 준비하는 크리에이터이며 [INFERENCE] 작성 자료를 실제로 찾을 수 있게 하면 첫 작성 준비를 도울 수 있습니다. 원본 context 실사용자0/100·가입24h0/7일4·방문7일3·클릭0·신청누계1, 분모/효과는 미관측입니다. 신규 장애·실패 Deploy·사고의 근거가 없어서 조건부 P0는 발동하지 않았으며 Sentry 새 이슈는 미확인입니다.
+- 새 심층 **Growth PM 직접**: GitHub 공식 AUP §4/§10·파일 다운로드·무료 공개 저장소 원문과 실제 회사 안내/파일 화면을 확인했습니다. Raw HTML의 코드 열람과 실행 가능한 다운로드 자료 배포를 구분해야 합니다. 반복 소개글 대신 기존 안내에 이미 제작·검증된 자료와 정확한 다운로드 방법을 연결했습니다. 실제 실행·원문·고정 버전·비용·철회·관측은 [G2 실행 원본](../acquisition-playbook.md#2026-10-12-g2-작성-자료-실제-배포)에 둡니다. 신규 외부 채널 도달이나 가입 성과가 아닙니다.
+
+| 팀·마지막 확인/변화 | 두 후보·추천/보류 이유 | 이번 실제 주체·상태 | 측정·승인·다음 행동 |
+| --- | --- | --- | --- |
+| Product 10/12 08:01~08:12 직전 실행 보고 재사용 | 대표작 준비 자료 소비 추천 / 새 점검 기능은 실제 막힌 단계 피드백 공백 보류 | 새 실행 없음, 0168 완료/0169 관측 미완료를 티켓에서 확인 | R25 10/19 02:44:02 이후 기존 정의 관측·제품 요구 재확정 전 새 기능 없음 |
+| Research 10/12 07:45 직전 context 보고 재사용 | 회사 접근/AI 방식 허용된 신규 채널 추천 / mastodon.social·Pixelfed.social 금지 방식 보류 | 새 전문 조사 없음, 마지막 접근/규칙 blocker 재사용 | 다른 서버에 금지 일반화 없음·무료 홍보 재승인 요청 없음; 정상 회사 인증 가능한 대안 새 조사 |
+| Growth 이번 PM 새 심층·실제 공개 | 준비 자료 실제 배포 추천 / 새 GitHub 홍보글·또 다른 워크시트는 신규 도달 공백·반복 위험 보류 | PM guard0→기존 #111에 두 자료/다운로드 안내 공개, 운영 실행 | 10/19 08:24:14 안전/존속 점검·기존 G2 리뷰 유지. 다운로드/가입 분모·효과 미관측, 추가 비용 약정 없음 |
+| Events 10/12 05:41 재사용·보상 변화 없음 | 기존 자율 챌린지 유지 / 업데이트 이벤트는 동기 공백·혼재 보류 | 새 실행 없음 | R26 10/19 03:47:11 이후 동일 정의 관측·신청누계1≠활성화·새 보상/발송 없음 |
+| Web 10/12 06:03 재사용·제품 UI 변화 없음 | 기존 수동 URL 저장 안내 추천 / CTA 재변경 보류 | 새 실행 없음, 자료 배포는 서비스 UI 출시가 아님 | 실제 사용자 피드백으로 다음 UI 판단·PR126/127 미병합 유지 |
+| API 10/12 06:22 재사용·수집 변화 없음 | 동일 정의 지표 읽기 추천 /0087 귀속 추적은 제품·개인정보 선행 보류 | PM context 읽기, API 전문 실행/DB 시험 없음 | 첫 링크·실사용자와 가입 기간 분리·합성 localhost 기본 제외/대조군도 합성·운영 시험 금지 |
+| SRE 10/12 06:40 보고 재사용+이번 PM 목록 | 자료 공개/커밋 인계 추천 / 당일 상한 초과 병합·docs Deploy를 제품출시로 표시 보류 | PM14 worktree와 exact automation provenance 대조·삭제0·main/Deploy 없음 | 43~51 completed 원본9PR CLOSED≠MERGED, 53/54 PR126/127 OPEN·main/current55/legacy 보존. 삭제 선행/instance 종료 명령 없음 |
+| QA 10/12 07:04 보고 재사용+이번 PM 소비 확인 | 다운로드 바이트→localhost 실행/공개 본문 확인 추천 / 운영 시험·미확보 PNG를 성공으로 표시 보류 | 전문 QA 새 실행 없음, PM HTTP200·원본일치·390/1280·영상 생성/사진 초기화·공개 링크 확인 | PNG timeout 미확보·서비스 저장/DB/OAuth 시험 아님·위험/오표시 발견 시 추가 절만 철회 |
+
+- 작은 단일 기존 글 업데이트여서 새 Orca Run/Task/Dispatch/worker 없음, Delivery0. 직전 두 Sol 워커는 completed/succeeded/released·archive captured이며 재시작하지 않았습니다. legacy `task_4794a89c6e03`/`ctx_9f2c6510908d`는 user_owned/retained/start_unknown/unverifiable, `crelink-activation-metric-claude` 변경 보존·중복 편집/재시작/삭제 금지입니다. accepted settlement 없는 live 삭제나 일반 terminal close는 하지 않았습니다.
+- 자동화 provider `omp`·extra args `--model openai-codex/gpt-6.1-sol`·PM 환경 신원을 확인했습니다. PM terminal show `agentWait=null`로 구조화 실효 receipt와 모델 비용/입출력 토큰은 미확인입니다. 공유 OS 경계는 지침 기반이며 기술적 격리가 아닙니다. 다음 순환은 가장 오래된 Events 새 근거를 확인하되 이미 출시한 챌린지/CTA를 재설계하지 않고 실제 실행 가능한 무료 신규 채널을 비교합니다.
+
