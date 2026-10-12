@@ -67,7 +67,7 @@ migration은 `apps/api/migrations/`의 SQL 파일(기존 실행기). 모든 시�
 
 | 테이블 | 주요 컬럼 | 규칙 |
 | --- | --- | --- |
-| `users` | `id uuid`, `email`, `role ('creator'\|'operator')`, `extra_link_slots int default 0`, `suspended_at`, `created_at` | R15 크리링 고유 사용자. 운영자는 `OPERATOR_EMAILS`에 있는 구글 이메일(검증된 이메일)로 로그인할 때 `operator`. |
+| `users` | `id uuid`, `email`, `role ('creator'\|'operator')`, `suspended_at`, `created_at` | R15 크리링 고유 사용자. 운영자는 `OPERATOR_EMAILS`에 있는 구글 이메일(검증된 이메일)로 로그인할 때 `operator`. 처음 있던 `extra_link_slots`는 2026-10-12에 지움(아래 변경 기록). |
 | `user_identities` | `id`, `user_id`, `provider ('google')`, `provider_subject`, `email`, `created_at`, `last_login_at` | `UNIQUE(provider, provider_subject)`. 한 사용자에 여러 행 가능(R15). |
 | `sessions` | `id`, `user_id`, `token_hash`, `expires_at`, `created_at` | 쿠키에는 원문 토큰, DB에는 SHA-256. 30일 `[임시값]`. |
 | `landings` | `id`, `user_id`, `public_id` (10자 `[a-z0-9]`, 변경 불가), `display_name`, `bio`, `avatar_file_id`, `created_at`, `updated_at` | R7 자동 ID. MVP는 사용자당 1개(R6). |
@@ -221,3 +221,4 @@ API 통합 테스트(0016): 가입 트랜잭션, 주소 규칙(예약어·중복
 - 2026-10-08: 크리에이터 관리 화면을 랜딩별 관리 화면 하나로 합치고 편집·보기 모드를 실시간 미리보기로 대체(PRD R18 사용자 결정, 디자인 `design/desktop-landing-manager/`). `/me`는 이동만 하고, 화면 상태 표의 `/me` 행을 관리 화면 행으로 옮김. API 변경 없음(`docs/work/orchestrator/0053-desktop-landing-manager.md`).
 - 2026-10-08: 관리 화면 `페이지 편집`을 미리보기 직접 편집으로 바꾸고 프로필·SNS 채널을 `프로필` 메뉴(`/profile`)로 옮김(PRD R18 사용자 결정, 디자인 `design/preview-direct-edit/`). API 변경 없음(`docs/work/orchestrator/0058-preview-direct-edit.md`).
 - 2026-10-12: 유료 링크 한도 없음(사용자 결정). 보이는 링크 한도(5 + `extra_link_slots`)와 운영자 추가 슬롯 경로를 없애고 숨김 포함 50개만 남김. 오류 `link_limit_reached` 제거, 한도 응답 `{ totalMax, totalUsed }`. `users.extra_link_slots`는 지우지 않고 읽지 않음(삭제 결정 `docs/work/api/0179-drop-retired-link-slot-data.md`). 설계 [외부 링크 50개 기본 제공과 광고 블록 켜고 끄기](crelink-link-limit-ad-toggle.md), 에픽 `docs/work/epics/0175-link-limit-ad-block-toggle.md`.
+- 2026-10-12: 쓰지 않는 `users.extra_link_slots`를 migration `0008_drop_retired_link_slot_data`로 지움(사용자 결정, 운영 백업 뒤, `docs/work/api/0179-drop-retired-link-slot-data.md`).

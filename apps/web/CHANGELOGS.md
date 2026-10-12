@@ -4,6 +4,7 @@
 
 ## 2026-10-12
 
+- 개인정보 처리방침(0180): 크리에이터 수집 항목에서 끝난 외부 링크 +5 이벤트 신청 기록을 빼고, 보관 기간에 "2026년 10월 12일에 모두 지웠어요"를 적음(API migration `0008_drop_retired_link_slot_data`, `docs/work/api/0179-drop-retired-link-slot-data.md`).
 - 링크 한도 단일화·광고 블록 켜고 끄기 웹(0177, 설계 `docs/specs/crelink-link-limit-ad-toggle.md` `화면 상태와 API 대응`, PRD R13·R20 ⑩·R24 철회). 근거: `docs/work/web/0177-link-limit-ad-toggle-web.md`(API `docs/work/api/0176-link-limit-ad-toggle-api.md`).
   - 걷어 냄: `/admin/slot-event`(페이지·`loading.tsx`·`SlotEventPeriodForm`), 운영자 메뉴 `이벤트`, 홈 이벤트 카드(`HomeSlotEvent`, 홈의 `GET /api/public/slot-event` 조회), 편집 화면 이벤트 띠·신청 줄(`SlotEventOffer`, `ManagerContext`의 신청 상태), 크리에이터 상세 `ExtraSlotsForm`·`이벤트 신청일`, AI 실행 기록 지표의 이벤트 칸, BFF 허용 경로 `POST api/me/slot-event/entry`·`GET/PUT api/admin/slot-event`·`PUT api/admin/creators/{id}/extra-slots`, 오류 문구 `link_limit_reached`·`slot_event_*`, `slot-event-*`·`event-*`·`home-event*` 스타일. 운영 기록은 지난 기록의 `creator.extra_slots`·`slot_event.period_update`·`slot_event` 이름만 남기고 `platform.ad_block` `플랫폼 광고 블록 변경`·`platform_setting` `플랫폼 설정`을 더함.
   - 링크 한도: 배지·처음 패널 요약 `링크 n/50`(`linkLimitLabel`, 숨긴·차단 포함), 상한이면 `링크 추가` 대신 `숨긴 링크를 포함해 링크는 최대 50개까지 둘 수 있어요. 쓰지 않는 링크를 지운 뒤 추가해 주세요.`(`linkLimitNotice(limits)`). 숨김 해제는 한도와 관계없음. 크리에이터 상세 `링크 n/50(숨긴·차단 링크 포함)`과 `광고 블록` `켬`·`꺼짐`. 홈 카드 `외부 링크 50개`·`숨긴 링크도 이 수에 들어가요`, 사용 안내·인스타그램·포트폴리오·첫 크리링 챌린지 문서의 보이는 링크 한도·+5 이벤트·운영자 문의 문구를 50개 기준으로 바꾸고 챌린지 문서의 이벤트 조회를 없앰.

@@ -617,4 +617,60 @@ describe('runMigrations', () => {
       ]);
     });
   });
+
+  describe('0008_drop_retired_link_slot_data', () => {
+    const source = join(__dirname, '../migrations');
+    const earlier = readdirSync(source)
+      .filter((name) => name.endsWith('.sql') && name < '0008_drop_retired_link_slot_data.sql')
+      .sort();
+
+    beforeEach(async () => {
+      for (const name of earlier) copyFileSync(join(source, name), join(directory, name));
+      await runMigrations(pool, directory);
+    });
+
+    it('추가 슬롯 컬럼과 링크 슬롯 이벤트 테이블만 지우고, 계정·운영자 행동 기록은 남기며 lock_timeout은 그 파일 안에서만 쓴다', async () => {
+      const user = (
+        await pool.query<{ id: string }>(
+          'INSERT INTO users (email, extra_link_slots, ad_block_enabled) VALUES ($1, 3, true) RETURNING id',
+          ['old@example.com'],
+        )
+      ).rows[0].id;
+      await pool.query(
+        "INSERT INTO slot_event_entries (event_id, user_id, bonus_links) SELECT id, $1, 5 FROM slot_events WHERE code = 'link-slots-plus-5'",
+        [user],
+      );
+      await pool.query(
+        `INSERT INTO operator_actions (actor_kind, actor_user_id, action, target_type, target_id, before, after)
+         VALUES ('human', $1, 'creator.extra_slots', 'creator', $2, '{"extraLinkSlots":0}', '{"extraLinkSlots":3}')`,
+        [user, user],
+      );
+
+      copyFileSync(
+        join(source, '0008_drop_retired_link_slot_data.sql'),
+        join(directory, '0008_drop_retired_link_slot_data.sql'),
+      );
+      await runMigrations(pool, directory);
+
+      expect(await versions()).toEqual([
+        ...earlier.map((name) => name.replace(/\.sql$/, '')),
+        '0008_drop_retired_link_slot_data',
+      ]);
+      const tables = await pool.query(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'slot_event%'",
+      );
+      expect(tables.rows).toEqual([]);
+      const columns = await pool.query(
+        "SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'extra_link_slots'",
+      );
+      expect(columns.rowCount).toBe(0);
+      expect((await pool.query('SELECT email, ad_block_enabled FROM users WHERE id = $1', [user])).rows).toEqual([
+        { email: 'old@example.com', ad_block_enabled: true },
+      ]);
+      expect((await pool.query('SELECT action FROM operator_actions')).rows).toEqual([
+        { action: 'creator.extra_slots' },
+      ]);
+      expect((await pool.query('SHOW lock_timeout')).rows[0].lock_timeout).toBe('0');
+    });
+  });
 });
