@@ -59,8 +59,9 @@ export async function rethrowBannerError(
 }
 
 /**
- * 배너 슬롯 회수 안내(`slotNotice`, handoff `슬롯 회수됨(편집 중)`). 넓은 화면은 처음 패널 머리 아래(초점은 `PageEditor`가 옮김),
- * 좁은 화면은 관리 화면 sticky 줄 아래에 두고 `autoFocus`로 닫힌 시트 대신 이 안내에 초점을 둡니다. 안내가 없으면 그리지 않습니다.
+ * 슬롯 안내(`slotNotice`): 배너 슬롯 회수(handoff `슬롯 회수됨(편집 중)`)와 광고 블록 기능 꺼짐(409 `ad_block_unavailable`, R20 ⑩).
+ * 넓은 화면은 처음 패널 머리 아래(초점은 `PageEditor`가 옮김), 좁은 화면은 관리 화면 sticky 줄 아래에 두고 `autoFocus`로
+ * 닫힌 시트 대신 이 안내에 초점을 둡니다. 안내가 없으면 그리지 않습니다.
  */
 export function BannerSlotNotice({ autoFocus = false }: { autoFocus?: boolean }) {
   const { slotNotice } = useManager();

@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { sectionOfKey, targetKey, type LandingEditTarget } from '../../lib/landing-edit';
 import { draftKey } from '../../lib/landing-preview';
-import { slotPositionLabel } from '../../lib/slot-order';
+import { slotEditable, slotPositionLabel } from '../../lib/slot-order';
 import { useAction } from '../../lib/use-action';
 import { useWideLayout } from '../../lib/use-wide-layout';
 import { ActionStatus } from '../ActionStatus';
 import { DefaultAvatar } from '../DefaultAvatar';
 import { RemoteImage } from '../RemoteImage';
 import { PortfolioForm, PortfolioSection } from '../me/PortfolioSection';
+import { AdBlockSwitch } from './AdBlockSwitch';
 import { BannerForm } from './BannerForm';
 import { BannerSlotNotice, BannerSlotSection } from './BannerSlotSection';
 import { EditSheet } from './EditSheet';
@@ -20,7 +21,7 @@ import { GuestbookSwitch } from './GuestbookSwitch';
 import { LinkForm } from './LinkForm';
 import { LinksSection } from './LinksSection';
 import { useManager } from './ManagerContext';
-import { SlotEventBand } from './SlotEventOffer';
+import { linkLimitLabel } from './limits';
 import { managerHref, managerMenuLabel } from './menu';
 
 /**
@@ -28,8 +29,9 @@ import { managerHref, managerMenuLabel } from './menu';
  * 구역 목록에서 고른 대상(`selection`)에 따라 편집 패널이 구역 목록 → 외부 링크·링크 폼·광고 블록·배너 슬롯·포트폴리오·항목 폼·방명록·
  * 프로필 안내로 바뀝니다. 1024px 이상은 오른쪽 패널(머리 `← 전체`), 1023px 이하는 하단 시트입니다. 고르면 초점은 패널 제목(시트는 첫 입력)으로,
  * 처음 패널로 돌아오면 처음 고른 요소로 돌아갑니다. 예외로 광고 블록 패널의 `외부 링크 목록에서 끌어 옮기기`는 외부 링크 패널을 열고
- * 초점을 광고 행 손잡이로 옮깁니다. 배너 슬롯이 회수되어(편집 상태의 `slot.kind`가 'ad') 배너 패널·폼이 사라지면 처음 패널로 돌아가
- * 회수 안내(`BannerSlotNotice`)에 초점을 둡니다.
+ * 초점을 광고 행 손잡이로 옮깁니다. 광고 블록 줄·패널은 운영자 플랫폼 스위치가 켜졌을 때만 있습니다(R20 ⑩, `slotEditable`).
+ * 배너 슬롯이 회수되거나(편집 상태의 `slot.kind`가 'ad') 광고 블록 기능이 꺼져 지금 패널이 사라지면 처음 패널로 돌아가
+ * 슬롯 안내(`BannerSlotNotice`)에 초점을 둡니다.
  */
 export function PageEditor() {
   const wide = useWideLayout();
@@ -45,7 +47,6 @@ export function PageEditor() {
     isPortfolioDirty,
     isBannerDirty,
     resetSelection,
-    resetSlotEvent,
     setFormPending,
     firstRunGuide,
   } = useManager();
@@ -65,8 +66,6 @@ export function PageEditor() {
   }
   // 다른 메뉴로 옮기면 고른 대상을 지웁니다(초안은 남음). 돌아오면 처음 패널부터.
   useEffect(() => resetSelection, [resetSelection]);
-  // 링크 슬롯 이벤트 결과 줄은 `페이지 편집`을 떠날 때까지만 남습니다(design/slot-event/handoff.md `관리 화면 페이지 편집 띠`).
-  useEffect(() => resetSlotEvent, [resetSlotEvent]);
   // 시작 안내 카드의 상태 줄·완료 카드도 `페이지 편집`을 떠나면 지웁니다(세 단계를 마친 채 다시 들어오면 카드 없음).
   const resetFirstRunGuide = firstRunGuide.reset;
   useEffect(() => resetFirstRunGuide, [resetFirstRunGuide]);
@@ -119,11 +118,12 @@ export function PageEditor() {
   const banner =
     selection?.kind === 'banner' && selection.id ? state.banners.find((entry) => entry.id === selection.id) : null;
   const creatorSlot = state.slot.kind === 'creator';
-  // 슬롯이 부여·회수되어 종류가 바뀌었으면 그 패널도 사라진 것으로 봅니다.
+  const slotShown = slotEditable(state.slot.kind, state.adBlock.platformEnabled);
+  // 슬롯이 부여·회수되어 종류가 바뀌었거나 광고 블록 기능이 꺼졌으면 그 패널도 사라진 것으로 봅니다.
   const missing =
     (selection?.kind === 'link' && selection.id !== null && !link) ||
     (selection?.kind === 'portfolio-item' && selection.id !== null && !item) ||
-    (selection?.kind === 'ad-slot' && creatorSlot) ||
+    (selection?.kind === 'ad-slot' && (creatorSlot || !slotShown)) ||
     ((selection?.kind === 'banner-slot' || selection?.kind === 'banner') && !creatorSlot) ||
     (selection?.kind === 'banner' && selection.id !== null && !banner);
   useEffect(() => {
@@ -175,7 +175,7 @@ export function PageEditor() {
       break;
     case 'ad-slot':
       title = '광고 블록';
-      help = '크리링 광고가 나오는 자리예요. 지우거나 숨길 수 없고, 링크 사이 원하는 위치로 옮길 수 있어요.';
+      help = '링크 사이에 크리링 광고 배너를 넣는 자리예요. 지울 수는 없고, 링크 사이 원하는 위치로 옮길 수 있어요.';
       body = (
         <AdSlotPanel
           onMove={() => {
@@ -303,19 +303,27 @@ export function PageEditor() {
   );
 }
 
-/** 광고 블록 패널: 지금 위치, `외부 링크 목록에서 끌어 옮기기`, 한도 안내, 게시 0장 안내(디자인 design/ad-banner-block/handoff.md). */
+/**
+ * 광고 블록 패널: `광고 블록 표시` 스위치(R20 ⑩, 기본 꺼짐)와 안내, 지금 위치, `외부 링크 목록에서 끌어 옮기기`, 게시 0장 안내
+ * (디자인 design/ad-banner-block/handoff.md). 플랫폼 스위치가 켜졌을 때만 엽니다. 크리에이터에게 수익을 약속하는 문구는 두지 않습니다.
+ */
 function AdSlotPanel({ onMove }: { onMove: () => void }) {
-  const { state } = useManager();
+  const { state, adBlockAction } = useManager();
   return (
     <>
+      <div className="panel-switch-row">
+        <p className="section-help">켜면 공개 페이지의 이 자리에 크리링 광고 배너가 보여요. 기본은 꺼짐이에요.</p>
+        <AdBlockSwitch />
+      </div>
+      <ActionStatus error={adBlockAction.error} notice={adBlockAction.notice} />
       <p className="slot-position">
         지금 위치 <strong>{slotPositionLabel(state.slot.slotIndex, state.links.length)}</strong>
       </p>
       <button type="button" className="secondary" onClick={onMove}>
         외부 링크 목록에서 끌어 옮기기
       </button>
-      <p className="section-help">광고 블록은 보이는 링크 한도({state.limits.visibleMax}개)에 들지 않아요.</p>
-      {state.adBanners.length === 0 ? (
+      <p className="section-help">광고 블록은 링크 수에 들어가지 않아요.</p>
+      {state.adBlock.enabled && state.adBanners.length === 0 ? (
         <p className="notice-box">지금은 게시 중인 크리링 광고가 없어 방문자에게 보이지 않아요.</p>
       ) : null}
     </>
@@ -329,26 +337,30 @@ function AdSlotPanel({ onMove }: { onMove: () => void }) {
 function PageOverview({ headingRef }: { headingRef: React.RefObject<HTMLHeadingElement | null> }) {
   const { state, select, dirty, firstRunGuide } = useManager();
   const { limits, slot, bannerLimits } = state;
-  const rows: Array<{ target: LandingEditTarget; title: string; meta: string; dirty: boolean }> = [
-    {
-      target: { kind: 'links' },
-      title: '외부 링크',
-      meta: `보이는 링크 ${limits.visibleUsed}/${limits.visibleMax}`,
-      dirty: dirty.link,
-    },
-    slot.kind === 'ad'
+  const slotRow: { target: LandingEditTarget; title: string; meta: string; dirty: boolean } | null =
+    slot.kind === 'creator'
       ? {
-          target: { kind: 'ad-slot' },
-          title: '광고 블록',
-          meta: slotPositionLabel(slot.slotIndex, state.links.length),
-          dirty: false,
-        }
-      : {
           target: { kind: 'banner-slot' },
           title: '배너 슬롯',
           meta: `보이는 배너 ${bannerLimits.visibleUsed}/${bannerLimits.visibleMax}장 · 전체 ${bannerLimits.totalUsed}장`,
           dirty: dirty.banner,
-        },
+        }
+      : state.adBlock.platformEnabled
+        ? {
+            target: { kind: 'ad-slot' },
+            title: '광고 블록',
+            meta: `${state.adBlock.enabled ? '켜짐' : '꺼짐'} · ${slotPositionLabel(slot.slotIndex, state.links.length)}`,
+            dirty: false,
+          }
+        : null;
+  const rows: Array<{ target: LandingEditTarget; title: string; meta: string; dirty: boolean }> = [
+    {
+      target: { kind: 'links' },
+      title: '외부 링크',
+      meta: linkLimitLabel(limits),
+      dirty: dirty.link,
+    },
+    ...(slotRow ? [slotRow] : []),
     {
       target: { kind: 'portfolio' },
       title: '포트폴리오',
@@ -372,7 +384,6 @@ function PageOverview({ headingRef }: { headingRef: React.RefObject<HTMLHeadingE
       </div>
       <FirstRunGuide onClosed={() => headingRef.current?.focus()} />
       <BannerSlotNotice />
-      <SlotEventBand />
       <h2 className="panel-subtitle">구역 선택</h2>
       <ul className="section-picker">
         {rows.map((row) => (

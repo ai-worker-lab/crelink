@@ -15,9 +15,11 @@ import { formatDateTime } from '../../lib/format';
 
 export const ACTOR_LABELS: Record<OperatorActorKind, string> = { human: '사람', ai: 'AI', system: '시스템' };
 
-/** 행동 이름. 다른 에픽이 더한 행동도 오므로 모르는 값은 원래 키로 보여 줍니다. */
+/**
+ * 행동 이름. 다른 에픽이 더한 행동도 오므로 모르는 값은 원래 키로 보여 줍니다.
+ * `creator.extra_slots`·`slot_event.period_update`는 2026-10-12에 없앤 기능의 지난 기록에만 있는 행동입니다(이름만 남김).
+ */
 const ACTION_LABELS: Record<OperatorActionType, string> = {
-  'creator.extra_slots': '추가 링크 슬롯 변경',
   'creator.suspension': '이용 정지·해제',
   'creator.banner_slot': '배너 슬롯 부여·회수',
   'creator.metrics_exclusion': '지표 제외 변경',
@@ -32,6 +34,8 @@ const ACTION_LABELS: Record<OperatorActionType, string> = {
   'ai_operator.pause': 'AI 멈춤 변경',
   'ai_operator.token_issue': 'AI 토큰 발급',
   'ai_operator.token_revoke': 'AI 토큰 폐기',
+  'platform.ad_block': '플랫폼 광고 블록 변경',
+  'creator.extra_slots': '추가 링크 슬롯 변경',
   'slot_event.period_update': '링크 슬롯 이벤트 기간 변경',
 };
 
@@ -43,6 +47,8 @@ const TARGET_LABELS: Record<OperatorActionTargetType, string> = {
   ad_banner: '광고 배너',
   ai_operator: 'AI 운영자',
   api_token: 'AI 토큰',
+  platform_setting: '플랫폼 설정',
+  // 지난 기록에만 있는 대상(링크 슬롯 이벤트, 2026-10-12 기능 제거).
   slot_event: '링크 슬롯 이벤트',
 };
 

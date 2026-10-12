@@ -23,6 +23,7 @@ describe('허용 경로(메서드·조각 경계 고정)', () => {
     assert.equal(agentProxyPath('GET', ['api', 'files', 'f1']), 'api/files/f1');
     assert.equal(agentProxyPath('GET', ['api', 'admin', 'ai-operator']), 'api/admin/ai-operator');
     assert.equal(agentProxyPath('PATCH', ['api', 'admin', 'agent-runs', 'r1']), 'api/admin/agent-runs/r1');
+    assert.equal(agentProxyPath('PUT', ['api', 'admin', 'ad-block']), 'api/admin/ad-block');
     assert.equal(
       agentProxyPath('DELETE', ['api', 'admin', 'blocked-domains', 'x.example']),
       'api/admin/blocked-domains/x.example',
@@ -35,7 +36,7 @@ describe('허용 경로(메서드·조각 경계 고정)', () => {
       ['PATCH', ['api', 'me', 'landing']],
       ['GET', ['api', 'me', 'landing']],
       ['PUT', ['api', 'me', 'banners', 'order']],
-      ['POST', ['api', 'me', 'slot-event', 'entry']],
+      ['PUT', ['api', 'me', 'ad-block']],
       ['GET', ['api', 'me', 'files']],
       ['POST', ['api', 'me']],
       ['POST', ['api', 'health']],

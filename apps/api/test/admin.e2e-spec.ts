@@ -42,7 +42,6 @@ describe('운영자 API (R10, R13, R14)와 보존 작업 (R11)', () => {
       ['GET', '/api/admin/creators'],
       ['GET', `/api/admin/creators/${creator.userId}`],
       ['GET', `/api/admin/creators/${creator.userId}/stats`],
-      ['PUT', `/api/admin/creators/${creator.userId}/extra-slots`],
       ['PUT', `/api/admin/creators/${creator.userId}/suspension`],
       ['PUT', `/api/admin/links/${creator.userId}/block`],
       ['GET', '/api/admin/blocked-domains'],
@@ -108,7 +107,7 @@ describe('운영자 API (R10, R13, R14)와 보존 작업 (R11)', () => {
     expect([badPage.status, badPage.body.code]).toEqual([400, 'validation_failed']);
   });
 
-  it('상세·추가 슬롯·정지, 없는 크리에이터는 404 creator_not_found', async () => {
+  it('상세·정지, 운영자 추가 슬롯 경로는 없고(404), 없는 크리에이터는 404 creator_not_found', async () => {
     const creator = await newCreator();
     await addLink(creator.cookie, { title: '숨김', url: 'https://a.example', hidden: true });
     const detail = await api<OperatorCreatorDetail>(t.baseUrl, 'GET', `/api/admin/creators/${creator.userId}`, {
@@ -116,28 +115,25 @@ describe('운영자 API (R10, R13, R14)와 보존 작업 (R11)', () => {
     });
     expect(detail.body).toMatchObject({
       userId: creator.userId,
-      extraLinkSlots: 0,
-      limits: { visibleMax: 5, visibleUsed: 0, totalMax: 50, totalUsed: 1 },
+      adBlockEnabled: false,
+      limits: { totalMax: 50, totalUsed: 1 },
       links: [expect.objectContaining({ title: '숨김', hidden: true })],
-      slotEvent: null,
     });
-    const slots = await api<OperatorCreatorDetail>(
-      t.baseUrl,
-      'PUT',
-      `/api/admin/creators/${creator.userId}/extra-slots`,
-      {
-        cookie: operator,
-        body: { extraSlots: 2 },
-      },
-    );
-    expect(slots.body).toMatchObject({ extraLinkSlots: 2, limits: { visibleMax: 7 } });
-    for (const extraSlots of [-1, 1.5, 46, '1']) {
-      const bad = await api(t.baseUrl, 'PUT', `/api/admin/creators/${creator.userId}/extra-slots`, {
-        cookie: operator,
-        body: { extraSlots },
-      });
-      expect(bad.status).toBe(400);
-    }
+    expect(detail.body).not.toHaveProperty('extraLinkSlots');
+    expect(detail.body).not.toHaveProperty('slotEvent');
+    await t.pool.query('UPDATE users SET ad_block_enabled = true WHERE id = $1', [creator.userId]);
+    expect(
+      (
+        await api<OperatorCreatorDetail>(t.baseUrl, 'GET', `/api/admin/creators/${creator.userId}`, {
+          cookie: operator,
+        })
+      ).body.adBlockEnabled,
+    ).toBe(true);
+    const removed = await api(t.baseUrl, 'PUT', `/api/admin/creators/${creator.userId}/extra-slots`, {
+      cookie: operator,
+      body: { extraSlots: 2 },
+    });
+    expect([removed.status, removed.body.code]).toEqual([404, 'not_found']);
 
     const suspended = await api<OperatorCreatorDetail>(
       t.baseUrl,
@@ -178,7 +174,8 @@ describe('운영자 API (R10, R13, R14)와 보존 작업 (R11)', () => {
     expect(landing.body.blocks[0].links).toEqual([]);
     const own = await api<CreatorLandingState>(t.baseUrl, 'GET', '/api/me/landing', { cookie: creator.cookie });
     expect(own.body.links[0]).toMatchObject({ blocked: true, blockedReason: '신고 접수' });
-    expect(own.body.limits.visibleUsed).toBe(0);
+    // 차단된 링크도 전체 한도에 듭니다.
+    expect(own.body.limits).toEqual({ totalMax: 50, totalUsed: 1 });
     const unblocked = await api<LinkView>(t.baseUrl, 'PUT', `/api/admin/links/${link.id}/block`, {
       cookie: operator,
       body: { blocked: false },

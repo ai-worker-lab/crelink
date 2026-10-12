@@ -1,6 +1,6 @@
 # 링크 슬롯 +5 이벤트 기술 설계
 
-- 상태: 승인
+- 상태: 대체됨 (2026-10-12 사용자 결정으로 기능 제거, [외부 링크 50개 기본 제공과 광고 블록 켜고 끄기 기술 설계](crelink-link-limit-ad-toggle.md)). 아래는 과거 설계 기록이며 현재 구현이 아닙니다. 남은 테이블 `slot_events`·`slot_event_entries`는 읽지 않고 보관합니다.
 - 작성일: 2026-10-10
 - 에픽: `docs/work/epics/0089-slot-event.md`
 - 입력: PRD R24 ①~⑦과 관련 R13([docs/product/crelink.md](../product/crelink.md), R24는 0090이 PRD에 옮김), 디자인 인계 `design/slot-event/handoff.md`, [디자인 시스템](../../design/system/DESIGN.md), 기존 설계 [MVP](crelink-mvp.md)(R13 한도·운영자 추가 슬롯)·[광고 배너](crelink-ad-banner.md)(운영자 게시 기간 입력)·[운영 배포](crelink-prod-deploy.md)(migration 규칙). 새 기술 조사·ADR 없음(새 의존성·새 패턴 없음).

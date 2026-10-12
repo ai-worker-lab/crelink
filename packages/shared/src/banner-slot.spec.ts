@@ -1,4 +1,4 @@
-// 광고 블록·배너 슬롯 배치·숨김 규칙(R20 ①⑥, R21 ①③). 근거: docs/specs/crelink-ad-banner.md `resolveBannerSlot`.
+// 광고 블록·배너 슬롯 배치·숨김 규칙(R20 ①⑥⑦, R21 ①③). 근거: docs/specs/crelink-ad-banner.md `resolveBannerSlot`.
 // 실행: pnpm --filter @crelink/shared test
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
@@ -13,6 +13,7 @@ function input(patch: Partial<ResolveBannerSlotInput<string>> = {}): ResolveBann
     slotIndex: null,
     linkVisible: [true, true, true],
     hasPortfolio: false,
+    adBlockEnabled: true,
     adBanners: AD,
     creatorBanners: MINE,
     ...patch,
@@ -37,6 +38,24 @@ describe('종류와 배너 목록', () => {
   test('돌려준 배너 목록은 입력 배열과 다른 사본이다', () => {
     const slot = resolveBannerSlot(input());
     assert.notEqual(slot.banners, AD);
+  });
+});
+
+describe('광고 블록 스위치(R20 ⑩)', () => {
+  test('광고인데 스위치가 꺼졌으면 다른 조건보다 먼저 ad_off로 숨기고 위치는 계산한다', () => {
+    assert.deepEqual(resolveBannerSlot(input({ adBlockEnabled: false, slotIndex: 1 })), {
+      kind: 'ad',
+      afterLinkCount: 1,
+      banners: AD,
+      hidden: 'ad_off',
+    });
+    assert.equal(resolveBannerSlot(input({ adBlockEnabled: false, linkVisible: [], adBanners: [] })).hidden, 'ad_off');
+  });
+
+  test('배너 슬롯이 부여됐으면 스위치와 관계없이 크리에이터 배너를 쓴다', () => {
+    const slot = resolveBannerSlot(input({ granted: true, adBlockEnabled: false }));
+    assert.equal(slot.kind, 'creator');
+    assert.equal(slot.hidden, null);
   });
 });
 

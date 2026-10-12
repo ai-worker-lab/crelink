@@ -35,7 +35,6 @@ export function AdminShell({
         <Link href="/admin">크리에이터</Link>
         <Link href="/admin/blocked-domains">차단 도메인</Link>
         <Link href="/admin/ad-banners">광고 배너</Link>
-        <Link href="/admin/slot-event">이벤트</Link>
         <Link href={CRELINK_WEB_PATHS.adminAgentRuns}>AI 실행 기록</Link>
         <Link href={CRELINK_WEB_PATHS.adminActions}>운영 기록</Link>
         <Link href="/me">내 크리링</Link>

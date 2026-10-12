@@ -96,7 +96,7 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
   await expect(openPublic).toHaveAttribute('target', '_blank');
   await expect(stage.getByText('아직 준비 중인 페이지예요.')).toBeVisible();
   // 처음 패널: 구역 목록(외부 링크·포트폴리오·방명록과 상태)과 프로필 메뉴 안내
-  await expect(main.getByRole('button', { name: /외부 링크.*보이는 링크 0\/5/ })).toBeVisible();
+  await expect(main.getByRole('button', { name: /외부 링크.*링크 0\/50/ })).toBeVisible();
   await expect(main.getByRole('button', { name: /포트폴리오.*0\/20/ })).toBeVisible();
   await expect(main.getByRole('button', { name: /방명록.*켜짐/ })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -247,7 +247,7 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
   // 광고 블록 행(`.slot-edit-card`, 맨 뒤)은 링크가 아니라 뺍니다. 광고 행 정렬은 ad-banner.spec.ts가 봅니다.
   const titles = links.locator('.link-edit-card:not(.slot-edit-card) .link-title');
   await expect(links.getByText('아직 추가한 링크가 없어요.', { exact: false })).toBeVisible();
-  await expect(links.getByText('보이는 링크 0/5')).toBeVisible();
+  await expect(links.getByText('링크 0/50')).toBeVisible();
 
   // 미리보기 끝의 `+ 링크 추가`를 누르면 패널이 `새 링크` 폼(대화상자 아님, 입력 자동 초점 없음). 저장 전 입력이 미리보기 끝에 붙고,
   // Esc로 취소하면 사라지며 외부 링크 패널 제목으로 초점
@@ -266,22 +266,12 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
   await expect(previewTitles).toHaveCount(0);
   await expect(draftChip).toHaveCount(0);
 
-  // 링크 5개 → 한도 안내, 패널·미리보기에 추가 버튼 없음, API도 409
-  for (let index = 1; index <= 5; index += 1) await addLink(main, `링크 ${index}`, data.externalUrl(`l${index}`));
-  await expect(links.getByText('보이는 링크 5/5')).toBeVisible();
-  await expect(links.getByText('보이는 링크 한도(5개)에 도달했어요.', { exact: false })).toBeVisible();
-  await expect(links.getByRole('button', { name: '링크 추가' })).toHaveCount(0);
-  await expect(stage.getByRole('button', { name: '링크 추가' })).toHaveCount(0);
-  await expect(stage.getByText('보이는 링크 한도(5개)에 도달했어요.', { exact: false })).toBeVisible();
-  await expect(previewTitles).toHaveText(['링크 1', '링크 2', '링크 3', '링크 4', '링크 5']);
-  const sixth = await page.request.post(`${WEB_URL}/api/backend/api/me/links`, {
-    headers: { Origin: WEB_URL },
-    data: { title: '링크 6', url: data.externalUrl('l6') },
-  });
-  expect(sixth.status(), '보이는 링크 6번째 추가는 API도 거부').toBe(409);
-  expect((await sixth.json()).code).toBe('link_limit_reached');
+  // 보이는 링크 6개 이상도 그대로 추가(유료 한도 없음, R13). 배지는 숨긴 링크를 포함한 전체 수
+  for (let index = 1; index <= 6; index += 1) await addLink(main, `링크 ${index}`, data.externalUrl(`l${index}`));
+  await expect(links.getByText('링크 6/50')).toBeVisible();
+  await expect(previewTitles).toHaveText(['링크 1', '링크 2', '링크 3', '링크 4', '링크 5', '링크 6']);
 
-  // 숨기기 스위치 → 흐리게·숨김 배지, 미리보기에서 빠짐, 한도 여유 → 6번째 추가
+  // 숨기기 스위치 → 흐리게·숨김 배지, 미리보기에서 빠짐. 숨긴 링크도 한도에 들어가 배지는 그대로
   const hide1 = links.getByRole('switch', { name: '링크 1 숨기기' });
   await expect(hide1).toHaveAttribute('aria-checked', 'false');
   await hide1.click();
@@ -290,20 +280,55 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
   const item1 = links.getByRole('listitem').filter({ has: page.getByRole('button', { name: '링크 1 수정' }) });
   await expect(item1).toHaveClass(/is-hidden/);
   await expect(item1.getByText('숨김', { exact: true }).last()).toBeVisible();
-  await expect(links.getByText('보이는 링크 4/5')).toBeVisible();
-  await expect(previewTitles).toHaveText(['링크 2', '링크 3', '링크 4', '링크 5']);
-  await addLink(main, '링크 6', data.externalUrl('l6'));
-  await expect(links.getByText('보이는 링크 5/5')).toBeVisible();
-
-  // 한도가 찬 상태에서 다시 보이게 하면 API 409 → 스위치가 되돌아가고 안내
-  data.allowConsoleError(/status of 409 .*\/api\/backend\/api\/me\/links\/[^/\s]+$/);
-  await hide1.click();
-  await expect(
-    links.getByText('보이는 링크 한도에 도달했어요. 다른 링크를 숨기거나 지운 뒤 다시 시도해 주세요.'),
-  ).toBeVisible();
-  await expect(hide1).toHaveAttribute('aria-checked', 'true');
-  await expect(links.getByText('보이는 링크 5/5')).toBeVisible();
+  await expect(links.getByText('링크 6/50')).toBeVisible();
   await expect(previewTitles).toHaveText(['링크 2', '링크 3', '링크 4', '링크 5', '링크 6']);
+
+  // 다시 보이기에는 한도가 없음(보이는 링크 6개) → 다음 단계를 위해 다시 숨김
+  await hide1.click();
+  await expect(hide1).toHaveAttribute('aria-checked', 'false');
+  await expect(previewTitles).toHaveText(['링크 1', '링크 2', '링크 3', '링크 4', '링크 5', '링크 6']);
+  await hide1.click();
+  await expect(hide1).toHaveAttribute('aria-checked', 'true');
+  await expect(previewTitles).toHaveText(['링크 2', '링크 3', '링크 4', '링크 5', '링크 6']);
+
+  // 숨김 포함 50개 한도: 숨긴 링크 44개를 API로 채우면 추가 버튼 대신 한도 안내, 51번째는 API도 409 `link_total_limit_reached`
+  const createLink = (title: string, slug: string, hidden: boolean) =>
+    page.request.post(`${WEB_URL}/api/backend/api/me/links`, {
+      headers: { Origin: WEB_URL },
+      data: { title, url: data.externalUrl(slug), hidden },
+    });
+  const fillerIds: string[] = [];
+  for (let index = 7; index <= 50; index += 1) {
+    const response = await createLink(`채움 ${index}`, `fill${index}`, true);
+    expect(response.status(), `${index}번째 링크(숨김)`).toBe(201);
+    const created: { id: string } = await response.json();
+    fillerIds.push(created.id);
+  }
+  await page.reload();
+  await pick('외부 링크 구역 편집').click();
+  await expect(links.getByText('링크 50/50')).toBeVisible();
+  await expect(
+    links.getByText('숨긴 링크를 포함해 링크는 최대 50개까지 둘 수 있어요. 쓰지 않는 링크를 지운 뒤 추가해 주세요.'),
+  ).toBeVisible();
+  await expect(links.getByRole('button', { name: '링크 추가' })).toHaveCount(0);
+  await expect(stage.getByRole('button', { name: '링크 추가' })).toHaveCount(0);
+  await expect(previewTitles).toHaveText(['링크 2', '링크 3', '링크 4', '링크 5', '링크 6']);
+  for (const hidden of [false, true]) {
+    const over = await createLink(`링크 51 ${hidden ? '숨김' : '보임'}`, `over${hidden ? 'h' : 'v'}`, hidden);
+    expect(over.status(), '51번째 링크는 숨김 여부와 관계없이 API도 거부').toBe(409);
+    const error: { code: string } = await over.json();
+    expect(error.code).toBe('link_total_limit_reached');
+  }
+  for (const id of fillerIds) {
+    const removed = await page.request.delete(`${WEB_URL}/api/backend/api/me/links/${id}`, {
+      headers: { Origin: WEB_URL },
+    });
+    expect(removed.status()).toBe(204);
+  }
+  await page.reload();
+  await pick('외부 링크 구역 편집').click();
+  await expect(links.getByText('링크 6/50')).toBeVisible();
+  await expect(titles).toHaveText(['링크 1', '링크 2', '링크 3', '링크 4', '링크 5', '링크 6']);
 
   // 행의 `수정`은 패널을 링크 폼으로 바꿈(행 아래 펼침·`접기` 없음). 표시 이름·설명·썸네일을 고치면 저장 전 미리보기 제자리에 반영
   await links.getByRole('button', { name: '링크 3 수정', exact: true }).click();
@@ -335,9 +360,9 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
   await back.click();
   await expect(page.getByRole('heading', { name: '페이지 편집', level: 1 })).toBeVisible();
   await expect(pick('외부 링크 구역 편집')).toBeFocused();
-  await expect(main.getByRole('button', { name: /외부 링크.*보이는 링크 5\/5.*저장 안 함/ })).toBeVisible();
+  await expect(main.getByRole('button', { name: /외부 링크.*링크 6\/50.*저장 안 함/ })).toBeVisible();
   await expect(draftChip).toBeVisible();
-  await main.getByRole('button', { name: /외부 링크.*보이는 링크 5\/5/ }).click();
+  await main.getByRole('button', { name: /외부 링크.*링크 6\/50/ }).click();
   await expect(panelTitle('외부 링크')).toBeFocused();
   const item3Draft = links
     .getByRole('listitem')
@@ -379,8 +404,8 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
   await handle4.focus();
   await page.keyboard.press('Space');
   await expect(handle4).toHaveAttribute('aria-pressed', 'true');
-  // 전체 개수에는 맨 뒤의 광고 블록 행도 들어갑니다(링크 6 + 광고 행 1).
-  await expect(announcement).toHaveText('링크 4 링크를 들었어요. 지금 5번째, 전체 7개예요.');
+  // 광고 블록 플랫폼 스위치가 기본(꺼짐)이라 광고 블록 행이 없고 전체 개수는 링크 수입니다(R20 ⑩).
+  await expect(announcement).toHaveText('링크 4 링크를 들었어요. 지금 5번째, 전체 6개예요.');
   // 들어 올린 직후 dnd-kit이 목록 위치를 재기 전에 누른 화살표는 무시되므로, 안내가 바뀔 때까지 ↑를 다시 누릅니다.
   await expect(async () => {
     await page.keyboard.press('ArrowUp');
@@ -405,7 +430,7 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
   await expect(deleteForm).toHaveCount(0);
   await expect(links.getByText("'링크 5' 링크를 지웠어요.")).toBeVisible();
   await expect(titles).toHaveText(['링크 1', '링크 6', '링크 2', '링크 4', '링크 3 고침']);
-  await expect(links.getByText('보이는 링크 4/5')).toBeVisible();
+  await expect(links.getByText('링크 5/50')).toBeVisible();
   await expect(pick('+ 링크 추가')).toBeVisible();
 
   // 미리보기: 방문자 화면과 같은 내용(숨긴 링크 없음, 바꾼 순서). `페이지 편집` 미리보기에는 원래 링크(<a>)가 없고,

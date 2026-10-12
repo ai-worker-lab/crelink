@@ -15,7 +15,7 @@ import type { PoolClient } from 'pg';
 import { domainToASCII } from 'node:url';
 import { Database, isUniqueViolation } from '../database';
 import { apiError, UUID_PATTERN } from '../common/http';
-import { bodyObject, optionalText, pageNumber } from '../common/input';
+import { bodyObject, booleanField, optionalText, pageNumber } from '../common/input';
 import { AppConfig } from '../config.service';
 import { OperatorActor, recordOperatorAction } from '../ai-operator/audit';
 import {
@@ -25,16 +25,13 @@ import {
   LINK_COLUMNS,
   LinkRow,
 } from '../creator/creator.service';
-import { SlotEventService } from '../slot-event/slot-event.service';
 import { StatsService } from './stats.service';
 
-/** 운영자 부여 슬롯 상한. 보이는 링크가 전체 상한(50)을 넘을 수 없으므로 50 - 5. */
-const MAX_EXTRA_SLOTS = CRELINK_LIMITS.totalLinks - CRELINK_LIMITS.freeVisibleLinks;
 const DOMAIN_PATTERN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
 const SUMMARY_SELECT = `
   SELECT u.id AS user_id, u.email, l.display_name, s.slug, l.public_id, u.suspended_at IS NOT NULL AS suspended,
-         u.created_at, u.extra_link_slots, sl.id AS short_link_id, l.id AS landing_id, u.banner_slot_granted_at,
+         u.created_at, u.ad_block_enabled, sl.id AS short_link_id, l.id AS landing_id, u.banner_slot_granted_at,
          u.kind, u.metrics_excluded_at IS NOT NULL AS metrics_excluded,
          (SELECT count(*)::int FROM visits v
           WHERE v.short_link_id = sl.id AND v.occurred_at > now() - interval '30 days') AS visits_30d
@@ -51,7 +48,8 @@ interface SummaryRow {
   public_id: string;
   suspended: boolean;
   created_at: Date;
-  extra_link_slots: number;
+  /** 크리에이터 광고 블록 스위치(R20 ⑩). */
+  ad_block_enabled: boolean;
   short_link_id: string;
   /** 배너 한도·목록은 랜딩 단위입니다(MVP는 사용자당 랜딩 1개). */
   landing_id: string;
@@ -65,7 +63,6 @@ interface SummaryRow {
 interface LockedUser {
   role: UserRole;
   kind: AccountKind;
-  extra_link_slots: number;
   suspended: boolean;
   banner_slot_granted: boolean;
   metrics_excluded: boolean;
@@ -104,15 +101,6 @@ function blockInput(body: unknown): { blocked: boolean; reason: string | null } 
   return { blocked: input.blocked, reason };
 }
 
-/** `{ [field]: boolean }` 요청 본문. 아니면 400 `validation_failed`. */
-function booleanField(body: unknown, field: string): boolean {
-  const value = bodyObject(body)[field];
-  if (typeof value !== 'boolean') {
-    throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', `${field}는 true 또는 false여야 합니다.`);
-  }
-  return value;
-}
-
 /**
  * 운영자 화면 API(R10, R13, R14, R21, R23 ③⑧). 모든 쓰기는 한 트랜잭션에서 `FOR UPDATE`로 이전 값을 읽고 바꾼 뒤
  * `recordOperatorAction`으로 행위자·행동·대상·전후 값을 남깁니다(설계 `docs/specs/crelink-ai-operator.md` `행동 기록 규칙`).
@@ -124,7 +112,6 @@ export class AdminService {
     private readonly creator: CreatorService,
     private readonly stats: StatsService,
     private readonly config: AppConfig,
-    private readonly slotEvents: SlotEventService,
   ) {}
 
   private summary(row: SummaryRow): OperatorCreatorSummary {
@@ -159,7 +146,7 @@ export class AdminService {
   private async lockCreator(client: PoolClient, actor: OperatorActor, userId: string): Promise<LockedUser> {
     const result = UUID_PATTERN.test(userId)
       ? await client.query<LockedUser>(
-          `SELECT role, kind, extra_link_slots, suspended_at IS NOT NULL AS suspended,
+          `SELECT role, kind, suspended_at IS NOT NULL AS suspended,
                   banner_slot_granted_at IS NOT NULL AS banner_slot_granted,
                   metrics_excluded_at IS NOT NULL AS metrics_excluded
            FROM users WHERE id = $1 FOR UPDATE`,
@@ -198,57 +185,26 @@ export class AdminService {
   async detail(userId: string): Promise<OperatorCreatorDetail> {
     const row = await this.summaryRow(userId);
     const db = this.database.pool;
-    const [{ extraLinkSlots, ...limits }, links, banners, bannerLimits, slotEvent] = await Promise.all([
+    const [limits, links, banners, bannerLimits] = await Promise.all([
       this.creator.limits(db, userId),
       this.creator.links(db, userId),
       this.creator.creatorBanners(db, row.landing_id),
       this.creator.bannerLimits(db, row.landing_id),
-      this.slotEvents.entry(db, userId),
     ]);
     return {
       ...this.summary(row),
-      extraLinkSlots,
+      adBlockEnabled: row.ad_block_enabled,
       limits,
       links,
       bannerSlot: { grantedAt: row.banner_slot_granted_at?.toISOString() ?? null },
       banners,
       bannerLimits,
-      slotEvent,
     };
   }
 
   async creatorStats(userId: string, from: unknown, to: unknown): Promise<OperatorCreatorStats> {
     const row = await this.summaryRow(userId);
     return this.stats.stats(row.short_link_id, from, to);
-  }
-
-  async setExtraSlots(actor: OperatorActor, userId: string, body: unknown): Promise<OperatorCreatorDetail> {
-    const extraSlots = bodyObject(body).extraSlots;
-    if (
-      typeof extraSlots !== 'number' ||
-      !Number.isInteger(extraSlots) ||
-      extraSlots < 0 ||
-      extraSlots > MAX_EXTRA_SLOTS
-    ) {
-      throw apiError(
-        HttpStatus.BAD_REQUEST,
-        'validation_failed',
-        `추가 슬롯은 0~${MAX_EXTRA_SLOTS} 사이의 정수여야 합니다.`,
-      );
-    }
-    await this.database.transaction(async (client) => {
-      const before = await this.lockCreator(client, actor, userId);
-      await client.query('UPDATE users SET extra_link_slots = $2 WHERE id = $1', [userId, extraSlots]);
-      await recordOperatorAction(client, actor, {
-        action: 'creator.extra_slots',
-        targetType: 'user',
-        targetId: userId,
-        subjectUserId: userId,
-        before: { extraSlots: before.extra_link_slots },
-        after: { extraSlots },
-      });
-    });
-    return this.detail(userId);
   }
 
   /** 정지하면 기존 세션을 모두 지워 바로 로그아웃시키고, 랜딩·단축 URL은 안내 화면으로 바뀝니다. AI 계정은 토큰 인증도 막힙니다. */

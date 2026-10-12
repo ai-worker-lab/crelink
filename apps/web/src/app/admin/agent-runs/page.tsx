@@ -191,7 +191,6 @@ function MetricTiles({ metrics }: { metrics: AiOperatorMetrics }) {
     { label: '게시 중 광고 배너', value: formatNumber(metrics.adBanners.live) },
     { label: '광고 노출 · 최근 7일', value: formatNumber(metrics.adBanners.impressionsLast7Days) },
     { label: '광고 클릭 · 최근 7일', value: formatNumber(metrics.adBanners.clicksLast7Days) },
-    ...metrics.events.map((event) => ({ label: event.label, value: formatNumber(event.value) })),
   ];
   return (
     <>

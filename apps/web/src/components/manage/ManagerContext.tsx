@@ -3,7 +3,7 @@
 import {
   CRELINK_API_PATHS,
   type CreatorLandingState,
-  type CreatorSlotEventState,
+  type SetAdBlockRequest,
   type UpdateLandingRequest,
 } from '@crelink/shared';
 import {
@@ -45,15 +45,6 @@ import { useFirstRunProgress } from '../../lib/use-first-run-progress';
 
 /** 편집 중 배너 슬롯이 회수됐을 때의 안내(handoff `슬롯 회수됨(편집 중)`, 오류 코드 `banner_slot_not_granted`). */
 export const BANNER_SLOT_REVOKED_NOTICE = '배너 슬롯이 회수되어 이 자리에 다시 크리링 광고 블록이 나와요.';
-
-/** 신청 404(`slot_event_not_found`)의 관리 화면 문구(handoff `문구 원문` `404 slot_event_not_found(신청)`). 409는 `errors.ts` 고정 문구. */
-const SLOT_EVENT_NOT_FOUND_APPLY = '진행 중인 이벤트가 없어 신청하지 못했어요.';
-
-/** 링크 슬롯 이벤트 신청 결과 줄: 완료(`ok`) 또는 신청 기간 아님·이벤트 없음(409·404). 네트워크·그 밖 오류는 `slotEventAction.error`. */
-export interface SlotEventResult {
-  ok: boolean;
-  text: string;
-}
 
 /** 영역별 `저장 안 함` 여부. 하나라도 참이면 주소 막대에 `저장하지 않은 변경 포함`을 붙입니다. 링크·포트폴리오·배너는 초안 중 하나라도 바뀌었으면 참입니다. */
 export interface ManagerDirty {
@@ -113,7 +104,7 @@ export interface ManagerContextValue {
    * 다시 읽은 상태가 아직 배너 슬롯이면 false를 돌려줍니다(부르는 쪽이 오류 줄을 보임).
    */
   bannerSlotRevoked: () => Promise<boolean>;
-  /** 배너 슬롯 회수 안내. 다른 대상을 고르면 지웁니다. */
+  /** 슬롯 자리가 바뀌었다는 안내(배너 슬롯 회수, 광고 블록 기능 꺼짐). 다른 대상을 고르면 지웁니다. */
   slotNotice: string | null;
   /** `페이지 편집`에서 고른 대상. null이면 처음 패널(구역 목록)입니다. */
   selection: LandingEditTarget | null;
@@ -132,6 +123,12 @@ export interface ManagerContextValue {
   /** 방명록 켜기 스위치(즉시 저장, 실패하면 되돌림). 저장 중에는 방명록 목록을 부르지 않습니다(꺼진 랜딩은 404). */
   guestbookAction: ActionState;
   toggleGuestbook: (enabled: boolean) => Promise<void>;
+  /**
+   * 광고 블록 표시 스위치(R20 ⑩, `PUT /api/me/ad-block`). 바로 바꾸고 응답 상태로 바꾸며, 실패하면 되돌립니다.
+   * 409 `ad_block_unavailable`(그새 플랫폼 스위치가 꺼짐)이면 상태를 다시 읽고, 광고 블록이 사라졌으면 안내를 `slotNotice`로 옮깁니다.
+   */
+  adBlockAction: ActionState;
+  toggleAdBlock: (enabled: boolean) => Promise<void>;
   /** 방명록 관리 목록에서 글을 숨기거나 풀면 늘어, 미리보기 방명록이 다시 불러옵니다. */
   guestbookVersion: number;
   guestbookChanged: () => void;
@@ -140,19 +137,6 @@ export interface ManagerContextValue {
   requestSlugFocus: () => void;
   /** 초점 요청이 남아 있으면 true를 돌려주고 지웁니다(메뉴를 다시 열 때 또 옮기지 않도록). */
   takeSlugFocus: () => boolean;
-  /**
-   * 링크 슬롯 이벤트 신청(design/slot-event/handoff.md). `페이지 편집` 띠와 외부 링크 패널 신청 카드가 같은 요청·진행 상태를 씁니다.
-   * `pending`이면 두 `신청하기`가 함께 잠기고, 네트워크·그 밖 오류는 `error`로 카드 안에 보이며 버튼이 `다시 시도`가 됩니다.
-   */
-  slotEventAction: ActionState;
-  /** 신청 결과 줄. 띠·카드가 사라져도(`reload()` 뒤 조건이 풀림) 남고, `페이지 편집`을 떠나면 `resetSlotEvent`가 지웁니다. */
-  slotEventResult: SlotEventResult | null;
-  /**
-   * `POST /api/me/slot-event/entry` 뒤 `reload()`. 201·200은 완료 줄, 409·404는 고정 문구 + `reload()`(다시 시도 없음).
-   * 남긴 결과 줄을 돌려줍니다(네트워크·그 밖 오류면 null). 누른 쪽이 초점을 옮길 때 씁니다.
-   */
-  applySlotEvent: () => Promise<SlotEventResult | null>;
-  resetSlotEvent: () => void;
   firstRunGuide: FirstRunGuide;
 }
 
@@ -200,9 +184,7 @@ export function ManagerProvider({
   const [slugFocusRequest, setSlugFocusRequest] = useState(0);
   const slugFocusPending = useRef(false);
   const guestbookAction = useAction();
-  const slotEventAction = useAction();
-  const [slotEventResult, setSlotEventResult] = useState<SlotEventResult | null>(null);
-  const { setError: setSlotEventError } = slotEventAction;
+  const adBlockAction = useAction();
   // 시작 안내 카드: ①은 저장 상태의 보이는 항목 수, ②·③·닫기는 기기 로컬 진행. 첫 항목을 저장해 ①을 막 마치면(② 전) 상태 줄로 알리고,
   // 보이는 항목이 다시 0개가 되면 지웁니다.
   const [firstRunProgress, updateFirstRun] = useFirstRunProgress(state.landing.publicId);
@@ -233,42 +215,46 @@ export function ManagerProvider({
     }
   }
 
-  async function applySlotEvent(): Promise<SlotEventResult | null> {
-    let result: SlotEventResult | null = null;
-    setSlotEventResult(null);
-    await slotEventAction.run(async () => {
-      let applied: CreatorSlotEventState;
-      try {
-        applied = await browserApi<CreatorSlotEventState>(CRELINK_API_PATHS.meSlotEventEntry, { method: 'POST' });
-      } catch (caught) {
-        // 기간 아님·이벤트 없음: 다시 눌러도 같으므로 결과 줄을 남기고 상태를 다시 읽어 띠·카드를 거둡니다(설계 `디자인 검토 의견` 2).
-        if (
-          caught instanceof BrowserApiError &&
-          (caught.code === 'slot_event_closed' || caught.code === 'slot_event_not_found')
-        ) {
-          result = {
-            ok: false,
-            text: caught.code === 'slot_event_closed' ? caught.message : SLOT_EVENT_NOT_FOUND_APPLY,
-          };
-          setSlotEventResult(result);
-          await reload().catch(() => undefined);
-          return;
+  async function toggleAdBlock(enabled: boolean) {
+    const payload: SetAdBlockRequest = { enabled };
+    const setEnabled = (value: boolean) =>
+      setState((current) => ({ ...current, adBlock: { ...current.adBlock, enabled: value } }));
+    /** 409 `ad_block_unavailable`의 안내(task 안에서 정해짐). */
+    const failure: { unavailable: string | null } = { unavailable: null };
+    // 방명록 스위치와 같이 바로 바꾸고, 실패하면 원래대로 돌립니다.
+    setEnabled(enabled);
+    const saved = await adBlockAction.run(
+      async () => {
+        try {
+          setState(
+            await browserApi<CreatorLandingState>(CRELINK_API_PATHS.meAdBlock, {
+              method: 'PUT',
+              body: JSON.stringify(payload),
+            }),
+          );
+        } catch (caught) {
+          if (caught instanceof BrowserApiError && caught.code === 'ad_block_unavailable') {
+            failure.unavailable = caught.message;
+          }
+          throw caught;
         }
-        throw caught;
-      }
-      // 201(새로)·200(이미)은 같은 결과입니다. 새 한도는 다시 읽은 `limits.visibleMax`, 다시 읽기가 실패하면 대체 문구(설계 `디자인 검토 의견` 4).
-      let text: string;
-      try {
-        const next = await reload();
-        text = `이벤트를 신청했어요. 이제 보이는 외부 링크를 ${next.limits.visibleMax}개까지 둘 수 있어요.`;
-      } catch {
-        setState((current) => ({ ...current, slotEvent: applied }));
-        text = `이벤트를 신청했어요. 보이는 외부 링크가 ${applied.entry?.bonusLinks ?? applied.event?.bonusLinks ?? 0}개 늘었어요.`;
-      }
-      result = { ok: true, text };
-      setSlotEventResult(result);
-    });
-    return result;
+      },
+      enabled
+        ? '광고 블록을 켰어요. 공개 페이지의 이 자리에 크리링 광고 배너가 보여요.'
+        : '광고 블록을 껐어요. 공개 페이지에 크리링 광고 배너가 보이지 않아요.',
+    );
+    if (saved) return;
+    setEnabled(!enabled);
+    const { unavailable } = failure;
+    if (unavailable === null) return;
+    // 그새 플랫폼 스위치가 꺼짐: 다시 읽으면 광고 블록 줄·패널·스위치가 사라집니다. 광고 블록 패널에서 눌렀으면 패널이 닫히므로
+    // 안내를 처음 패널의 슬롯 안내 자리로 옮기고, 외부 링크 패널에서 눌렀으면 그 패널의 오류 줄에 그대로 둡니다.
+    const fromPanel = selection?.kind === 'ad-slot';
+    const next = await reload().catch(() => null);
+    if (next && !next.adBlock.platformEnabled && fromPanel) {
+      adBlockAction.setError(null);
+      setSlotNotice(unavailable);
+    }
   }
 
   async function toggleGuestbook(guestbookEnabled: boolean) {
@@ -410,10 +396,6 @@ export function ManagerProvider({
     slugFocusPending.current = false;
     return pending;
   }, []);
-  const resetSlotEvent = useCallback(() => {
-    setSlotEventResult(null);
-    setSlotEventError(null);
-  }, [setSlotEventError]);
 
   const value: ManagerContextValue = {
     state,
@@ -458,10 +440,8 @@ export function ManagerProvider({
     slugFocusRequest,
     requestSlugFocus,
     takeSlugFocus,
-    slotEventAction,
-    slotEventResult,
-    applySlotEvent,
-    resetSlotEvent,
+    adBlockAction,
+    toggleAdBlock,
     firstRunGuide: {
       view: firstRunGuideView({ progress: firstRunProgress, visibleCount, finishedNow: firstRunFinished }),
       notice: firstRunNotice,

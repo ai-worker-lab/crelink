@@ -294,7 +294,6 @@ async function context() {
   out.push(
     `크리링 배너: 게시 ${metrics.adBanners.live}개, 7일 노출 ${metrics.adBanners.impressionsLast7Days}·클릭 ${metrics.adBanners.clicksLast7Days}`,
   );
-  for (const event of metrics.events ?? []) out.push(`${event.label}: ${event.value}`);
   out.push('');
   out.push('# 직전 실행(최신순)');
   const previous = runs.items.filter((run) => run.id !== current).slice(0, 5);

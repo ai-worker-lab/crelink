@@ -41,16 +41,6 @@ interface Fixtures {
 
 /** 운영자 쓰기 경로 → 남겨야 할 행동과 사람 운영자로 부르는 시험 호출(순서대로 실행). */
 const AUDITED: Record<string, { action: OperatorActionType; call: (t: TestApp, f: Fixtures) => Promise<number> }> = {
-  'PUT /api/admin/creators/:userId/extra-slots': {
-    action: 'creator.extra_slots',
-    call: async (t, f) =>
-      (
-        await api(t.baseUrl, 'PUT', `/api/admin/creators/${f.creatorId}/extra-slots`, {
-          cookie: f.operator,
-          body: { extraSlots: 1 },
-        })
-      ).status,
-  },
   'PUT /api/admin/creators/:userId/suspension': {
     action: 'creator.suspension',
     call: async (t, f) =>
@@ -169,15 +159,10 @@ const AUDITED: Record<string, { action: OperatorActionType; call: (t: TestApp, f
     call: async (t, f) =>
       (await api(t.baseUrl, 'PUT', `/api/admin/ai-operator/tokens/${f.tokenId}/revoke`, { cookie: f.operator })).status,
   },
-  'PUT /api/admin/slot-event': {
-    action: 'slot_event.period_update',
+  'PUT /api/admin/ad-block': {
+    action: 'platform.ad_block',
     call: async (t, f) =>
-      (
-        await api(t.baseUrl, 'PUT', '/api/admin/slot-event', {
-          cookie: f.operator,
-          body: { startsAt: '2026-10-01T00:00:00Z', endsAt: null },
-        })
-      ).status,
+      (await api(t.baseUrl, 'PUT', '/api/admin/ad-block', { cookie: f.operator, body: { enabled: true } })).status,
   },
 };
 

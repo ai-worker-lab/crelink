@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   BannerLimits,
+  CreatorAdBlockState,
   CreatorBannerView,
   CreatorLandingState,
   CRELINK_LIMITS,
@@ -16,7 +17,6 @@ import { AppConfig } from '../config.service';
 import { Database, Queryable } from '../database';
 import { apiError } from '../common/http';
 import { FilesService } from '../files/files.service';
-import { SlotEventService } from '../slot-event/slot-event.service';
 
 export interface LinkRow {
   id: string;
@@ -37,7 +37,7 @@ export const LINK_COLUMNS =
 
 /**
  * 방문자에게 보이는 링크(숨기지 않았고 운영자가 차단하지 않음). links 별칭은 `l`이어야 합니다.
- * 공개 랜딩·관리 상태(한도)·단축 주소 클릭·운영자 지표(실사용자)가 함께 씁니다. 차단 도메인은 쓸 때 `blocked_at`에 반영됩니다.
+ * 공개 랜딩·단축 주소 클릭·운영자 지표(실사용자)가 함께 씁니다. 차단 도메인은 쓸 때 `blocked_at`에 반영됩니다.
  */
 export const VISIBLE_LINK_CONDITION = 'NOT l.hidden AND l.blocked_at IS NULL';
 
@@ -107,6 +107,8 @@ export interface PublicLandingRow {
   guestbook_enabled: boolean;
   /** 계정에 배너 슬롯이 부여됐는지(`users.banner_slot_granted_at IS NOT NULL`, R21 ①). */
   banner_slot_granted: boolean;
+  /** 광고 블록을 그려도 되는지(R20 ⑩): 플랫폼 스위치와 크리에이터 스위치가 모두 켜짐. 배너 슬롯에는 쓰지 않습니다. */
+  ad_block_enabled: boolean;
 }
 
 /** 편집 화면·운영자 화면이 함께 쓰는 조회와 응답 모양. */
@@ -116,7 +118,6 @@ export class CreatorService {
     private readonly database: Database,
     private readonly files: FilesService,
     private readonly config: AppConfig,
-    private readonly slotEvents: SlotEventService,
   ) {}
 
   /** 방문자가 여는 랜딩. 형식이 틀리거나 없으면 404 `landing_not_found`, 크리에이터가 정지되었으면 410 `creator_suspended`. */
@@ -124,7 +125,9 @@ export class CreatorService {
     const result = /^[a-z0-9]{10}$/.test(publicId)
       ? await db.query<PublicLandingRow & { suspended: boolean }>(
           `SELECT l.id, l.user_id, l.display_name, l.bio, l.avatar_file_id, l.guestbook_enabled,
-                  u.banner_slot_granted_at IS NOT NULL AS banner_slot_granted, u.suspended_at IS NOT NULL AS suspended
+                  u.banner_slot_granted_at IS NOT NULL AS banner_slot_granted, u.suspended_at IS NOT NULL AS suspended,
+                  u.ad_block_enabled AND coalesce((SELECT ad_block_enabled FROM platform_settings), false)
+                    AS ad_block_enabled
            FROM landings l JOIN users u ON u.id = l.user_id WHERE l.public_id = $1`,
           [publicId],
         )
@@ -176,31 +179,23 @@ export class CreatorService {
     return rows.rows.map((row) => this.linkView(row));
   }
 
-  /**
-   * 한도(R13, R24 ②): 보이는(숨기지 않고 차단되지 않은) 링크 ≤ min(5 + 추가 슬롯 + 링크 슬롯 이벤트 보너스 합, 50), 전체 ≤ 50.
-   * 보너스는 신청 행 `slot_event_entries.bonus_links`의 합이라 운영자 추가 슬롯을 바꿔도 그대로입니다.
-   */
-  async limits(db: Queryable, userId: string): Promise<LinkLimits & { extraLinkSlots: number }> {
-    const result = await db.query<{ extra_link_slots: number; event_bonus: number; visible: number; total: number }>(
-      `SELECT u.extra_link_slots,
-              (SELECT coalesce(sum(e.bonus_links), 0)::int FROM slot_event_entries e WHERE e.user_id = u.id) AS event_bonus,
-              count(l.id) FILTER (WHERE ${VISIBLE_LINK_CONDITION})::int AS visible,
-              count(l.id)::int AS total
-       FROM users u LEFT JOIN links l ON l.user_id = u.id
-       WHERE u.id = $1 GROUP BY u.id`,
+  /** 한도(R13): 숨김·차단 포함 링크 ≤ `CRELINK_LIMITS.totalLinks`(50). 보이는 링크 수에는 따로 한도가 없습니다. */
+  async limits(db: Queryable, userId: string): Promise<LinkLimits> {
+    const result = await db.query<{ total: number }>('SELECT count(*)::int AS total FROM links WHERE user_id = $1', [
+      userId,
+    ]);
+    return { totalMax: CRELINK_LIMITS.totalLinks, totalUsed: result.rows[0].total };
+  }
+
+  /** 광고 블록 스위치 두 개(R20 ⑩): 플랫폼(`platform_settings`, 1행)과 이 계정(`users.ad_block_enabled`). */
+  async adBlock(db: Queryable, userId: string): Promise<CreatorAdBlockState> {
+    const result = await db.query<CreatorAdBlockState>(
+      `SELECT coalesce((SELECT ad_block_enabled FROM platform_settings), false) AS "platformEnabled",
+              ad_block_enabled AS enabled
+       FROM users WHERE id = $1`,
       [userId],
     );
-    const row = result.rows[0];
-    return {
-      extraLinkSlots: row.extra_link_slots,
-      visibleMax: Math.min(
-        CRELINK_LIMITS.freeVisibleLinks + row.extra_link_slots + row.event_bonus,
-        CRELINK_LIMITS.totalLinks,
-      ),
-      visibleUsed: row.visible,
-      totalMax: CRELINK_LIMITS.totalLinks,
-      totalUsed: row.total,
-    };
+    return result.rows[0];
   }
 
   /** 링크 호스트가 차단 도메인이거나 그 하위 도메인이면 차단 도메인을, 아니면 null. */
@@ -360,7 +355,7 @@ export class CreatorService {
       userId,
     ]);
     const row = landing.rows[0];
-    const [shortLink, links, socials, portfolio, limits, slot, adBanners, banners, bannerLimits, slotEvent] =
+    const [shortLink, links, socials, portfolio, limits, slot, adBanners, banners, bannerLimits, adBlock] =
       await Promise.all([
         this.shortLink(db, userId),
         this.links(db, userId),
@@ -371,9 +366,8 @@ export class CreatorService {
         this.liveAdBanners(db),
         this.creatorBanners(db, row.id),
         this.bannerLimits(db, row.id),
-        this.slotEvents.state(db, userId),
+        this.adBlock(db, userId),
       ]);
-    const { visibleMax, visibleUsed, totalMax, totalUsed } = limits;
     return {
       landing: {
         publicId: row.public_id,
@@ -387,13 +381,13 @@ export class CreatorService {
       links,
       socials,
       portfolio,
-      limits: { visibleMax, visibleUsed, totalMax, totalUsed },
+      limits,
       slot,
       // 미리보기용이라 클릭 주소는 저장된 URL입니다(기록 주소 아님, R7 ⑥).
       adBanners: adBanners.map((banner) => this.publicBannerView(banner, banner.url)),
       banners,
       bannerLimits,
-      slotEvent,
+      adBlock,
     };
   }
 }

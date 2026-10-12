@@ -1,5 +1,6 @@
 import {
   AdBannerView,
+  AdBlockSettingView,
   AgentRunView,
   ApiError,
   CreatorBannerView,
@@ -88,30 +89,10 @@ describe('운영자 행동 기록 (R23 ③⑧)', () => {
     await t?.close();
   });
 
-  it('creator.* 쓰기(추가 슬롯·정지·배너 슬롯·지표 제외)는 사람·AI 행위자와 전후 값·대상·실행 id를 남긴다', async () => {
+  it('creator.* 쓰기(정지·배너 슬롯·지표 제외)는 사람·AI 행위자와 전후 값·대상·실행 id를 남긴다', async () => {
     const creator = await newCreator();
     const path = (suffix: string) => `/api/admin/creators/${creator.userId}/${suffix}`;
     const target = { target_type: 'user', target_id: creator.userId, subject_user_id: creator.userId };
-
-    expect(
-      (await api(t.baseUrl, 'PUT', path('extra-slots'), { cookie: operator, body: { extraSlots: 3 } })).status,
-    ).toBe(200);
-    expect(await lastAction()).toEqual({
-      ...human(),
-      ...target,
-      action: 'creator.extra_slots',
-      before: { extraSlots: 0 },
-      after: { extraSlots: 3 },
-    });
-    expect((await api(t.baseUrl, 'PUT', path('extra-slots'), { ...asAi(), body: { extraSlots: 4 } })).status).toBe(200);
-    expect(await lastAction()).toEqual({
-      ...byAi(),
-      ...target,
-      action: 'creator.extra_slots',
-      before: { extraSlots: 3 },
-      after: { extraSlots: 4 },
-    });
-
     expect((await api(t.baseUrl, 'PUT', path('suspension'), { ...asAi(), body: { suspended: true } })).status).toBe(
       200,
     );
@@ -182,7 +163,6 @@ describe('운영자 행동 기록 (R23 ③⑧)', () => {
     const before = await actionCount();
     for (const userId of [operatorId, ai.userId, other.userId]) {
       for (const [suffix, body] of [
-        ['extra-slots', { extraSlots: 1 }],
         ['suspension', { suspended: true }],
         ['banner-slot', { granted: true }],
       ] as const) {
@@ -193,7 +173,7 @@ describe('운영자 행동 기록 (R23 ③⑧)', () => {
     expect(await actionCount()).toBe(before);
     const state = await t.pool.query(
       `SELECT count(*)::int AS n FROM users WHERE (role = 'operator' OR kind = 'ai')
-         AND (suspended_at IS NOT NULL OR extra_link_slots > 0 OR banner_slot_granted_at IS NOT NULL)`,
+         AND (suspended_at IS NOT NULL OR banner_slot_granted_at IS NOT NULL)`,
     );
     expect(state.rows[0].n).toBe(0);
     // 사람 운영자는 AI 계정을 정지할 수 있고, 정지되면 토큰 인증이 막힙니다.
@@ -337,34 +317,43 @@ describe('운영자 행동 기록 (R23 ③⑧)', () => {
     ).toBe(200);
   });
 
-  it('링크 슬롯 이벤트 기간 저장(PUT /api/admin/slot-event)은 바뀐 기간을 사람·AI 행위자로 남긴다', async () => {
-    const startsAt = '2026-10-01T00:00:00.000Z';
-    const saved = await api(t.baseUrl, 'PUT', '/api/admin/slot-event', {
+  it('플랫폼 광고 블록 스위치(PUT /api/admin/ad-block)는 사람·AI 행위자와 전후 값을 남기고, 값이 그대로여도 기록한다', async () => {
+    const target = { target_type: 'platform_setting', target_id: 'ad_block', subject_user_id: null };
+    const turnedOn = await api<AdBlockSettingView>(t.baseUrl, 'PUT', '/api/admin/ad-block', {
       ...asAi(),
-      body: { startsAt, endsAt: '2999-01-01T00:00:00Z' },
+      body: { enabled: true },
     });
-    expect(saved.status).toBe(200);
-    const last = await lastAction();
-    expect(last).toMatchObject({
+    expect([turnedOn.status, turnedOn.body.enabled, turnedOn.body.updatedBy]).toEqual([200, true, ai.email]);
+    expect(await lastAction()).toEqual({
       ...byAi(),
-      action: 'slot_event.period_update',
-      target_type: 'slot_event',
-      target_id: 'link-slots-plus-5',
-      subject_user_id: null,
-      after: { startsAt, endsAt: '2999-01-01T00:00:00.000Z' },
+      ...target,
+      action: 'platform.ad_block',
+      before: { enabled: false },
+      after: { enabled: true },
     });
-    expect(Object.keys(last.before as object).sort()).toEqual(['endsAt', 'startsAt']);
 
-    expect(
-      (await api(t.baseUrl, 'PUT', '/api/admin/slot-event', { cookie: operator, body: { startsAt, endsAt: null } }))
-        .status,
-    ).toBe(200);
-    expect(await lastAction()).toMatchObject({
-      ...human(),
-      action: 'slot_event.period_update',
-      before: { endsAt: '2999-01-01T00:00:00.000Z' },
-      after: { endsAt: null },
+    // 값이 그대로면 바꾼 사람·시각은 그대로 두고 기록만 남깁니다.
+    const count = await actionCount();
+    const same = await api<AdBlockSettingView>(t.baseUrl, 'PUT', '/api/admin/ad-block', {
+      cookie: operator,
+      body: { enabled: true },
     });
+    expect(same.body).toEqual(turnedOn.body);
+    expect(await actionCount()).toBe(count! + 1);
+    expect(await lastAction()).toEqual({
+      ...human(),
+      ...target,
+      action: 'platform.ad_block',
+      before: { enabled: true },
+      after: { enabled: true },
+    });
+
+    const turnedOff = await api<AdBlockSettingView>(t.baseUrl, 'PUT', '/api/admin/ad-block', {
+      cookie: operator,
+      body: { enabled: false },
+    });
+    expect([turnedOff.body.enabled, turnedOff.body.updatedBy]).toEqual([false, 'operator@example.com']);
+    expect(await lastAction()).toMatchObject({ ...human(), before: { enabled: true }, after: { enabled: false } });
   });
 
   it('크리링 배너 등록·수정(바뀐 필드만)·순서·내리기(멱등 포함)를 남긴다', async () => {
@@ -441,9 +430,9 @@ describe('운영자 행동 기록 (R23 ③⑧)', () => {
       await client.query('BEGIN');
       await client.query("UPDATE ai_operator_settings SET paused = true, paused_reason = '경쟁'");
       // 가드는 커밋 전 값(멈춤 아님)을 보고 통과하고, 기록의 FOR SHARE가 이 트랜잭션을 기다립니다.
-      const pending = api<ApiError>(t.baseUrl, 'PUT', `/api/admin/creators/${creator.userId}/extra-slots`, {
+      const pending = api<ApiError>(t.baseUrl, 'PUT', `/api/admin/creators/${creator.userId}/banner-slot`, {
         ...asAi(),
-        body: { extraSlots: 7 },
+        body: { granted: true },
       });
       let settled = false;
       void pending.then(() => (settled = true));
@@ -456,8 +445,8 @@ describe('운영자 행동 기록 (R23 ③⑧)', () => {
     } finally {
       client.release();
     }
-    const slots = await t.pool.query('SELECT extra_link_slots FROM users WHERE id = $1', [creator.userId]);
-    expect(slots.rows[0].extra_link_slots).toBe(0);
+    const granted = await t.pool.query('SELECT banner_slot_granted_at FROM users WHERE id = $1', [creator.userId]);
+    expect(granted.rows[0].banner_slot_granted_at).toBeNull();
     expect(await actionCount()).toBe(before);
     await t.pool.query('UPDATE ai_operator_settings SET paused = false, paused_reason = NULL');
   });

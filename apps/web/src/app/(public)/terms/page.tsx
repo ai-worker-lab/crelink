@@ -1,11 +1,13 @@
+import { CRELINK_LIMITS } from '@crelink/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = { title: '이용약관' };
 
 /**
- * 서비스·이벤트 이용 조건의 공개 초안입니다. 근거: docs/product/crelink.md R14·R20·R23·R24,
- * docs/work/web/0140-terms-of-service-page.md. 법률 검토 전 문구입니다.
+ * 서비스 이용 조건의 공개 초안입니다. 근거: docs/product/crelink.md R13·R14·R20·R23,
+ * docs/specs/crelink-link-limit-ad-toggle.md(광고 블록 켜고 끄기, 외부 링크 한도), docs/work/web/0140-terms-of-service-page.md.
+ * 법률 검토 전 문구입니다.
  */
 export default function TermsPage() {
   return (
@@ -54,22 +56,22 @@ export default function TermsPage() {
         <section aria-labelledby="terms-advertising">
           <h2 id="terms-advertising">4. 광고 블록</h2>
           <p>
-            배너 슬롯이 없는 랜딩페이지에는 크리링 플랫폼이 운영하는 광고 블록이 표시될 수 있어요. 광고 블록에는 광고
-            표시가 붙고, 크리에이터 링크와 구별돼요. 현재는 크리링 플랫폼의 배너만 게시하며 외부 광고주나 광고
-            네트워크의 배너를 받지 않아요.
+            랜딩페이지의 링크 사이에는 크리링 플랫폼이 운영하는 광고 블록을 둘 수 있어요. 광고 블록은 크리링이 기능을
+            열고 크리에이터가 관리 화면에서 직접 켠 경우에만 보이고, 기본은 꺼져 있어요. 배너 슬롯을 받은 랜딩페이지에는
+            광고 블록 대신 크리에이터 배너가 보여요.
+          </p>
+          <p>
+            광고 블록에는 광고 표시가 붙고, 크리에이터 링크와 구별돼요. 현재는 크리링 플랫폼의 배너만 게시하며 외부
+            광고주나 광고 네트워크의 배너를 받지 않아요. 광고 수익을 크리에이터와 나눌지와 그 조건은 아직 정해지지
+            않았어요. 정해지면 적용 전에 이 페이지에 미리 알려요.
           </p>
         </section>
 
-        <section aria-labelledby="terms-event">
-          <h2 id="terms-event">5. 외부 링크 +5 이벤트</h2>
+        <section aria-labelledby="terms-links">
+          <h2 id="terms-links">5. 외부 링크 한도</h2>
           <p>
-            이벤트가 열려 있을 때 신청한 계정은 보이는 외부 링크 한도가 5개 늘어나요. 이벤트 신청은 계정당 한 번이고,
-            신청하지 않은 계정에는 보너스가 적용되지 않아요. 이벤트 보너스는 운영자가 따로 부여한 슬롯과 별도로
-            계산돼요.
-          </p>
-          <p>
-            이벤트 시작 전이나 종료 후에는 새 신청을 받지 않아요. 이벤트가 종료되어도 이미 신청해 받은 보너스는 회수하지
-            않아요. 이벤트 기간과 신청 가능 여부는 운영자가 정한 설정에 따라 화면에 표시돼요.
+            외부 링크는 계정마다 숨긴 링크를 포함해 {CRELINK_LIMITS.totalLinks}개까지 둘 수 있어요. 모든 크리에이터에게
+            같은 한도이고, 돈을 내고 한도를 늘리는 상품은 없어요.
           </p>
         </section>
 
@@ -98,7 +100,7 @@ export default function TermsPage() {
           </p>
         </section>
 
-        <p>시행일: 2026년 10월 11일</p>
+        <p>시행일: 2026년 10월 12일</p>
       </article>
     </main>
   );

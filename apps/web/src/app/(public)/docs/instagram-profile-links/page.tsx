@@ -58,10 +58,7 @@ export default function InstagramProfileLinksPage() {
         <ul>
           <li>프로필 사진·이름·소개({CRELINK_LIMITS.bioMax}자까지)</li>
           <li>SNS 채널 아이콘(최대 {CRELINK_LIMITS.socialLinks}개)</li>
-          <li>
-            외부 링크 목록(방문자에게 보이는 링크 {CRELINK_LIMITS.freeVisibleLinks}개, 숨긴 링크를 포함해{' '}
-            {CRELINK_LIMITS.totalLinks}개까지 저장)
-          </li>
+          <li>외부 링크 목록(숨긴 링크를 포함해 {CRELINK_LIMITS.totalLinks}개까지)</li>
           <li>제목·이미지·설명이 있는 포트폴리오(최대 {CRELINK_LIMITS.portfolioItems}개)</li>
         </ul>
       </section>

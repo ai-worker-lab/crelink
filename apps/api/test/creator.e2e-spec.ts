@@ -52,13 +52,14 @@ describe('크리에이터 편집 API', () => {
       ['POST', '/api/me/portfolio'],
       ['POST', '/api/me/files'],
       ['GET', '/api/me/short-link/availability?slug=abc'],
+      ['PUT', '/api/me/ad-block'],
     ]) {
       const response = await api(t.baseUrl, method, path, { body: method === 'GET' ? undefined : {} });
       expect([path, response.status, response.body.code]).toEqual([path, 401, 'unauthenticated']);
     }
   });
 
-  it('편집 상태는 랜딩·단축 URL·빈 목록·한도·링크 슬롯 이벤트(미신청)를 준다', async () => {
+  it('편집 상태는 랜딩·단축 URL·빈 목록·전체 한도·광고 블록 스위치(둘 다 꺼짐)를 준다', async () => {
     const { cookie } = await newCreator();
     const body = await state(cookie);
     expect(body.landing.url).toBe(`${WEB_URL}/p/${body.landing.publicId}`);
@@ -67,9 +68,10 @@ describe('크리에이터 편집 API', () => {
       links: [],
       socials: [],
       portfolio: [],
-      limits: { visibleMax: 5, visibleUsed: 0, totalMax: 50, totalUsed: 0 },
-      slotEvent: { event: { bonusLinks: 5, endsAt: null, status: 'open' }, entry: null },
+      limits: { totalMax: 50, totalUsed: 0 },
+      adBlock: { platformEnabled: false, enabled: false },
     });
+    expect(body).not.toHaveProperty('slotEvent');
   });
 
   it('프로필 수정: 길이 검증, 빈 문자열은 비움, 남의 파일은 404 file_not_found', async () => {
@@ -240,42 +242,43 @@ describe('크리에이터 편집 API', () => {
       expect(longTitle.status).toBe(400);
     });
 
-    it('보이는 링크는 5 + 추가 슬롯까지, 숨긴 링크는 세지 않고, 숨김을 풀 때도 한도를 확인한다', async () => {
-      const { cookie, userId } = await newCreator();
-      for (let index = 0; index < 5; index += 1) {
+    it('보이는 링크는 따로 한도가 없고(6개 이상), 숨김을 풀 때도 한도를 확인하지 않는다', async () => {
+      const { cookie } = await newCreator();
+      for (let index = 0; index < 7; index += 1) {
         expect((await addLink(cookie, { title: `링크 ${index}`, url: `https://site${index}.com` })).status).toBe(201);
       }
-      const sixth = await addLink(cookie, { title: '여섯째', url: 'https://six.com' });
-      expect([sixth.status, sixth.body.code]).toEqual([409, 'link_limit_reached']);
-      const hidden = await addLink(cookie, { title: '숨김', url: 'https://six.com', hidden: true });
+      const hidden = await addLink(cookie, { title: '숨김', url: 'https://hidden.com', hidden: true });
       expect(hidden.status).toBe(201);
-      const unhide = await api(t.baseUrl, 'PATCH', `/api/me/links/${hidden.body.id}`, {
-        cookie,
-        body: { hidden: false },
-      });
-      expect([unhide.status, unhide.body.code]).toEqual([409, 'link_limit_reached']);
-      expect((await state(cookie)).limits).toEqual({ visibleMax: 5, visibleUsed: 5, totalMax: 50, totalUsed: 6 });
-
-      await t.pool.query('UPDATE users SET extra_link_slots = 1 WHERE id = $1', [userId]);
       const shown = await api<LinkView>(t.baseUrl, 'PATCH', `/api/me/links/${hidden.body.id}`, {
         cookie,
         body: { hidden: false, title: '이제 보임' },
       });
       expect(shown.status).toBe(200);
       expect(shown.body).toMatchObject({ hidden: false, title: '이제 보임' });
-      expect((await state(cookie)).limits).toMatchObject({ visibleMax: 6, visibleUsed: 6 });
+      expect((await state(cookie)).limits).toEqual({ totalMax: 50, totalUsed: 8 });
     });
 
-    it('숨긴 링크 포함 전체 50개를 넘으면 409 link_total_limit_reached', async () => {
+    it('숨김·차단 포함 전체 50개가 차면 51번째는 409 link_total_limit_reached, 숨김 해제는 그대로 된다', async () => {
       const { cookie, userId } = await newCreator();
       await t.pool.query(
-        `INSERT INTO links (public_id, user_id, block_id, title, url, host, position, hidden)
-         SELECT 'bulk' || lpad(g::text, 6, '0'), $1, b.id, 't', 'https://a.com/', 'a.com', g, true
-         FROM generate_series(1, 50) g, landings l JOIN landing_blocks b ON b.landing_id = l.id WHERE l.user_id = $1`,
+        `INSERT INTO links (public_id, user_id, block_id, title, url, host, position, hidden, blocked_at)
+         SELECT 'bulk' || lpad(g::text, 6, '0'), $1, b.id, 't', 'https://a.com/', 'a.com', g, g % 2 = 0,
+                CASE WHEN g = 49 THEN now() END
+         FROM generate_series(1, 49) g, landings l JOIN landing_blocks b ON b.landing_id = l.id WHERE l.user_id = $1`,
         [userId],
       );
-      const response = await addLink(cookie, { title: '하나 더', url: 'https://b.com', hidden: true });
-      expect([response.status, response.body.code]).toEqual([409, 'link_total_limit_reached']);
+      const fiftieth = await addLink(cookie, { title: '50번째', url: 'https://b.com', hidden: true });
+      expect(fiftieth.status).toBe(201);
+      expect((await state(cookie)).limits).toEqual({ totalMax: CRELINK_LIMITS.totalLinks, totalUsed: 50 });
+      for (const hidden of [true, false]) {
+        const response = await addLink(cookie, { title: '하나 더', url: 'https://c.com', hidden });
+        expect([hidden, response.status, response.body.code]).toEqual([hidden, 409, 'link_total_limit_reached']);
+      }
+      const unhide = await api<LinkView>(t.baseUrl, 'PATCH', `/api/me/links/${fiftieth.body.id}`, {
+        cookie,
+        body: { hidden: false },
+      });
+      expect([unhide.status, unhide.body.hidden]).toEqual([200, false]);
     });
 
     it('차단 도메인과 그 하위 도메인은 추가·수정 모두 422 link_domain_blocked', async () => {

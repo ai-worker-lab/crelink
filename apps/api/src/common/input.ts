@@ -42,6 +42,15 @@ export function optionalBoolean(value: unknown, label: string): boolean | undefi
   return value;
 }
 
+/** `{ [field]: boolean }` 요청 본문(운영자 스위치·광고 블록 스위치). 아니면 400 `validation_failed`. */
+export function booleanField(body: unknown, field: string): boolean {
+  const value = bodyObject(body)[field];
+  if (typeof value !== 'boolean') {
+    throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', `${field}는 true 또는 false여야 합니다.`);
+  }
+  return value;
+}
+
 /** 선택 0 이상 정수. 아니면 400 `validation_failed`. */
 export function optionalNonNegativeInteger(value: unknown, label: string): number | undefined {
   if (value === undefined) return undefined;
@@ -64,7 +73,7 @@ export function pageNumber(value: unknown): number {
 const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/i;
 
 /**
- * 기간 입력 시각(크리링 배너 게시 기간, 링크 슬롯 이벤트 기간). 시간대가 붙은 ISO 8601만 받고(아니면 400 `validation_failed`),
+ * 기간 입력 시각(크리링 배너 게시 기간). 시간대가 붙은 ISO 8601만 받고(아니면 400 `validation_failed`),
  * 그대로 DB에 넘길 문자열과 비교용 밀리초를 돌려줍니다. label은 오류 문구에 쓰는 항목 이름입니다.
  */
 export function zonedTime(value: unknown, label: string): { text: string; ms: number } {

@@ -293,7 +293,8 @@ export function resolveBannerSlot<B>(input: {
 - `kind = granted ? 'creator' : 'ad'`, `banners`는 그 종류의 목록입니다.
 - `afterLinkCount`는 `linkVisible` 앞쪽 `min(slotIndex ?? ∞, n)`개 가운데 true인 수입니다.
 - `hidden`은 다음 순서로 정합니다.
-  - `kind = 'ad'`이고 보이는 링크 0개·포트폴리오 0개면 `'no_content'`입니다(R20 ⑥, 결정 7).
+  - `kind = 'ad'`이고 광고 블록 스위치가 꺼졌으면(`adBlockEnabled = false`, 플랫폼·크리에이터 스위치 중 하나라도 꺼짐) `'ad_off'`입니다(R20 ⑩, 2026-10-12 `변경 기록`).
+  - 그렇지 않고 `kind = 'ad'`이고 보이는 링크 0개·포트폴리오 0개면 `'no_content'`입니다(R20 ⑥, 결정 7).
   - 그렇지 않고 배너 목록이 비면 `'no_banners'`입니다.
   - 그 밖에는 null입니다.
 - 공개 API는 `hidden !== null`이면 `slot: null`로 바꿉니다.
@@ -388,7 +389,7 @@ export function resolveBannerSlot<B>(input: {
 
 ### 노출 `[AI 제안]`: 서버·`passAccepted`·첫 장
 
-공개 랜딩 API는 `passAccepted === true`이고 `slot.kind = 'ad'`일 때 첫 장 배너 1건을 백그라운드로 올립니다. upsert 도우미 `recordAdStat(kind: 'impression' | 'click', …)`은 `TrackingService`에 두고, 예정 T2가 만들고 T7이 씁니다.
+공개 랜딩 API는 `passAccepted === true`이고 `slot.kind = 'ad'`일 때 첫 장 배너 1건을 백그라운드로 올립니다. 광고 블록 스위치가 꺼져 `slot: null`이면 올리지 않습니다(R20 ⑩). upsert 도우미 `recordAdStat(kind: 'impression' | 'click', …)`은 `TrackingService`에 두고, 예정 T2가 만들고 T7이 씁니다.
 
 ```sql
 INSERT INTO ad_banner_daily_stats (day, ad_banner_id, landing_public_id, impressions)
@@ -778,3 +779,4 @@ work item 번호(2026-10-09 생성): T1 → 0067, T2 → 0068, T3 → 0069, T4 �
 - 2026-10-09: 사용자 지시("타임어택이다 완성시켜라")를 설계 승인으로 보고 `상태: 승인`으로 바꿨습니다. 티켓 0067~0085를 만들었습니다.
 - 2026-10-09: S1 스파이크 결과(0075) 정지 이미지는 `createImageBitmap(file)` 하나로 만듭니다. Chromium·Firefox·WebKit·iOS 26.5 Safari에서 GIF·움직이는 WebP·APNG 9개 표본 모두 첫 장면·3:1 자르기·투명도가 맞았습니다. `ImageDecoder`는 iOS에 없고 macOS WebKit에서 자르기·투명도가 깨져 뺐습니다. 도우미는 `apps/web/src/lib/still-image.ts`입니다.
 - 2026-10-09: T17 통합(0085). 검증 계획 1~9를 실제 API·DB로 `tests/e2e/ad-banner.spec.ts`(테스트 4개)에 옮겼습니다. 설계와 달라진 점은 둘입니다. (1) 크리링 배너는 모든 무료 랜딩이 함께 보는 전역 데이터라, 다른 E2E 화면에 끼어들고 지운 배너 이미지가 404 콘솔 오류가 됩니다. 그래서 Playwright 프로젝트 `ad-banner`를 나머지(`main`) 뒤에 한 워커로 돌립니다. (2) 슬롯이 링크 목록 맨 앞일 때 관리 미리보기의 슬롯 칩이 `외부 링크` 칩을 가려, 맨 앞일 때만 슬롯 칩을 왼쪽 위에 둡니다(화면 계약 변화 없음). 운영 주소 검사(`infra/prod/verify.sh`)에 `/b/`·`/a/` 302 `link_unavailable`을 더했습니다.
+- 2026-10-12: 광고 블록 스위치 두 개(PRD R20 ⑩, 사용자 결정). 운영자 플랫폼 스위치(`platform_settings.ad_block_enabled`, `/admin/ad-banners`)와 크리에이터 계정 스위치(`users.ad_block_enabled`, `페이지 편집` 광고 줄)가 모두 기본 꺼짐이고, 둘 다 켜졌을 때만 공개 랜딩에 광고 블록이 보입니다(`resolveBannerSlot` `adBlockEnabled`·숨김 사유 `'ad_off'`). 플랫폼이 꺼져 있으면 편집 화면에 광고 블록이 보이지 않습니다. 위치(`slot_position`)와 배너 슬롯(R21)은 그대로입니다. 설계 [외부 링크 50개 기본 제공과 광고 블록 켜고 끄기](crelink-link-limit-ad-toggle.md), 에픽 `docs/work/epics/0175-link-limit-ad-block-toggle.md`.

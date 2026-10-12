@@ -28,7 +28,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useRouter } from 'next/navigation';
-import { useId, useRef, useState } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { browserApi } from '../../lib/api/browser';
 import { formatDateTime, formatNumber } from '../../lib/format';
 import { useAction } from '../../lib/use-action';
@@ -65,8 +65,9 @@ type Editing = { banner: AdBannerView | null } | null;
  * - 1280px은 표, 700px 이하는 같은 표를 CSS로 카드처럼 그립니다(목록을 하나만 그려 dnd-kit id가 겹치지 않음).
  * - 순서는 `전체`에서만 손잡이(끌기·키보드)로 바꾸고 바로 `PUT …/order`(전체 id)로 저장합니다. 실패하면 되돌립니다.
  * - `내리기`는 확인 뒤 `PUT …/{id}/end`, 등록·수정은 `AdBannerDialog`. 바꾼 뒤에는 서버 화면을 다시 읽습니다(상태·수 갱신).
+ * - 머리 바로 아래에는 플랫폼 광고 블록 스위치 카드(`adBlock`, R20 ⑩)를 둡니다.
  */
-export function AdBanners({ list }: { list: AdBannerListResponse }) {
+export function AdBanners({ list, adBlock }: { list: AdBannerListResponse; adBlock: ReactNode }) {
   const router = useRouter();
   const dndId = useId();
   const { pending, error, notice, run, setError, setNotice } = useAction();
@@ -175,13 +176,15 @@ export function AdBanners({ list }: { list: AdBannerListResponse }) {
         <div>
           <h1 className="page-title">광고 배너</h1>
           <p className="section-help">
-            게시 중인 배너는 배너 슬롯이 없는 모든 랜딩의 광고 블록에 나와요. 여러 장이면 아래 순서대로 넘겨 봐요.
+            게시 중인 배너는 광고 블록을 켠 크리에이터 랜딩의 광고 블록에 나와요(아래 광고 블록 스위치가 켜졌을 때만).
+            여러 장이면 아래 순서대로 넘겨 봐요.
           </p>
         </div>
         <button type="button" className="primary" onClick={(event) => openDialog(null, event.currentTarget)}>
           배너 등록
         </button>
       </div>
+      {adBlock}
       {counts.live === 0 ? (
         <p className="notice-box ad-banners-warning">
           지금 게시 중인 배너가 없어 모든 랜딩에서 광고 블록이 숨어 있어요.

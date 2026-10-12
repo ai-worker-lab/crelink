@@ -176,6 +176,9 @@ describe('운영자 배너 슬롯·배너 차단 (R21 ①④⑤, R14)', () => {
     });
     const banner = await insertCreatorBanner(creator, { position: 0 });
     const adId = await insertAdBanner('https://ads.example/', '2026-01-01T00:00:00+09:00', null);
+    // 광고 블록은 두 스위치(R20 ⑩)가 모두 켜져야 보입니다. 배너 슬롯 전환은 스위치와 관계없습니다.
+    await t.pool.query('UPDATE platform_settings SET ad_block_enabled = true');
+    await t.pool.query('UPDATE users SET ad_block_enabled = true WHERE id = $1', [creator.userId]);
 
     expect((await publicSlot(creator))?.kind).toBe('ad');
     const granted = await setSlot(creator.userId, { granted: true });

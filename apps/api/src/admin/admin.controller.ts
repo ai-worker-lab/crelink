@@ -39,15 +39,6 @@ export class AdminController {
     return this.admin.creatorStats(userId, from, to);
   }
 
-  @Put('creators/:userId/extra-slots')
-  setExtraSlots(
-    @CurrentActor() actor: RequestActor,
-    @Param('userId') userId: string,
-    @Body() body: unknown,
-  ): Promise<OperatorCreatorDetail> {
-    return this.admin.setExtraSlots(actor, userId, body);
-  }
-
   @Put('creators/:userId/suspension')
   setSuspension(
     @CurrentActor() actor: RequestActor,

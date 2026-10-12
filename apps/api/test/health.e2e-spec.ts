@@ -92,11 +92,13 @@ describe('API 기동과 health', () => {
         'link_clicks',
         'links',
         'operator_actions',
+        'platform_settings',
         'portfolio_items',
         'schema_migrations',
         'sessions',
         'short_links',
         'short_slugs',
+        // 링크 슬롯 이벤트 테이블은 더 쓰지 않지만 남겨 둡니다(삭제 결정: work item 0179).
         'slot_event_entries',
         'slot_events',
         'social_links',
@@ -114,6 +116,7 @@ describe('API 기동과 health', () => {
         { version: '0004_ai_operator' },
         { version: '0005_slot_event' },
         { version: '0006_agent_run_agent' },
+        { version: '0007_ad_block_toggle' },
       ]);
     } finally {
       await client.end();

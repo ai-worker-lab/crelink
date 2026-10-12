@@ -266,7 +266,7 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
               clickUrl: `${SHORT_URL}/c/${visiblePublicId}`,
             },
           ],
-          // 게시 중 크리링 배너가 없으면 광고 블록은 숨김(no_banners)입니다.
+          // 광고 블록 스위치가 꺼져 있으면(기본, R20 ⑩) 광고 블록은 숨김(ad_off)입니다.
           slot: null,
         },
       ],
@@ -365,7 +365,9 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
 
     it('GET /a/{배너}/{랜딩}은 게시 중이면 쿠키 없이 날짜·배너·랜딩 카운터를 올리고 저장된 URL로, 아니면 link_unavailable', async () => {
       const creator = await newCreator();
-      // 광고 블록은 보이는 링크나 포트폴리오가 있어야 보입니다(no_content).
+      // 광고 블록은 두 스위치(R20 ⑩)가 켜지고 보이는 링크나 포트폴리오가 있어야 보입니다(ad_off·no_content).
+      await t.pool.query('UPDATE platform_settings SET ad_block_enabled = true');
+      await t.pool.query('UPDATE users SET ad_block_enabled = true WHERE id = $1', [creator.userId]);
       await addLink(creator.cookie, { title: '링크', url: 'https://link.example' });
       const banner = await insertAdBanner();
       // 공개 랜딩이 passAccepted일 때 내려 주는 광고 clickUrl이 이 경로입니다(노출 1건도 함께 기록).

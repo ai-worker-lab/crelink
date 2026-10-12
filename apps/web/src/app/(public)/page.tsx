@@ -1,17 +1,8 @@
-import {
-  COOKIE_NAMES,
-  CRELINK_API_PATHS,
-  CRELINK_LIMITS,
-  CRELINK_WEB_PATHS,
-  type MeResponse,
-  type PublicSlotEventResponse,
-  type SlotEventView,
-} from '@crelink/shared';
+import { COOKIE_NAMES, CRELINK_API_PATHS, CRELINK_LIMITS, CRELINK_WEB_PATHS, type MeResponse } from '@crelink/shared';
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { HomeExampleLanding } from '../../components/HomeExampleLanding';
-import { HomeSlotEvent } from '../../components/HomeSlotEvent';
 import { LogoutButton } from '../../components/LogoutButton';
 import { serverApi, ServerApiError } from '../../lib/api/server';
 import { crelinkOpenGraph, SITE_DESCRIPTION, SITE_JSON_LD } from '../../lib/site';
@@ -43,20 +34,6 @@ async function readSession(): Promise<SessionState> {
   }
 }
 
-/**
- * 진행 중인 링크 슬롯 이벤트(R24 ④). 없음·시작 전·끝남이면 null이고, 조회가 실패해도 홈에 오류를 보이지 않고 안내만 뺍니다
- * (설계 docs/specs/crelink-slot-event.md `구성과 흐름`).
- */
-async function readOpenSlotEvent(): Promise<SlotEventView | null> {
-  try {
-    const { event } = await serverApi<PublicSlotEventResponse>(CRELINK_API_PATHS.publicSlotEvent);
-    return event?.status === 'open' ? event : null;
-  } catch (error) {
-    if (!(error instanceof ServerApiError)) throw error;
-    return null;
-  }
-}
-
 const HOME_TITLE = '인스타그램 프로필 링크 하나로 나를 소개하세요.';
 const HOME_LEAD =
   '크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.';
@@ -71,13 +48,12 @@ function GoogleStart() {
 }
 
 /** 로그인한 홈: 관리 화면으로 가는 입구(design/home-intro/handoff.md `로그인한 홈`, 바꾸지 않음). */
-function SignedInHome({ user, slotEvent }: { user: MeResponse; slotEvent: SlotEventView | null }) {
+function SignedInHome({ user }: { user: MeResponse }) {
   return (
     <section className="landing" aria-labelledby="home-title">
       <p className="brand-mark">크리링</p>
       <h1 id="home-title">{HOME_TITLE}</h1>
       <p>{HOME_LEAD}</p>
-      {slotEvent ? <HomeSlotEvent event={slotEvent} signedIn /> : null}
       <div className="home-actions">
         <p className="home-account">{user.email}으로 로그인했어요.</p>
         <div className="button-row">
@@ -97,12 +73,9 @@ function SignedInHome({ user, slotEvent }: { user: MeResponse; slotEvent: SlotEv
   );
 }
 
-/**
- * 로그인 전·로그인 확인 오류 홈 소개(design/home-intro/handoff.md 상태 A·B·E). 숫자는 `CRELINK_LIMITS`에서 읽고,
- * 이벤트 카드는 설명 아래·첫 버튼 위 한 곳에만 둡니다(로그인 확인 오류도 로그인 전 카드 C1과 같게).
- */
-function HomeIntro({ errorMessage, slotEvent }: { errorMessage: string | null; slotEvent: SlotEventView | null }) {
-  const { freeVisibleLinks, slugChangeIntervalDays, retiredSlugGraceDays } = CRELINK_LIMITS;
+/** 로그인 전·로그인 확인 오류 홈 소개(design/home-intro/handoff.md 상태 A·B·E). 숫자는 `CRELINK_LIMITS`에서 읽습니다. */
+function HomeIntro({ errorMessage }: { errorMessage: string | null }) {
+  const { totalLinks, slugChangeIntervalDays, retiredSlugGraceDays } = CRELINK_LIMITS;
   return (
     <div className="home-intro">
       <section className="home-hero" aria-labelledby="home-title">
@@ -110,7 +83,6 @@ function HomeIntro({ errorMessage, slotEvent }: { errorMessage: string | null; s
           <p className="brand-mark">크리링</p>
           <h1 id="home-title">{HOME_TITLE}</h1>
           <p className="home-hero-lead">{HOME_LEAD}</p>
-          {slotEvent ? <HomeSlotEvent event={slotEvent} signedIn={false} /> : null}
           <div className="home-actions">
             {errorMessage !== null ? (
               <p className="form-error" role="alert">
@@ -169,13 +141,13 @@ function HomeIntro({ errorMessage, slotEvent }: { errorMessage: string | null; s
             </p>
           </li>
           <li className="home-card">
-            <h3>외부 링크 {freeVisibleLinks}개</h3>
-            <p>
-              방문자에게 보이는 외부 링크를 {freeVisibleLinks}개까지 둘 수 있어요. 숨긴 링크는 이 수에 들어가지 않아요.
-            </p>
+            <h3>외부 링크 {totalLinks}개</h3>
+            <p>외부 링크를 {totalLinks}개까지 둘 수 있어요. 숨긴 링크도 이 수에 들어가요.</p>
           </li>
         </ul>
-        <p className="home-free-note">무료 랜딩에는 링크 사이에 크리링 광고가 한 칸 보일 수 있어요.</p>
+        <p className="home-free-note">
+          광고 블록은 기본으로 꺼져 있어요. 직접 켠 경우에만 링크 사이에 크리링 광고가 한 칸 보여요.
+        </p>
       </section>
       <section className="home-final" aria-labelledby="home-final-title">
         <h2 id="home-final-title">내 크리링을 만들어 보세요</h2>
@@ -187,15 +159,15 @@ function HomeIntro({ errorMessage, slotEvent }: { errorMessage: string | null; s
 }
 
 export default async function HomePage() {
-  const [session, slotEvent] = await Promise.all([readSession(), readOpenSlotEvent()]);
+  const session = await readSession();
   return (
     <main className="public-page">
       {/* 사이트 이름 선호(Google `WebSite` 구조화 데이터는 홈에만 둡니다). 고정 상수라 사용자 입력이 섞이지 않습니다. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: SITE_JSON_LD }} />
       {session.kind === 'signed-in' ? (
-        <SignedInHome user={session.user} slotEvent={slotEvent} />
+        <SignedInHome user={session.user} />
       ) : (
-        <HomeIntro errorMessage={session.kind === 'error' ? session.message : null} slotEvent={slotEvent} />
+        <HomeIntro errorMessage={session.kind === 'error' ? session.message : null} />
       )}
       <footer className="site-footer">
         <Link href={CRELINK_WEB_PATHS.docs}>문서</Link>

@@ -1,15 +1,11 @@
-import { CRELINK_API_PATHS, CRELINK_LIMITS, CRELINK_WEB_PATHS, type PublicSlotEventResponse } from '@crelink/shared';
+import { CRELINK_LIMITS, CRELINK_WEB_PATHS } from '@crelink/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { serverApi, ServerApiError } from '../../../../lib/api/server';
 import { crelinkOpenGraph } from '../../../../lib/site';
 
 const TITLE = '첫 크리링 완성 챌린지';
 const DESCRIPTION =
   '목적 하나 고르기, 내 실제 링크 하나 저장하기, 내 프로필에 공유할 준비까지. 보상이나 외부 게시 의무 없이 내 속도로 완성해요.';
-
-// 슬롯 신청 가능 여부는 정적 빌드 시점이 아닌 현재 API 상태로 안내합니다.
-export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -17,20 +13,7 @@ export const metadata: Metadata = {
   openGraph: { ...crelinkOpenGraph(TITLE, DESCRIPTION), url: '/docs/first-crelink-challenge' },
 };
 
-async function readSlotEvent() {
-  try {
-    return {
-      kind: 'loaded' as const,
-      ...(await serverApi<PublicSlotEventResponse>(CRELINK_API_PATHS.publicSlotEvent)),
-    };
-  } catch (error) {
-    if (!(error instanceof ServerApiError)) throw error;
-    return { kind: 'unavailable' as const };
-  }
-}
-
-export default async function FirstCrelinkChallengePage() {
-  const slotEvent = await readSlotEvent();
+export default function FirstCrelinkChallengePage() {
   return (
     <article className="prose">
       <h1>{TITLE}</h1>
@@ -118,8 +101,8 @@ export default async function FirstCrelinkChallengePage() {
           </li>
         </ol>
         <p>
-          저장 오류가 보이면 화면의 안내를 확인하고 주소를 고쳐 다시 저장해요. 한도가 찼다면 기존 링크를 수정하거나 숨김
-          상태와 한도를 확인해요. 이 안내는 URL 안전 검사·권한·차단·슬롯 한도를 우회하지 않아요. 자세한 조작은{' '}
+          저장 오류가 보이면 화면의 안내를 확인하고 주소를 고쳐 다시 저장해요. 한도가 찼다면 쓰지 않는 링크를 지우거나
+          기존 링크를 수정해요. 이 안내는 URL 안전 검사·권한·차단·링크 한도를 우회하지 않아요. 자세한 조작은{' '}
           <Link href={`${CRELINK_WEB_PATHS.docsGuide}#guide-links`}>외부 링크 관리 안내</Link>에서 볼 수 있어요.
         </p>
         <p>
@@ -159,34 +142,11 @@ export default async function FirstCrelinkChallengePage() {
         </p>
       </section>
 
-      <section aria-labelledby="challenge-slots">
-        <h2 id="challenge-slots">링크 슬롯 이벤트는 별도 선택이에요</h2>
+      <section aria-labelledby="challenge-limits">
+        <h2 id="challenge-limits">링크 한도</h2>
         <p>
-          첫 링크는 기본 보이는 링크 {CRELINK_LIMITS.freeVisibleLinks}개 범위에서 시작할 수 있어요. 기존 외부 링크 +5
-          이벤트는 챌린지 완성 보상이 아니에요. 안내를 읽거나 목적을 펼쳐도 자동 신청·보너스 부여는 없어요.
-        </p>
-        {slotEvent.kind === 'unavailable' ? (
-          <p>현재 이벤트 상태를 확인하지 못했어요. 신청 가능하다고 안내하지 않으며 관리 화면에서 다시 확인해 주세요.</p>
-        ) : slotEvent.event?.status === 'open' ? (
-          <p>
-            현재 기존 이벤트는 신청 기간이에요. 원하는 경우 <Link href="/me">내 크리링 편집</Link>의 이벤트 안내에서
-            <strong> 신청하기</strong>를 직접 눌러요. 신청한 계정만 보이는 링크를 {slotEvent.event.bonusLinks}개 더 둘
-            수 있어요. 신청 순간의 기간·결과는 관리 화면에서 다시 확인해 주세요.
-          </p>
-        ) : slotEvent.event?.status === 'scheduled' ? (
-          <p>현재 기존 이벤트는 시작 전이에요. 지금은 새 신청을 할 수 없지만 첫 링크 작성은 계속할 수 있어요.</p>
-        ) : slotEvent.event?.status === 'ended' ? (
-          <p>
-            현재 기존 이벤트는 종료됐어요. 새 신청은 받지 않으며 이미 받은 보너스는 유지돼요. 첫 링크 작성은 계속할 수
-            있어요.
-          </p>
-        ) : (
-          <p>현재 안내할 슬롯 이벤트가 없어요. 기본 한도에서 첫 링크를 작성할 수 있어요.</p>
-        )}
-        <p>
-          기존 이벤트 신청은 계정당 한 번이에요. 이미 신청했다면 다시 보너스를 받지 않고, 기간이 끝나도 받은 보너스는
-          유지돼요. 운영자 수동 추가 슬롯과 이벤트 보너스는 따로 합산하며 숨긴 링크를 포함한 전체 상한은{' '}
-          {CRELINK_LIMITS.totalLinks}개예요. 오류·이미 신청·종료 상태는 관리 화면의 실제 안내를 따라 주세요.
+          외부 링크는 숨긴 링크를 포함해 {CRELINK_LIMITS.totalLinks}개까지 둘 수 있어서 첫 링크는 바로 시작할 수 있어요.
+          챌린지를 마쳐도 한도가 늘거나 보상이 생기지는 않아요.
         </p>
       </section>
       <p>

@@ -9,7 +9,6 @@ import { BannerSlotNotice } from './BannerSlotSection';
 import { FirstRunGuide } from './FirstRunGuide';
 import { useManager } from './ManagerContext';
 import { ManagerStage, NarrowBar, PreviewLanding, type PreviewMode } from './ManagerPreview';
-import { SlotEventBand } from './SlotEventOffer';
 import { MANAGER_MENU, managerHref, managerMenuLabel, type ManagerMenuSegment } from './menu';
 
 /**
@@ -48,13 +47,8 @@ export function ManagerShell({ children }: { children: ReactNode }) {
             onClosed={() => document.querySelector<HTMLElement>('.narrow-bar .copy-control button')?.focus()}
           />
         ) : null}
-        {/* 배너 슬롯 회수 안내·링크 슬롯 이벤트 띠(좁은 화면 `페이지 편집`): 닫힌 시트 대신 초점을 받도록 미리보기 위에 둡니다. */}
-        {!wide && !narrowPreview && mode === 'edit' ? (
-          <>
-            <BannerSlotNotice autoFocus />
-            <SlotEventBand />
-          </>
-        ) : null}
+        {/* 슬롯 안내(배너 슬롯 회수·광고 블록 기능 꺼짐, 좁은 화면 `페이지 편집`): 닫힌 시트 대신 초점을 받도록 미리보기 위에 둡니다. */}
+        {!wide && !narrowPreview && mode === 'edit' ? <BannerSlotNotice autoFocus /> : null}
         {wide ? null : narrowPreview ? (
           <PreviewLanding key="plain" mode="plain" framed={false} />
         ) : mode === 'edit' ? (

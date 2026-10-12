@@ -215,12 +215,12 @@ describe('AI 실행 기록과 멈춤 스위치 (R23 ④⑤⑥)', () => {
     );
     const runId = (await start()).body.id;
     const creator = await login(t.baseUrl, 'runs-creator|runs-creator@example.com');
-    const slots = await api(t.baseUrl, 'PUT', `/api/admin/creators/${creator.body.user!.id}/extra-slots`, {
+    const granted = await api(t.baseUrl, 'PUT', `/api/admin/creators/${creator.body.user!.id}/banner-slot`, {
       token: ai.token,
       runId,
-      body: { extraSlots: 2 },
+      body: { granted: true },
     });
-    expect(slots.status).toBe(200);
+    expect(granted.status).toBe(200);
 
     const first = await api<AgentRunPage>(t.baseUrl, 'GET', '/api/admin/agent-runs', { cookie: operator });
     expect(first.body.items).toHaveLength(20);
@@ -240,12 +240,12 @@ describe('AI 실행 기록과 멈춤 스위치 (R23 ④⑤⑥)', () => {
     expect(detail.status).toBe(200);
     expect(detail.body.operatorActions).toEqual([
       expect.objectContaining({
-        action: 'creator.extra_slots',
+        action: 'creator.banner_slot',
         actor: { kind: 'ai', userId: ai.userId, email: ai.email },
         runId,
         subjectUserId: creator.body.user!.id,
-        before: { extraSlots: 0 },
-        after: { extraSlots: 2 },
+        before: { bannerSlotGranted: false },
+        after: { bannerSlotGranted: true },
       }),
     ]);
     for (const id of ['00000000-0000-4000-8000-000000000000', 'nope']) {
@@ -404,7 +404,6 @@ describe('운영자 지표 GET /api/admin/metrics (R23 ⑧, PRD 목표)', () => 
       visits: { last7Days: 0, last30Days: 0 },
       linkClicks: { last7Days: 0, last30Days: 0 },
       adBanners: { live: 0, impressionsLast7Days: 0, clicksLast7Days: 0 },
-      events: [{ key: 'slot_event_applications', label: '링크 슬롯 이벤트 신청', value: 0 }],
     });
 
     // 실사용자: 보이는 링크.
@@ -484,9 +483,6 @@ describe('운영자 지표 GET /api/admin/metrics (R23 ⑧, PRD 목표)', () => 
               ((now() AT TIME ZONE 'Asia/Seoul')::date - 7, $1, 'p1', 100, 50)`,
       [live],
     );
-    // R24 링크 슬롯 이벤트 신청 수(시드 이벤트는 열려 있음).
-    const entry = await api(t.baseUrl, 'POST', '/api/me/slot-event/entry', { cookie: real.cookie });
-    expect(entry.status).toBe(201);
 
     const result = await metrics();
     expect(result).toEqual({
@@ -500,7 +496,6 @@ describe('운영자 지표 GET /api/admin/metrics (R23 ⑧, PRD 목표)', () => 
       visits: { last7Days: 2, last30Days: 3 },
       linkClicks: { last7Days: 1, last30Days: 2 },
       adBanners: { live: 1, impressionsLast7Days: 15, clicksLast7Days: 3 },
-      events: [{ key: 'slot_event_applications', label: '링크 슬롯 이벤트 신청', value: 1 }],
     });
     const byAi = await api(t.baseUrl, 'GET', '/api/admin/metrics', { token: ai.token });
     expect(byAi.status).toBe(200);

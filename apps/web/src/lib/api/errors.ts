@@ -22,7 +22,6 @@ const API_ERROR_MESSAGES: Record<CrelinkErrorCode, string> = {
   link_not_found: '링크를 찾을 수 없어요. 새로고침한 뒤 다시 시도해 주세요.',
   link_url_invalid: 'http:// 또는 https://로 시작하는 올바른 주소를 입력해 주세요.',
   link_domain_blocked: '크리링 차단 목록에 있는 도메인이라 저장할 수 없어요.',
-  link_limit_reached: '보이는 링크 한도에 도달했어요. 다른 링크를 숨기거나 지운 뒤 다시 시도해 주세요.',
   link_total_limit_reached: '숨긴 링크를 포함해 링크는 최대 50개까지 둘 수 있어요.',
   order_mismatch: '목록이 다른 곳에서 바뀌었어요. 새로고침한 뒤 다시 시도해 주세요.',
   portfolio_item_not_found: '포트폴리오 항목을 찾을 수 없어요. 새로고침한 뒤 다시 시도해 주세요.',
@@ -43,11 +42,8 @@ const API_ERROR_MESSAGES: Record<CrelinkErrorCode, string> = {
   banner_slot_not_granted: '배너 슬롯이 회수되어 이 자리에 다시 크리링 광고 블록이 나와요.',
   ad_banner_not_found: '광고 배너를 찾을 수 없어요. 새로고침해 주세요.',
   banner_period_invalid: '게시 끝은 시작보다 뒤여야 해요.',
-  // 링크 슬롯 이벤트 고정 문구(설계 docs/specs/crelink-slot-event.md `디자인 검토 의견` 3, design/slot-event/handoff.md `문구 원문`).
-  // 신청의 404는 관리 화면이 `진행 중인 이벤트가 없어 신청하지 못했어요.`로 바꿔 보입니다(`SLOT_EVENT_NOT_FOUND_APPLY`).
-  slot_event_not_found: '이벤트를 찾을 수 없어요. 새로고침해 주세요.',
-  slot_event_closed: '이벤트 신청 기간이 아니어서 신청하지 못했어요.',
-  slot_event_period_invalid: '끝은 시작보다 뒤여야 해요.',
+  // 광고 블록 켜고 끄기(R20 ⑩). 플랫폼 스위치가 꺼져 있는 동안 크리에이터 스위치를 바꾸려 할 때입니다.
+  ad_block_unavailable: '크리링이 광고 블록 기능을 꺼 두어 지금은 바꿀 수 없어요.',
   agent_run_not_found: '실행 기록을 찾을 수 없어요.',
   agent_run_in_progress: '다른 AI 실행이 진행 중이에요.',
   agent_run_closed: '이미 끝난 실행 기록이에요.',
