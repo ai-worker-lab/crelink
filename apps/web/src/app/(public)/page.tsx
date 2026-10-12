@@ -14,12 +14,19 @@ import { HomeExampleLanding } from '../../components/HomeExampleLanding';
 import { HomeSlotEvent } from '../../components/HomeSlotEvent';
 import { LogoutButton } from '../../components/LogoutButton';
 import { serverApi, ServerApiError } from '../../lib/api/server';
-import { crelinkOpenGraph, SITE_DESCRIPTION } from '../../lib/site';
+import { crelinkOpenGraph, SITE_DESCRIPTION, SITE_JSON_LD } from '../../lib/site';
 
 // 로그인 상태는 요청마다 확인합니다.
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = { openGraph: { ...crelinkOpenGraph('크리링', SITE_DESCRIPTION), url: '/' } };
+/**
+ * 검색 결과 제목. `크리링`만으로는 같은 이름의 만화 등장인물 결과와 구별되지 않아 서비스 종류를 함께 적습니다(0174).
+ * 사이트 이름 선호는 아래 `WebSite` 구조화 데이터가 원본입니다.
+ */
+export const metadata: Metadata = {
+  title: { absolute: '크리링 - 크리에이터 링크인바이오·포트폴리오 랜딩페이지' },
+  openGraph: { ...crelinkOpenGraph('크리링', SITE_DESCRIPTION), url: '/' },
+};
 
 type SessionState =
   { kind: 'signed-out' } | { kind: 'signed-in'; user: MeResponse } | { kind: 'error'; message: string };
@@ -183,6 +190,8 @@ export default async function HomePage() {
   const [session, slotEvent] = await Promise.all([readSession(), readOpenSlotEvent()]);
   return (
     <main className="public-page">
+      {/* 사이트 이름 선호(Google `WebSite` 구조화 데이터는 홈에만 둡니다). 고정 상수라 사용자 입력이 섞이지 않습니다. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: SITE_JSON_LD }} />
       {session.kind === 'signed-in' ? (
         <SignedInHome user={session.user} slotEvent={slotEvent} />
       ) : (

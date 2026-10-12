@@ -13,6 +13,19 @@ export const SITE_DESCRIPTION =
   '인스타그램 프로필 링크 하나로 SNS·포트폴리오·외부 링크를 모아 보여 주는 크리에이터 랜딩페이지, 크리링.';
 
 /**
+ * 홈의 Google 사이트 이름 선호(`WebSite` 구조화 데이터, https://developers.google.com/search/docs/appearance/site-names).
+ * 이름은 `og:site_name`·홈 제목과 같은 `크리링`이고, 영문 이름과 소문자 도메인을 대안으로 둡니다.
+ * `<`를 이스케이프해 `</script>`로 끝나는 일이 없게 합니다.
+ */
+export const SITE_JSON_LD = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: '크리링',
+  alternateName: ['Crelink', 'links.shaul.kr'],
+  url: `${SITE_URL}/`,
+}).replace(/</g, '\\u003c');
+
+/**
  * 크리링 소개 링크 미리보기(홈·문서). 원본 HTML은 `apps/web/docs/og-image/og-image.html`(1200×630 화면 캡처).
  * 루트 레이아웃에 두지 않습니다. 공개 랜딩(`/p/{publicId}`)이 물려받으면 크리에이터 미리보기에 크리링 소개가 섞입니다.
  */
