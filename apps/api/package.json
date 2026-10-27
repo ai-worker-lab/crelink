@@ -16,7 +16,7 @@
     "@nestjs/common": "^12.1.2",
     "@nestjs/core": "^12.1.2",
     "@nestjs/platform-express": "^12.1.2",
-    "@sentry/nestjs": "~11.4.0",
+    "@sentry/nestjs": "~11.9.0",
     "bowser": "^2.14.1",
     "google-auth-library": "^11.1.0",
     "maxmind": "^5.0.7",
