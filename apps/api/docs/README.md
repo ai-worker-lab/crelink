@@ -254,6 +254,10 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 
 ## 통계와 보존 작업
 
+크리에이터 본인·운영자 서비스 통합 지표/통계는 [분석 조회](analytics.md)를 따릅니다. 역할별 `GET /api/me/analytics`, `/api/admin/analytics`가 같은 응답을 제공하고 원본·보존 합계는 단일 읽기 스냅샷에서 조회합니다. 기존 `/api/admin/metrics`는 사업 목표 지표로 유지합니다.
+
+브라우저의 페이지 표시·전체 대상 클릭·블록 노출·활성 체류·스크롤·언어/시간대/화면·익명 세션과 UTM 확장은 [공개 방문 계측](visitor-telemetry.md)을 따릅니다. `POST /api/landings/{publicId}/events`와 새 집계는 기존 302 방문·클릭 지표와 구분합니다.
+
 - 날짜 기준 시간대는 `Asia/Seoul`입니다(`STATS_TIME_ZONE`). 통계 기간은 `from`·`to` 양 끝 포함 최대 366일이고, 둘 다 없으면 오늘까지 30일입니다.
 - 보존 작업(R11, `src/retention/retention.service.ts`): 기동 시와 24시간마다 실행합니다. 트랜잭션 advisory lock(`pg_advisory_xact_lock`)으로 여러 인스턴스가 동시에 돌지 않게 하고, 늦게 온 인스턴스는 기다렸다가 남은 것만 처리합니다. 오늘(Asia/Seoul)에서 365일 전 0시보다 이전의 `visits`·`link_clicks`를 날짜·단축 URL 단위로 `visit_daily_rollups`, 값별로 `visit_dimension_rollups`(유입 호스트·기기·브라우저·OS·국가, 값이 없으면 `unknown`), 링크별로 `link_click_rollups`에 더하고, `creator_banner_clicks`는 배너별로 `creator_banner_click_rollups`에만 더한 뒤(`visit_daily_rollups.link_clicks`에 섞지 않음) 같은 트랜잭션에서 원본을 지웁니다. 집계에는 IP를 넣지 않습니다. 결과 건수는 로그로 남깁니다. `ad_banner_daily_stats`는 개인 식별 정보가 없는 집계라 계속 보관합니다.
 - 통계 API는 원본과 집계를 합칩니다. 집계된 날짜의 순 방문자는 날짜별 순 방문자 합이라, 원본 기간의 순 방문자(기간 전체에서 중복 제거)와 계산 방식이 다릅니다.

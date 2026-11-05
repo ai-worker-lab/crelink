@@ -58,6 +58,25 @@ export const MANAGER_MENU = [
     ),
   },
   {
+    segment: 'metrics',
+    label: '지표',
+    icon: (
+      <svg {...iconProps}>
+        <path d="M4 20V10h4v10M10 20V4h4v16M16 20v-7h4v7" />
+      </svg>
+    ),
+  },
+  {
+    segment: 'stats',
+    label: '통계',
+    icon: (
+      <svg {...iconProps}>
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <path d="M4 10h16M10 10v10M4 15h16" />
+      </svg>
+    ),
+  },
+  {
     segment: 'settings',
     label: '주소 설정',
     icon: (

@@ -5,7 +5,8 @@ import Link from 'next/link';
 export const metadata: Metadata = { title: '개인정보 처리방침' };
 
 /**
- * 개인정보 수집·보관·국외 이전 고지(R9·R11·R19·R24, Sentry). 근거: docs/specs/crelink-mvp.md `권한·보안·개인정보`,
+ * 개인정보 수집·보관·국외 이전 고지(R9·R11·R19·R24·R27, Sentry). 근거: docs/specs/crelink-mvp.md `권한·보안·개인정보`,
+ * docs/specs/crelink-visitor-data.md(방문·행동·환경·캠페인과 브라우저 저장소),
  * docs/specs/crelink-guestbook.md `권한·보안·개인정보`, docs/specs/crelink-ad-banner.md `권한·보안·개인정보`(배너 클릭·광고 노출 수),
  * docs/specs/crelink-link-limit-ad-toggle.md(끝난 링크 슬롯 이벤트의 신청 기록 삭제, work item 0179),
  * docs/adr/0012-error-monitoring-sentry.md, docs/adr/0014-sentry-free-plan-features.md. 법률 검토 전 문구입니다.
@@ -27,7 +28,7 @@ export default function PrivacyPage() {
           <p>
             크리에이터의 크리링 링크(단축 주소)로 들어오거나 랜딩페이지의 외부 링크·크리에이터 배너를 누르면 다음을
             기록해요. 다른 사이트나 메신저에서 랜딩페이지 주소로 바로 들어와도 크리링 링크를 거쳐 열리므로 같은 항목이
-            기록돼요.
+            기록돼요. 페이지가 열린 뒤에는 실제로 보인 구역과 누른 항목, 페이지를 이용한 정도도 기록해요.
           </p>
           <ul>
             <li>접근 시각과 접근한 크리링 링크(단축 주소)</li>
@@ -35,16 +36,22 @@ export default function PrivacyPage() {
             <li>기기·브라우저·운영체제 정보(User-Agent)</li>
             <li>IP 주소 원문과 IP로 추정한 대략적인 위치(국가·도시 수준)</li>
             <li>재방문을 구분하는 방문자 식별 쿠키 값</li>
-            <li>랜딩페이지에서 누른 외부 링크와 누른 시각</li>
-            <li>랜딩페이지에서 누른 크리에이터 배너와 누른 시각(외부 링크와 같은 항목을 함께 기록해요)</li>
+            <li>실제로 열린 페이지와 화면에 보인 구역·항목, 노출 시각</li>
+            <li>랜딩페이지에서 누른 외부 링크·SNS·포트폴리오·배너와 누른 시각</li>
+            <li>페이지가 화면에 보이는 동안의 이용 시간과 가장 아래까지 본 위치(스크롤 비율)</li>
+            <li>브라우저 언어·시간대, 화면과 표시 영역의 크기·픽셀 배율</li>
+            <li>공유 주소에 붙은 캠페인 정보(UTM의 유입원·매체·캠페인·ID·검색어·콘텐츠)</li>
+            <li>연속 이용과 페이지 열람을 구분하는 무작위 세션·페이지 식별자</li>
           </ul>
         </section>
 
         <section aria-labelledby="privacy-ad-banner">
           <h2 id="privacy-ad-banner">크리링 광고 노출·클릭 수</h2>
           <p>
-            랜딩페이지의 크리링 광고 블록이 보이거나 눌리면 날짜·랜딩페이지·광고 배너별 횟수만 세어요. 누가 보거나
-            눌렀는지 알아볼 수 있는 정보(IP 주소·방문자 식별 쿠키·기기 정보)는 이 기록에 남기지 않아요.
+            랜딩페이지를 불러올 때 첫 광고 배너를 노출로 세고, 광고 링크를 누른 횟수도 날짜·랜딩페이지·배너별로
+            집계해요. 이 기본 노출 수는 스크롤해서 실제 화면에 나타난 횟수와 다를 수 있어요. 이 합계에는 IP 주소·방문자
+            식별 쿠키·기기 정보를 넣지 않아요. 별도의 페이지 행동 기록에는 위 방문자 수집 항목과 함께 화면에 나타나거나
+            누른 광고 배너가 포함돼요.
           </p>
         </section>
 
@@ -112,11 +119,13 @@ export default function PrivacyPage() {
           <h2 id="privacy-purpose">이용 목적</h2>
           <ul>
             <li>크리에이터 랜딩페이지 제공과 크리링 링크 연결</li>
-            <li>크리에이터별·기간별 접근 통계 작성(크리링 운영자만 조회)</li>
+            <li>기간별 지표·통계 제공(운영자는 전체, 크리에이터는 본인 페이지의 집계만 조회)</li>
             <li>위험한 링크 차단 등 서비스 운영과 부정 이용 방지</li>
             <li>서비스 오류 파악과 성능 개선, 이용자 의견 확인(오류·성능 진단 정보)</li>
             <li>크리에이터 랜딩페이지 방명록 제공</li>
-            <li>크리링 광고 블록 운영(광고 배너별 노출·클릭 수 집계, 크리링 운영자만 조회)</li>
+            <li>
+              크리링 광고 블록 운영과 성과 집계(전체 광고 집계는 운영자, 본인 페이지의 관측 성과는 크리에이터도 조회)
+            </li>
           </ul>
         </section>
 
@@ -124,12 +133,13 @@ export default function PrivacyPage() {
           <h2 id="privacy-retention">보관 기간</h2>
           <ul>
             <li>
-              접근 기록 원본(IP 주소 원문 포함, 크리에이터 배너 클릭 기록 포함)은{' '}
+              접근·페이지 행동 기록 원본(IP 주소 원문과 클릭·노출·이용 시간·환경·캠페인 정보 포함)은{' '}
               {CRELINK_LIMITS.rawLogRetentionDays / 365}년 보관한 뒤 자동으로 지워요.
             </li>
             <li>
               지우기 전에 날짜별 합계(방문 수·순 방문자 수·클릭 수와 항목별 분포, 배너별 클릭 수)를 만들어 계속
-              보관해요. 합계에는 IP 주소를 넣지 않아요.
+              보관해요. 페이지 행동의 날짜별 횟수와 이용 정도도 합계로 남겨요. 합계에는 IP 주소나 방문자·세션 식별자를
+              넣지 않아요.
             </li>
             <li>크리링 광고 노출·클릭 수는 개인을 알아볼 수 있는 정보가 없는 합계라 계속 보관해요.</li>
             <li>크리에이터 계정 정보와 입력한 내용은 계정을 이용하는 동안 보관해요.</li>
@@ -146,12 +156,16 @@ export default function PrivacyPage() {
         </section>
 
         <section aria-labelledby="privacy-cookies">
-          <h2 id="privacy-cookies">쿠키</h2>
+          <h2 id="privacy-cookies">쿠키와 브라우저 저장소</h2>
           <ul>
             <li>
               <code>{COOKIE_NAMES.visitor}</code>: 크리링 링크(단축 주소) 도메인이 발급하는 무작위 방문자 식별자예요.
-              같은 방문자의 재방문을 구분하는 데만 쓰고 1년 동안 유지돼요. 별도 동의 창 없이 이 페이지로 알려 드려요.
-              쿠키를 막아도 랜딩페이지는 그대로 볼 수 있어요.
+              같은 방문자의 방문·클릭·노출·이용 정보를 연결하고 부정 이용을 막는 데 쓰며 1년 동안 유지돼요. 별도 동의 창
+              없이 이 페이지로 알려 드려요. 쿠키를 막아도 랜딩페이지는 그대로 볼 수 있어요.
+            </li>
+            <li>
+              브라우저 세션 저장소(sessionStorage): 랜딩페이지별 연속 이용을 구분하는 무작위 식별자를 보관해요. 같은
+              탭에서 이어서 방문할 때 쓰고 30분 동안 이용이 없으면 새 식별자로 바꿔요. 탭을 닫으면 저장소도 지워져요.
             </li>
             <li>
               <code>{COOKIE_NAMES.session}</code>: 크리에이터 로그인을 유지하는 쿠키예요. {CRELINK_LIMITS.sessionDays}일
@@ -166,7 +180,11 @@ export default function PrivacyPage() {
 
         <section aria-labelledby="privacy-access">
           <h2 id="privacy-access">열람 권한</h2>
-          <p>접근 기록은 크리링 운영자 화면에서만 볼 수 있어요. 크리에이터와 방문자 화면에는 보이지 않아요.</p>
+          <p>
+            크리링 운영자는 서비스 전체와 크리에이터별 지표·통계를 볼 수 있어요. 크리에이터는 로그인한 뒤 본인 페이지의
+            방문·클릭·노출·이용 시간과 유입·기기·지역 등의 집계 통계를 볼 수 있어요. 다른 크리에이터의 통계와 개별
+            방문자의 IP 주소·방문자 식별자·원문 기기 정보는 크리에이터 통계에 보여 주지 않아요.
+          </p>
         </section>
 
         <section aria-labelledby="privacy-transfer">

@@ -1,4 +1,11 @@
-import { CRELINK_API_PATHS, CRELINK_WEB_PATHS, LANDING_PASS_PARAM, type PublicLandingResponse } from '@crelink/shared';
+import {
+  CRELINK_API_PATHS,
+  CRELINK_WEB_PATHS,
+  LANDING_PASS_PARAM,
+  readLandingUtm,
+  withLandingUtm,
+  type PublicLandingResponse,
+} from '@crelink/shared';
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import Link from 'next/link';
@@ -6,6 +13,7 @@ import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { Landing } from '../../../../components/landing/Landing';
 import { PassCleanup } from '../../../../components/landing/PassCleanup';
+import { VisitorTracker } from '../../../../components/landing/VisitorTracker';
 import { serverApi, ServerApiError, type ServerApiResult } from '../../../../lib/api/server';
 
 export const dynamic = 'force-dynamic';
@@ -44,10 +52,11 @@ async function loadForRequest({ params, searchParams }: Props) {
   const value = query[LANDING_PASS_PARAM];
   const pass = typeof value === 'string' ? value : undefined;
   const result = await loadLanding(publicId, pass);
+  const utm = readLandingUtm(query);
   if (result.ok && !result.data.passAccepted && (await headers()).get('sec-fetch-site') !== 'same-origin') {
-    redirect(result.data.shortUrl);
+    redirect(withLandingUtm(result.data.shortUrl, utm));
   }
-  return { result, hasPass: value !== undefined };
+  return { result, hasPass: value !== undefined, utm };
 }
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
@@ -60,11 +69,19 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 }
 
 export default async function PublicLandingPage(props: Props) {
-  const { result, hasPass } = await loadForRequest(props);
+  const { result, hasPass, utm } = await loadForRequest(props);
   return (
     <div className="profile-page">
       {hasPass ? <PassCleanup /> : null}
-      <main className="profile-main">
+      {result.ok && result.data.passAccepted && result.data.telemetryToken && result.data.telemetrySessionKey ? (
+        <VisitorTracker
+          publicId={result.data.publicId}
+          token={result.data.telemetryToken}
+          sessionKey={result.data.telemetrySessionKey}
+          utm={utm}
+        />
+      ) : null}
+      <main className="profile-main" data-visitor-root>
         {result.ok ? <Landing landing={result.data} /> : <LandingError error={result.error} />}
       </main>
       <footer className="profile-footer">

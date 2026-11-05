@@ -6,6 +6,7 @@ export const IMAGE_MAX_LABEL = `${Math.floor(CRELINK_LIMITS.imageMaxBytes / (102
 /** API 오류 코드별 사용자 안내. 계약(`CrelinkErrorCode`)의 모든 코드를 다룹니다. */
 const API_ERROR_MESSAGES: Record<CrelinkErrorCode, string> = {
   validation_failed: '입력값을 확인해 주세요.',
+  telemetry_rate_limited: '방문 기록 요청이 많아요. 잠시 후 다시 시도해 주세요.',
   unauthenticated: '로그인이 필요해요. 다시 로그인해 주세요.',
   forbidden: '이 작업을 할 권한이 없어요.',
   auth_not_configured: '구글 로그인이 아직 설정되지 않았어요. 운영자에게 문의해 주세요.',

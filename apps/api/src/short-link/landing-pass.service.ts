@@ -6,7 +6,10 @@ export const LANDING_PASS_TTL_SECONDS = 60;
 
 /** HMAC-SHA256 앞 16바이트(base64url 22자). 위조돼도 피해가 "방문이 안 세어짐"뿐이라 이 길이로 충분합니다. */
 const SIGNATURE_BYTES = 16;
-const PASS_PATTERN = /^(\d{1,12})\.([A-Za-z0-9_-]{22})$/;
+const PASS_PATTERN = /^(\d{1,12})(?:\.([a-f0-9-]{36}))?\.([A-Za-z0-9_-]{22})$/;
+const TELEMETRY_PATTERN = /^(\d{1,12})\.(\d{1,12})\.([a-f0-9-]{36})\.([A-Za-z0-9_-]{22})$/;
+const VISITOR_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+export const TELEMETRY_TTL_SECONDS = 24 * 60 * 60;
 
 /**
  * 단축 주소 리디렉트(`GET {SHORT}/{slug}`)가 랜딩 주소에 붙이는 통과 표시(PRD R7).
@@ -25,9 +28,10 @@ export class LandingPassService {
   private readonly key = randomBytes(32);
 
   /** `nowMs`는 시험에서 만료를 만들 때만 넘깁니다. */
-  issue(publicId: string, nowMs = Date.now()): string {
+  issue(publicId: string, nowMs = Date.now(), visitorId?: string): string {
     const expires = Math.floor(nowMs / 1000) + LANDING_PASS_TTL_SECONDS;
-    return `${expires}.${this.sign(publicId, expires)}`;
+    const visitor = visitorId && VISITOR_PATTERN.test(visitorId) ? visitorId : undefined;
+    return `${expires}.${visitor ? `${visitor}.` : ''}${this.sign(publicId, expires, visitor)}`;
   }
 
   /** 이 publicId에 대해 발급했고 아직 만료되지 않은 표시면 true. 형식이 틀리거나 비어 있으면 false. */
@@ -36,16 +40,45 @@ export class LandingPassService {
     if (!match) return false;
     const expires = Number(match[1]);
     if (nowMs > expires * 1000) return false;
-    const expected = Buffer.from(this.sign(publicId, expires));
-    const given = Buffer.from(match[2]);
+    if (match[2] && !VISITOR_PATTERN.test(match[2])) return false;
+    const expected = Buffer.from(this.sign(publicId, expires, match[2]));
+    const given = Buffer.from(match[3]);
     return given.length === expected.length && timingSafeEqual(given, expected);
   }
 
-  private sign(publicId: string, expires: number): string {
-    return createHmac('sha256', this.key)
-      .update(`${publicId}.${expires}`)
-      .digest()
-      .subarray(0, SIGNATURE_BYTES)
-      .toString('base64url');
+  telemetryToken(publicId: string, pass: unknown, nowMs = Date.now()): string | null {
+    if (!this.verify(publicId, pass, nowMs)) return null;
+    const match = PASS_PATTERN.exec(pass as string)!;
+    const visitor = match[2];
+    if (!visitor) return null;
+    const expires = Math.floor(nowMs / 1000) + TELEMETRY_TTL_SECONDS;
+    const sourceAt = Number(match[1]) - LANDING_PASS_TTL_SECONDS;
+    return `${expires}.${sourceAt}.${visitor}.${this.signature(`telemetry.${publicId}.${expires}.${sourceAt}.${visitor}`)}`;
+  }
+
+  telemetrySessionKey(publicId: string, pass: unknown, nowMs = Date.now()): string | null {
+    if (!this.verify(publicId, pass, nowMs)) return null;
+    return PASS_PATTERN.exec(pass as string)?.[2] ?? null;
+  }
+
+  verifyTelemetry(
+    publicId: string,
+    token: unknown,
+    nowMs = Date.now(),
+  ): { visitorId: string; sourceAt: number } | null {
+    const match = typeof token === 'string' ? TELEMETRY_PATTERN.exec(token) : null;
+    if (!match || !VISITOR_PATTERN.test(match[3]) || nowMs > Number(match[1]) * 1000) return null;
+    const expected = Buffer.from(this.signature(`telemetry.${publicId}.${match[1]}.${match[2]}.${match[3]}`));
+    const supplied = Buffer.from(match[4]);
+    if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) return null;
+    return { visitorId: match[3], sourceAt: Number(match[2]) };
+  }
+
+  private sign(publicId: string, expires: number, visitorId?: string): string {
+    return this.signature(`${publicId}.${expires}${visitorId ? `.${visitorId}` : ''}`);
+  }
+
+  private signature(value: string): string {
+    return createHmac('sha256', this.key).update(value).digest().subarray(0, SIGNATURE_BYTES).toString('base64url');
   }
 }

@@ -21,6 +21,7 @@ import { MANAGER_MENU, managerHref, managerMenuLabel, type ManagerMenuSegment } 
 export function ManagerShell({ children }: { children: ReactNode }) {
   const wide = useWideLayout();
   const segment = useMenuSegment();
+  const analytics = segment === 'metrics' || segment === 'stats';
   const mode: PreviewMode = segment === '' ? 'edit' : segment === 'profile' ? 'profile' : 'plain';
   const [view, setView] = useState<'edit' | 'preview'>('edit');
   const [viewSegment, setViewSegment] = useState(segment);
@@ -32,14 +33,14 @@ export function ManagerShell({ children }: { children: ReactNode }) {
 
   // 자식 자리를 폭과 관계없이 고정합니다(없는 자리는 null). 그래야 1024px 경계를 넘거나 좁은 기기에서 하이드레이션할 때
   // 메뉴 내용(children)이 다시 마운트되지 않아 고른 대상·입력 중인 값·불러온 목록이 남습니다.
-  const narrowPreview = !wide && view === 'preview';
+  const narrowPreview = !analytics && !wide && view === 'preview';
   const guideHere = firstRunGuidePlacement({ wide, pageEditor: mode === 'edit', preview: narrowPreview }) === 'narrow';
   return (
-    <div className="manager">
+    <div className={`manager${analytics ? ' manager-analytics' : ''}`}>
       <ManagerMenu />
-      {wide ? <ManagerStage mode={mode} /> : null}
+      {wide && !analytics ? <ManagerStage mode={mode} /> : null}
       <main className="manager-panel">
-        {wide ? null : <NarrowBar view={view} onViewChange={setView} />}
+        {wide || analytics ? null : <NarrowBar view={view} onViewChange={setView} />}
         {narrowPreview ? <h1 className="visually-hidden">{managerMenuLabel(segment)} 미리보기</h1> : null}
         {/* 시작 안내 카드(좁은 화면 `페이지 편집`의 `편집` 모드): sticky 줄 바로 아래. 닫으면 sticky 줄 `복사`로 초점. */}
         {guideHere ? (

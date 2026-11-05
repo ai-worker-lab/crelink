@@ -131,7 +131,15 @@ function CreatorDetail({
       </section>
 
       <section className="card" aria-labelledby="stats-title">
-        <h2 id="stats-title">접근 통계</h2>
+        <h2 id="stats-title">접근 통계 · 리디렉트 기록</h2>
+        <nav className="preset-links" aria-label="크리에이터 방문자 분석">
+          <Link href={`/admin/metrics?${new URLSearchParams({ creatorId: creator.userId, from, to })}`}>
+            방문자 지표
+          </Link>
+          <Link href={`/admin/stats?${new URLSearchParams({ creatorId: creator.userId, from, to })}`}>
+            방문자 상세 통계
+          </Link>
+        </nav>
         <form className="period-form" action={base} method="get">
           <div className="field">
             <label htmlFor="stats-from">시작일</label>

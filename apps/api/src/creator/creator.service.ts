@@ -229,9 +229,9 @@ export class CreatorService {
     return `${this.config.webUrl}${CRELINK_WEB_PATHS.landing(publicId)}`;
   }
 
-  async socials(db: Queryable, landingId: string): Promise<SocialLinkView[]> {
+  async socials(db: Queryable, landingId: string, withId = false): Promise<SocialLinkView[]> {
     const result = await db.query<SocialLinkView>(
-      'SELECT platform, url FROM social_links WHERE landing_id = $1 ORDER BY position',
+      `SELECT ${withId ? 'id,' : ''} platform, url FROM social_links WHERE landing_id = $1 ORDER BY position`,
       [landingId],
     );
     return result.rows;

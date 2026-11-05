@@ -61,7 +61,7 @@ export class PublicLandingController {
          FROM links l WHERE l.user_id = $1 ORDER BY l.position, l.created_at`,
         [landing.user_id],
       ),
-      this.creator.socials(db, landing.id),
+      this.creator.socials(db, landing.id, true),
       this.creator.portfolio(db, landing.id),
       this.creator.shortLink(db, landing.user_id),
       // 부여됐으면 이 랜딩의 크리에이터 배너, 광고 블록이 켜졌으면 게시 중 크리링 배너(질의 1개), 둘 다 아니면 읽지 않습니다.
@@ -75,6 +75,8 @@ export class PublicLandingController {
     const slotBlockId = blocks.rows.find((block) => block.type === 'list')?.id;
     return {
       publicId,
+      telemetryToken: this.landingPass.telemetryToken(publicId, pass),
+      telemetrySessionKey: this.landingPass.telemetrySessionKey(publicId, pass),
       displayName: landing.display_name,
       bio: landing.bio,
       avatarUrl: landing.avatar_file_id ? this.files.imageUrl(landing.avatar_file_id) : null,
@@ -90,6 +92,7 @@ export class PublicLandingController {
         const blockLinks = links.rows.filter((link) => link.block_id === block.id);
         const slotPosition = block.slot_position;
         return {
+          id: block.id,
           type: 'list',
           links: blockLinks
             .filter((link) => link.visible)

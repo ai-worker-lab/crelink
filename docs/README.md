@@ -77,3 +77,7 @@ AI 운영자: [AI 운영자 기술 설계](specs/crelink-ai-operator.md) — 전
 - 외부 기술·라이선스 비교 자료: `docs/references/`
 
 하위 문서 폴더는 해당 범위의 첫 문서가 생길 때 만듭니다.
+
+- [방문자 행동 수집 확장](specs/crelink-visitor-data.md) - PRD R27, 기존 방문자 연결·UTM·가시 노출·외부 항목 클릭·활성 체류·환경 수집과 보존.
+
+- [지표·통계 화면과 조회 권한](specs/crelink-analytics.md) — R10·R28, 관리자 전체/사용자 본인, 요약·상세4화면·공유API·보존과 누락 의미.

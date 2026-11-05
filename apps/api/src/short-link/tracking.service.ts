@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as Bowser from 'bowser';
+import { readLandingUtm, type LandingUtm } from '@crelink/shared';
 import type { Request } from 'express';
 import maxmind, { CityResponse, Reader } from 'maxmind';
 import { isIP } from 'node:net';
@@ -46,6 +47,7 @@ interface RequestFacts {
   referrer: string | null;
   referrerHost: string | null;
   userAgent: string | null;
+  utm?: LandingUtm;
 }
 
 /** IPv4-mapped IPv6(`::ffff:1.2.3.4`)는 IPv4로, IPv6는 소문자로 바꿉니다. IP가 아니면 null. */
@@ -82,6 +84,7 @@ export function requestFacts(request: Request, trustedProxyHops: number): Reques
     referrer,
     referrerHost: referrer && URL.canParse(referrer) ? new URL(referrer).hostname || null : null,
     userAgent: request.headers['user-agent']?.slice(0, USER_AGENT_MAX) || null,
+    utm: readLandingUtm(request.query),
   };
 }
 
@@ -108,8 +111,8 @@ export class TrackingService {
   async recordVisit(shortLinkId: string, slug: string, visitorId: string, facts: RequestFacts): Promise<void> {
     const { country, city, deviceType, browser, os } = this.describe(facts);
     await this.database.query(
-      `INSERT INTO visits (short_link_id, slug, visitor_id, ip, country, city, referrer, referrer_host, user_agent, device_type, browser, os)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      `INSERT INTO visits (short_link_id, slug, visitor_id, ip, country, city, referrer, referrer_host, user_agent, device_type, browser, os, utm)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         shortLinkId,
         slug,
@@ -123,6 +126,7 @@ export class TrackingService {
         deviceType,
         browser,
         os,
+        facts.utm ?? {},
       ],
     );
   }

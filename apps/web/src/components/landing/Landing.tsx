@@ -41,35 +41,48 @@ export function Landing({
   const empty =
     !landing.displayName && !landing.bio && !landing.avatarUrl && landing.socials.length === 0 && !hasLinkContent;
 
-  const linkItems = links.map((link) => {
-    const content = (
-      <LinkCardContent
-        title={link.title}
-        description={link.description}
-        thumbnailUrl={link.thumbnailUrl}
-        faviconUrl={link.faviconUrl}
-      />
-    );
-    return (
-      <li key={link.id} className={edit ? 'edit-item-slot' : undefined}>
-        {edit ? (
-          <EditItem
-            edit={edit}
-            target={{ kind: 'link', id: link.id === DRAFT_ITEM_ID ? null : link.id }}
-            kindLabel="링크"
-            title={link.title}
-            className="link-card"
-          >
-            {content}
-          </EditItem>
-        ) : (
-          <a className="link-card" href={link.clickUrl} rel="noopener">
-            {content}
-          </a>
-        )}
-      </li>
-    );
-  });
+  const linkItems = landing.blocks.flatMap((block) =>
+    block.links.map((link) => {
+      const content = (
+        <LinkCardContent
+          title={link.title}
+          description={link.description}
+          thumbnailUrl={link.thumbnailUrl}
+          faviconUrl={link.faviconUrl}
+        />
+      );
+      return (
+        <li
+          key={link.id}
+          className={edit ? 'edit-item-slot' : undefined}
+          data-visitor-kind={block.id ? 'block' : undefined}
+          data-visitor-id={block.id}
+        >
+          {edit ? (
+            <EditItem
+              edit={edit}
+              target={{ kind: 'link', id: link.id === DRAFT_ITEM_ID ? null : link.id }}
+              kindLabel="링크"
+              title={link.title}
+              className="link-card"
+            >
+              {content}
+            </EditItem>
+          ) : (
+            <a
+              className="link-card"
+              href={link.clickUrl}
+              rel="noopener"
+              data-visitor-kind="link"
+              data-visitor-id={link.id}
+            >
+              {content}
+            </a>
+          )}
+        </li>
+      );
+    }),
+  );
   const placeholder = edit?.slotPlaceholder ?? null;
   const slotContent = slot ? (
     <BannerSlot slot={slot} displayName={landing.displayName} edit={edit} />
@@ -94,7 +107,12 @@ export function Landing({
     linkItems.splice(
       at,
       0,
-      <li key="banner-slot" className="banner-slot-item">
+      <li
+        key="banner-slot"
+        className="banner-slot-item"
+        data-visitor-kind={landing.blocks[0]?.id ? 'block' : undefined}
+        data-visitor-id={landing.blocks[0]?.id}
+      >
         {slotContent}
       </li>,
     );
@@ -130,11 +148,19 @@ export function Landing({
                     {content}
                   </EditItem>
                 ) : item.url ? (
-                  <a className="portfolio-card" href={item.url} rel="noopener">
+                  <a
+                    className="portfolio-card"
+                    href={item.url}
+                    rel="noopener"
+                    data-visitor-kind="portfolio"
+                    data-visitor-id={item.id}
+                  >
                     {content}
                   </a>
                 ) : (
-                  <div className="portfolio-card">{content}</div>
+                  <div className="portfolio-card" data-visitor-kind="portfolio" data-visitor-id={item.id}>
+                    {content}
+                  </div>
                 )}
               </li>
             );
@@ -199,7 +225,13 @@ export function Landing({
                 <span className="visually-hidden">{SOCIAL_PLATFORM_LABELS[social.platform].name}</span>
               </span>
             ) : (
-              <a className="social-link" href={social.url} rel="noopener">
+              <a
+                className="social-link"
+                href={social.url}
+                rel="noopener"
+                data-visitor-kind="social"
+                data-visitor-id={social.id}
+              >
                 <SocialIcon platform={social.platform} />
                 <span className="visually-hidden">{SOCIAL_PLATFORM_LABELS[social.platform].name}</span>
               </a>
@@ -312,11 +344,23 @@ function BannerSlot({
           );
         }
         return banner.clickUrl && !edit ? (
-          <a key={banner.id} className="banner-frame banner-link" href={banner.clickUrl} rel="noopener">
+          <a
+            key={banner.id}
+            className="banner-frame banner-link"
+            href={banner.clickUrl}
+            rel="noopener"
+            data-visitor-kind={ad ? 'ad_banner' : 'creator_banner'}
+            data-visitor-id={banner.id}
+          >
             {picture}
           </a>
         ) : (
-          <div key={banner.id} className="banner-frame">
+          <div
+            key={banner.id}
+            className="banner-frame"
+            data-visitor-kind={ad ? 'ad_banner' : 'creator_banner'}
+            data-visitor-id={banner.id}
+          >
             {picture}
           </div>
         );

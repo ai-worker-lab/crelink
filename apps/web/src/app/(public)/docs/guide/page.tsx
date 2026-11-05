@@ -38,11 +38,11 @@ export default function GuidePage() {
           </li>
           <li>
             관리 화면에는 <strong>페이지 편집</strong>·<strong>프로필</strong>·<strong>방명록</strong>·
-            <strong>주소 설정</strong> 메뉴가 있어요. 넓은 화면에서는 가운데에 방문자에게 보이는 모습이 미리보기로
-            보이고, 오른쪽 패널에서 고쳐요. 휴대폰에서는 위쪽의 <strong>편집</strong>·<strong>미리보기</strong>로 바꿔
-            봐요. 저장하기 전 입력도 미리보기에 바로 보여요(<strong>저장하지 않은 변경 포함</strong>). 미리보기 안
-            링크는 눌러도 열리지 않으니, 실제 페이지는 미리보기 위 주소 막대의 <strong>공개 페이지 열기</strong>로
-            확인해요.
+            <strong>지표</strong>·<strong>통계</strong>·<strong>주소 설정</strong> 메뉴가 있어요. 편집 메뉴의 넓은
+            화면에서는 가운데에 방문자에게 보이는 모습이 미리보기로 보이고, 오른쪽 패널에서 고쳐요. 휴대폰에서는 위쪽의{' '}
+            <strong>편집</strong>·<strong>미리보기</strong>로 바꿔 봐요. 저장하기 전 입력도 미리보기에 바로 보여요(
+            <strong>저장하지 않은 변경 포함</strong>). 미리보기 안 링크는 눌러도 열리지 않으니, 실제 페이지는 미리보기
+            위 주소 막대의 <strong>공개 페이지 열기</strong>로 확인해요.
           </li>
           <li>
             처음에는 <strong>페이지 편집</strong>에 <strong>인스타그램에 내 크리링 걸기</strong> 안내가 보여요. 링크나
@@ -177,6 +177,20 @@ export default function GuidePage() {
         </ul>
       </section>
 
+      <section aria-labelledby="guide-analytics">
+        <h2 id="guide-analytics">6. 내 페이지 지표·통계 보기</h2>
+        <p>
+          <strong>지표</strong>에서 내 페이지의 페이지뷰·익명 순 방문자·클릭·활성 체류와 일별 추이를 봐요.{' '}
+          <strong>통계</strong>에서는 대상별 클릭·노출, 스크롤 도달, 유입·캠페인·지역·기기 분포를 확인해요. 내 계정의
+          집계만 볼 수 있고 방문자의 원본 IP나 개인별 기록은 보여주지 않아요.
+        </p>
+        <p>
+          기간을 고르고 <strong>조회</strong>를 누르거나 최근 7·30·90일을 선택해요. 단축 주소 방문·링크 이동 기록은
+          브라우저 행동과 별도예요. 수집 이전이나 전송 차단으로 자료가 없을 수 있고, 과거 자료에서 복원할 수 없는 값은
+          확인 불가·계산 불가로 표시해요.
+        </p>
+      </section>
+
       <section aria-labelledby="guide-notes">
         <h2 id="guide-notes">알아 두면 좋은 것</h2>
         <ul>
@@ -184,7 +198,7 @@ export default function GuidePage() {
             크리링 차단 목록에 있는 도메인은 링크로 저장할 수 없어요. 크리링이 안전을 위해 차단한 링크에는{' '}
             <strong>차단됨</strong>이 붙고 방문자에게 보이지 않아요.
           </li>
-          <li>방문 수와 링크 클릭 수는 지금은 크리에이터 화면에서 볼 수 없어요.</li>
+          <li>지표·통계의 지역은 추정 값이고 익명 순 방문자가 실제 사람 수를 보장하지는 않아요.</li>
           <li>
             방문자와 크리에이터에게서 무엇을 수집하고 얼마나 보관하는지는{' '}
             <Link href={CRELINK_WEB_PATHS.privacy}>개인정보 처리방침</Link>에 있어요.
