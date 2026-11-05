@@ -79,13 +79,15 @@ export class AnalyticsService {
       throw invalid();
     if (query.includeExcluded !== undefined && query.includeExcluded !== '1') throw invalid();
 
+    // 운영자도 자기 랜딩은 조회하며, 관리자 집계는 기존 사람 크리에이터 범위를 유지한다.
+    const creatorRole = ownUserId ? '' : "AND u.role='creator'";
     return this.database.snapshot(async (db) => {
       let creatorId = ownUserId ?? (query.creatorId as string | undefined);
       let landingPublicId = query.landingPublicId as string | undefined;
       if (creatorId || landingPublicId) {
         const selected = await db.query<{ user_id: string; public_id: string }>(
           `SELECT l.user_id,l.public_id FROM landings l JOIN users u ON u.id=l.user_id
-           WHERE u.kind='human' AND u.role='creator' AND ($1::uuid IS NULL OR l.user_id=$1)
+           WHERE u.kind='human' ${creatorRole} AND ($1::uuid IS NULL OR l.user_id=$1)
              AND ($2::text IS NULL OR l.public_id=$2)`,
           [creatorId ?? null, landingPublicId ?? null],
         );
@@ -99,7 +101,7 @@ export class AnalyticsService {
       const params = [creatorId ?? null, includeExcluded, range.from, range.to, STATS_TIME_ZONE];
       const scope = `WITH scope AS (
         SELECT sl.id FROM short_links sl JOIN users u ON u.id=sl.user_id
-        WHERE u.kind='human' AND u.role='creator' AND ($1::uuid IS NULL OR u.id=$1)
+        WHERE u.kind='human' ${creatorRole} AND ($1::uuid IS NULL OR u.id=$1)
           AND ($1::uuid IS NOT NULL OR $2::boolean OR u.metrics_excluded_at IS NULL)
       )`;
       const rawRange = `e.short_link_id IN (SELECT id FROM scope)

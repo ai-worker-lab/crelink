@@ -133,6 +133,43 @@ describe('본인·관리자 방문 분석', () => {
     });
   });
 
+  it('운영자도본인랜딩의집계를조회하고서비스전체의크리에이터범위는유지한다', async () => {
+    const owner = await creator();
+    const other = await creator();
+    await t.pool.query("UPDATE users SET role='operator',metrics_excluded_at=now() WHERE id=$1", [owner.userId]);
+    const view = await event(owner, 'page_view', '2026-11-02 12:00+09', { active: 12000 });
+    await event(owner, 'click', '2026-11-02 12:00:01+09', {
+      ...view,
+      targetKind: 'block',
+      targetId: owner.blockId,
+    });
+    await event(other, 'page_view', '2026-11-02 12:00+09', { active: 90000 });
+    await t.pool.query(
+      "INSERT INTO visits(short_link_id,slug,visitor_id,occurred_at) VALUES($1,'s',$2,'2026-11-02 12:00+09')",
+      [owner.shortId, randomUUID()],
+    );
+
+    const response = await mine(owner, '2026-11-02');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(response.body.scope).toEqual({
+      kind: 'creator',
+      creatorId: owner.userId,
+      landingPublicId: owner.publicId,
+      includeExcluded: false,
+    });
+    expect(response.body.summary).toMatchObject({ pageViews: 1, clicks: 1, activeMs: 12000 });
+    expect(response.body.legacy.visits).toBe(1);
+    expect(response.body.targets[0]).toMatchObject({ targetId: owner.blockId, clicks: 1 });
+    for (const includeExcluded of ['', '&includeExcluded=1']) {
+      const all = await report(`/api/admin/analytics?from=2026-11-02&to=2026-11-02${includeExcluded}`, owner.cookie);
+      expect(all.status).toBe(200);
+      expect(all.body.summary).toMatchObject({ pageViews: 1, clicks: 0, activeMs: 90000 });
+    }
+    expect((await report(`/api/me/analytics?creatorId=${other.userId}`, owner.cookie)).status).toBe(400);
+    expect((await report(`/api/admin/analytics?creatorId=${owner.userId}`)).status).toBe(404);
+  });
+
   it('본인자료만반환하고누적active중복·후속클릭중복을제거하며원식별자를내보내지않는다', async () => {
     const owner = await creator();
     const other = await creator();

@@ -1,12 +1,12 @@
 # 크리에이터·서비스 지표와 통계
 
-로그인한 크리에이터는 본인 페이지의 집계를, 운영자는 서비스 전체 또는 선택 크리에이터의 집계를 조회합니다. 지표와 통계 화면은 같은 응답을 사용합니다. 방문자 IP·원문 UA·방문자/세션/페이지뷰/이벤트 UUID와 개별 방문 기록은 반환하지 않습니다. 계약은 [AnalyticsReport](../../../packages/shared/src/analytics.ts), 구현은 [AnalyticsService](../src/analytics/analytics.service.ts), 공유 경로는 [crelink.ts](../../../packages/shared/src/crelink.ts)가 기준입니다. 요구·화면은 [조회 설계](../../../docs/specs/crelink-analytics.md)를 따릅니다.
+본인 랜딩이 있는 사람 계정은 역할에 관계없이 본인 페이지의 집계를 조회합니다. 운영자는 서비스 전체 또는 선택 크리에이터의 집계도 조회합니다. 지표와 통계 화면은 같은 응답을 사용합니다. 방문자 IP·원문 UA·방문자/세션/페이지뷰/이벤트 UUID와 개별 방문 기록은 반환하지 않습니다. 계약은 [AnalyticsReport](../../../packages/shared/src/analytics.ts), 구현은 [AnalyticsService](../src/analytics/analytics.service.ts), 공유 경로는 [crelink.ts](../../../packages/shared/src/crelink.ts)가 기준입니다. 요구·화면은 [조회 설계](../../../docs/specs/crelink-analytics.md)를 따릅니다.
 
 ## 조회와 권한
 
 | 경로 | 권한 | 조건 |
 | --- | --- | --- |
-| `GET /api/me/analytics` | `SessionGuard` | `CurrentUser.id`의 페이지. `from`, `to`만 허용 |
+| `GET /api/me/analytics` | `SessionGuard` | `CurrentUser.id`의 페이지(사람 크리에이터·운영자). `from`, `to`만 허용 |
 | `GET /api/admin/analytics` | `OperatorGuard` | `from`, `to`, 선택 `creatorId`, `landingPublicId`, `includeExcluded=1` |
 
 날짜는 `YYYY-MM-DD`, `Asia/Seoul` 기준 양 끝 포함이며 기본은 오늘까지 30일, 최대 366일입니다. 잘못된 날짜는 400 `date_range_invalid`, 중복·알 수 없는 query와 필터 형식 오류는 400 `validation_failed`입니다. 없는 크리에이터와 서로 맞지 않는 계정·랜딩 조건은 404 `creator_not_found`, 미로그인은 401, 운영자가 아닌 관리 경로 접근은 403입니다. 본인 경로는 계정·랜딩·시험 계정 포함 필터를 거부해 타인 범위로 넓힐 수 없습니다. 응답 캐시는 `private, no-store`입니다.
@@ -39,6 +39,6 @@
 
 ## 검증
 
-[analytics.e2e-spec.ts](../test/analytics.e2e-spec.ts)는 실제 일회용 PostgreSQL과 HTTP에서 권한·본인 범위·관리 필터·서비스 전체 DISTINCT·누적 체류·cohort 자정·원식별자 비노출·날짜/빈 구간·기존 302 분리·보존 전후·이전 집계의 null·원본 읽기 뒤 실제 보존 커밋을 검증합니다. 동시성 회귀는 새 조회와 기존 운영자 통계 모두에 적용합니다. 운영 DB·실제 개인정보는 시험에 사용하지 않습니다.
+[analytics.e2e-spec.ts](../test/analytics.e2e-spec.ts)는 실제 일회용 PostgreSQL과 HTTP에서 권한·본인 범위·관리 필터·서비스 전체 DISTINCT·누적 체류·cohort 자정·원식별자 비노출·날짜/빈 구간·기존 302 분리·보존 전후·이전 집계의 null·원본 읽기 뒤 실제 보존 커밋을 검증합니다. 운영자 본인 조회는 실제 이벤트·기존 방문 집계를 반환하고, 타인 자료와 관리자 전체 집계의 운영자 제외 정책을 유지하는지 확인합니다. 동시성 회귀는 새 조회와 기존 운영자 통계 모두에 적용합니다. 운영 DB·실제 개인정보는 시험에 사용하지 않습니다.
 
 집중 명령: `pnpm --filter @crelink/api test --runInBand analytics admin landing-events health`.

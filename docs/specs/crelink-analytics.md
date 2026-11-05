@@ -21,7 +21,7 @@
 
 구현 원본은 `packages/shared/src/analytics.ts`와 `crelink.ts`의 경로, API 서비스·controller·migration이다.
 
-- `GET /api/me/analytics`: SessionGuard, CurrentUser.id로만 조회 범위를 결정. 계정/타인 랜딩/시험계정 포함 같은 관리자 필터는 거부한다.
+- `GET /api/me/analytics`: SessionGuard, CurrentUser.id로만 조회 범위를 결정. 본인 랜딩이 있는 사람 운영자도 자기 집계를 조회할 수 있다. 계정/타인 랜딩/시험계정 포함 같은 관리자 필터는 거부한다.
 - `GET /api/admin/analytics`: OperatorGuard. 날짜 외에 선택 creatorId·landingPublicId와 includeExcluded=1을 받는다. 잘못된 형식은 400, 없는 대상·서로 맞지 않는 필터는 404. 일반 사용자는 403, 비로그인은 401.
 - 두 화면은 역할별 하나의 AnalyticsReport를 공유해 불필요한 중복 API를 만들지 않는다. 기존 `GET /api/admin/metrics`(운영 목표)은 변경하지 않고 관리자 요약 화면이 별도 기간·정의로 병행한다.
 - 서비스 기본 집계는 기존 실사용 지표와 맞춰 human creator 중 지표 제외 표시가 없는 계정이다. 관리자는 “시험 계정 포함”으로 제외 표시 계정도 통합하거나 해당 크리에이터를 직접 골라 볼 수 있다. 본인 조회는 제외 표시와 무관하다.
