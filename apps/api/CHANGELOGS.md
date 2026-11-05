@@ -4,6 +4,8 @@
 
 ## 2026-11-06
 
+- 운영자 본인 분석404 수정(0194): `AnalyticsService`의 본인 대상 확인과 공통 집계 범위에서 역할 제한을 제거하고 사람 계정·본인ID를 유지합니다. 관리자 전체·명시 크리에이터 조회의 역할 제한은 유지합니다. 실제 PostgreSQL HTTP 회귀에서 본인 이벤트/기존 방문·타인 격리·서비스 전체 제외를 확인합니다. 근거 `docs/work/orchestrator/0194-operator-own-analytics.md`, 공개 릴리스 `v0.1.1`.
+
 - 크리에이터 본인·운영자 서비스 통합 지표/통계 조회 `GET /api/me/analytics`, `/api/admin/analytics`를 추가했습니다. 서울 날짜·계정/랜딩/시험 계정 필터·원본 고유 방문/세션·cohort 클릭률·활성 체류·스크롤·대상·UTM/유입/기기 분포를 집계하며 방문자 원식별자는 반환하지 않습니다. 기존 AI 운영 목표 `/api/admin/metrics`와 302 통계 계약은 유지합니다. `0010_analytics_rollups`는 nullable 카운터와 비식별 분포 집계를 추가하고 복원 불가 과거 값은 null/unknown으로 구분합니다. 새 조회·기존 StatsService 모두 단일 읽기 스냅샷을 사용하며 실제 보존 커밋을 교차한 회귀로 중복을 방지합니다. [운영 안내](docs/analytics.md), 근거 `docs/work/api/0190-analytics-contract.md`, `docs/work/api/0191-analytics-api.md`.
 
 ## 2026-11-05

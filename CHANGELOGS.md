@@ -6,6 +6,8 @@
 
 ## 2026-11-06
 
+- 운영자 본인 지표·통계의 `creator_not_found` 수정(0194): 본인 조회의 대상·집계 범위에서 운영자 역할을 허용하고 관리자 전체의 크리에이터 기준은 유지합니다. API HTTP 회귀와 운영 브라우저 확인을 연결합니다. 근거 `docs/work/orchestrator/0194-operator-own-analytics.md`, 공개 릴리스 `v0.1.1`.
+
 - 방문자 수집·지표·통계 운영 배포 착수(0193): 사용자 명시 배포 요청에 따라 검증된 전체 변경의 PR·CI·main 병합·기존 Blue/Green CD를 진행합니다. 사용자 릴리스 `v0.1.0`을 기록했으며 실제 배포 결과는 `docs/work/orchestrator/0193-analytics-release.md`에 남깁니다.
 
 - 지표·통계 구현·로컬 검증(0188): R10을 관리자 전체·크리에이터 본인 집계 조회로 확대하고 역할별4화면과 메뉴·공유 조회 계약·보존 분포·권한 경계를 연결했습니다. 실제 고립 DB와390/1280브라우저에서 관리자 통합/선택·본인 조회·공개 방문 증분·오류 복구를 확인했습니다. 기준: `docs/specs/crelink-analytics.md`, PRD R28, `design/analytics/handoff.md`. 실제 검증은 `docs/work/orchestrator/0188-analytics.md`에 기록합니다.
