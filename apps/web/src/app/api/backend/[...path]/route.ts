@@ -2,6 +2,7 @@ import { COOKIE_NAMES } from '@crelink/shared';
 import type { NextRequest } from 'next/server';
 import { forwardToApi, proxyErrorResponse } from '../../../../lib/api/proxy';
 import { apiOrigin, apiRequestHeaders } from '../../../../lib/api/server';
+import { readVisitorEventBody } from '../../../../lib/api/visitor-event';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,10 +12,11 @@ export const dynamic = 'force-dynamic';
  * `upload`는 multipart 본문과 Content-Type(boundary 포함)을 그대로 넘기는 경로입니다.
  */
 const ID = '[^/]+';
-const rules: ReadonlyArray<{ methods: readonly string[]; pattern: RegExp; upload?: true }> = [
+const rules: ReadonlyArray<{ methods: readonly string[]; pattern: RegExp; upload?: true; visitorEvent?: true }> = [
   { methods: ['GET'], pattern: /^api\/health$/ },
   { methods: ['POST'], pattern: /^api\/auth\/logout$/ },
   { methods: ['GET'], pattern: /^api\/me$/ },
+  { methods: ['GET'], pattern: /^api\/(me|admin)\/analytics$/ },
   { methods: ['GET', 'PATCH'], pattern: /^api\/me\/landing$/ },
   { methods: ['GET'], pattern: /^api\/me\/short-link\/availability$/ },
   { methods: ['PUT'], pattern: /^api\/me\/short-link\/slug$/ },
@@ -34,6 +36,7 @@ const rules: ReadonlyArray<{ methods: readonly string[]; pattern: RegExp; upload
   { methods: ['POST'], pattern: /^api\/me\/files$/, upload: true },
   { methods: ['GET'], pattern: new RegExp(`^api/files/${ID}$`) },
   { methods: ['GET'], pattern: new RegExp(`^api/public/landings/${ID}$`) },
+  { methods: ['POST'], pattern: /^api\/landings\/[a-z0-9]{10}\/events$/, visitorEvent: true },
   { methods: ['GET'], pattern: /^api\/admin\/creators$/ },
   { methods: ['GET'], pattern: new RegExp(`^api/admin/creators/${ID}$`) },
   { methods: ['GET'], pattern: new RegExp(`^api/admin/creators/${ID}/stats$`) },
@@ -79,11 +82,17 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
   request.nextUrl.searchParams.forEach((value, key) => target.searchParams.append(key, value));
   const headers = apiRequestHeaders({ Accept: request.headers.get('accept') ?? 'application/json' });
   const session = request.cookies.get(COOKIE_NAMES.session)?.value;
-  if (session) headers.set('Cookie', `${COOKIE_NAMES.session}=${session}`);
+  if (session && !rule.visitorEvent) headers.set('Cookie', `${COOKIE_NAMES.session}=${session}`);
   let body: ArrayBuffer | string | undefined;
   if (mutating) {
     const contentType = request.headers.get('content-type');
-    if (rule.upload) {
+    if (rule.visitorEvent) {
+      const eventBody = await readVisitorEventBody(request);
+      if (eventBody instanceof Response) return eventBody;
+      body = eventBody;
+      headers.set('Content-Type', 'application/json');
+      headers.set('Origin', request.headers.get('origin')!);
+    } else if (rule.upload) {
       if (contentType) headers.set('Content-Type', contentType);
       body = await request.arrayBuffer();
     } else {

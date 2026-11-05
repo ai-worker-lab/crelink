@@ -119,8 +119,11 @@ export class Database implements OnModuleInit, OnModuleDestroy {
       // DB가 응답하지 않을 때 요청(readiness 포함)이 무한히 기다리지 않게 합니다.
       connectionTimeoutMillis: 5000,
     });
-    // DB가 idle 연결을 끊으면 pool이 error를 냅니다. 처리하지 않으면 프로세스가 종료됩니다.
-    this.pool.on('error', (error) => this.logger.error(`idle PostgreSQL 연결 오류: ${error.message}`));
+    const onConnectionError = (error: Error) => this.logger.error(`PostgreSQL 연결 오류: ${error.message}`);
+    this.pool.on('error', onConnectionError);
+    // pg-pool은 대여 중 idle 오류 리스너를 떼므로 트랜잭션 연결도 따로 처리해야 합니다.
+    this.pool.on('acquire', (client) => client.on('error', onConnectionError));
+    this.pool.on('release', (_error, client) => client.removeListener('error', onConnectionError));
     await this.pool.query('SELECT 1');
     await runMigrations(this.pool, resolve(__dirname, '../migrations'));
   }
@@ -136,6 +139,13 @@ export class Database implements OnModuleInit, OnModuleDestroy {
   }
   transaction<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {
     return withTransaction(this.pool, run);
+  }
+  /** 원본 → 보존 집계 이동 중에도 여러 조회가 같은 스냅샷을 읽습니다. */
+  snapshot<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {
+    return this.transaction(async (client) => {
+      await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      return run(client);
+    });
   }
 }
 

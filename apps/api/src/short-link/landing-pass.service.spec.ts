@@ -27,4 +27,18 @@ describe('LandingPassService (단축 주소 통과 표시)', () => {
       expect(pass.verify('abcdefghij', value, now)).toBe(false);
     }
   });
+
+  it('방문자 바인딩 표시는 목적과 페이지가 다른 계측 토큰으로 사용할 수 없다', () => {
+    const visitor = '11111111-2222-4333-8444-555555555555';
+    const bound = pass.issue('abcdefghij', now, visitor);
+    expect(pass.verify('abcdefghij', bound, now)).toBe(true);
+    expect(pass.verify('abcdefghij', bound.replace(visitor, '22222222-2222-4333-8444-555555555555'), now)).toBe(false);
+    const token = pass.telemetryToken('abcdefghij', bound, now)!;
+    expect(pass.verifyTelemetry('abcdefghij', token, now)).toEqual({ visitorId: visitor, sourceAt: now / 1000 });
+    expect(pass.verifyTelemetry('another-id', token, now)).toBeNull();
+    expect(pass.verifyTelemetry('abcdefghij', bound, now)).toBeNull();
+    expect(pass.verify('abcdefghij', token, now)).toBe(false);
+    expect(pass.verifyTelemetry('abcdefghij', token, now + 24 * 60 * 60 * 1000 + 1)).toBeNull();
+    expect(pass.telemetryToken('abcdefghij', pass.issue('abcdefghij', now), now)).toBeNull();
+  });
 });

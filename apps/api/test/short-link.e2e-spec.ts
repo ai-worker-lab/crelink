@@ -33,7 +33,7 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
       .public_id;
   /** 단축 주소 302의 랜딩 주소. 통과 표시 `?pass=<만료 초>.<서명 22자>`가 붙습니다. */
   const landingLocation = (publicId: string) =>
-    new RegExp(`^${WEB_URL.replace(/\./g, '\\.')}/p/${publicId}\\?pass=\\d+\\.[A-Za-z0-9_-]{22}$`);
+    new RegExp(`^${WEB_URL.replace(/\./g, '\\.')}/p/${publicId}\\?pass=\\d+\\.(?:[a-f0-9-]{36}\\.)?[A-Za-z0-9_-]{22}$`);
   const publicLanding = (publicId: string, pass?: string) =>
     api<PublicLandingResponse>(
       t.baseUrl,
@@ -251,10 +251,11 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
       displayName: '공개 이름',
       bio: null,
       avatarUrl: null,
-      socials: [{ platform: 'instagram', url: 'https://instagram.com/me' }],
+      socials: [{ id: expect.any(String), platform: 'instagram', url: 'https://instagram.com/me' }],
       portfolio: [{ id: expect.any(String), title: '작업', url: null, description: null, imageUrl: null }],
       blocks: [
         {
+          id: expect.any(String),
           type: 'list',
           links: [
             {
@@ -272,6 +273,8 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
       ],
       guestbookEnabled: true,
       passAccepted: false,
+      telemetryToken: null,
+      telemetrySessionKey: null,
       shortUrl: `${SHORT_URL}/${creator.slug}`,
     });
   });

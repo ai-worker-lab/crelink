@@ -1,6 +1,13 @@
 import { Controller, Get, Param, Req, RequestMethod, Res } from '@nestjs/common';
 import type { RouteInfo } from '@nestjs/common/interfaces';
-import { COOKIE_NAMES, CRELINK_LIMITS, CRELINK_WEB_PATHS, NoticeReason } from '@crelink/shared';
+import {
+  COOKIE_NAMES,
+  CRELINK_LIMITS,
+  CRELINK_WEB_PATHS,
+  NoticeReason,
+  readLandingUtm,
+  withLandingUtm,
+} from '@crelink/shared';
 import type { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { AppConfig } from '../config.service';
@@ -193,7 +200,10 @@ export class ShortLinkController {
     countBusinessMetric('crelink.short_link.visit');
     this.redirect(
       response,
-      `${this.config.webUrl}${CRELINK_WEB_PATHS.landing(target.public_id, this.landingPass.issue(target.public_id))}`,
+      withLandingUtm(
+        `${this.config.webUrl}${CRELINK_WEB_PATHS.landing(target.public_id, this.landingPass.issue(target.public_id, Date.now(), visitorId))}`,
+        readLandingUtm(request.query),
+      ),
     );
   }
 }

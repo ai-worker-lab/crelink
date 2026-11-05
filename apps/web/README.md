@@ -4,6 +4,8 @@ Next.js App Router와 TypeScript 기반 크리링(CreLink) 웹 클라이언트�
 
 ## 화면
 
+지표·통계는 크리에이터가 본인 집계를, 관리자가 전체·선택 계정 집계를 조회합니다. 공용 서버 화면·필터·수치 의미는 [지표·통계 안내](docs/analytics.md)에 있습니다.
+
 | 경로 | 내용 |
 | --- | --- |
 | `/` | 로그인 전·로그인 확인 오류는 소개 화면(디자인 `design/home-intro/`): 첫 화면(제목·설명·`구글로 시작하기`, 1024px 이상은 오른쪽에 가상 예시 랜딩 `HomeExampleLanding`), `이렇게 시작해요` 3단계와 `사용 안내 자세히 보기`(`/docs/guide`), `무료로 쓸 수 있어요`(카드 `외부 링크 {CRELINK_LIMITS.totalLinks}개`·숨긴 링크 포함, 숫자는 `CRELINK_LIMITS`)와 광고 블록은 기본으로 꺼져 있다는 한 줄, 마지막 `구글로 시작하기`. 로그인 후는 한 열 화면 그대로 `내 크리링 편집`(`/me`, 운영자는 `/admin`도) |
@@ -19,6 +21,10 @@ Next.js App Router와 TypeScript 기반 크리링(CreLink) 웹 클라이언트�
 | `/admin/agent-runs`, `/admin/agent-runs/[runId]` | AI 운영자 실행 기록(설계 `docs/specs/crelink-ai-operator.md` `화면 상태와 API 대응`). 첫 쪽은 멈춤 스위치(상태·사유·바꾼 사람·시각, 켤 때 선택 사유와 확인)·진행 중 실행(90분이 지나면 "다음 실행 때 포기 처리됨")·지표 카드(실사용자 `n / 100`, 가입·방문·클릭·광고, 기준 시각. 지표만 실패하면 그 자리에 오류 문구)·실행 `<details>` 카드 목록·`AI 계정` 절(토큰 목록과 `폐기`), `?cursor=` 쪽은 실행 목록만. 페이지 이동 `이전 기록`·`처음으로`. 관련 링크는 http(s)만 새 창 링크. 상세는 실행 전체와 그 실행의 운영 기록, 없으면 `AI 실행 기록으로` |
 | `/admin/actions` | 운영 기록(사람·AI·시스템의 운영 쓰기). 걸러보기 `?actor=`(`전체`·`사람`·`AI`·`시스템`), 행은 시각·행위자 배지·행동 이름(모르는 값은 원래 키)·대상·크리에이터 상세 링크·전후 값 JSON 글자·실행 링크. 700px 이하는 공용 쌓는 표(`.data-table.is-stacked`, 광고 배너 표와 같은 규칙)로 카드. 잘못된 커서·`actor`는 오류 안내와 `처음으로` |
 
+### 지표·통계
+
+방문자 분석 화면은 크리에이터 `/me/landings/[publicId]/metrics`·`stats`, 관리자 `/admin/metrics`·`stats`입니다. 기존 관리 메뉴·운영자 메뉴에서 이동하며 크리에이터 분석에서는 편집 미리보기 대신 본문 폭을 사용합니다. 조회는 `GET /api/me/analytics`·`GET /api/admin/analytics`, 관리자 운영 목표 카드는 별도 `GET /api/admin/metrics`입니다.
+
 ### 외부 링크 한도와 광고 블록(설계 `docs/specs/crelink-link-limit-ad-toggle.md`)
 
 - 외부 링크 한도는 숨긴·차단 링크를 포함한 `limits.totalUsed/totalMax` 하나입니다(`components/manage/limits.ts`). `외부 링크` 패널 배지·처음 패널 구역 요약은 `링크 n/50`, 상한에 닿으면 `링크 추가` 대신 안내(미리보기 `+ 링크 추가` 자리도 같은 문장)이고, 숨긴 링크를 다시 보이게 하는 것은 한도와 관계없습니다.
@@ -30,10 +36,15 @@ SNS 채널 아이콘 자산의 출처·상표 사용 규칙은 [SNS 채널 아�
 ## BFF(`src/app/api/backend/[...path]/route.ts`)
 
 - 허용 목록(메서드·경로)에 있는 요청만 전달하고 나머지는 404 `route_not_allowed`입니다. 로그인 시작·콜백은 BFF가 아니라 위 route handler가 부릅니다. AI 운영자 쓰기는 `PUT api/admin/ai-operator/pause`·`PUT api/admin/ai-operator/tokens/{id}/revoke`·`PUT api/admin/creators/{id}/metrics-exclusion`만 열고, 조회 GET은 서버 렌더만 부르므로 열지 않습니다.
-- 요청 쿠키 중 `cl_session`만 API로 넘기고, API 응답의 `Set-Cookie`·`Content-Type`·`Cache-Control`·`ETag`·`Last-Modified`와 본문(이미지 바이너리 포함)을 그대로 돌려줍니다. 204는 본문 없이 돌려줍니다.
+- 요청 쿠키 중 `cl_session`만 API로 넘기고(방문 이벤트 경로는 쿠키를 넘기지 않음), API 응답의 `Set-Cookie`·`Content-Type`·`Cache-Control`·`ETag`·`Last-Modified`와 본문(이미지 바이너리 포함)을 그대로 돌려줍니다. 204는 본문 없이 돌려줍니다.
 - `POST api/me/files`만 multipart 본문과 `Content-Type`(boundary 포함)을 그대로 넘기고, 그 밖의 본문은 JSON으로 넘깁니다.
 - POST·PUT·PATCH·DELETE는 `Origin` 헤더의 호스트가 요청 호스트와 같아야 하며, 없거나 다르면 403 `forbidden`입니다.
 - 오류 응답(`{ code, message }`)·돌려줄 응답 헤더 고르기·upstream 호출은 AI 토큰 경로와 함께 `src/lib/api/proxy.ts`를 씁니다.
+- 공개 방문 이벤트 `POST api/landings/{publicId}/events`는 JSON만 받고 실제 스트림도 16KiB까지 읽습니다. 이 경로만 `Origin`을 API로 넘겨 API의 `WEB_URL` 검증을 받습니다. 클라이언트 IP·원본 쿠키·임의 요청 헤더는 복사하지 않습니다.
+
+## 공개 방문 계측
+
+유효한 단축 진입 표시를 API가 확인하고 `telemetryToken`을 준 공개 랜딩에만 `VisitorTracker`를 마운트합니다. 공개 열람·명시한 링크 클릭·화면에 보인 대상·보이는 동안의 체류와 최대 스크롤, 언어·시간대·화면 크기·화이트리스트 UTM을 수집합니다. 관리 미리보기·내부 공개 페이지 열기는 계측하지 않습니다. 저장소를 쓸 수 없으면 문서 메모리의 익명 세션을 사용하고, 전송 실패는 화면·탐색을 막지 않습니다. 구현 경계·이벤트 정의·시험은 [방문 계측 안내](docs/visitor-telemetry.md)에 있습니다. 기존 리디렉트 클릭 집계와 신규 행동 이벤트는 합산하지 않습니다.
 
 ## AI 토큰 경로(`src/app/api/agent/[...path]/route.ts`)
 

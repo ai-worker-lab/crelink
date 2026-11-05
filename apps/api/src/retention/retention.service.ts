@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@ne
 import * as Sentry from '@sentry/nestjs';
 import { CRELINK_LIMITS } from '@crelink/shared';
 import { Database } from '../database';
+import { ANALYTICS_DIMENSIONS_SQL } from '../analytics/dimensions';
 
 /** 통계의 "날짜" 기준 시간대. 보존 작업·통계 API가 같은 값을 씁니다. */
 export const STATS_TIME_ZONE = 'Asia/Seoul';
@@ -106,6 +107,50 @@ export class RetentionService implements OnApplicationBootstrap, OnModuleDestroy
            clicks = creator_banner_click_rollups.clicks + EXCLUDED.clicks`,
         values,
       );
+      // 브라우저 보고 계측은 기존 302 클릭 지표와 섞지 않고 개인 식별 없는 일별 집계만 남깁니다.
+      await client.query(
+        `INSERT INTO landing_event_daily_rollups(day, short_link_id, kind, target_kind, target_id,
+           events, unique_visitors, unique_sessions, active_ms, max_scroll_percent,
+           clicked_page_views, observed_clicks, scroll_25, scroll_50, scroll_75, scroll_100)
+         SELECT (e.occurred_at AT TIME ZONE $1)::date, e.short_link_id, e.kind, e.target_kind, e.target_id,
+           count(*)::int, count(DISTINCT e.visitor_id)::int, count(DISTINCT e.session_id)::int,
+           coalesce(sum(e.active_ms) FILTER (WHERE e.kind='page_view'),0), max(e.scroll_percent),
+           count(*) FILTER (WHERE e.kind='page_view' AND EXISTS (
+             SELECT 1 FROM landing_events c WHERE c.page_view_id=e.page_view_id AND c.kind='click'))::int,
+           count(*) FILTER (WHERE e.kind='impression' AND EXISTS (
+             SELECT 1 FROM landing_events c WHERE c.page_view_id=e.page_view_id AND c.kind='click'
+               AND c.target_kind=e.target_kind AND c.target_id=e.target_id AND c.occurred_at>=e.occurred_at))::int,
+           count(*) FILTER (WHERE e.kind='page_view' AND e.scroll_percent>=25)::int,
+           count(*) FILTER (WHERE e.kind='page_view' AND e.scroll_percent>=50)::int,
+           count(*) FILTER (WHERE e.kind='page_view' AND e.scroll_percent>=75)::int,
+           count(*) FILTER (WHERE e.kind='page_view' AND e.scroll_percent>=100)::int
+         FROM landing_events e WHERE e.occurred_at < $2 GROUP BY 1,2,3,4,5
+         ON CONFLICT(short_link_id,day,kind,target_kind,target_id) DO UPDATE SET
+           events=landing_event_daily_rollups.events+EXCLUDED.events,
+           unique_visitors=landing_event_daily_rollups.unique_visitors+EXCLUDED.unique_visitors,
+           unique_sessions=landing_event_daily_rollups.unique_sessions+EXCLUDED.unique_sessions,
+           active_ms=landing_event_daily_rollups.active_ms+EXCLUDED.active_ms,
+           max_scroll_percent=greatest(landing_event_daily_rollups.max_scroll_percent,EXCLUDED.max_scroll_percent),
+           clicked_page_views=landing_event_daily_rollups.clicked_page_views+EXCLUDED.clicked_page_views,
+           observed_clicks=landing_event_daily_rollups.observed_clicks+EXCLUDED.observed_clicks,
+           scroll_25=landing_event_daily_rollups.scroll_25+EXCLUDED.scroll_25,
+           scroll_50=landing_event_daily_rollups.scroll_50+EXCLUDED.scroll_50,
+           scroll_75=landing_event_daily_rollups.scroll_75+EXCLUDED.scroll_75,
+           scroll_100=landing_event_daily_rollups.scroll_100+EXCLUDED.scroll_100`,
+        values,
+      );
+      await client.query(
+        `INSERT INTO landing_event_dimension_rollups(day,short_link_id,dimension,value,page_views)
+         SELECT (e.occurred_at AT TIME ZONE $1)::date,e.short_link_id,d.dimension,
+           coalesce(nullif(d.value,''),'unknown'),count(*)::int
+         FROM landing_events e, ${ANALYTICS_DIMENSIONS_SQL}
+         WHERE e.kind='page_view' AND e.occurred_at<$2 GROUP BY 1,2,3,4
+         ON CONFLICT(short_link_id,day,dimension,value) DO UPDATE SET
+           page_views=landing_event_dimension_rollups.page_views+EXCLUDED.page_views`,
+        values,
+      );
+      await client.query('DELETE FROM landing_events WHERE occurred_at < $1', [boundary.rows[0].boundary]);
+      await client.query("DELETE FROM landing_event_limits WHERE window_start < now() - interval '15 minutes'");
       const visits = await client.query('DELETE FROM visits WHERE occurred_at < $1', [boundary.rows[0].boundary]);
       const clicks = await client.query('DELETE FROM link_clicks WHERE occurred_at < $1', [boundary.rows[0].boundary]);
       const bannerClicks = await client.query('DELETE FROM creator_banner_clicks WHERE occurred_at < $1', [

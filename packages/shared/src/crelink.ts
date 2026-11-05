@@ -87,6 +87,7 @@ export type UserRole = 'creator' | 'operator';
 
 export type CrelinkErrorCode =
   | 'validation_failed'
+  | 'telemetry_rate_limited'
   | 'unauthenticated'
   | 'forbidden'
   | 'auth_not_configured'
@@ -211,6 +212,8 @@ export interface LinkView {
 }
 
 export interface SocialLinkView {
+  /** 공개 계측 대상 식별자. 이전 데이터·미리보기 계약과의 호환을 위해 선택입니다. */
+  id?: string;
   platform: SocialPlatform;
   url: string;
 }
@@ -439,6 +442,8 @@ export interface PublicBannerSlotView {
 }
 
 export interface PublicBlockView {
+  /** 공개 블록 노출 계측 대상 식별자. */
+  id?: string;
   type: 'list';
   links: PublicLinkView[];
   /** 숨김 조건이면 null(R20 ⑥, R21 ③). 첫 list 구역에만 붙습니다. 웹은 없거나 null이면 그리지 않습니다. */
@@ -511,6 +516,10 @@ export interface PublicLandingView {
  * 외부에서 랜딩에 들어온 방문은 단축 주소를 거쳐야 기록되므로(PRD R7), 웹은 이 두 값으로 그대로 그릴지 단축 주소로 보낼지 정합니다.
  */
 export interface PublicLandingResponse extends PublicLandingView {
+  /** 유효한 방문자 바인딩 통과 표시로 열린 공개 랜딩만 계측합니다. 미리보기·구형 표시는 null입니다. */
+  telemetryToken?: string | null;
+  /** 기존 익명 방문자 바인딩. 쿠키가 바뀌면 브라우저 세션도 새로 만들기 위한 키이며 인증 용도가 아닙니다. */
+  telemetrySessionKey?: string | null;
   /** `pass`가 단축 주소 리디렉트(`GET {SHORT}/{slug}`)가 이 랜딩에 붙여 준, 아직 만료되지 않은 통과 표시이면 true. */
   passAccepted: boolean;
   /** 이 랜딩의 현재 단축 주소 `{SHORT}/{slug}`(옛 주소 아님). */
@@ -972,10 +981,12 @@ export interface SetMetricsExclusionRequest {
 export const LANDING_PASS_PARAM = 'pass';
 
 export const CRELINK_API_PATHS = {
+  landingEvents: (publicId: string) => `/api/landings/${encodeURIComponent(publicId)}/events`,
   authGoogleStart: '/api/auth/google/start',
   authGoogleCallback: '/api/auth/google/callback',
   authLogout: '/api/auth/logout',
   me: '/api/me',
+  meAnalytics: '/api/me/analytics',
   meLanding: '/api/me/landing',
   meSlugAvailability: '/api/me/short-link/availability',
   meSlug: '/api/me/short-link/slug',
@@ -1032,6 +1043,7 @@ export const CRELINK_API_PATHS = {
     return `/api/admin/actions${text ? `?${text}` : ''}`;
   },
   adminMetrics: '/api/admin/metrics',
+  adminAnalytics: '/api/admin/analytics',
   adminCreatorMetricsExclusion: (userId: string) =>
     `/api/admin/creators/${encodeURIComponent(userId)}/metrics-exclusion`,
 } as const;

@@ -4,6 +4,18 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-11-06
+
+- 방문자 수집·지표·통계 운영 배포 착수(0193): 사용자 명시 배포 요청에 따라 검증된 전체 변경의 PR·CI·main 병합·기존 Blue/Green CD를 진행합니다. 사용자 릴리스 `v0.1.0`을 기록했으며 실제 배포 결과는 `docs/work/orchestrator/0193-analytics-release.md`에 남깁니다.
+
+- 지표·통계 구현·로컬 검증(0188): R10을 관리자 전체·크리에이터 본인 집계 조회로 확대하고 역할별4화면과 메뉴·공유 조회 계약·보존 분포·권한 경계를 연결했습니다. 실제 고립 DB와390/1280브라우저에서 관리자 통합/선택·본인 조회·공개 방문 증분·오류 복구를 확인했습니다. 기준: `docs/specs/crelink-analytics.md`, PRD R28, `design/analytics/handoff.md`. 실제 검증은 `docs/work/orchestrator/0188-analytics.md`에 기록합니다.
+
+- Next.js 보안 패치(0187): 실제 개발 서버·빌드 중단을 일으킨 16.4.0을 16.4.1로 올렸습니다. manifest와 Next/env/SWC 및 해당 peer 참조만 잠금 파일에 반영하고, 나머지 workspace importer는 기존 버전으로 유지했습니다. `pnpm install --frozen-lockfile` 통과, 공식 npm bulk에서 next16.4.1 advisory 0건 확인. 범위·검증: `docs/work/web/0187-next-security-patch.md`.
+
+## 2026-11-05
+
+- 방문자 데이터 수집 확장(0181): 기존 방문·클릭에 캠페인·실제 페이지 열람·누락 클릭·노출·활성 체류·표시 환경을 연결하는 공유 계약·API·웹·보존·개인정보 고지를 함께 갱신. 기준: `docs/specs/crelink-visitor-data.md`, PRD R27. 운영 배포 전 로컬 작업이며 검증 근거는 `docs/work/orchestrator/0181-visitor-data.md`에 기록.
+
 ## 2026-10-12
 
 - 사용자 결정 두 가지(`0180`, `0179`). (1) 쓰지 않는 `users.extra_link_slots`·`slot_events`·`slot_event_entries`를 운영 백업 뒤 migration `0008_drop_retired_link_slot_data`로 지웁니다(운영자 행동 기록은 유지). 0008 뒤에는 0007보다 앞선 릴리스로 롤백할 수 없습니다. `/privacy`는 이벤트 신청 기록을 수집 항목에서 빼고 삭제 사실을 적었습니다. (2) 광고 수익 쉐어 조건은 보류하고, 크리에이터의 진입·사용 허들을 낮추는 일을 우선 방향으로 PRD `목표`에 기록했습니다. 근거: `docs/work/orchestrator/0180-retired-data-drop-and-entry-focus.md`.

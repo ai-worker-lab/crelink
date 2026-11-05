@@ -33,6 +33,8 @@ export function AdminShell({
     <div className="app-page">
       <SiteHeader label="운영자 메뉴">
         <Link href="/admin">크리에이터</Link>
+        <Link href="/admin/metrics">지표</Link>
+        <Link href="/admin/stats">통계</Link>
         <Link href="/admin/blocked-domains">차단 도메인</Link>
         <Link href="/admin/ad-banners">광고 배너</Link>
         <Link href={CRELINK_WEB_PATHS.adminAgentRuns}>AI 실행 기록</Link>

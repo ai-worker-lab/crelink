@@ -5,6 +5,7 @@ import type { Express } from 'express';
 import { Client } from 'pg';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/app.setup';
+import { Database } from '../src/database';
 import { createTestDatabase, TestDatabase } from './test-database';
 import { setTestEnvironment, WEB_URL } from './test-app';
 
@@ -87,6 +88,10 @@ describe('API 기동과 health', () => {
         'files',
         'guestbook_entries',
         'landing_blocks',
+        'landing_event_daily_rollups',
+        'landing_event_dimension_rollups',
+        'landing_event_limits',
+        'landing_events',
         'landings',
         'link_click_rollups',
         'link_clicks',
@@ -115,6 +120,8 @@ describe('API 기동과 health', () => {
         { version: '0006_agent_run_agent' },
         { version: '0007_ad_block_toggle' },
         { version: '0008_drop_retired_link_slot_data' },
+        { version: '0009_landing_telemetry' },
+        { version: '0010_analytics_rollups' },
       ]);
     } finally {
       await client.end();
@@ -148,15 +155,23 @@ describe('readiness', () => {
   });
 
   it('실행 중 DB가 사라지면 readiness는 503과 ApiError를 반환하고 liveness는 200을 유지한다', async () => {
-    // 데이터베이스를 강제로 지워 API의 기존 연결을 끊고 새 연결도 실패하게 만듭니다.
-    await database.drop({ force: true });
+    // 대여 중인 연결도 유지해 pool의 idle 오류 처리만으로는 막지 못하는 강제 종료를 검사합니다.
+    const client = await app.get(Database).pool.connect();
+    try {
+      await database.drop({ force: true });
 
-    const ready = await fetch(`${baseUrl}/api/health/ready`);
-    expect(ready.status).toBe(503);
-    expect(await ready.json()).toEqual({ code: 'database_unavailable', message: '데이터베이스에 연결할 수 없습니다.' });
+      const ready = await fetch(`${baseUrl}/api/health/ready`);
+      expect(ready.status).toBe(503);
+      expect(await ready.json()).toEqual({
+        code: 'database_unavailable',
+        message: '데이터베이스에 연결할 수 없습니다.',
+      });
 
-    const live = await fetch(`${baseUrl}/api/health`);
-    expect(live.status).toBe(200);
-    expect(await live.json()).toEqual({ status: 'ok' });
+      const live = await fetch(`${baseUrl}/api/health`);
+      expect(live.status).toBe(200);
+      expect(await live.json()).toEqual({ status: 'ok' });
+    } finally {
+      client.release(true);
+    }
   });
 });

@@ -2,6 +2,15 @@
 
 내부 참고용으로 백엔드 API의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-11-06
+
+- 크리에이터 본인·운영자 서비스 통합 지표/통계 조회 `GET /api/me/analytics`, `/api/admin/analytics`를 추가했습니다. 서울 날짜·계정/랜딩/시험 계정 필터·원본 고유 방문/세션·cohort 클릭률·활성 체류·스크롤·대상·UTM/유입/기기 분포를 집계하며 방문자 원식별자는 반환하지 않습니다. 기존 AI 운영 목표 `/api/admin/metrics`와 302 통계 계약은 유지합니다. `0010_analytics_rollups`는 nullable 카운터와 비식별 분포 집계를 추가하고 복원 불가 과거 값은 null/unknown으로 구분합니다. 새 조회·기존 StatsService 모두 단일 읽기 스냅샷을 사용하며 실제 보존 커밋을 교차한 회귀로 중복을 방지합니다. [운영 안내](docs/analytics.md), 근거 `docs/work/api/0190-analytics-contract.md`, `docs/work/api/0191-analytics-api.md`.
+
+## 2026-11-05
+
+- DB 연결을 대여한 동안에도 연결 오류를 기록해 강제 DB 종료가 미처리 `error`로 API를 종료하지 않게 했습니다. `pg-pool`의 idle 오류 처리와 대여/반환 리스너를 함께 사용하며 쿼리 실패는 기존 호출자에게 전달합니다. `health.e2e-spec.ts`는 대여 중인 연결을 포함한 DB 강제 종료 뒤 readiness 503·liveness 200을 검사합니다.
+- 공개 브라우저 방문 계측과 UTM 보존을 추가했습니다. 기존 방문자 쿠키를 새 통과 표시에 바인딩하고 목적이 분리된24시간 계측 토큰·안정 방문자 키를 공개 랜딩에 제공합니다. 이벤트는 같은 페이지의 대상만 허용하며 ID 멱등·노출 중복·누적 체류/스크롤·소유 바인딩·Origin·크기/횟수 제한을 적용합니다. 원 단축 방문의 근접 기록이 없으면 IP·UA 등은 추정하지 않습니다. migration0009는 원본 이벤트·일별 비식별 집계·제한 버킷과 visits의 UTM을 추가하고 기존 보존 트랜잭션을 확장합니다. [운영 안내](docs/visitor-telemetry.md), 근거 `docs/work/api/0183-visitor-data-contract.md`, `docs/work/api/0184-visitor-data-api.md`.
+
 ## 2026-10-12
 
 - 쓰지 않는 링크 슬롯 데이터 삭제(0179, 통합 0180). migration `0008_drop_retired_link_slot_data`(첫 줄 `SET LOCAL lock_timeout = '5s'`): `DROP TABLE slot_event_entries`, `DROP TABLE slot_events`, `ALTER TABLE users DROP COLUMN extra_link_slots`. 0007 이후 코드는 셋을 읽지 않아 Blue/Green 겹침에 영향이 없고, 0007보다 앞선 릴리스로는 롤백할 수 없습니다. 운영 행은 적용 전에 백업했습니다(0179 진행 기록). 시험: `migrations.e2e-spec.ts` 0008 1건(삭제, 사용자·운영자 행동 기록 유지, lock_timeout 범위), `health.e2e-spec.ts` 테이블·적용 목록.
