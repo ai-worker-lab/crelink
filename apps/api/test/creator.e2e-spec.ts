@@ -74,6 +74,35 @@ describe('크리에이터 편집 API', () => {
     expect(body).not.toHaveProperty('slotEvent');
   });
 
+  it('링크 표시 방식은 기본 list, 본인만 list/grid 저장하고 공개 조회에도 반영한다', async () => {
+    const mine = await newCreator(),
+      other = await newCreator();
+    const before = await state(mine.cookie);
+    expect(before.landing.linkLayout).toBe('list');
+    for (const linkLayout of ['grid', 'list']) {
+      const saved = await api<CreatorLandingState>(t.baseUrl, 'PATCH', '/api/me/landing', {
+        cookie: mine.cookie,
+        body: { linkLayout, userId: other.userId },
+      });
+      expect(saved.status).toBe(200);
+      expect(saved.body.landing).toEqual({ ...before.landing, linkLayout });
+      expect((await state(mine.cookie)).landing.linkLayout).toBe(linkLayout);
+      expect((await state(other.cookie)).landing.linkLayout).toBe('list');
+      const response = await api<{ linkLayout: string }>(
+        t.baseUrl,
+        'GET',
+        `/api/public/landings/${before.landing.publicId}`,
+      );
+      expect(response.body.linkLayout).toBe(linkLayout);
+    }
+    for (const linkLayout of [null, false, 1, '', 'GRID', 'cards', [], {}]) {
+      expect(
+        (await api(t.baseUrl, 'PATCH', '/api/me/landing', { cookie: mine.cookie, body: { linkLayout } })).status,
+      ).toBe(400);
+    }
+    expect((await api(t.baseUrl, 'PATCH', '/api/me/landing', { body: { linkLayout: 'grid' } })).status).toBe(401);
+  });
+
   it('프로필 수정: 길이 검증, 빈 문자열은 비움, 남의 파일은 404 file_not_found', async () => {
     const { cookie } = await newCreator();
     const other = await newCreator();

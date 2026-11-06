@@ -296,3 +296,7 @@ pnpm --filter @crelink/api --silent ai-operator list-tokens   # 또는 node apps
 ## Instabio 가져오기
 
 로그인한 사용자의 `POST /api/me/imports/instabio/preview {url}`은 DB 변경 없이 공개 버튼 링크를 읽습니다. `POST /api/me/imports/instabio`는 원본 fingerprint·선택 id/제목·프로필 교체 여부를 받아 기존 링크 뒤에 추가합니다. 계약은 `packages/shared/src/imports.ts`, 보안·복구 경계는 [설계](../../../docs/specs/instabio-import.md)를 따릅니다. 준비 후 미참조 업로드는 자동 정리를 보장하지 않습니다.
+
+## 링크 표시 방식
+
+기존 본인 랜딩 `PATCH /api/me/landing`의 `linkLayout`은 `list`/`grid`만 허용합니다. migration0011이 기존 랜딩을 기본 list로 유지하며 편집·공개 조회에도 반환합니다. 이전 응답에 필드가 없으면 list로 표시하고 저장 응답이 요청과 일치할 때만 성공 안내합니다. rollback 때 컬럼과 값을 삭제하지 않습니다. [0198](../../../docs/specs/link-grid-layout.md).

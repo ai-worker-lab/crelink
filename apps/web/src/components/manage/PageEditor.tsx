@@ -51,6 +51,8 @@ export function PageEditor() {
     firstRunGuide,
   } = useManager();
   const formAction = useAction();
+  const layoutAction = useAction();
+  const pending = formAction.pending || layoutAction.pending;
   /** 폼 저장·삭제 결과 안내. 결과가 나온 구역 패널(열쇠가 같을 때)에서만 보여 줍니다. */
   const [doneNotice, setDoneNotice] = useState<{ key: string; text: string } | null>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -63,6 +65,8 @@ export function PageEditor() {
     setSeenKey(key);
     formAction.setError(null);
     formAction.setNotice(null);
+    layoutAction.setError(null);
+    layoutAction.setNotice(null);
     if (key !== 'links') setSlotHandleFocus(false);
   }
   // 다른 메뉴로 옮기면 고른 대상을 지웁니다(초안은 남음). 돌아오면 처음 패널부터.
@@ -71,7 +75,7 @@ export function PageEditor() {
   const resetFirstRunGuide = firstRunGuide.reset;
   useEffect(() => resetFirstRunGuide, [resetFirstRunGuide]);
   // 폼 저장 중에는 미리보기 고르기를 막습니다(ManagerPreview가 봄).
-  useEffect(() => setFormPending(formAction.pending), [formAction.pending, setFormPending]);
+  useEffect(() => setFormPending(pending), [pending, setFormPending]);
   // 저장이 끝났을 때 그 폼이 아직 고른 대상인지(메뉴를 떠났거나 다른 대상을 골랐으면 패널을 바꾸지 않음).
   const currentKey = useRef(key);
   const mounted = useRef(false);
@@ -173,6 +177,7 @@ export function PageEditor() {
       body = (
         <LinksSection
           importAction={formAction}
+          layoutAction={layoutAction}
           notice={doneNotice?.key === formKey ? doneNotice.text : null}
           focusSlotHandle={slotHandleFocus}
         />
@@ -276,7 +281,7 @@ export function PageEditor() {
     return (
       <>
         <h1 className="visually-hidden">{managerMenuLabel('')}</h1>
-        <EditSheet key={key} title={title} pending={formAction.pending} onDismiss={closeSheet}>
+        <EditSheet key={key} title={title} pending={pending} onDismiss={closeSheet}>
           {dirty ? (
             <p className="badges">
               <span className="badge dirty-chip">저장 안 함</span>
@@ -292,7 +297,7 @@ export function PageEditor() {
     <section className="panel-section" aria-labelledby="panel-title">
       <h1 className="visually-hidden">{managerMenuLabel('')}</h1>
       <div className="panel-head">
-        <button type="button" className="back-button" onClick={() => go(null)} disabled={formAction.pending}>
+        <button type="button" className="back-button" onClick={() => go(null)} disabled={pending}>
           <span aria-hidden="true">←</span> 전체
         </button>
         <div className="panel-title-row">

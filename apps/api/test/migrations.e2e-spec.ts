@@ -97,6 +97,24 @@ describe('runMigrations', () => {
     expect((await pool.query('SELECT 1 FROM guestbook_entries')).rowCount).toBe(0);
   });
 
+  it('0011_link_layout은 기존 랜딩을 list로 유지하고 list/grid만 저장한다', async () => {
+    const source = join(__dirname, '../migrations');
+    copyFileSync(join(source, '0001_crelink_mvp.sql'), join(directory, '0001_crelink_mvp.sql'));
+    await runMigrations(pool, directory);
+    const user = await pool.query("INSERT INTO users (email) VALUES ('layout@example.com') RETURNING id");
+    await pool.query("INSERT INTO landings(user_id,public_id,bio) VALUES($1,'abcdefghij','기존 소개')", [
+      user.rows[0].id,
+    ]);
+    copyFileSync(join(source, '0011_link_layout.sql'), join(directory, '0011_link_layout.sql'));
+    await runMigrations(pool, directory);
+    expect((await pool.query('SELECT link_layout,bio FROM landings')).rows).toEqual([
+      { link_layout: 'list', bio: '기존 소개' },
+    ]);
+    await pool.query("UPDATE landings SET link_layout='grid'");
+    await expect(pool.query("UPDATE landings SET link_layout='other'")).rejects.toThrow(/link_layout_check/);
+    expect((await pool.query('SELECT link_layout FROM landings')).rows[0].link_layout).toBe('grid');
+  });
+
   describe('0003_ad_banner', () => {
     const source = join(__dirname, '../migrations');
     let fileSeq = 0;

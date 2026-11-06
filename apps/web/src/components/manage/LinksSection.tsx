@@ -22,6 +22,7 @@ import {
 import { useId, useRef } from 'react';
 import { browserApi } from '../../lib/api/browser';
 import { mixedOrder, SLOT_ROW_ID, slotEditable, slotRowName, splitOrder, withParticle } from '../../lib/slot-order';
+import { LinkLayoutPicker } from './LinkLayoutPicker';
 import { InstabioImport } from './InstabioImport';
 import { useAction, type ActionState } from '../../lib/use-action';
 import { ActionStatus } from '../ActionStatus';
@@ -49,14 +50,16 @@ export function LinksSection({
   notice: doneNotice,
   focusSlotHandle = false,
   importAction,
+  layoutAction,
 }: {
   notice?: string | null;
   focusSlotHandle?: boolean;
   importAction: ActionState;
+  layoutAction: ActionState;
 }) {
   const { state, setState, reload, select, isLinkDirty, adBlockAction } = useManager();
   const { pending: listPending, error, notice, run } = useAction();
-  const pending = listPending || importAction.pending;
+  const pending = listPending || importAction.pending || layoutAction.pending;
   const dndId = useId();
   /** 이번 끌기에서 한 번이라도 다른 자리로 옮겼는지(스크린리더 안내용). */
   const movedSinceStart = useRef(false);
@@ -156,6 +159,7 @@ export function LinksSection({
 
   return (
     <>
+      <LinkLayoutPicker action={layoutAction} busy={pending} />
       <div className="panel-badges">
         <p className={`limit-badge${limitNotice ? ' limit-full' : ''}`}>{linkLimitLabel(limits)}</p>
       </div>

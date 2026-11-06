@@ -78,6 +78,7 @@ export class PublicLandingController {
       telemetryToken: this.landingPass.telemetryToken(publicId, pass),
       telemetrySessionKey: this.landingPass.telemetrySessionKey(publicId, pass),
       displayName: landing.display_name,
+      linkLayout: landing.link_layout,
       bio: landing.bio,
       avatarUrl: landing.avatar_file_id ? this.files.imageUrl(landing.avatar_file_id) : null,
       socials,

@@ -34,6 +34,7 @@ export function Landing({
   headingLevel?: 1 | 2;
 }) {
   const Heading = headingLevel === 1 ? 'h1' : 'h2';
+  const grid = landing.linkLayout === 'grid';
   const links = landing.blocks.flatMap((block) => block.links);
   // 옛 API(Blue/Green 겹침 구간)는 slot을 보내지 않습니다.
   const slot = landing.blocks[0]?.slot ?? null;
@@ -46,6 +47,7 @@ export function Landing({
       const content = (
         <LinkCardContent
           title={link.title}
+          grid={grid}
           description={link.description}
           thumbnailUrl={link.thumbnailUrl}
           faviconUrl={link.faviconUrl}
@@ -118,7 +120,8 @@ export function Landing({
     );
   }
 
-  const linkList = linkItems.length > 0 ? <ul className="link-list">{linkItems}</ul> : null;
+  const linkList =
+    linkItems.length > 0 ? <ul className={grid ? 'link-list link-grid' : 'link-list'}>{linkItems}</ul> : null;
 
   const portfolioList =
     landing.portfolio.length > 0 ? (
@@ -393,6 +396,7 @@ export function LinkCardContent({
   thumbnailUrl,
   faviconUrl,
   descriptionId,
+  grid = false,
 }: {
   title: string;
   description: string | null;
@@ -400,13 +404,20 @@ export function LinkCardContent({
   /** 비어 있으면(저장 전 초안) 기본 아이콘을 그립니다. */
   faviconUrl: string;
   descriptionId?: string;
+  grid?: boolean;
 }) {
   return (
     <>
-      {thumbnailUrl ? <RemoteImage className="link-thumb" src={thumbnailUrl} alt="" width={56} height={56} /> : null}
+      {thumbnailUrl ? (
+        <RemoteImage className="link-thumb" src={thumbnailUrl} alt="" width={56} height={56} />
+      ) : grid ? (
+        <span className="link-grid-placeholder">
+          <Favicon key={faviconUrl} src={faviconUrl} />
+        </span>
+      ) : null}
       <span className="link-text">
         <span className="link-title">
-          <Favicon key={faviconUrl} src={faviconUrl} />
+          {grid ? null : <Favicon key={faviconUrl} src={faviconUrl} />}
           <span>{title}</span>
         </span>
         {description ? (

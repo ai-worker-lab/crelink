@@ -42,6 +42,12 @@ export class ProfileService {
   async updateLanding(userId: string, body: unknown): Promise<void> {
     const input = bodyObject(body);
     const changes: Record<string, unknown> = {};
+    if (input.linkLayout !== undefined) {
+      if (input.linkLayout !== 'list' && input.linkLayout !== 'grid') {
+        throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', '링크 표시 방식은 list 또는 grid여야 합니다.');
+      }
+      changes.link_layout = input.linkLayout;
+    }
     const displayName = optionalText(input.displayName, '표시 이름', CRELINK_LIMITS.displayNameMax);
     if (displayName !== undefined) changes.display_name = displayName;
     const bio = optionalText(input.bio, '소개', CRELINK_LIMITS.bioMax);

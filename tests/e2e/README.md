@@ -62,3 +62,7 @@ pnpm e2e --config tests/e2e/analytics-responsive.config.ts # 분석 UI만 Chromi
 | `personas.spec.ts` | SIM-01~04 | 첫 링크 UI 저장→모바일 공개 방문/클릭 기록→시험 계정 성장 지표 불변, localhost 포함 대조군의 숨김/공개/제외/재포함, 다른 사용자/익명/위험 URL 쓰기 거부와 기존 데이터 보존, 세션 만료 뒤 재시도 거부 |
 
 실제 구글 로그인(키 발급 후)과 인스타그램 인앱 브라우저 확인은 이 테스트 범위 밖이며 설계의 [위험과 스파이크](../../docs/specs/crelink-mvp.md#위험과-스파이크)대로 수동으로 확인합니다.
+
+## 링크 표시 방식만 검사
+
+`pnpm e2e --config tests/e2e/link-layout.config.ts`는 합성 계정으로 Chromium·모바일 조건의 WebKit·Firefox에서 설정 저장/복구·공개 화면·320/390/768/1280·배너/사진/긴 제목·키보드를 확인합니다. 실제 iPhone 실행을 뜻하지 않습니다. [0198](../../docs/work/orchestrator/0198-link-grid-layout.md).
