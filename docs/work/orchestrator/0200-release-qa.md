@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 진행
+- 상태: 완료
 - 종류: 유지보수
 - 우선순위: P1
 - 작성일: 2026-11-06
@@ -16,8 +16,8 @@
 - [x] 320px 이상 카드2열, 기본 리스트·콘텐츠·선택 저장·새로고침·공개/미리보기 일치를 실제로 확인한다.
 - [x] 실제 localhost API/PostgreSQL에서 첫 저장→공개→방문/클릭→본인 통계, 타 계정 권한·만료 세션·실패/재시도·Instabio 보존을 확인한다.
 - [x] Chromium/WebKit/Firefox의 analytics-responsive/link-layout 및 핵심 E2E가 PR CI 필수 gate에 연결되고 실패 report/trace/PNG가 보관된다.
-- [ ] 격리된 음성 CI에서 실제 gate 실패를 관측하고 정상 복원 SHA의 성공을 확인한다.
-- [ ] 최소 시각 회귀·접근성 검사와 viewport320/390/768/1280·회전/확대 증거를 남긴다.
+- [x] 격리된 음성 CI에서 실제 gate 실패를 관측하고 정상 복원 SHA의 성공을 확인한다.
+- [x] 최소 시각 회귀·접근성 검사와 viewport320/390/768/1280·회전/확대 증거를 남긴다.
 - [x] verify/smoke/scope/비밀값 검토 후 draft PR과 실제 CI URL을 남긴다. main 병합·배포는 하지 않는다.
 
 ## 범위
@@ -62,3 +62,5 @@
 - 2026-11-07: 빈기간 assertion 뒤 다음 독립 `page.goto` 직전 한 경계에만 `waitForLoadState('networkidle')`를 추가했다. 제품/권한·console/error 수집·기존 assertions·retries·skip은 변경하지 않았다. 진단 리스너/로그는 삭제했고 동일 production WebKit targeted3회가21.7초에3 passed로 복원됐다. 실패/정상 원본은 `.local/ci/webkit-{diagnosis,pageerror-timeline,navigation-fixed}/`에 보존한다.
 - 2026-11-07: 첫 경계 수정 뒤 production analytics 전체 영향 검증은11 passed/1 failed(WebKit creator metrics)였다. 잘못된기간 화면→초기화 클릭에서도 진행 중 settings RSC가 취소되는 같은 유형의 경계가 남아 있어, 해당 오류 화면의 assertion 뒤 초기화 클릭 전에도 완료 대기를 한정했다. creator metrics WebKit targeted3회가20.2초에3 passed로 복원됐다. 앞선 영향 검증 실패는 `.local/ci/analytics-navigation-fixed/`, 수정 후 targeted는 `.local/ci/webkit-reset-fixed/`에 보존한다.
 - 2026-11-07: 두 탐색 경계 동기화 후 production analytics Chromium/WebKit/Firefox12개가43.5초에12 passed·failed/flaky0으로 통과했고 scoped Prettier·ESLint도 통과했다. 원본 JSON/HTML/PNG는 `.local/ci/analytics-production-final/`이다. 임시 production 서비스는 종료하고 `make web-up`으로 원래 checkout 전용 Next dev를 복원했다. localhost 웹/API readiness 모두200, E2E 합성 사용자 잔여0, scope29파일·diff check 통과를 확인했다. API preload는 제거 상태이며 추가 진단 계측은 남기지 않았다.
+- 2026-11-07: [정상 CI42242157268](https://github.com/ai-worker-lab/crelink/actions/runs/42242157268)(`f49109f27d65f3f88ee1330afc0038e6e02a1271`)에서 Node24/26 verify·이미지2종·smoke·scope·required `CI 통과`가 모두 success다(문서전용 job만 조건상 skipped). 원격 JSON을 다운로드해 core9/personas4/analytics12/layout3, 총28 passed·failed/flaky/skipped/errors0을 직접 확인했다. Linux Chromium의 승인 기준선 픽셀비교0허용·axe·WebKit/Firefox까지 정상이다. 초기 음성 gate failure→별도시험결함수정→정상 gate 복원을 실제 관측해 이번 개발·QA 연결 수용 기준을 완료했다. main 병합·배포는 하지 않았다.
+- 2026-11-07: 정상 artifact `13515772035`(`browser-qa-42242157268-1`,17,109,146bytes), 원본 `.local/ci/remote-42242157268/ci/e2e/{core,personas,analytics,layout}/results.json`, suite별 `report/index.html` 및 `results/`의 PNG/axe/환경 attachment를 보존한다. 실패 trace/PNG는 이전 음성/복원 실패 artifact에 남아 있다. 이번 기록 반영 후 최종 문서 SHA의 required gate와 원격 head 일치는 PR148의 최종 검사 결과/본문에서 확인한다.

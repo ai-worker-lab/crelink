@@ -73,3 +73,7 @@ layout 폭320/390/768/1280·가로844×390·글자200%/320px. analytics 폭320/3
 전용 PostgreSQL/Valkey·PM2 `crelink-web`(Next dev)·`crelink-api`(start:dev)는 실행 상태로 PM Dispatch `ctx_08594edcf659`에 런타임 소유권을 인계한다. API 프로세스에는 `CRELINK_E2E_INSTABIO=1`과 `NODE_OPTIONS=--import <checkout>/tests/e2e/instabio-source.mjs`, 네 loopback 대상 환경변수가 남아 있다. 일반/운영 시작 설정은 변경하지 않았다. PM 인수 뒤 QA는 추가 런타임 실행하지 않는다.
 
 남은 출시 gate는 PM의 Linux actual PNG 검토/기준선 명시 추가/정상 비교, 통합 CI·음성 gate·PR 검증이다. 이 항목을 로컬 macOS 통과로 대체하지 않으며 baseline 미승인 상태에서 전체 출시 QA 완료를 주장하지 않는다.
+
+## PM 통합 검증 후속
+
+위 `not-run`과 인계 상태는 QA의 macOS 실행 종료 시점 기록이다. 이후 PM이 최종 통합 소유권을 인수해 Linux 기준선 직접 검토·등록·정상 비교, 실제 Actions 음성 gate 차단과 정상 복원, production WebKit의 독립 탐색 경합 재현·최소 동기화까지 검증했다. 원격 run/SHA·suite별 원본·수정 및 미검증 경계의 최종 근거는 [0200 진행 기록](../work/orchestrator/0200-release-qa.md), 최종 head 검사는 [draft PR148](https://github.com/ai-worker-lab/crelink/pull/148)을 따른다. 실제 OAuth·인앱·실물 기기·외부 Instabio live의 `not-run`은 그대로 유지한다.
