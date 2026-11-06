@@ -20,6 +20,7 @@ const rules: ReadonlyArray<{ methods: readonly string[]; pattern: RegExp; upload
   { methods: ['GET', 'PATCH'], pattern: /^api\/me\/landing$/ },
   { methods: ['GET'], pattern: /^api\/me\/short-link\/availability$/ },
   { methods: ['PUT'], pattern: /^api\/me\/short-link\/slug$/ },
+  { methods: ['POST'], pattern: /^api\/me\/imports\/instabio(\/preview)?$/ },
   { methods: ['POST'], pattern: /^api\/me\/links$/ },
   { methods: ['PUT'], pattern: /^api\/me\/links\/order$/ },
   // 광고 블록 켜고 끄기(R20 ⑩): 크리에이터 스위치와 운영자 플랫폼 스위치. 플랫폼 스위치 `GET`은 서버 렌더만 부르므로 넣지 않습니다.

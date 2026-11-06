@@ -54,37 +54,40 @@ export class LinksService {
   }
 
   async create(userId: string, body: unknown): Promise<LinkView> {
+    return this.database.transaction((client) => this.createInTransaction(client, userId, body));
+  }
+
+  /** 가져오기 배치와 단일 추가가 같은 소유권·한도·차단·순서 검사를 씁니다. */
+  async createInTransaction(client: PoolClient, userId: string, body: unknown): Promise<LinkView> {
     const input = bodyObject(body);
     const title = requiredText(input.title, '링크 제목', CRELINK_LIMITS.linkTitleMax);
     const { url, host } = linkUrl(input.url);
     const description = optionalText(input.description, '설명', CRELINK_LIMITS.linkDescriptionMax) ?? null;
     const hidden = optionalBoolean(input.hidden, '숨김') ?? false;
-    return this.database.transaction(async (client) => {
-      await this.lockUser(client, userId);
-      const thumbnail = (await this.files.ownedFileId(client, userId, input.thumbnailFileId)) ?? null;
-      await this.assertDomainAllowed(client, host);
-      const limits = await this.creator.limits(client, userId);
-      if (limits.totalUsed >= limits.totalMax) {
-        throw apiError(
-          HttpStatus.CONFLICT,
-          'link_total_limit_reached',
-          `링크는 숨긴 링크를 포함해 ${limits.totalMax}개까지 만들 수 있습니다.`,
-        );
-      }
-      const { blockId } = await this.creator.context(client, userId);
-      const row = await insertWithRandomId(LINK_PUBLIC_ID_LENGTH, async (publicId) => {
-        const inserted = await client.query<LinkRow>(
-          `INSERT INTO links (public_id, user_id, block_id, title, url, host, description, thumbnail_file_id, hidden, position)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
-                   (SELECT coalesce(max(position) + 1, 0) FROM links WHERE user_id = $2))
-           ON CONFLICT (public_id) DO NOTHING
-           RETURNING ${LINK_COLUMNS}`,
-          [publicId, userId, blockId, title, url, host, description, thumbnail, hidden],
-        );
-        return inserted.rows[0];
-      });
-      return this.creator.linkView(row);
+    await this.lockUser(client, userId);
+    const thumbnail = (await this.files.ownedFileId(client, userId, input.thumbnailFileId)) ?? null;
+    await this.assertDomainAllowed(client, host);
+    const limits = await this.creator.limits(client, userId);
+    if (limits.totalUsed >= limits.totalMax) {
+      throw apiError(
+        HttpStatus.CONFLICT,
+        'link_total_limit_reached',
+        `링크는 숨긴 링크를 포함해 ${limits.totalMax}개까지 만들 수 있습니다.`,
+      );
+    }
+    const { blockId } = await this.creator.context(client, userId);
+    const row = await insertWithRandomId(LINK_PUBLIC_ID_LENGTH, async (publicId) => {
+      const inserted = await client.query<LinkRow>(
+        `INSERT INTO links (public_id, user_id, block_id, title, url, host, description, thumbnail_file_id, hidden, position)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+                 (SELECT coalesce(max(position) + 1, 0) FROM links WHERE user_id = $2))
+         ON CONFLICT (public_id) DO NOTHING
+         RETURNING ${LINK_COLUMNS}`,
+        [publicId, userId, blockId, title, url, host, description, thumbnail, hidden],
+      );
+      return inserted.rows[0];
     });
+    return this.creator.linkView(row);
   }
 
   async update(userId: string, linkId: string, body: unknown): Promise<LinkView> {

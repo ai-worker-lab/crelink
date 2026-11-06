@@ -7,6 +7,9 @@ import { BannersController } from './banners.controller';
 import { BannersService } from './banners.service';
 import { CreatorController, LinksController, PortfolioController } from './creator.controller';
 import { CreatorService } from './creator.service';
+import { InstabioSource } from './instabio-source';
+import { InstabioImportService } from './instabio-import.service';
+import { InstabioImportController } from './instabio-import.controller';
 import { LinksService } from './links.service';
 import { ProfileService } from './profile.service';
 import { PublicLandingController } from './public-landing.controller';
@@ -14,8 +17,23 @@ import { SlugService } from './slug.service';
 
 @Module({
   imports: [AuthModule, FilesModule, LandingPassModule, ShortLinkModule],
-  controllers: [CreatorController, LinksController, PortfolioController, PublicLandingController, BannersController],
-  providers: [CreatorService, LinksService, ProfileService, SlugService, BannersService],
+  controllers: [
+    InstabioImportController,
+    CreatorController,
+    LinksController,
+    PortfolioController,
+    PublicLandingController,
+    BannersController,
+  ],
+  providers: [
+    InstabioSource,
+    InstabioImportService,
+    CreatorService,
+    LinksService,
+    ProfileService,
+    SlugService,
+    BannersService,
+  ],
   exports: [CreatorService],
 })
 export class CreatorModule {}

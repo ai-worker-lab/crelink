@@ -40,10 +40,15 @@ export class FilesService {
   /** 업로드 때 형식과 움직임(GIF·WebP·APNG, `files.animated`)을 판정해 저장합니다. */
   async upload(userId: string, file: Express.Multer.File | undefined): Promise<UploadFileResponse> {
     if (!file) throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', '업로드할 이미지 파일(file)을 보내 주세요.');
-    if (file.size > CRELINK_LIMITS.imageMaxBytes) {
+    return this.uploadBytes(userId, file.buffer);
+  }
+
+  /** 가져오기에도 같은 이미지 검증과 저장 경로를 적용합니다. */
+  async uploadBytes(userId: string, data: Buffer): Promise<UploadFileResponse> {
+    if (data.length > CRELINK_LIMITS.imageMaxBytes) {
       throw apiError(HttpStatus.BAD_REQUEST, 'file_too_large', IMAGE_TOO_LARGE_MESSAGE);
     }
-    const contentType = detectImageType(file.buffer);
+    const contentType = detectImageType(data);
     if (!contentType) {
       throw apiError(
         HttpStatus.BAD_REQUEST,
@@ -51,12 +56,12 @@ export class FilesService {
         'JPEG, PNG, WebP, GIF 이미지만 올릴 수 있습니다.',
       );
     }
-    const animated = isAnimatedImage(contentType, file.buffer);
+    const animated = isAnimatedImage(contentType, data);
     const id = randomUUID();
-    await this.storage.put(id, file.buffer);
+    await this.storage.put(id, data);
     await this.database.query(
       'INSERT INTO files (id, owner_user_id, storage_key, content_type, size, animated) VALUES ($1, $2, $3, $4, $5, $6)',
-      [id, userId, id, contentType, file.size, animated],
+      [id, userId, id, contentType, data.length, animated],
     );
     return { fileId: id, url: this.imageUrl(id), animated };
   }
