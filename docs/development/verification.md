@@ -51,12 +51,19 @@
 | `변경 종류`(`changes`) | 전체 이력을 받아 위 기준으로 `code` 출력(`true`·`false`)을 정합니다. 판정 근거 파일 목록을 로그에 남깁니다. |
 | `docs` | 문서만 바뀌었을 때 `.nvmrc` Node로 `pnpm install --frozen-lockfile` 후 `pnpm verify --docs --keep-going`. |
 | `check` | 코드가 바뀌었을 때 지원 Node.js(`matrix.node`: 기준 LTS 24와 다음 LTS 후보 26)마다 `pnpm install --frozen-lockfile` 후 `pnpm verify --keep-going`. PostgreSQL 17 서비스 컨테이너에 `TEST_DATABASE_URL`로 연결합니다. 한 버전이 실패해도 나머지 버전 결과를 끝까지 봅니다. |
-| `smoke` | `.nvmrc` Node로 `node scripts/instance.mjs --print-env`의 슬롯 0 포트·주소(`API_PORT`·`WEB_PORT`·`API_URL`·`WEB_URL`, 원본 `infra/local/.env.example`)를 job 환경에 넣고, 공용 패키지·API·웹을 빌드해 PostgreSQL 서비스에 연결한 API(`node apps/api/dist/main.js`, `PORT=$API_PORT`)와 웹(`next start --port $WEB_PORT`)을 백그라운드로 띄운 뒤 준비를 기다려 `pnpm smoke`를 실행합니다. 실패하면 API·웹 로그를 출력합니다. |
+| `smoke` | 고정 `ubuntu-24.04`·`.nvmrc` Node·lockfile Playwright에서 공용 패키지/API/웹을 빌드하고 localhost PostgreSQL 서비스와 API/웹을 시작합니다. 인스턴스 주소를 job 환경에 넣은 뒤 smoke → 핵심 사용자 Chromium → personas → analytics-responsive 3엔진 → link-layout 3엔진을 같은 DB에서 순서대로 실행합니다. 실패는 job과 필수 `CI 통과`를 실패시키며 `always()` artifact에 suite별 HTML/JSON·PNG·trace와 API/웹 로그를14일 보관합니다. |
 | `이미지 빌드 api`·`이미지 빌드 web` | 운영 이미지(`apps/api/Dockerfile`, `apps/web/Dockerfile`)가 `linux/amd64`로 빌드되는지 확인합니다(buildx, gha 캐시). 푸시하지 않습니다. 배포 대상 플랫폼 빌드는 `deploy.yml`이 합니다. |
 | `work scope` | `work/NNNN-*` 브랜치의 PR에서만 전체 이력을 받아 `pnpm work:scope --base origin/<기준 브랜치>`로 변경 파일이 티켓 역할의 소유 경로 안에 있는지 검사합니다. |
 | `CI 통과` | 위 job이 모두 끝난 뒤 항상 돌아, 하나라도 실패·취소면 실패합니다(건너뜀은 통과). ruleset의 필수 검사는 이 job 하나입니다. 개별 job을 필수로 걸면 문서만 바뀐 PR에서 건너뛴 matrix job이 치환되지 않은 이름(`check (Node ${{ matrix.node }})`)으로 보고되어 필수 이름이 오지 않기 때문입니다. job을 추가하면 이 job의 `needs`에도 넣습니다. |
 
 지원 Node.js 버전을 바꾸면 workflow의 `matrix.node`, `.nvmrc`, 운영 이미지 베이스(`apps/*/Dockerfile`), `apps/web/package.json`의 `engines`, README 요구사항을 함께 고칩니다. 버전 선택 기준은 [저장소 공통 정책](repository-policy.md#의존성-버전)입니다.
+
+### 브라우저 gate와 시각 기준선
+
+현재 PR 선택 범위는 workflow의 명령이 원본입니다. 핵심 사용자 검사는 작성·공개·권한·안내·방명록·출시 QA와 합성 사용자 세션을 포함합니다. AI 운영자 실행·광고 전역 스위치 전체 회귀를 매 PR에 중복 실행하지 않습니다. OAuth fixture와 외부 목적지 mock의 한계는 [가상 사용자 계약](user-simulation.md)을 따릅니다.
+
+시각 기준선은 고정 Linux CI의 Chromium·viewport·합성 콘텐츠·폰트 준비 조건에서 생성하고 PNG 원본을 직접 검토한 뒤에만 등록합니다. macOS 캡처를 Linux baseline으로 바꾸거나 실패 이미지를 자동 승인하지 않습니다. 최초 기준선 부재로 실패한 실행은 중간 실패이며, 같은 실행의 artifact와 필수 gate 실패를 확인한 뒤 기준선을 명시적으로 추가하고 정상 최종 SHA에서 전체 gate 성공을 확인해야 합니다. 검증 기록은 [출시 QA 설계](../specs/release-qa.md), 결과는 [0200](../work/orchestrator/0200-release-qa.md)에 연결합니다.
+
 
 ## CD(운영 배포)
 

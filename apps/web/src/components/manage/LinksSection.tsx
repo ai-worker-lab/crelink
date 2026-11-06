@@ -23,7 +23,7 @@ import { useId, useRef } from 'react';
 import { browserApi } from '../../lib/api/browser';
 import { mixedOrder, SLOT_ROW_ID, slotEditable, slotRowName, splitOrder, withParticle } from '../../lib/slot-order';
 import { LinkLayoutPicker } from './LinkLayoutPicker';
-import { InstabioImport } from './InstabioImport';
+import { InstabioImport, type InstabioImportDraft } from './InstabioImport';
 import { useAction, type ActionState } from '../../lib/use-action';
 import { ActionStatus } from '../ActionStatus';
 import { EditableLinkCard } from './EditableLinkCard';
@@ -50,11 +50,13 @@ export function LinksSection({
   notice: doneNotice,
   focusSlotHandle = false,
   importAction,
+  importDraft,
   layoutAction,
 }: {
   notice?: string | null;
   focusSlotHandle?: boolean;
   importAction: ActionState;
+  importDraft: InstabioImportDraft;
   layoutAction: ActionState;
 }) {
   const { state, setState, reload, select, isLinkDirty, adBlockAction } = useManager();
@@ -171,7 +173,7 @@ export function LinksSection({
       <ActionStatus error={error} notice={notice ?? doneNotice ?? null} />
       {/* 광고 블록 행 스위치 결과. 409 `ad_block_unavailable`로 행이 사라져도 안내는 여기 남습니다. */}
       <ActionStatus error={adBlockAction.error} notice={adBlockAction.notice} />
-      <InstabioImport action={importAction} />
+      <InstabioImport action={importAction} draft={importDraft} />
       <DndContext
         id={dndId}
         sensors={sensors}

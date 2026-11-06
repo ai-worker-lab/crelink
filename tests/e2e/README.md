@@ -41,6 +41,7 @@ pnpm e2e --config tests/e2e/analytics-responsive.config.ts # 분석 UI만 Chromi
 - 세션: 무작위 토큰의 SHA-256 hex를 `sessions.token_hash`에 넣고, 원문 토큰을 브라우저 컨텍스트의 `cl_session` 쿠키(웹 호스트 `127.0.0.1`, httpOnly, SameSite=Lax)로 심습니다(`data.session(user)`, 둘째 인자로 터치 모바일 같은 컨텍스트 설정을 덧붙임). 쿠키는 포트와 무관해 단축 도메인(로컬은 API 주소) 요청에도 함께 갑니다.
 - 고유 이름: 실행마다 무작위 꼬리를 붙인 이메일(`…@e2e.crelink.test`), 단축 주소, 링크 도메인(`….e2e.test`), 차단 도메인(`blk-….e2e.test`)을 씁니다. `.test`는 DNS로 풀리지 않아 외부 사이트로 요청이 나가지 않습니다.
 - 정리: 테스트가 끝나면 만든 사용자를 지웁니다(나머지 행은 `ON DELETE CASCADE`, 업로드 이미지는 디스크 파일도 지움). 그 사용자가 올린 이미지를 쓰는 크리링 배너(`ad_banners`, 이미지 FK `ON DELETE RESTRICT`)는 사용자보다 먼저 지웁니다. 사용자를 지워도 남는 운영 감사 기록(`operator_actions`·`agent_runs`, `ON DELETE SET NULL`)도 그 사용자가 남긴 것을 먼저 지웁니다. 차단 도메인도 지웁니다. 중단된 실행이 남긴 데이터는 다음 실행이 시작할 때 1시간이 지난 것만 지웁니다. 다만 `ad-banner.spec.ts`는 시작할 때 시험 운영자(`…@e2e.crelink.test`)가 만든 크리링 배너를 시각과 관계없이 지웁니다(남은 게시 배너가 `n / m` 같은 전제를 깨므로). 위 꼬리가 없는 개발 DB의 다른 데이터는 건드리지 않으므로, 개발 DB에 직접 게시한 크리링 배너가 있으면 `ad-banner.spec.ts`가 실패합니다.
+- 늦은 beacon과 정리가 겹쳐도 잠금 순서를 뒤집지 않도록, 최종 사용자 삭제는 **해당 정리 대상 사용자의 이벤트 행만** `event_id` 순서로 먼저 `FOR UPDATE`하고 같은 transaction에서 CASCADE 삭제합니다. 실패는 rollback 후 테스트 실패이며 재시도로 숨기지 않습니다.
 - AI 운영자 계정(`data.aiAccount()`): 서버 CLI `ensure-account`·`issue-token`처럼 가입과 같은 행(랜딩·단축 주소)을 만든 뒤 `users.kind='ai'`(`role='operator'`)로 바꾸고 Google 신원·세션을 지우며, `api_tokens`(SHA-256 해시) 행을 넣고 토큰 원문을 돌려줍니다. `ai-operator.spec.ts`는 멈춤 스위치와 진행 중 실행이 전역이라 시작할 때 멈춤을 끄고 남은 `running` 실행을 `abandoned`로 닫으며, 끝날 때 멈춤을 끕니다.
 - 외부 요청: 컨텍스트마다 `127.0.0.1`(웹·API) 밖 요청에 가짜 응답(`/favicon.ico`는 404, 그 밖은 200)을 줍니다. Playwright route는 리디렉트된 요청을 가로채지 않아 `{SHORT}/c/{id}` 302의 도착지는 DNS 실패로 끝나므로, 테스트는 302 응답의 `Location`과 브라우저가 그 주소로 요청한 것을 확인합니다.
 - 콘솔 오류: 모든 페이지의 `console.error`·페이지 예외를 모아 테스트 끝에 비어 있는지 확인합니다. 외부 사이트 아이콘을 못 불러온 리소스 오류(설계상 기본 아이콘으로 대체)와, 시나리오가 일부러 일으킨 API 거부(`data.allowConsoleError`, 예: 차단 도메인 저장 422, 보이는 배너 한도가 찬 상태의 다시 보이기 409)만 뺍니다.
@@ -59,10 +60,40 @@ pnpm e2e --config tests/e2e/analytics-responsive.config.ts # 분석 UI만 Chromi
 | `guestbook.spec.ts` | 방명록 1~8 | 크리에이터·작성자·다른 회원·비회원 컨텍스트로 `/p/{id}#guestbook`(단축 주소를 거쳐도 해시와 방명록 탭 유지) → 비회원 빈 상태·`로그인하고 남기기`(`returnTo`) → 작성자의 공개글·비밀글 → 비회원·다른 회원은 공개글만(BFF 응답 원문에도 비밀글 없음, 버튼 없음) → 크리에이터가 관리 화면 `방명록` 메뉴(비밀글 표시, 삭제·작성 폼 없음)에서 숨김: 무대 미리보기 방명록 탭(방문자 시점, 비밀글·숨긴 글·버튼 없음, 누를 수 없는 로그인 안내)과 비회원·다른 회원에게서 사라지고 작성자에게는 숨김 표시 없이 그대로, 숨김 해제 → 작성자 삭제 → `방명록` 메뉴 스위치로 끄면 꺼짐 안내, 미리보기·공개 랜딩에 탭 없음, API 404 `guestbook_disabled` → `페이지 편집` 구역 목록 `방명록 꺼짐`으로 연 방명록 패널(제목 초점)의 같은 스위치로 켜면 미리보기가 방명록 탭, `전체`로 돌아오면 구역 목록 `켜짐`·미리보기 링크 탭 → 미리보기 `방명록 탭 편집`으로 다시 패널, `방명록 글 관리`로 남은 글(관리 화면 390px 확인) → 이름 없는 작성자 '크리링 회원', 긴 글 390px |
 | `ad-banner.spec.ts` | 광고 배너 1~9, 광고 블록 스위치 (b)~(e) | **무료 랜딩**: 운영자 배너 2장 → **플랫폼 스위치 꺼짐(기본)**: 공개 랜딩에 광고 없음, 편집 화면에 광고 칩·광고 행·`광고 블록 표시` 스위치 없음, `PUT /api/me/ad-block`은 409 `ad_block_unavailable` → 운영자가 `/admin/ad-banners`의 `광고 블록 사용` 스위치를 켬(행동 기록 `platform.ad_block` 전후 값) → **크리에이터 꺼짐(기본)**: 공개 랜딩 광고·노출 없음, 편집 화면 광고 행과 꺼진 스위치, 미리보기 광고 없음 → 크리에이터가 켜면 미리보기 광고 칩 → 단축 주소로 연 랜딩 맨 뒤에 `크리링 광고` 영역·`광고` 배지·`1 / 2`, 5초 뒤에도 그대로, `다음 배너`로 `2 / 2`(끝 비활성), ←로 첫 장(초점은 새 장 링크) → 노출 1(첫 장, 랜딩별) → `/a/{배너}/{랜딩}` 302(no-store, 쿠키 없음)·클릭 기록, 없는 `/a/`·`/b/`는 `link_unavailable` → 운영자 화면에서 연 랜딩(같은 출처)은 광고 주소가 저장된 URL → 외부 링크 패널의 광고 행(`광고 블록 표시` 스위치, 삭제 없음, `링크 3/50`)을 키보드로 맨 앞·2번째 링크 다음으로, 링크를 슬롯 너머로 옮기면 미리보기·공개 랜딩 순서가 같음, `광고 블록` 패널의 `외부 링크 목록에서 끌어 옮기기`는 광고 행 손잡이로 초점, 관리 미리보기·운영자 화면에서 연 랜딩은 노출이 늘지 않음 → 운영자 표 노출·클릭이 DB 누적과 같음 → 모두 내리면 광고 없음·미리보기 점선 안내 → 다시 게시 뒤 링크를 모두 숨기면 없음, 포트폴리오를 더하면 광고 블록만. **운영자 크리링 배너**: 메뉴 `광고 배너` → 게시 0장 경고 → `배너 등록` 대화상자 오류(ftp 주소·차단 도메인·끝이 시작보다 앞) 뒤 저장 → GIF는 정지 이미지 쌍으로 저장(DB `animated`) → 미래 시작은 `예약`에만 → `전체`에서 키보드 정렬이 공개 랜딩 순서 → `수정` 대화상자는 바뀐 필드(연결 URL)만 PATCH → `움직임 멈추기`로 정지 이미지, `prefers-reduced-motion: reduce`는 처음부터 정지 이미지·버튼 숨김 → 차단 도메인을 더하면 게시 배너가 끝남, 기간만 고쳐 다시 열면 422 → `내리기`(확인)로 끝남·랜딩에서 빠짐·게시 0장 경고, 390·700·1280px. **배너 슬롯**: 운영자 부여(확인) → 보이는 배너 0장이라 숨음(미리보기 점선) → `배너 추가` 필수 항목·차단 도메인 거부 → 같은 자리에 배지 없는 `<이름> 배너`, `/b/` 클릭 기록(visitor_id·IP) → 5장이면 추가 막힘, 숨긴 배너 다시 보이기 409 안내·스위치 되돌림, 숨긴 배너 주소는 안내 → 패널 키보드 정렬이 공개 랜딩 첫 장 → 운영자 배너 차단: 패널 `차단됨`·사유·잠긴 스위치, 주소를 바꿔도 차단 유지 → `배너별 클릭` 표 → 회수: 같은 자리 광고 블록, 보관 6장 → 재부여: 이전 배너 그대로, 플랫폼·크리에이터 스위치를 꺼도 배너 슬롯 그대로 → 차단 도메인 추가로 배너 차단 → 배너 폼 `삭제`(확인) → 배너 폼을 연 채 회수되면 저장 시 회수 안내·처음 패널·초안 버림 → 운영자 `차단 풀기`, 크리에이터 상세 390·1280px. **방명록·반응형**: 광고는 `링크` 탭에만, 공개 랜딩 320·390·1280px, 페이지 편집 390·1280px, 390px의 `광고 블록` 칩 → 하단 시트 → `외부 링크 목록에서 끌어 옮기기`가 광고 행 손잡이로 초점. 파일 시작·끝에 플랫폼 스위치를 꺼짐으로 되돌림 |
 | `ai-operator.spec.ts` | AI 운영자 1~4 | 실행 호스트 도구 `scripts/ai-operator.mjs`(시험 전용 환경변수·상태 폴더)를 실제로 실행해 웹 토큰 경로 `/api/agent` → API를 지남: 토큰 없음 401·토큰 200·`precheck` 0 → `start`로 실행 기록 열기, 두 번째 `start` 409 `agent_run_in_progress`·`precheck` 1 → 실행 헤더 없는 AI 쓰기 409 `agent_run_required`, `api`로 배너 슬롯 부여(행동 기록 `ai`·실행 id·전후 값 DB 확인), AI가 사람 운영자 정지·멈춤 바꾸기는 403 → `context` 지표·이번 실행 → `finish`(요약·한 일·다음 할 일·PR 링크) → 사람 운영자 390px `/admin/agent-runs` 카드(성공·다음 할 일·PR 링크)·상세의 `이 실행의 운영 기록`·`/admin/actions?actor=ai` 행, 가로 넘침 없음 → 크리에이터 상세 `지표에서 빼기`(배지·사람 행위자 기록), AI 계정 상세는 안내만 → 화면에서 멈춤 켜기 → `precheck`·`start` 1, 같은 멈춤의 기록 한 행(`paused_count` 2), AI 쓰기 409 `ai_operator_paused` → 멈춤 풀기 → `precheck` 0 → 화면에서 토큰 폐기 → 401·`precheck` 1 |
-| `personas.spec.ts` | SIM-01~04 | 첫 링크 UI 저장→모바일 공개 방문/클릭 기록→시험 계정 성장 지표 불변, localhost 포함 대조군의 숨김/공개/제외/재포함, 다른 사용자/익명/위험 URL 쓰기 거부와 기존 데이터 보존, 세션 만료 뒤 재시도 거부 |
+| `personas.spec.ts` | SIM-01~04 | 첫 링크 UI 저장 실패(503)→입력/DB 보존→실제 저장 재시도→새로고침→모바일 공개 방문/브라우저 클릭→본인 수집 페이지뷰/클릭 통계, 시험 계정 성장 지표 불변, localhost 포함 대조군의 숨김/공개/제외/재포함, 타 계정 통계 격리/운영 통계 거부·익명/위험 URL 쓰기 거부·기존 데이터 보존, 세션 만료 뒤 재시도 거부 |
+| `instabio-import.spec.ts` | 0197·0200 | 외부 원본만 고정 fixture로 제공하고 실제 내부 API/PostgreSQL로 미리보기 무변경→중복 제외 추가 저장→기존 프로필/링크/카드 설정 보존→새로고침/공개 표시·접근성 검사 |
 
 실제 구글 로그인(키 발급 후)과 인스타그램 인앱 브라우저 확인은 이 테스트 범위 밖이며 설계의 [위험과 스파이크](../../docs/specs/crelink-mvp.md#위험과-스파이크)대로 수동으로 확인합니다.
 
 ## 링크 표시 방식만 검사
 
-`pnpm e2e --config tests/e2e/link-layout.config.ts`는 합성 계정으로 Chromium·모바일 조건의 WebKit·Firefox에서 설정 저장/복구·공개 화면·320/390/768/1280·배너/사진/긴 제목·키보드를 확인합니다. 실제 iPhone 실행을 뜻하지 않습니다. [0198](../../docs/work/orchestrator/0198-link-grid-layout.md).
+`pnpm e2e --config tests/e2e/link-layout.config.ts`는 합성 계정으로 Chromium·모바일 조건의 WebKit·Firefox에서 리스트/카드 선택 저장·실패 복구/재시도·새로고침·공개/미리보기 일치·320/390/768/1280의 **카드2열**·844×390 가로 조건·320px 글자200% 확대·배너 전체 열/사진/긴 제목/이미지 없음·키보드·axe WCAG A/AA를 확인합니다. 글자 확대는 브라우저 페이지 배율이나 OS 확대를 대신하지 않습니다. 실제 iPhone 실행을 뜻하지 않습니다. [0200](../../docs/work/orchestrator/0200-release-qa.md).
+
+## 출시 QA·CI 실행 계약
+
+기존 runner/fixture·3엔진 config를 재사용합니다. 같은 DB에서 아래 명령을 **순차** 실행합니다. `core`는 전역 AI 실행/운영 토큰 시험을 포함하지 않습니다. CI는 reporter CLI 옵션과 `PLAYWRIGHT_HTML_OUTPUT_DIR`·`PLAYWRIGHT_JSON_OUTPUT_NAME`·`--output`을 suite별로 지정하고 종료 코드가 0이 아니면 실패입니다.
+
+실행별 정상/실패·수정·미검증 근거는 [0200 출시 QA 보고](../../docs/reviews/0200-release-qa.md)에 남깁니다. `release-qa.spec.ts`를 별도로 만들지 않고 기존 personas/layout 시나리오를 확장합니다.
+
+```sh
+PLAYWRIGHT_HTML_OPEN=never PLAYWRIGHT_HTML_OUTPUT_DIR="$PWD/.local/ci/e2e/core/html" PLAYWRIGHT_JSON_OUTPUT_NAME="$PWD/.local/ci/e2e/core/report.json" pnpm e2e '(^|/)(creator|visitor|operator|notices|guestbook|instabio-import)\.spec\.ts$' --project=main --no-deps --reporter=list,html,json --output=.local/ci/e2e/core/results
+PLAYWRIGHT_HTML_OPEN=never PLAYWRIGHT_HTML_OUTPUT_DIR="$PWD/.local/ci/e2e/personas/html" PLAYWRIGHT_JSON_OUTPUT_NAME="$PWD/.local/ci/e2e/personas/report.json" pnpm e2e personas --project=personas --no-deps --reporter=list,html,json --output=.local/ci/e2e/personas/results
+PLAYWRIGHT_HTML_OPEN=never PLAYWRIGHT_HTML_OUTPUT_DIR="$PWD/.local/ci/e2e/analytics/html" PLAYWRIGHT_JSON_OUTPUT_NAME="$PWD/.local/ci/e2e/analytics/report.json" pnpm e2e --config tests/e2e/analytics-responsive.config.ts --reporter=list,html,json --output=.local/ci/e2e/analytics/results
+PLAYWRIGHT_HTML_OPEN=never PLAYWRIGHT_HTML_OUTPUT_DIR="$PWD/.local/ci/e2e/layout/html" PLAYWRIGHT_JSON_OUTPUT_NAME="$PWD/.local/ci/e2e/layout/report.json" pnpm e2e --config tests/e2e/link-layout.config.ts --reporter=list,html,json --output=.local/ci/e2e/layout/results
+```
+
+각 `results/`에 PNG·실패 trace가 남고 HTML/JSON은 위 경로에 남습니다. CI의 artifact 업로드는 성공/실패와 무관하게 이 트리를 보관해야 합니다. 직접 Playwright 실행도 fixture의 loopback 검사와 정리를 우회하지 못합니다.
+
+명령은 저장소 루트에서 실행합니다. JSON reporter의 상대 경로 기준은 config 디렉터리이므로 절대 경로를 넘깁니다. CI에서는 `$PWD` 대신 `$GITHUB_WORKSPACE`도 사용할 수 있습니다.
+
+### Instabio 외부 fixture 준비
+
+API **프로세스에만** `CRELINK_E2E_INSTABIO=1 NODE_OPTIONS="--import <checkout 절대 경로>/tests/e2e/instabio-source.mjs"`와 네 로컬 대상 환경변수를 전달하고 시작합니다. 일반 서버·운영 실행 설정에는 넣지 않습니다. preload는 기존 `assertLocalE2ETargets`를 먼저 실행하고 `https://instabio.cc/CrelinkE2E0200` 및 그 ID의 고정 CDN JSON 두 URL만 대체합니다. 그 밖의 요청은 원래 fetch로 전달합니다. 내부 웹/BFF/API/인증/DB는 실제 경로이며, 외부 live Instabio 가용성·구조 변경·실제 이미지 다운로드 검증으로 보고하지 않습니다.
+
+### 시각 기준선과 접근성
+
+`link-layout.spec.ts`의 안정된 공개2열 grid 영역(390×844, 고정 합성 제목/배너, 이미지·기본 아이콘, fonts.ready, animation disabled)을 Linux Chromium에서 `toHaveScreenshot('public-two-column.png')`로 비교합니다. OS별 렌더링을 섞지 않기 위해 Ubuntu24.04·lockfile Playwright1.64.0 Linux Chromium을 생성/검증 환경으로 맞춥니다. macOS 실행에서는 수치·동작·axe만 검증하고 screenshot 비교는 **not-run**입니다. 3엔진 실행은 유지하며 WebKit/Firefox를 Chromium 시각 baseline과 비교하지 않습니다.
+
+기준선이 없으면 CI는 missing-baseline으로 **실패**해야 합니다. PM이 실패 artifact의 actual PNG를 직접 열어2열·잘림·간격·배너·가독성을 검토하고 승인한 PNG만 `tests/e2e/link-layout.spec.ts-snapshots/public-two-column-chromium-linux.png`에 추가한 뒤, 같은 환경에서 일반 명령으로 비교 성공을 확인합니다. 실패 이미지를 자동승인하거나 허용 픽셀을 임의로 늘리지 않습니다(`maxDiffPixels: 0`). Playwright/OS/폰트 변경은 기준선 재검토 대상입니다.
+
+접근성은 [Playwright 공식 지침](https://playwright.dev/docs/accessibility-testing)의 `@axe-core/playwright`4.14.0으로 공개 grid 전체 페이지와 열린 Instabio 패널에 WCAG2/2.1 A/AA를 검사합니다. 전체 scan JSON을 attachment로 보존하며 위반을 일괄 제외하지 않습니다. 자동검사는 스크린리더·실물 터치·키보드 수동 평가 전체를 보증하지 않습니다.

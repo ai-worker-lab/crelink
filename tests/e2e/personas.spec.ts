@@ -38,6 +38,20 @@ test('SIM-01 초보 크리에이터의 첫 링크·모바일 방문·클릭은 �
   const form = owner.page.getByRole('main').getByRole('form', { name: '새 링크', exact: true });
   await form.getByLabel('표시 이름 (필수)').fill('협업 문의');
   await form.getByLabel('주소 (필수)').fill(url);
+  // 첫 저장 실패는 입력을 지우거나 DB에 반쪽 링크를 남기면 안 됩니다.
+  const savePath = '**/api/backend/api/me/links';
+  data.allowConsoleError(/503.*\/api\/backend\/api\/me\/links/);
+  await owner.page.route(savePath, (route) =>
+    route.request().method() === 'POST'
+      ? route.fulfill({ status: 503, json: { code: 'service_unavailable', message: '합성 저장 실패' } })
+      : route.continue(),
+  );
+  await form.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(form.getByLabel('표시 이름 (필수)')).toHaveValue('협업 문의');
+  await expect(form.getByLabel('주소 (필수)')).toHaveValue(url);
+  await expect(owner.page.locator('.form-error')).toBeVisible();
+  expect((await data.db.query('SELECT id FROM links WHERE user_id=$1', [novice.userId])).rows).toEqual([]);
+  await owner.page.unroute(savePath);
   await form.getByRole('button', { name: '저장', exact: true }).click();
   await expect(form).toHaveCount(0);
   await owner.page.reload();
@@ -54,13 +68,33 @@ test('SIM-01 초보 크리에이터의 첫 링크·모바일 방문·클릭은 �
   const publicLink = visitor.page.getByRole('link', { name: '협업 문의', exact: true });
   const clickUrl = await publicLink.getAttribute('href');
   expect(clickUrl).toMatch(new RegExp(`^${SHORT_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/c/`));
-  const click = await visitor.context.request.get(clickUrl!, { maxRedirects: 0 });
+  const outbound = visitor.page.waitForRequest(url);
+  const redirect = visitor.page.waitForResponse((response) => response.url() === clickUrl && response.status() === 302);
+  await publicLink.click();
+  await outbound;
+  const click = await redirect;
   expect(click.status()).toBe(302);
   expect(click.headers().location).toBe(url);
   await waitForCount(data, 'visits', novice.shortLinkId, 1);
   await waitForCount(data, 'link_clicks', novice.shortLinkId, 1);
   await expectNoHorizontalOverflow(visitor.page, 'SIM-01 모바일 공개 프로필');
   expect(await growthMetrics(admin.page)).toEqual(baseline);
+  await expect
+    .poll(async () => {
+      const response = await owner.page.request.get(`${API_URL}/api/me/analytics`);
+      expect(response.status()).toBe(200);
+      const report = await response.json();
+      return { pageViews: report.summary.pageViews, clicks: report.summary.clicks };
+    })
+    .toEqual({ pageViews: 1, clicks: 1 });
+  await owner.page.goto(`/me/landings/${novice.publicId}/metrics`);
+  const summary = owner.page.locator('section', { has: owner.page.getByRole('heading', { name: '방문자 행동 요약' }) });
+  await expect(
+    summary.locator('div', { has: owner.page.getByText('수집된 페이지뷰', { exact: true }) }).locator('dd'),
+  ).toHaveText('1');
+  await expect(summary.locator('div', { has: owner.page.getByText('클릭', { exact: true }) }).locator('dd')).toHaveText(
+    '1',
+  );
 
   await admin.page.goto(`/admin/creators/${novice.userId}`);
   await expect(admin.page.getByRole('button', { name: '지표에 다시 넣기' })).toBeVisible();
@@ -147,6 +181,15 @@ test('SIM-03 다른 사용자·익명 사용자의 쓰기와 위험 URL을 거�
   expect(unauthenticated.status()).toBe(401);
   const metrics = await stranger.page.request.get(`${API_URL}/api/admin/metrics`);
   expect(metrics.status()).toBe(403);
+  expect((await stranger.page.request.get(`${API_URL}/api/admin/analytics?creatorId=${creator.userId}`)).status()).toBe(
+    403,
+  );
+  expect((await stranger.page.request.get(`${API_URL}/api/me/analytics?creatorId=${creator.userId}`)).status()).toBe(
+    400,
+  );
+  const isolated = await stranger.page.request.get(`${API_URL}/api/me/analytics`);
+  expect(isolated.status()).toBe(200);
+  expect((await isolated.json()).summary.pageViews).toBe(0);
   const unsafe = await owner.page.request.post(backend('/api/me/links'), {
     headers: { Origin: WEB_URL },
     data: { title: '위험 주소', url: 'javascript:alert(1)' },

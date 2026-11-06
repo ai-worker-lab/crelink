@@ -112,8 +112,9 @@ jobs:
     name: smoke
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 시각 baseline은 이 OS와 lockfile의 Playwright 버전에서만 생성·비교합니다.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:17-alpine
@@ -128,6 +129,8 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+    env:
+      DATABASE_URL: postgresql://crelink:crelink-ci-only@127.0.0.1:5432/crelink
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -147,7 +150,7 @@ jobs:
           DATABASE_URL: postgresql://crelink:crelink-ci-only@127.0.0.1:5432/crelink
         run: |
           mkdir -p .local/ci
-          PORT="$API_PORT" nohup node apps/api/dist/main.js > .local/ci/api.log 2>&1 &
+          WEB_URL="$WEB_URL" API_URL="$API_URL" SHORT_LINK_BASE_URL="$SHORT_LINK_BASE_URL" DATABASE_URL="$DATABASE_URL" CRELINK_E2E_INSTABIO=1 NODE_OPTIONS="--import $GITHUB_WORKSPACE/tests/e2e/instabio-source.mjs" PORT="$API_PORT" nohup node apps/api/dist/main.js > .local/ci/api.log 2>&1 &
           API_INTERNAL_URL="$API_URL" nohup pnpm --filter @crelink/web exec next start --port "$WEB_PORT" > .local/ci/web.log 2>&1 &
       - name: 서비스 준비 대기
         run: |
@@ -157,8 +160,42 @@ jobs:
           done
           echo "API·웹이 2분 안에 준비되지 않았습니다. 아래 'API·웹 로그' 단계를 확인하세요."
           exit 1
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright install --with-deps chromium webkit firefox
       - run: pnpm smoke
+      # 같은 DB의 전역 상태·지표 대조군이 겹치지 않도록 suite를 순서대로 실행합니다.
+      # 테스트 인증은 로컬 fixture이며 실제 Google OAuth/실물 기기 시험이 아닙니다.
+      - name: 핵심 사용자 E2E
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: ${{ github.workspace }}/.local/ci/e2e/core/report
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/.local/ci/e2e/core/results.json
+        run: pnpm e2e '(^|/)(creator|visitor|operator|notices|guestbook|instabio-import)\.spec\.ts$' --project=main --reporter=list,html,json --output=.local/ci/e2e/core/results
+      - name: 가상 사용자 권한·세션 E2E
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: ${{ github.workspace }}/.local/ci/e2e/personas/report
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/.local/ci/e2e/personas/results.json
+        run: pnpm e2e personas --project=personas --no-deps --reporter=list,html,json --output=.local/ci/e2e/personas/results
+      - name: 분석 반응형 3엔진 E2E
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: ${{ github.workspace }}/.local/ci/e2e/analytics/report
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/.local/ci/e2e/analytics/results.json
+        run: pnpm e2e --config tests/e2e/analytics-responsive.config.ts --reporter=list,html,json --output=.local/ci/e2e/analytics/results
+      - name: 링크 배치 3엔진 E2E
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: ${{ github.workspace }}/.local/ci/e2e/layout/report
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/.local/ci/e2e/layout/results.json
+        run: pnpm e2e --config tests/e2e/link-layout.config.ts --reporter=list,html,json --output=.local/ci/e2e/layout/results
+      - name: 브라우저 검증 증거
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-qa-${{ github.run_id }}-${{ github.run_attempt }}
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            .local/ci/e2e/
+            .local/ci/*.log
+            .local/smoke/test-results/
       - name: API·웹 로그
         if: failure()
         run: |

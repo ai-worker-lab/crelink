@@ -6,6 +6,8 @@
 
 ## 2026-11-06
 
+- 출시 QA 연결과 카드2열(0200): 최신 사용자 지시로320px 이상 카드2열 기준을 제품·설계·디자인에 맞추고, 기존 PR smoke job에 핵심 사용자·권한/세션·분석/배치3엔진 검사와 항상 업로드하는 HTML/JSON/PNG/trace 증거를 연결합니다. 접근성 검사를 위한 `@axe-core/playwright`4.14.0만 추가하며 실제 통합·CI 결과는 [0200](docs/work/orchestrator/0200-release-qa.md), 범위와 후속 기능 제안은 [설계](docs/specs/release-qa.md)에 남깁니다. main 병합·배포는 포함하지 않습니다.
+
 - 카드형 그리드3열(0199): 사용자 요청으로 공개/미리보기 그리드 열 수를3으로 바꾸고3엔진 검증과 현재 디자인 기준을 맞췄습니다. [0199](docs/work/orchestrator/0199-grid-three-columns.md).
 
 - 생성자 링크 표시 방식(0198): 외부 링크에서 리스트/카드형2열 그리드를 선택하면 저장 상태·공개 페이지·미리보기에 함께 반영합니다. 기존 토큰/카드와 PATCH를 재사용하며 migration0011 기본 list로 기존 랜딩을 보존합니다. [설계](docs/specs/link-grid-layout.md), [검증](docs/work/orchestrator/0198-link-grid-layout.md).

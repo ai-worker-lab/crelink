@@ -81,3 +81,4 @@ AI 운영자: [AI 운영자 기술 설계](specs/crelink-ai-operator.md) — 전
 - [방문자 행동 수집 확장](specs/crelink-visitor-data.md) - PRD R27, 기존 방문자 연결·UTM·가시 노출·외부 항목 클릭·활성 체류·환경 수집과 보존.
 
 - [지표·통계 화면과 조회 권한](specs/crelink-analytics.md) — R10·R28, 관리자 전체/사용자 본인, 요약·상세4화면·공유API·보존과 누락 의미.
+- [출시 준비와 PR 브라우저 QA](specs/release-qa.md) — 카드2열 최신 기준, localhost 검증·필수 CI·시각/접근성·후속 기능 제안.

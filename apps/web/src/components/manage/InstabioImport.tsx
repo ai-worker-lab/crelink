@@ -7,7 +7,7 @@ import {
   type InstabioImportRequest,
   type InstabioImportResult,
 } from '@crelink/shared';
-import { useId, useRef, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react';
 import { BrowserApiError, browserApi } from '../../lib/api/browser';
 import { isProfileDirty, profileDraftOf } from '../../lib/landing-preview';
 import type { ActionState } from '../../lib/use-action';
@@ -15,13 +15,61 @@ import { ActionStatus } from '../ActionStatus';
 import { RemoteImage } from '../RemoteImage';
 import { useManager } from './ManagerContext';
 
-export function InstabioImport({ action }: { action: ActionState }) {
-  const { state, setState, setProfile, reload, dirty } = useManager();
+export interface InstabioImportDraft {
+  url: string;
+  setUrl: Dispatch<SetStateAction<string>>;
+  preview: InstabioImportPreview | null;
+  setPreview: Dispatch<SetStateAction<InstabioImportPreview | null>>;
+  titles: Record<string, string>;
+  setTitles: Dispatch<SetStateAction<Record<string, string>>>;
+  selected: string[];
+  setSelected: Dispatch<SetStateAction<string[]>>;
+  replaceProfile: boolean;
+  setReplaceProfile: Dispatch<SetStateAction<boolean>>;
+  open: boolean;
+  setOpen: Dispatch<SetStateAction<boolean>>;
+}
+
+/** 패널/하단 시트가 교체돼도 남도록 PageEditor에서 소유하는 가져오기 초안입니다. */
+export function useInstabioImportDraft(): InstabioImportDraft {
   const [url, setUrl] = useState('');
   const [preview, setPreview] = useState<InstabioImportPreview | null>(null);
   const [titles, setTitles] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<string[]>([]);
   const [replaceProfile, setReplaceProfile] = useState(false);
+  const [open, setOpen] = useState(false);
+  return {
+    url,
+    setUrl,
+    preview,
+    setPreview,
+    titles,
+    setTitles,
+    selected,
+    setSelected,
+    replaceProfile,
+    setReplaceProfile,
+    open,
+    setOpen,
+  };
+}
+
+export function InstabioImport({ action, draft }: { action: ActionState; draft: InstabioImportDraft }) {
+  const { state, setState, setProfile, reload, dirty } = useManager();
+  const {
+    url,
+    setUrl,
+    preview,
+    setPreview,
+    titles,
+    setTitles,
+    selected,
+    setSelected,
+    replaceProfile,
+    setReplaceProfile,
+    open,
+    setOpen,
+  } = draft;
   const heading = useRef<HTMLHeadingElement>(null);
   const status = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -113,7 +161,7 @@ export function InstabioImport({ action }: { action: ActionState }) {
   }
 
   return (
-    <details className="instabio-import">
+    <details className="instabio-import" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary
         onClick={(event) => {
           if (pending) event.preventDefault();

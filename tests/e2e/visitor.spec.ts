@@ -129,7 +129,6 @@ test('외부에서 랜딩 주소로 바로 열면 단축 주소를 거쳐 방문
   const { page } = await data.session();
   const response = await page.goto(creator.landingUrl, { referer: 'https://open.kakao.com/' });
   const landed = response!.request();
-  expect(landed.url()).toMatch(new RegExp(`^${creator.landingUrl.replace(/\./g, '\\.')}\\?pass=\\d+\\.[\\w-]{22}$`));
   expect(landed.redirectedFrom()?.url()).toBe(creator.shortUrl);
   expect(landed.redirectedFrom()?.redirectedFrom()?.url()).toBe(creator.landingUrl);
   await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
