@@ -32,6 +32,8 @@
 - 웹 첫 화면(`/`)이 200으로 열리고 보이는 내용이 있으며 브라우저 콘솔 오류와 페이지 예외가 없음. 특정 화면 문구는 검사하지 않으므로 첫 화면을 바꾸는 기능 티켓도 smoke를 고치지 않고 통과합니다. 화면별 시나리오와 웹→API 연결은 기능의 통합 티켓이 E2E로 확인합니다([기술 설계와 티켓 분해](../specs/README.md)).
 - 1280px·390px 폭에서 `document.documentElement.scrollWidth <= clientWidth`(가로 넘침 없음).
 
+웹 화면 변경의 UI/UX 완료 기준은 [디자인 시스템의 기기·OS·브라우저 대응](../../design/system/DESIGN.md#기기os브라우저-대응)에 있다. 위 smoke는 Chromium 기반의 공통 상태 검사다. 변경한 내부 페이지의 입력 겹침·카드 경계·표/차트 가독성·정보 배치와 WebKit/Firefox·실물 결함의 확인 결과는 기능별 검증에 별도로 남긴다. 디자인 기준 추가만으로 현재 smoke에 다중 엔진 검사가 구현됐다고 설명하지 않는다.
+
 실패한 테스트의 trace는 `.local/smoke/test-results/`에 남습니다. `pnpm exec playwright show-trace <trace.zip>`으로 엽니다.
 
 ## `pnpm e2e`

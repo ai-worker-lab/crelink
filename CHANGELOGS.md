@@ -6,6 +6,9 @@
 
 ## 2026-11-06
 
+- 분석 UI 모바일 대응 구현·선택 QA(0196): 기존 토큰과 공통 컴포넌트로 날짜/선택·기간·일별 표·차트·정보 우선순위를 보완합니다. 네 분석 페이지의 다중 엔진 선택 검사를 추가하고 실제 기기와 에뮬레이션의 증거를 구분합니다. 검증·범위: `docs/work/orchestrator/0196-analytics-responsive-compatibility.md`, 웹 상세 `apps/web/docs/analytics.md`.
+- 기기·OS·브라우저 디자인 대응 기준 추가(0195): `design/system/DESIGN.md`에 모바일 정보 우선순위·native 입력·표/차트·터치·다중 엔진·페이지별 스크린샷·실물 결함 재검증 기준을 명시했습니다. 지표·통계 인계와 검증 루프를 같은 기준에 연결합니다. 제품 수정·라이브러리 도입·자동화 실행 결과와 문서 기준을 구분합니다. 근거 `docs/work/orchestrator/0195-responsive-design-contract.md`.
+
 - 운영자 본인 지표·통계의 `creator_not_found` 수정(0194): 본인 조회의 대상·집계 범위에서 운영자 역할을 허용하고 관리자 전체의 크리에이터 기준은 유지합니다. API HTTP 회귀와 운영 브라우저 확인을 연결합니다. 근거 `docs/work/orchestrator/0194-operator-own-analytics.md`, 공개 릴리스 `v0.1.1`.
 
 - 방문자 수집·지표·통계 운영 배포 착수(0193): 사용자 명시 배포 요청에 따라 검증된 전체 변경의 PR·CI·main 병합·기존 Blue/Green CD를 진행합니다. 사용자 릴리스 `v0.1.0`을 기록했으며 실제 배포 결과는 `docs/work/orchestrator/0193-analytics-release.md`에 남깁니다.

@@ -11,6 +11,9 @@ pnpm e2e                                  # 전체 시나리오
 pnpm e2e operator                         # 파일 이름 일부로 골라 실행(나머지 인자는 playwright test에 그대로 전달)
 pnpm e2e personas --project=personas --no-deps # 가상 사용자 네 시나리오만
 pnpm e2e personas --project=personas --no-deps --debug # 단계별 수동 검토
+pnpm e2e analytics-responsive --project=main # 분석 UI 변경만 Chromium으로 검사
+pnpm exec playwright install webkit firefox # 아래 다중 엔진 검사 최초 준비
+pnpm e2e --config tests/e2e/analytics-responsive.config.ts # 분석 UI만 Chromium·WebKit·Firefox
 ```
 
 - `scripts/e2e.mjs`가 `WEB_URL`·`API_URL`·`SHORT_LINK_BASE_URL`·`DATABASE_URL`을 환경변수, 없으면 이 checkout의 인스턴스 설정 `.local/instance.env`(`pnpm instance`)에서 읽어 넘깁니다. 실행 전에 API(`/api/health/ready`)·웹·DB 연결과 Chromium 실행을 확인하고, 실패하면 해결 방법을 출력합니다.
@@ -22,6 +25,14 @@ pnpm e2e personas --project=personas --no-deps --debug # 단계별 수동 검토
 - 프로젝트는 `main → ad-banner → personas` 순서입니다. 전역 광고 배너·광고 블록 플랫폼 스위치 변경은 다른 화면 시나리오와 겹치지 않고, 지표 포함 대조군을 만드는 `personas`는 마지막에 워커 하나로 실행합니다. `ad-banner`는 시작과 끝에 플랫폼 스위치를 기본값(꺼짐)으로 되돌립니다. 특정 프로젝트만 재현하려면 `--project=<이름> --no-deps`를 사용하며 이것은 전체 회귀 통과를 뜻하지 않습니다.
 
 ## fixture 원리
+
+### 분석 화면의 선택 호환성 검사
+
+`analytics-responsive.spec.ts`는 크리에이터/관리자 지표·통계 네 화면의 실제 local API와 합성 계정을 사용합니다. 공개 방문에서 수집된 페이지뷰가 나타날 때까지 확인한 뒤 날짜 경계·조회/빈 기간/잘못된 범위 복구·계정 조건 보존·최근7행/이전23행·고정 날짜·내부 스크롤·차트 글자·조작 높이·콘솔 오류를 검사합니다. 폭320/360/390/700/701/768/844·가로 조건과 데스크톱1280/1440을 포함합니다. 페이지별 모바일/데스크톱 첫 화면·전체 PNG 네 장을 결과 폴더에 저장합니다.
+
+일반 E2E의 `main`은 Chromium으로만 실행합니다. `analytics-responsive.config.ts`를 고를 때만 세 엔진으로 반복하므로 관련 없는 전역 시나리오나 모든 QA를 재실행하지 않습니다. 선택 실행의 JSON 결과는 `.local/e2e/analytics-responsive-report.json`에 실행 시간·환경 attachment를 포함해 저장합니다. custom context를 만드는 `data.session()`에 직접 기기 옵션을 전달합니다. Chromium은 Pixel 7, WebKit은 iPhone 13 Pro 프리셋, Firefox는 desktop 엔진의 touch/viewport 조건이며 실제 휴대폰 실행으로 설명하지 않습니다. iOS 조건의 WebKit에서 물리 키보드 가로 이동 대신 내부 scroll과 고정 열을 확인하며 터치 스와이프·native picker·실물 재현은 별도 검수 증거가 필요합니다.
+
+### 공용 데이터·세션
 
 구글 로그인 키 없이 로그인 상태를 만들기 위해 `fixtures.ts`가 개발 DB에 직접 행을 넣습니다(설계 검증 계획의 "테스트 전용 세션 발급").
 
