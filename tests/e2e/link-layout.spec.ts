@@ -81,7 +81,7 @@ test('생성자 표시 설정: 저장·미리보기·공개 그리드·모바일
         objectFit: getComputedStyle(node.querySelector('.link-thumb')!).objectFit,
       };
     });
-    expect(metrics.columns).toBe(2);
+    expect(metrics.columns).toBe(3);
     expect(metrics.cardMin).toBeGreaterThanOrEqual(44);
     expect(metrics.fits).toBe(true);
     expect(Math.abs(metrics.bannerWidth - metrics.width)).toBeLessThan(2);
