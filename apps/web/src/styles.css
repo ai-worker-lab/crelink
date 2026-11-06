@@ -3654,3 +3654,56 @@ body:has(.sheet[open]) {
     flex: 1 1 auto;
   }
 }
+
+/* Instabio 미리보기: 기존 폼 토큰을 쓰고 좁은 시트에서도 URL을 줄바꿈합니다. */
+.instabio-import {
+  margin-block: var(--ds-space-16);
+  padding: var(--ds-space-12);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-md);
+  min-width: 0;
+}
+.instabio-import summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: list-item;
+  align-content: center;
+  font-weight: var(--ds-font-weight-bold);
+}
+.instabio-profile p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.instabio-profile img {
+  display: block;
+  border-radius: var(--ds-corner-md);
+  object-fit: cover;
+  margin-bottom: var(--ds-space-8);
+}
+.instabio-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--ds-space-16);
+}
+.instabio-items li,
+.instabio-item-body > .field {
+  min-width: 0;
+}
+.instabio-item-body {
+  display: flex;
+  align-items: start;
+  gap: var(--ds-space-8);
+}
+.instabio-item-body img {
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: var(--ds-corner-sm);
+}
+.instabio-item-body > .field {
+  flex: 1;
+}
+.instabio-url {
+  overflow-wrap: anywhere;
+}

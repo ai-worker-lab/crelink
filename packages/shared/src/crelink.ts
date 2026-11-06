@@ -87,6 +87,10 @@ export type UserRole = 'creator' | 'operator';
 
 export type CrelinkErrorCode =
   | 'validation_failed'
+  | 'import_unavailable'
+  | 'import_source_changed'
+  | 'import_profile_changed'
+  | 'import_busy'
   | 'telemetry_rate_limited'
   | 'unauthenticated'
   | 'forbidden'
@@ -990,6 +994,8 @@ export const CRELINK_API_PATHS = {
   meLanding: '/api/me/landing',
   meSlugAvailability: '/api/me/short-link/availability',
   meSlug: '/api/me/short-link/slug',
+  meInstabioPreview: '/api/me/imports/instabio/preview',
+  meInstabioImport: '/api/me/imports/instabio',
   meLinks: '/api/me/links',
   meLink: (id: string) => `/api/me/links/${encodeURIComponent(id)}`,
   meLinksOrder: '/api/me/links/order',

@@ -5,6 +5,11 @@ export const IMAGE_MAX_LABEL = `${Math.floor(CRELINK_LIMITS.imageMaxBytes / (102
 
 /** API 오류 코드별 사용자 안내. 계약(`CrelinkErrorCode`)의 모든 코드를 다룹니다. */
 const API_ERROR_MESSAGES: Record<CrelinkErrorCode, string> = {
+  import_unavailable:
+    '원본을 가져오지 못했어요. 공개된 Instabio 주소와 페이지 상태를 확인한 뒤 다시 미리보기해 주세요.',
+  import_source_changed: '원본 내용이 바뀌었어요. 다시 미리보기한 뒤 가져와 주세요.',
+  import_profile_changed: '프로필이 다른 곳에서 바뀌었어요. 화면을 새로 고친 뒤 다시 가져와 주세요.',
+  import_busy: '다른 가져오기가 진행 중이에요. 잠시 뒤 다시 시도해 주세요.',
   validation_failed: '입력값을 확인해 주세요.',
   telemetry_rate_limited: '방문 기록 요청이 많아요. 잠시 후 다시 시도해 주세요.',
   unauthenticated: '로그인이 필요해요. 다시 로그인해 주세요.',

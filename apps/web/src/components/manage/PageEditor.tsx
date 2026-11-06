@@ -62,6 +62,7 @@ export function PageEditor() {
   if (seenKey !== key) {
     setSeenKey(key);
     formAction.setError(null);
+    formAction.setNotice(null);
     if (key !== 'links') setSlotHandleFocus(false);
   }
   // 다른 메뉴로 옮기면 고른 대상을 지웁니다(초안은 남음). 돌아오면 처음 패널부터.
@@ -170,7 +171,11 @@ export function PageEditor() {
     case 'links':
       title = '외부 링크';
       body = (
-        <LinksSection notice={doneNotice?.key === formKey ? doneNotice.text : null} focusSlotHandle={slotHandleFocus} />
+        <LinksSection
+          importAction={formAction}
+          notice={doneNotice?.key === formKey ? doneNotice.text : null}
+          focusSlotHandle={slotHandleFocus}
+        />
       );
       break;
     case 'ad-slot':

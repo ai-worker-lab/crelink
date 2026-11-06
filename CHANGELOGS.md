@@ -6,6 +6,8 @@
 
 ## 2026-11-06
 
+- Instabio 가져오기(0197): 공개 버튼 링크·썸네일·프로필 미리보기와 선택 저장을 기존 편집 화면에 추가했습니다. 추가 전용·중복 건너뛰기·프로필 명시 교체·외부 요청 제한·실패 원자성을 적용하며 새 의존성/스키마는 없습니다. [설계](docs/specs/instabio-import.md), [검증 기록](docs/work/orchestrator/0197-instabio-import.md).
+
 - 분석 UI 모바일 대응 구현·선택 QA(0196): 기존 토큰과 공통 컴포넌트로 날짜/선택·기간·일별 표·차트·정보 우선순위를 보완합니다. 네 분석 페이지의 다중 엔진 선택 검사를 추가하고 실제 기기와 에뮬레이션의 증거를 구분합니다. 검증·범위: `docs/work/orchestrator/0196-analytics-responsive-compatibility.md`, 웹 상세 `apps/web/docs/analytics.md`.
 - 기기·OS·브라우저 디자인 대응 기준 추가(0195): `design/system/DESIGN.md`에 모바일 정보 우선순위·native 입력·표/차트·터치·다중 엔진·페이지별 스크린샷·실물 결함 재검증 기준을 명시했습니다. 지표·통계 인계와 검증 루프를 같은 기준에 연결합니다. 제품 수정·라이브러리 도입·자동화 실행 결과와 문서 기준을 구분합니다. 근거 `docs/work/orchestrator/0195-responsive-design-contract.md`.
 

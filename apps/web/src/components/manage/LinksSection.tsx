@@ -22,7 +22,8 @@ import {
 import { useId, useRef } from 'react';
 import { browserApi } from '../../lib/api/browser';
 import { mixedOrder, SLOT_ROW_ID, slotEditable, slotRowName, splitOrder, withParticle } from '../../lib/slot-order';
-import { useAction } from '../../lib/use-action';
+import { InstabioImport } from './InstabioImport';
+import { useAction, type ActionState } from '../../lib/use-action';
 import { ActionStatus } from '../ActionStatus';
 import { EditableLinkCard } from './EditableLinkCard';
 import { useManager } from './ManagerContext';
@@ -47,12 +48,15 @@ const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
 export function LinksSection({
   notice: doneNotice,
   focusSlotHandle = false,
+  importAction,
 }: {
   notice?: string | null;
   focusSlotHandle?: boolean;
+  importAction: ActionState;
 }) {
   const { state, setState, reload, select, isLinkDirty, adBlockAction } = useManager();
-  const { pending, error, notice, run } = useAction();
+  const { pending: listPending, error, notice, run } = useAction();
+  const pending = listPending || importAction.pending;
   const dndId = useId();
   /** 이번 끌기에서 한 번이라도 다른 자리로 옮겼는지(스크린리더 안내용). */
   const movedSinceStart = useRef(false);
@@ -163,6 +167,7 @@ export function LinksSection({
       <ActionStatus error={error} notice={notice ?? doneNotice ?? null} />
       {/* 광고 블록 행 스위치 결과. 409 `ad_block_unavailable`로 행이 사라져도 안내는 여기 남습니다. */}
       <ActionStatus error={adBlockAction.error} notice={adBlockAction.notice} />
+      <InstabioImport action={importAction} />
       <DndContext
         id={dndId}
         sensors={sensors}
@@ -191,7 +196,9 @@ export function LinksSection({
                     busy={pending}
                     alone={links.length === 0}
                     autoFocus={focusSlotHandle}
-                    onEdit={() => select({ kind: 'banner-slot' })}
+                    onEdit={() => {
+                      if (!pending) select({ kind: 'banner-slot' });
+                    }}
                   />
                 );
               }
@@ -202,7 +209,9 @@ export function LinksSection({
                   link={link}
                   busy={pending}
                   dirty={isLinkDirty(link.id)}
-                  onEdit={(target) => select({ kind: 'link', id: target.id })}
+                  onEdit={(target) => {
+                    if (!pending) select({ kind: 'link', id: target.id });
+                  }}
                   onToggleHidden={toggleHidden}
                 />
               ) : null;

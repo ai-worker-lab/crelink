@@ -292,3 +292,7 @@ pnpm --filter @crelink/api --silent ai-operator list-tokens   # 또는 node apps
 ```
 
 `issue-token`의 출력은 토큰 원문이므로 터미널 기록·채팅·저장소에 남기지 말고 바로 `~/.config/crelink/ai-operator.env`(권한 600)로 옮깁니다. pnpm으로 부를 때는 `--silent`로 pnpm 머리말이 표준 출력에 섞이지 않게 합니다. 운영 절차는 [런북 17](../../../infra/docs/prod-runbook.md#17-ai-운영자-토큰)입니다.
+
+## Instabio 가져오기
+
+로그인한 사용자의 `POST /api/me/imports/instabio/preview {url}`은 DB 변경 없이 공개 버튼 링크를 읽습니다. `POST /api/me/imports/instabio`는 원본 fingerprint·선택 id/제목·프로필 교체 여부를 받아 기존 링크 뒤에 추가합니다. 계약은 `packages/shared/src/imports.ts`, 보안·복구 경계는 [설계](../../../docs/specs/instabio-import.md)를 따릅니다. 준비 후 미참조 업로드는 자동 정리를 보장하지 않습니다.

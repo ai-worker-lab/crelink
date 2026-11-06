@@ -125,3 +125,7 @@ Sentry(SaaS, 미국 리전)로 서버·브라우저 오류, 요청·화면 이�
 - 소스맵: `next build` 환경에 `SENTRY_AUTH_TOKEN`(Dockerfile의 BuildKit secret `sentry_auth_token`)이 있을 때만 브라우저 소스맵을 만들어 `SENTRY_ORG`·`SENTRY_PROJECT`·release `SENTRY_RELEASE`로 올리고(`widenClientFileUpload`) 올린 뒤 지웁니다. 없으면 브라우저 소스맵을 만들지 않고(`sourcemaps.disable`) 업로드도 건너뛰며 빌드는 성공합니다. 플러그인 기본값은 업로드 실패를 로그만 남기고 계속하므로 `errorHandler`로 빌드를 실패시킵니다(가짜 토큰 실측: 기본값이면 `Failed to create release: 404` 로그 뒤 빌드 성공, `errorHandler` 뒤 빌드 실패). Dockerfile은 토큰이 있는데 `SENTRY_ORG`·`SENTRY_PROJECT`·`SENTRY_RELEASE`가 비면 빌드를 멈춥니다. 서버 번들 소스맵(`.next/server`)은 Next 기본으로 생기며 공개 경로가 아닙니다.
 - 종료: Next 서버의 SIGTERM 처리(위 [종료 동작](#종료-동작sigterm))는 Sentry 전송을 기다리지 않으므로 종료 직전 보내던 서버 이벤트는 잃을 수 있습니다.
 - 로컬에서 전송 확인: 가짜 수신 서버를 띄우고 `apps/web/.env.local`에 `NEXT_PUBLIC_SENTRY_DSN=http://public@127.0.0.1:<포트>/2`를 넣은 뒤 `make web-restart`(또는 그 값으로 `next build`). 결과는 [0042 진행 기록](../../docs/work/orchestrator/0042-sentry-monitoring.md#진행-기록)과 [0052 진행 기록](../../docs/work/orchestrator/0052-sentry-free-features.md#진행-기록).
+
+## Instabio에서 가져오기
+
+페이지 편집 → 외부 링크 → **Instabio에서 가져오기**에서 직접 관리하는 공개 주소를 붙여 넣고 미리보기합니다. 항목·제목·제휴 고지를 확인한 뒤 저장하면 기존 링크 뒤에 추가됩니다. 같은 URL은 건너뛰고 프로필 이름·소개·사진은 별도로 교체를 선택합니다. 가져온 내용은 일반 편집 화면에서 수정할 수 있습니다. [검증·지원 범위](../../docs/work/orchestrator/0197-instabio-import.md).
