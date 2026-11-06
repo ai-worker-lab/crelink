@@ -48,14 +48,16 @@ export function AnalyticsFiltersForm({
           <>
             <div className="field">
               <label htmlFor="analytics-creator">크리에이터</label>
-              <select id="analytics-creator" className="input" name="creatorId" defaultValue={filters.creatorId}>
-                <option value="">전체 서비스</option>
-                {creators.map((creator) => (
-                  <option key={creator.id} value={creator.id}>
-                    {creator.label}
-                  </option>
-                ))}
-              </select>
+              <div className="analytics-select">
+                <select id="analytics-creator" className="input" name="creatorId" defaultValue={filters.creatorId}>
+                  <option value="">전체 서비스</option>
+                  {creators.map((creator) => (
+                    <option key={creator.id} value={creator.id}>
+                      {creator.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <input type="hidden" name="creatorQuery" value={filters.creatorQuery} />
             <input type="hidden" name="creatorPage" value={filters.creatorPage} />
@@ -74,7 +76,12 @@ export function AnalyticsFiltersForm({
         {[7, 30, 90].map((days) => {
           const range = recentRange(days);
           return (
-            <Link key={days} href={analyticsHref(base, filters, range)}>
+            <Link
+              key={days}
+              className="secondary"
+              href={analyticsHref(base, filters, range)}
+              aria-current={filters.from === range.from && filters.to === range.to ? 'date' : undefined}
+            >
               최근 {days}일
             </Link>
           );
@@ -135,33 +142,6 @@ export function AnalyticsDashboard({ report, mode }: { report: AnalyticsReport; 
   const summary = report.summary;
   return (
     <>
-      <section className="analytics-coverage notice-box" aria-label="집계 기준">
-        <p>
-          <strong>
-            {report.from} ~ {report.to}
-          </strong>{' '}
-          · 한국 시간 · 조회 {formatDateTime(report.generatedAt)}
-        </p>
-        <p>브라우저가 보낸 페이지 표시·행동 자료예요. 단축 주소 방문·리디렉트 클릭과 합산하지 않아요.</p>
-        <p className="field-help">
-          첫 관측 자료일 {report.coverage.firstRecordedDay ?? '아직 없음'} · 실제 계측 시작일을 뜻하지 않아요.
-          {report.coverage.firstRecordedDay && report.from < report.coverage.firstRecordedDay
-            ? ' 첫 관측 자료일 이전 날짜가 포함돼 그 기간의 0을 방문 없음으로 단정할 수 없어요.'
-            : ''}
-          {report.coverage.includesRollups
-            ? ' 과거 보존 집계가 포함돼 기간 전체의 정확한 순 방문자·세션·클릭 비율 일부는 확인할 수 없어요.'
-            : ''}
-          {report.coverage.hasMissingDimensions ? ' 보존된 자료에 없던 세부분포는 알 수 없음에 포함돼요.' : ''} 원본
-          보존 기준일 {report.coverage.rawFrom}. 분포는 남아 있는 원본과 보존 집계 기준이에요.
-        </p>
-      </section>
-      {summary.pageViews === 0 ? (
-        <p className="notice-box" role="status">
-          {report.legacy.visits > 0
-            ? '이 기간에 단축 주소 방문은 있지만 브라우저 행동 수집 자료가 없어요. 수집 이전이거나 브라우저가 전송을 차단했을 수 있어요.'
-            : '이 기간에 수집된 페이지 표시가 없어요. 방문이 없거나 수집 이전·전송 차단일 수 있어요.'}
-        </p>
-      ) : null}
       {mode === 'metrics' ? (
         <section className="card" aria-labelledby="analytics-summary-title">
           <h2 id="analytics-summary-title">방문자 행동 요약</h2>
@@ -187,16 +167,51 @@ export function AnalyticsDashboard({ report, mode }: { report: AnalyticsReport; 
           ) : null}
         </section>
       ) : null}
+      <details className="analytics-coverage notice-box">
+        <summary>집계 기준·자료 범위 보기</summary>
+        <p>
+          <strong>
+            {report.from} ~ {report.to}
+          </strong>{' '}
+          · 한국 시간 · 조회 {formatDateTime(report.generatedAt)}
+        </p>
+        <p>브라우저가 보낸 페이지 표시·행동 자료예요. 단축 주소 방문·리디렉트 클릭과 합산하지 않아요.</p>
+        <p className="field-help">
+          첫 관측 자료일 {report.coverage.firstRecordedDay ?? '아직 없음'} · 실제 계측 시작일을 뜻하지 않아요.
+          {report.coverage.firstRecordedDay && report.from < report.coverage.firstRecordedDay
+            ? ' 첫 관측 자료일 이전 날짜가 포함돼 그 기간의 0을 방문 없음으로 단정할 수 없어요.'
+            : ''}
+          {report.coverage.includesRollups
+            ? ' 과거 보존 집계가 포함돼 기간 전체의 정확한 순 방문자·세션·클릭 비율 일부는 확인할 수 없어요.'
+            : ''}
+          {report.coverage.hasMissingDimensions ? ' 보존된 자료에 없던 세부분포는 알 수 없음에 포함돼요.' : ''} 원본
+          보존 기준일 {report.coverage.rawFrom}. 분포는 남아 있는 원본과 보존 집계 기준이에요.
+        </p>
+      </details>
+      {report.coverage.includesRollups ||
+      (report.coverage.firstRecordedDay && report.from < report.coverage.firstRecordedDay) ? (
+        <p className="field-help">
+          수집 이전 기간이나 보존 집계가 포함돼요. 0을 방문 없음으로 단정할 수 없고 일부 수치는 확인 불가예요. 집계
+          기준을 확인해 주세요.
+        </p>
+      ) : null}
+      {summary.pageViews === 0 ? (
+        <p className="notice-box" role="status">
+          {report.legacy.visits > 0
+            ? '이 기간에 단축 주소 방문은 있지만 브라우저 행동 수집 자료가 없어요. 수집 이전이거나 브라우저가 전송을 차단했을 수 있어요.'
+            : '이 기간에 수집된 페이지 표시가 없어요. 방문이 없거나 수집 이전·전송 차단일 수 있어요.'}
+        </p>
+      ) : null}
       <section className="card" aria-labelledby="analytics-daily-title">
         <h2 id="analytics-daily-title">일별 추이</h2>
         <DailyTrend daily={report.daily} />
         {mode === 'metrics' ? (
           <details className="analytics-table-details">
             <summary>일별 데이터 표 보기</summary>
-            <DailyTable daily={report.daily} />
+            <DailyTables daily={report.daily} />
           </details>
         ) : (
-          <DailyTable daily={report.daily} />
+          <DailyTables daily={report.daily} />
         )}
       </section>
       {mode === 'stats' ? (
@@ -306,7 +321,7 @@ function DailyTrend({ daily }: { daily: AnalyticsDaily[] }) {
   return (
     <figure className="analytics-trend">
       <figcaption>막대: 페이지뷰 · 점선: 클릭 · 일별 최대 {formatNumber(maximum)}회</figcaption>
-      <svg viewBox="0 0 720 180" role="img" aria-labelledby="analytics-chart-title analytics-chart-description">
+      <svg viewBox="0 0 720 160" role="img" aria-labelledby="analytics-chart-title analytics-chart-description">
         <title id="analytics-chart-title">일별 페이지뷰와 클릭</title>
         <desc id="analytics-chart-description">
           {daily[0].day}부터 {daily.at(-1)?.day}까지의 페이지뷰 막대와 클릭 점선. 정확한 수치는 아래 일별 데이터 표에서
@@ -322,9 +337,7 @@ function DailyTrend({ daily }: { daily: AnalyticsDaily[] }) {
             height={(day.pageViews / maximum) * 130}
             className="analytics-bar"
           >
-            <title>
-              {day.day}: {formatNumber(day.pageViews)}회
-            </title>
+            <title>{`${day.day}: ${formatNumber(day.pageViews)}회`}</title>
           </rect>
         ))}
         <polyline
@@ -341,22 +354,37 @@ function DailyTrend({ daily }: { daily: AnalyticsDaily[] }) {
             className="analytics-click-point"
           />
         ) : null}
-        <text x="20" y="175">
-          {daily[0].day}
-        </text>
-        <text x="700" y="175" textAnchor="end">
-          {daily.at(-1)?.day}
-        </text>
       </svg>
+      <div className="analytics-chart-dates" aria-hidden="true">
+        <span>{daily[0].day}</span>
+        <span>{daily.at(-1)?.day}</span>
+      </div>
     </figure>
   );
 }
 
-function DailyTable({ daily }: { daily: AnalyticsDaily[] }) {
+function DailyTables({ daily }: { daily: AnalyticsDaily[] }) {
+  const newestFirst = [...daily].reverse();
+  return (
+    <>
+      <p className="field-help">최근 {Math.min(7, daily.length)}일 · 최신순 · 전체 기간의 합계는 바뀌지 않아요.</p>
+      <p className="field-help">표를 가로로 밀면 나머지 수치를 볼 수 있어요.</p>
+      <DailyTable daily={newestFirst.slice(0, 7)} label="최근 일별 데이터 가로 스크롤" />
+      {daily.length > 7 ? (
+        <details className="analytics-table-details">
+          <summary>이전 {daily.length - 7}일 데이터 보기</summary>
+          <DailyTable daily={newestFirst.slice(7)} label="이전 일별 데이터 가로 스크롤" />
+        </details>
+      ) : null}
+    </>
+  );
+}
+
+function DailyTable({ daily, label }: { daily: AnalyticsDaily[]; label: string }) {
   if (daily.length === 0) return null;
   return (
-    <div className="table-scroll" tabIndex={0} role="region" aria-label="일별 데이터 가로 스크롤">
-      <table className="data-table analytics-table">
+    <div className="table-scroll" tabIndex={0} role="region" aria-label={label}>
+      <table className="data-table analytics-table analytics-daily-table">
         <caption className="visually-hidden">일별 브라우저 행동과 별도 리디렉트 방문</caption>
         <thead>
           <tr>
