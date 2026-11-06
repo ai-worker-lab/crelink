@@ -6,6 +6,8 @@
 
 ## 2026-11-06
 
+- 카드형 그리드3열(0199): 사용자 요청으로 공개/미리보기 그리드 열 수를3으로 바꾸고3엔진 검증과 현재 디자인 기준을 맞췄습니다. [0199](docs/work/orchestrator/0199-grid-three-columns.md).
+
 - 생성자 링크 표시 방식(0198): 외부 링크에서 리스트/카드형2열 그리드를 선택하면 저장 상태·공개 페이지·미리보기에 함께 반영합니다. 기존 토큰/카드와 PATCH를 재사용하며 migration0011 기본 list로 기존 랜딩을 보존합니다. [설계](docs/specs/link-grid-layout.md), [검증](docs/work/orchestrator/0198-link-grid-layout.md).
 
 - Instabio 가져오기(0197): 공개 버튼 링크·썸네일·프로필 미리보기와 선택 저장을 기존 편집 화면에 추가했습니다. 추가 전용·중복 건너뛰기·프로필 명시 교체·외부 요청 제한·실패 원자성을 적용하며 새 의존성/스키마는 없습니다. [설계](docs/specs/instabio-import.md), [검증 기록](docs/work/orchestrator/0197-instabio-import.md).
