@@ -15,10 +15,10 @@
 
 - [x] 320px 이상 카드2열, 기본 리스트·콘텐츠·선택 저장·새로고침·공개/미리보기 일치를 실제로 확인한다.
 - [x] 실제 localhost API/PostgreSQL에서 첫 저장→공개→방문/클릭→본인 통계, 타 계정 권한·만료 세션·실패/재시도·Instabio 보존을 확인한다.
-- [ ] Chromium/WebKit/Firefox의 analytics-responsive/link-layout 및 핵심 E2E가 PR CI 필수 gate에 연결되고 실패 report/trace/PNG가 보관된다.
+- [x] Chromium/WebKit/Firefox의 analytics-responsive/link-layout 및 핵심 E2E가 PR CI 필수 gate에 연결되고 실패 report/trace/PNG가 보관된다.
 - [ ] 격리된 음성 CI에서 실제 gate 실패를 관측하고 정상 복원 SHA의 성공을 확인한다.
 - [ ] 최소 시각 회귀·접근성 검사와 viewport320/390/768/1280·회전/확대 증거를 남긴다.
-- [ ] verify/smoke/scope/비밀값 검토 후 draft PR과 실제 CI URL을 남긴다. main 병합·배포는 하지 않는다.
+- [x] verify/smoke/scope/비밀값 검토 후 draft PR과 실제 CI URL을 남긴다. main 병합·배포는 하지 않는다.
 
 ## 범위
 
@@ -52,3 +52,8 @@
 - 2026-11-06: PM에 런타임 소유권이 이전됐다. CI core9/6파일·personas4·analytics12·layout3 선택을 `--list`로 직접 확인했으며 이는 시험 실행 통과 증거가 아니다. 변경 코드의 private key/GitHub·서비스 credential 패턴 검사에서 일치 없음. 실제 Google OAuth·Instagram 인앱·실물 iOS/Android·OS/페이지 배율·외부 Instabio live는 not-run이다.
 - 2026-11-06: 변경 소스 scoped Prettier 후 `pnpm verify` 전체8단계가52.2초에 통과했다(실패/건너뜀0). API261 tests 및 localhost guard18 tests 포함. 전체 출력은 실행 artifact35에 보존했다. Linux baseline·PR CI는 아직 미실행이다.
 - 2026-11-06: `pnpm smoke`5 passed(1.9초), `pnpm work:scope 0200 --base origin/main`26파일 통과, `git diff --check` 통과. 시험 뒤 `env -u CRELINK_E2E_INSTABIO -u NODE_OPTIONS make api-up`으로 일반 API를 재시작했다. PM2 선택 필드 조회에서 API/웹 모두 fixture=false·preloadPresent=false·online, API readiness200을 확인했다. checkout 전용 web/API/PostgreSQL/Valkey는 계속 실행 중이며 운영/원본 인스턴스는 변경하지 않았다.
+- 2026-11-07: 초기 변경을 `746dfc7945985ddcad1b0053253a340c0b62117a`로 commit/push하고 [draft PR148](https://github.com/ai-worker-lab/crelink/pull/148)을 생성했다. 첫 [CI42238979823](https://github.com/ai-worker-lab/crelink/actions/runs/42238979823)은 Linux baseline 부재를 의도된 중간 실패로 관측할 실행이며 아직 성공으로 처리하지 않았다.
+- 2026-11-07: 부모가 settled QA의 최종 `tests/e2e/playwright.config.ts` 통합 편집 소유권을 PM에게 명시 이전했다. 기본 `screenshot: 'only-on-failure'`를 추가하고 실제 `data.session()` custom context의 명시 screenshot 전 의도 assertion 실패를 일회성 spec으로 실행했다(exit1, 예상 실패). `.local/ci/negative-capture/failure-capture-isolated-n-531c0-m-session-failure-artifacts-main/`에 `test-failed-1.png`·`trace.zip` 생성이 확인됐다. 일회성 실패 spec은 즉시 삭제했고 기존 SIM-01 정상1개가2.9초에 통과했다. 이 설정은 초기 SHA에 없으므로 첫 CI의 캡처를 새 옵션 적용 증거로 사용하지 않는다.
+- 2026-11-07: 첫 [CI42238979823](https://github.com/ai-worker-lab/crelink/actions/runs/42238979823) 종료는 failure다. 실제 원격 JSON은 core9/personas4/analytics12 passed, layout1 passed/2 failed·flaky0이다. Chromium은 의도한 missing-baseline, WebKit은 별개의 rollback 동작과 `check()` 최종조건 모순 때문에 실패했다. smoke job `127964048679`와 required `CI 통과` job `127966278537`가 failure여서 실제 gate 차단을 확인했다. 업로드 단계는 success이며 artifact `13514631232`(`browser-qa-42238979823-1`,34,047,410bytes)를 다운로드했다. 의도된 실패와 별도 결함을 섞어 제품 성공으로 보고하지 않는다.
+- 2026-11-07: Linux actual `.local/ci/remote-42238979823/ci/e2e/layout/results/link-layout-생성자-표시-설정-저장·미리보기·공개-그리드·모바일·실패-복구-chromium/public-two-column-actual.png`를 PM과 부모가 직접 열어2열·긴 제목·이미지/아이콘·배너 전체 열을 검토했다. Ubuntu24.04/Playwright1.64.0 Chromium·390×844에서 캡처한358×935 grid 영역이며 승인본만 `tests/e2e/link-layout.spec.ts-snapshots/public-two-column-chromium-linux.png`에 등록했다(SHA256 `7db6c3333d6738bfbb322a486ef333d0470ab6bd628fe602ee0749cf7d485a42`). 픽셀 허용치0과 실패 판정은 유지한다.
+- 2026-11-07: 실패 rollback 구간은 사용자 클릭 뒤 grid로 즉시 복원되어야 하므로 최종 list.checked=true를 요구하는 `.check()`를 `.click()`으로 바꾸고 기존 오류 안내·grid 복원·키보드 재시도·저장/새로고침 assertions는 유지했다. 변경 후 layout3엔진3 passed(13.2초), scoped Prettier·scope28파일·diff check 통과. 부모가 이 회귀 spec·baseline의 최종 통합 소유권을 PM에게 이전했다. 최종 정상 PR CI에서 Linux baseline 비교와 전체 gate 복원을 확인해야 음성→정상 시험이 완료된다.

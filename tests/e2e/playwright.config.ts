@@ -21,6 +21,7 @@ export default defineConfig({
     viewport: { width: 1280, height: 800 },
     baseURL: process.env.WEB_URL,
     trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
   },
   // 크리링 배너와 광고 블록 플랫폼 스위치는 모든 무료 랜딩이 함께 보는 전역 데이터라, 다른 시나리오가 화면을 연 채 배너(이미지)가 지워지면
   // 이미지 404가 콘솔 오류로 남고 스위치를 바꾸면 다른 편집 화면의 광고 줄이 생깁니다. 그래서 광고 배너 시나리오는 나머지가 끝난 뒤 따로 돌고
