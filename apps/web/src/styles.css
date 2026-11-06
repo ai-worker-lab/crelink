@@ -3707,3 +3707,54 @@ body:has(.sheet[open]) {
 .instabio-url {
   overflow-wrap: anywhere;
 }
+
+.link-layout-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-12);
+  min-width: 0;
+  margin: 0;
+  padding: var(--ds-space-12);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-md);
+}
+.link-layout-picker legend {
+  font-weight: var(--ds-font-weight-bold);
+}
+.link-list.link-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+.link-grid > li {
+  min-width: 0;
+}
+.link-grid .link-card {
+  flex-direction: column;
+  align-items: stretch;
+  height: 100%;
+  padding: var(--ds-space-12);
+}
+.link-grid .link-thumb,
+.link-grid-placeholder {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: var(--ds-corner-md);
+}
+.link-grid-placeholder {
+  display: grid;
+  place-items: center;
+  background: var(--ds-color-surface-raised);
+}
+.link-grid-placeholder .favicon {
+  width: 40px;
+  height: 40px;
+}
+.link-grid .link-text {
+  flex: none;
+}
+.link-grid .banner-slot-item {
+  grid-column: 1 / -1;
+}

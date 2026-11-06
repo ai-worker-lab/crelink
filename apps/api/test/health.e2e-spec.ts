@@ -122,6 +122,7 @@ describe('API 기동과 health', () => {
         { version: '0008_drop_retired_link_slot_data' },
         { version: '0009_landing_telemetry' },
         { version: '0010_analytics_rollups' },
+        { version: '0011_link_layout' },
       ]);
     } finally {
       await client.end();

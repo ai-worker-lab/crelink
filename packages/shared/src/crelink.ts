@@ -267,6 +267,8 @@ export interface CreatorBannerView {
   position: number;
 }
 
+export type LinkLayout = 'list' | 'grid';
+
 /** `GET /api/me/landing` 응답. 편집 화면 전체 상태입니다. */
 export interface CreatorLandingState {
   landing: {
@@ -278,6 +280,8 @@ export interface CreatorLandingState {
     avatar: ImageRef | null;
     /** 방명록 탭을 켰는지(R19, 기본 true). */
     guestbookEnabled: boolean;
+    /** 이전 API에서 없으면 list로 표시합니다. */
+    linkLayout?: LinkLayout;
   };
   shortLink: ShortLinkView;
   links: LinkView[];
@@ -319,6 +323,7 @@ export interface SetAdBlockRequest {
 
 /** `PATCH /api/me/landing`. 빈 문자열·null은 비움입니다. 응답은 `CreatorLandingState`. */
 export interface UpdateLandingRequest {
+  linkLayout?: LinkLayout;
   displayName?: string | null;
   bio?: string | null;
   avatarFileId?: string | null;
@@ -504,6 +509,8 @@ export function resolveBannerSlot<B>(input: ResolveBannerSlotInput<B>): Resolved
 
 /** 방문자가 보는 공개 랜딩 내용. 공개 랜딩(`/p/{publicId}`)과 관리 화면 보기 모드가 같은 모양으로 그립니다. */
 export interface PublicLandingView {
+  /** 생성자가 정한 표시 방식. 이전 응답에서 없으면 list입니다. */
+  linkLayout?: LinkLayout;
   publicId: string;
   displayName: string | null;
   bio: string | null;

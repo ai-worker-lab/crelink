@@ -4,6 +4,8 @@
 
 ## 2026-11-06
 
+- 링크 표시 방식(0198): 기본 list·list/grid CHECK 컬럼을 추가하는0011과 기존 PATCH/편집·공개 조회 계약을 연결했습니다. 본인 조건·엄격 입력 검증을 유지하며 이전 버전 rollback 시 추가 컬럼을 보존합니다. [0198](../../docs/work/orchestrator/0198-link-grid-layout.md).
+
 - Instabio 가져오기(0197): 미리보기/저장 API, 고정 원본/CDN·redirect 금지·스트림/시간/동시성 제한, 원본 변경 확인과 사용자 잠금 아래 중복/한도/차단 검사를 추가했습니다. 기존 이미지 검증·링크 생성 로직을 재사용하고 링크·선택한 프로필은 한번에 저장합니다. HTTP/DB·파서 회귀11건 통과. [0197](../../docs/work/orchestrator/0197-instabio-import.md).
 
 - 운영자 본인 분석404 수정(0194): `AnalyticsService`의 본인 대상 확인과 공통 집계 범위에서 역할 제한을 제거하고 사람 계정·본인ID를 유지합니다. 관리자 전체·명시 크리에이터 조회의 역할 제한은 유지합니다. 실제 PostgreSQL HTTP 회귀에서 본인 이벤트/기존 방문·타인 격리·서비스 전체 제외를 확인합니다. 근거 `docs/work/orchestrator/0194-operator-own-analytics.md`, 공개 릴리스 `v0.1.1`.

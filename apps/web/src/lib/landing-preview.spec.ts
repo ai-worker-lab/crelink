@@ -387,3 +387,9 @@ test('배너 저장 안 함 판정: 이미지·정지 이미지·대체 문구·
   assert.equal(isBannerDraftDirty(banners, bannerDraftOf(null)), false);
   assert.equal(isBannerDraftDirty(banners, { ...bannerDraftOf(null), alt: '새' }), true);
 });
+
+test('링크 표시 방식은 공개 미리보기에 전달하고 이전 응답은 list로 처리한다', () => {
+  const saved = state();
+  assert.equal(toLandingPreview(saved).linkLayout, 'list');
+  assert.equal(toLandingPreview({ ...saved, landing: { ...saved.landing, linkLayout: 'grid' } }).linkLayout, 'grid');
+});

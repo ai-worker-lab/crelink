@@ -248,6 +248,7 @@ export function toLandingPreview(state: CreatorLandingState, drafts: LandingDraf
   const slot = previewBannerSlot(state, drafts);
   return {
     publicId: state.landing.publicId,
+    linkLayout: state.landing.linkLayout ?? 'list',
     displayName: profile ? profile.displayName.trim() || null : state.landing.displayName,
     bio: profile ? profile.bio.trim() || null : state.landing.bio,
     avatarUrl: profile ? (profile.avatar?.url ?? null) : (state.landing.avatar?.url ?? null),
