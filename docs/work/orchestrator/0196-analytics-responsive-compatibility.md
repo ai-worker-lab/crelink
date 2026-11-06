@@ -18,8 +18,8 @@
 - [x] 긴 표의 최근 자료·다음 구간 접근과 모바일 핵심 숫자 우선 노출을 보완한다.
 - [x] 차트 레이블 실제 렌더 크기와 빠른 기간의 터치 영역·선택 상태를 기준에 맞춘다.
 - [x] 변경한 페이지를 다중 엔진·모바일 조건에서 검증하고 전후 스크린샷을 비교한다. 보고된 실물 결함의 미확인 범위를 남긴다.
-- [ ] 검증한 변경만 PR·CI·main 병합 후 GitHub Actions로 운영에 배포하고 이미지·서버 전환·운영 주소 검사·배포 태그를 확인한다.
-- [ ] 보고된 운영 분석 화면에서 변경된 UI·날짜 조회·표를 확인하고 실물 재확인과 구분해 기록한다.
+- [x] 검증한 변경만 PR·CI·main 병합 후 GitHub Actions로 운영에 배포하고 이미지·서버 전환·운영 주소 검사·배포 태그를 확인한다.
+- [x] 보고된 운영 분석 화면에서 변경된 UI·날짜 조회·표를 확인하고 실물 재확인과 구분해 기록한다.
 
 ## 범위
 
@@ -46,3 +46,6 @@
 - 2026-11-06 iOS 차이: iPhone17Pro/iOS26.5 Simulator Safari에서는 한 열/폭 제한만으로 날짜 외곽 넘침이 남았다. `appearance:none` 뒤 크리에이터 지표/통계·관리자 통계의 입력이 카드 내부에 들어오는 화면을 확인했다. desktop WebKit의 iPhone 프리셋 결과를 실제 iOS와 동일시하지 않는다. 사용자 iPhone13Pro와 Android 실물, native picker 직접 조작은 미검증이다. 연결 조회에는 simulated 기기만 있었고 Maestro hierarchy는35초 timeout, Simulator GUI 앱은 찾지 못했다. 첫 수용 기준은 해당 실물 재확인 전까지 체크하지 않는다.
 - 2026-11-06 검사: `pnpm verify`8단계·420 tests(shared59/web95/api248/script18) 통과, `pnpm smoke`5개 통과, `pnpm work:scope 0196` 통과. 브라우저 행렬의 trace/session/쿠키를 Git 기록에 복사하지 않았다. 로컬 PNG/상세 로그는 `.local/e2e/`·`.local/qa0196/`, 장기 검수 사본은 settings-sync `research/crelink-ui-ux/2026-11-06/0196/`의58PNG·해시·QA JSON·보고서/갤러리에 있다. 전체 제품/모든 버전/실물 QA·배포·commit/push 완료로 보고하지 않는다.
 - 2026-11-06 운영 반영 착수: 사용자가 iPhone13Pro Chrome 시크릿 모드에서도 기존 두 열 날짜·밑줄 프리셋이 보인다고 제보했다. 앞선 구현은 미커밋/미배포였고 원격 배포 태그가 ca494be, main은 문서 후속310154c여서 해당 수정이 운영에 들어가지 않은 상태임을 확인했다. 사용자 요청의 실제 사용 화면 반영을 위해0195 디자인 기준과0196 검증된 변경만 commit/PR/CI/main/Actions 배포로 연결한다. 기존0193 미커밋 기록은 제외한다. v0.1.2 웹 릴리스로 기록하며 운영 확인은 기존 사람 운영자 세션의 지표·통계 관리 GET/렌더/필터/표만 읽고 공개 방문·운영 쓰기·원본 데이터 조회는 하지 않는다.
+- 2026-11-06 Git/CI: 관련14파일의798adf925225d064885b9e194101e9a01b096d13을 push하고 [PR143](https://github.com/ai-worker-lab/crelink/pull/143)의 [CI42203310270](https://github.com/ai-worker-lab/crelink/actions/runs/42203310270)에서 Node24/26·smoke·API/웹 이미지 빌드·scope·필수 CI가 모두 통과했다. main squash c402bf1da5e7b0be555c397cf15029e8765cc382(2026-11-06T10:33:49Z)는 검증한 브랜치와 Git tree가 같다. 최종 로컬 verify8단계·420tests는37.6초에 통과했다.
+- 2026-11-06 배포: [Deploy42203628644](https://github.com/ai-worker-lab/crelink/actions/runs/42203628644)가 새 웹 이미지를 만들고 home-server를 blue→green으로 전환했다(2026-11-06T10:36:14Z). 배포·운영 주소 검사 성공, 자동 롤백은 실행하지 않음, 기록 job 완료10:36:54Z. 원격 deploy/prod·deploy/prod-web와 릴리스 v0.1.2의 대상은 c402bf1이며 바뀌지 않은 API 이미지/태그는 ca494be를 유지한다. 실제 배포는 Actions만 사용했고 기존0193 변경은 제외·보존했다.
+- 2026-11-06 운영 브라우저: TaskSpace31의 기존 사람 운영자 세션으로 크리에이터 지표·통계의 기본30일을 확인했다.390×844/touch5에서 grid 한 열·날짜48px·카드 경계 안·빠른 기간 버튼/선택 상태·최근7행 최신순·HTML 차트13px,1440×900에서도 문서 넘침0. 이전23행 펼침, 표 터치160px·고정 날짜 오차1px, 최근7일 링크와 직접 날짜11월1~6일/6행 조회가 동작했다. 지표의320/360/390 및844×390 회전에서 입력 겹침·문서 넘침0. `/docs/releases`200과 v0.1.2 노출을 확인했다. 새 탐색/조회 구간의 Runtime 예외·실패 요청·400이상 응답은0이었다. 첫 전환 이벤트에 상세 출처 미상의 Uncaught1건이 있어 버퍼 초기화 후 새로고침/조회에서0으로 재현되지 않음을 구분해 기록했다. 배포 후PNG9장과 사전1장·측정은 Git 제외 `.local/qa0196-production/`에 남기고 원본을 열어 검토했다. TaskSpace31을 종료했다. 실물 iPhone13Pro/Chrome의 재확인과 native picker 직접 조작은 여전히 미검증이다.
