@@ -74,6 +74,7 @@ describe('Instabio 가져오기 HTTP·DB', () => {
       expect((await api(t.baseUrl, 'POST', path, { body: {} })).status).toBe(401);
     const a = await creator(),
       b = await creator();
+    await api(t.baseUrl, 'PATCH', '/api/me/landing', { cookie: a.cookie, body: { listDensity: 12 } });
     await api(t.baseUrl, 'POST', '/api/me/links', {
       cookie: a.cookie,
       body: { title: '기존', url: 'https://old.example/' },
@@ -101,6 +102,10 @@ describe('Instabio 가져오기 HTTP·DB', () => {
     expect(after.links.map((link) => link.title)).toEqual(['기존', '수정 상품', '상품2']);
     expect(after.links.slice(1).map((link) => link.url)).toEqual(preview.links.map((link) => link.url));
     expect(after.landing).toMatchObject({ displayName: preview.profile.displayName, bio: preview.profile.bio });
+    expect(after.landing.listDensity).toBe(12);
+    expect((await t.pool.query('SELECT list_density FROM landings WHERE user_id=$1', [a.userId])).rows[0]).toEqual({
+      list_density: 12,
+    });
     expect((await state(b.cookie)).links).toEqual([]);
     for (const image of [after.landing.avatar!, ...after.links.slice(1).map((link) => link.thumbnail!)]) {
       expect(image.url).not.toContain('linkcdn');

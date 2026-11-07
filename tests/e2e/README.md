@@ -69,6 +69,12 @@ pnpm e2e --config tests/e2e/analytics-responsive.config.ts # 분석 UI만 Chromi
 
 `pnpm e2e --config tests/e2e/link-layout.config.ts`는 합성 계정으로 Chromium·모바일 조건의 WebKit·Firefox에서 리스트/카드 선택 저장·실패 복구/재시도·새로고침·공개/미리보기 일치·320/390/768/1280의 **카드2열**·844×390 가로 조건·320px 글자200% 확대·배너 전체 열/사진/긴 제목/이미지 없음·키보드·axe WCAG A/AA를 확인합니다. 글자 확대는 브라우저 페이지 배율이나 OS 확대를 대신하지 않습니다. 실제 iPhone 실행을 뜻하지 않습니다. [0200](../../docs/work/orchestrator/0200-release-qa.md).
 
+`list-density.spec.ts`도 같은 config에 포함됩니다(0204). 기본8과8/10/12 UI 저장→실제 PostgreSQL→creator/public·새 세션·새로고침, list/grid 왕복, 비기본10 실패 복구·수동 재시도·동일 이벤트 루프 중복/교차 잠금·pending 중 패널/시트 전환·실제401 홈 이동을 검사합니다. Instabio 외부 preload가 필요한 가져오기 초안/저장 보존도3엔진에 포함하므로 아래 API 전용 fixture 준비를 먼저 적용합니다. 503 및 잘못된 응답만 브라우저 route로 주입하며 그 뒤 실제 API 저장을 다시 확인합니다.
+
+390px에서 동일 한줄 제목·동일 사진14개를 실제 업로드하고 공개/미리보기의 목록 시작부터740px 내 완전 노출8/10/12·카드 높이·간격·동일 제목 글꼴·contain을 측정합니다. 폭320/390/768/1280의 긴 제목/설명·기본 아이콘·배너 전체 폭·44px 카드와320px 글자200%를 추가 검사합니다. 실행 PNG는 생성 시안/시각 baseline이 아니며 Linux grid 기준선은 그대로 유지합니다.
+
+오프라인 사진 fixture `fixtures/list-density-landscape.jpg`는 [Unsplash 원본](https://images.unsplash.com/photo-1500534623283-312aade485b7?w=240&h=160&fit=crop)의240×160 JPEG입니다([Unsplash 라이선스](https://unsplash.com/license)). 사진 내용·화소를 기준선으로 고정하지 않고 모든 행에서 같은 비정사각형 사진의contain·높이/밀도를 검사합니다. 테스트 중 외부 사진 다운로드는 하지 않습니다.
+
 ## 출시 QA·CI 실행 계약
 
 기존 runner/fixture·3엔진 config를 재사용합니다. 같은 DB에서 아래 명령을 **순차** 실행합니다. `core`는 전역 AI 실행/운영 토큰 시험을 포함하지 않습니다. CI는 reporter CLI 옵션과 `PLAYWRIGHT_HTML_OUTPUT_DIR`·`PLAYWRIGHT_JSON_OUTPUT_NAME`·`--output`을 suite별로 지정하고 종료 코드가 0이 아니면 실패입니다.

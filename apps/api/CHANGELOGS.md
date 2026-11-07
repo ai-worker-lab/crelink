@@ -2,6 +2,10 @@
 
 내부 참고용으로 백엔드 API의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-11-07
+
+- 리스트 밀도(0202): 공유 `ListDensity = 8 | 10 | 12`와 선택 `listDensity` 계약을 추가했습니다. 기존 PATCH는 엄격한 JSON 숫자만 저장하고 생략·소유권·인증 경계를 보존하며 편집/공개 조회는 항상 숫자를 반환합니다. 추가형 `0012_list_density.sql`은 기존 랜딩 기본8·NOT NULL·CHECK를 적용하고 구 서버 rollback 때도 값을 남깁니다. PostgreSQL·HTTP 회귀에 세 값 저장/공개 조회·잘못된 값·타인 격리·프로필/list-grid/가져오기 보존·기존 데이터 확장을 추가했습니다. [설계](../../docs/specs/list-density.md), [티켓](../../docs/work/api/0202-list-density-api.md).
+
 ## 2026-11-06
 
 - 링크 표시 방식(0198): 기본 list·list/grid CHECK 컬럼을 추가하는0011과 기존 PATCH/편집·공개 조회 계약을 연결했습니다. 본인 조건·엄격 입력 검증을 유지하며 이전 버전 rollback 시 추가 컬럼을 보존합니다. [0198](../../docs/work/orchestrator/0198-link-grid-layout.md).

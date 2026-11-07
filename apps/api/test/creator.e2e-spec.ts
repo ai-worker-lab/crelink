@@ -103,6 +103,51 @@ describe('크리에이터 편집 API', () => {
     expect((await api(t.baseUrl, 'PATCH', '/api/me/landing', { body: { linkLayout: 'grid' } })).status).toBe(401);
   });
 
+  it('리스트 밀도는 엄격한 숫자만 저장하며 소유권·부분수정·공개 조회를 보존한다', async () => {
+    const mine = await newCreator();
+    const other = await newCreator();
+    const before = await state(mine.cookie);
+    const otherBefore = await state(other.cookie);
+    for (const listDensity of [8, 10, 12]) {
+      const saved = await api<CreatorLandingState>(t.baseUrl, 'PATCH', '/api/me/landing', {
+        cookie: mine.cookie,
+        body: { listDensity, userId: other.userId, publicId: otherBefore.landing.publicId },
+      });
+      expect(saved.status).toBe(200);
+      expect(saved.body.landing).toEqual({ ...before.landing, listDensity });
+      expect((await t.pool.query('SELECT list_density FROM landings WHERE user_id=$1', [mine.userId])).rows[0]).toEqual(
+        { list_density: listDensity },
+      );
+      expect((await state(mine.cookie)).landing.listDensity).toBe(listDensity);
+      expect((await state(other.cookie)).landing).toEqual(otherBefore.landing);
+      const publicView = await api<{ listDensity: number }>(
+        t.baseUrl,
+        'GET',
+        `/api/public/landings/${before.landing.publicId}`,
+      );
+      expect([publicView.status, publicView.body.listDensity]).toEqual([200, listDensity]);
+    }
+    for (const listDensity of [null, '8', '10', '12', true, false, [], [8], {}, 0, 9, 11, 13, 8.5]) {
+      const response = await api(t.baseUrl, 'PATCH', '/api/me/landing', {
+        cookie: mine.cookie,
+        body: { listDensity, bio: '거절돼야 하는 변경' },
+      });
+      expect([response.status, response.body.code]).toEqual([400, 'validation_failed']);
+    }
+    expect((await state(mine.cookie)).landing).toEqual({ ...before.landing, listDensity: 12 });
+    for (const body of [{}, { displayName: '프로필 수정' }, { linkLayout: 'grid' }, { linkLayout: 'list' }]) {
+      const response = await api<CreatorLandingState>(t.baseUrl, 'PATCH', '/api/me/landing', {
+        cookie: mine.cookie,
+        body,
+      });
+      expect([response.status, response.body.landing.listDensity]).toEqual([200, 12]);
+    }
+    const anonymous = await api(t.baseUrl, 'PATCH', '/api/me/landing', { body: { listDensity: 8 } });
+    expect([anonymous.status, anonymous.body.code]).toEqual([401, 'unauthenticated']);
+    const admin = await api(t.baseUrl, 'GET', `/api/admin/creators/${other.userId}`, { cookie: mine.cookie });
+    expect([admin.status, admin.body.code]).toEqual([403, 'forbidden']);
+  });
+
   it('프로필 수정: 길이 검증, 빈 문자열은 비움, 남의 파일은 404 file_not_found', async () => {
     const { cookie } = await newCreator();
     const other = await newCreator();

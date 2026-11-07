@@ -48,6 +48,12 @@ export class ProfileService {
       }
       changes.link_layout = input.linkLayout;
     }
+    if (input.listDensity !== undefined) {
+      if (input.listDensity !== 8 && input.listDensity !== 10 && input.listDensity !== 12) {
+        throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', '리스트 밀도는 숫자 8, 10 또는 12여야 합니다.');
+      }
+      changes.list_density = input.listDensity;
+    }
     const displayName = optionalText(input.displayName, '표시 이름', CRELINK_LIMITS.displayNameMax);
     if (displayName !== undefined) changes.display_name = displayName;
     const bio = optionalText(input.bio, '소개', CRELINK_LIMITS.bioMax);

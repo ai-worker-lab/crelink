@@ -4,6 +4,10 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-11-07
+
+- 리스트 밀도8개형·10개형·12개형을 기존 외부 링크 설정의 즉시 저장·페이지별 API/DB·공개/미리보기 공통 렌더러에 연결했습니다. 기본8·카드2열·배너·가져오기 값 보존과 실패 시 선택만 복구/재시도를 유지합니다. 추가형 migration0012와 엄격 숫자 검증을 적용했고 실제 API/DB·3엔진34개 통합시나리오 및740px 목록의8/10/12 실측·캡처를 [QA 근거](docs/reviews/0204-list-density-qa.md)에 남겼습니다. 후속 PR의 실제 선행 base에서 같은 CI를 실행하도록 trigger에 `work/0200-release-qa`만 추가하며 기존 job·권한·Deploy는 유지합니다. 통합/최종CI와 사람 검토 인계는 [0201](docs/work/crelink-pm/0201-list-density.md), 계약은 [설계](docs/specs/list-density.md)에 기록합니다.
+
 ## 2026-11-06
 
 - 출시 QA 연결과 카드2열(0200): 최신 사용자 지시로320px 이상 카드2열 기준을 제품·설계·디자인에 맞추고, 기존 PR smoke job에 핵심 사용자·권한/세션·분석/배치3엔진 검사와 항상 업로드하는 HTML/JSON/PNG/trace 증거를 연결합니다. 접근성 검사를 위한 `@axe-core/playwright`4.14.0만 추가하며 실제 통합·CI 결과는 [0200](docs/work/orchestrator/0200-release-qa.md), 범위와 후속 기능 제안은 [설계](docs/specs/release-qa.md)에 남깁니다. main 병합·배포는 포함하지 않습니다.

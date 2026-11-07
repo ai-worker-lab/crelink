@@ -115,6 +115,33 @@ describe('runMigrations', () => {
     expect((await pool.query('SELECT link_layout FROM landings')).rows[0].link_layout).toBe('grid');
   });
 
+  it('0012는 기존 데이터를 기본8로 확장하고 구 서버 쓰기·재시작에도 밀도를 보존한다', async () => {
+    const source = join(__dirname, '../migrations');
+    copyFileSync(join(source, '0001_crelink_mvp.sql'), join(directory, '0001_crelink_mvp.sql'));
+    await runMigrations(pool, directory);
+    const user = await pool.query("INSERT INTO users(email) VALUES('density@example.com') RETURNING id");
+    await pool.query("INSERT INTO landings(user_id,public_id,bio) VALUES($1,'abcdefghij','기존 소개')", [
+      user.rows[0].id,
+    ]);
+    copyFileSync(join(source, '0012_list_density.sql'), join(directory, '0012_list_density.sql'));
+    await runMigrations(pool, directory);
+    expect((await pool.query('SELECT list_density,bio FROM landings')).rows).toEqual([
+      { list_density: 8, bio: '기존 소개' },
+    ]);
+    for (const density of [8, 10, 12]) {
+      await pool.query('UPDATE landings SET list_density=$1', [density]);
+      // 구 서버는 자신이 아는 컬럼만 갱신하고 migration을 재실행합니다.
+      await pool.query("UPDATE landings SET bio='구 서버 수정' WHERE user_id=$1", [user.rows[0].id]);
+      await runMigrations(pool, directory);
+      expect((await pool.query('SELECT list_density,bio FROM landings')).rows).toEqual([
+        { list_density: density, bio: '구 서버 수정' },
+      ]);
+    }
+    await expect(pool.query('UPDATE landings SET list_density=9')).rejects.toThrow(/list_density_check/);
+    await expect(pool.query('UPDATE landings SET list_density=NULL')).rejects.toThrow(/not-null/);
+    expect((await pool.query('SELECT list_density FROM landings')).rows).toEqual([{ list_density: 12 }]);
+  });
+
   describe('0003_ad_banner', () => {
     const source = join(__dirname, '../migrations');
     let fileSeq = 0;

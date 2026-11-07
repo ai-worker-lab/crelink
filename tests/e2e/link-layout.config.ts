@@ -5,7 +5,7 @@ export default defineConfig({
   ...base,
   projects: ['chromium', 'webkit', 'firefox'].map((browserName) => ({
     name: browserName,
-    testMatch: /link-layout\.spec\.ts$/,
+    testMatch: /(link-layout|list-density)\.spec\.ts$/,
     use: { browserName: browserName as 'chromium' | 'webkit' | 'firefox' },
   })),
 });

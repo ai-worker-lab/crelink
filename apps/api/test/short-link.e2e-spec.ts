@@ -250,6 +250,7 @@ describe('단축 도메인과 공개 랜딩 (R2, R3, R7~R9)', () => {
       publicId: creator.publicId,
       displayName: '공개 이름',
       linkLayout: 'list',
+      listDensity: 8,
       bio: null,
       avatarUrl: null,
       socials: [{ id: expect.any(String), platform: 'instagram', url: 'https://instagram.com/me' }],

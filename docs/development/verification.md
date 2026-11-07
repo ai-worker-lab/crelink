@@ -44,7 +44,9 @@
 
 ## CI
 
-[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)이 `main` 대상 PR에서만 실행합니다. main push(PR 머지)에서는 다시 돌리지 않습니다(0060). 대신 GitHub ruleset `main 보호`(0061)가 머지를 막습니다: main 직접 push·force push·삭제 금지, PR 필수(squash만, 승인 0), 필수 검사 `CI 통과`, PR 브랜치가 최신 `main`을 포함해야 함(뒤처지면 PR의 `Update branch`). 그래서 PR이 검사한 내용과 머지 결과가 같습니다. 우회는 저장소 admin의 PR 머지만 가능하고 Actions가 돌지 않을 때만 씁니다(아래 CD 절). 설정 값은 `gh api repos/ai-worker-lab/crelink/rulesets`로 봅니다. 먼저 `changes` job이 바뀐 파일(병합 커밋의 첫 부모와 비교)이 문서뿐인지 판정합니다. 문서는 `docs/`·`design/` 아래 파일과 `*.md`이고, `RELEASES.md`는 웹 `/docs/releases`가 빌드 때 읽으므로 코드로 봅니다. 문서뿐이면 `docs` job만, 아니면(비교할 수 없을 때 포함) `check`·`smoke`·이미지 빌드를 실행합니다.
+[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)이 `main`과 아래에 설명한 선행 `work/0200-release-qa` 대상 PR에서 실행합니다. main push(PR 머지)에서는 다시 돌리지 않습니다(0060). 대신 GitHub ruleset `main 보호`(0061)가 main 머지를 막습니다: main 직접 push·force push·삭제 금지, PR 필수(squash만, 승인 0), 필수 검사 `CI 통과`, PR 브랜치가 최신 `main`을 포함해야 함(뒤처지면 PR의 `Update branch`). 그래서 main PR이 검사한 내용과 머지 결과가 같습니다. 우회는 저장소 admin의 PR 머지만 가능하고 Actions가 돌지 않을 때만 씁니다(아래 CD 절). 설정 값은 `gh api repos/ai-worker-lab/crelink/rulesets`로 봅니다. 먼저 `changes` job이 바뀐 파일(병합 커밋의 첫 부모와 비교)이 문서뿐인지 판정합니다. 문서는 `docs/`·`design/` 아래 파일과 `*.md`이고, `RELEASES.md`는 웹 `/docs/releases`가 빌드 때 읽으므로 코드로 봅니다. 문서뿐이면 `docs` job만, 아니면(비교할 수 없을 때 포함) `check`·`smoke`·이미지 빌드를 실행합니다.
+
+0201 밀도 후속 PR은 선행 PR148이 미병합인 동안 `work/0200-release-qa`를 대상으로 하므로 같은 CI를 이 branch 대상 PR에도 한정 실행합니다. `pull_request.branches`는 [GitHub 공식 문서](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)에 따라 PR 대상 branch를 필터링합니다. `changes`는 merge commit의 첫 부모, scope는 실제 `GITHUB_BASE_REF`를 기준으로 검사합니다. 이 추가 trigger는 stacked branch에 main ruleset 보호를 설정한다는 뜻이 아닙니다. PR HEAD·실행 head SHA·base SHA·검증 merge ref/SHA를 구분하여 기록하고, 사람이 선행 PR을 병합한 뒤 main으로 retarget/rebase하면 그 최종 기준에서 CI를 다시 확인합니다. job·권한·concurrency·필수 job 이름·Deploy는 변경하지 않습니다.
 
 | job | 내용 |
 | --- | --- |

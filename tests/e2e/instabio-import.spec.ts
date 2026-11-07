@@ -8,7 +8,9 @@ test('Instabio 외부 합성 원본: 기존 프로필·링크·표시 방식 보
     links: [{ title: '기존 작업', url: 'https://import.e2e.test/existing' }],
   });
   const { page } = await data.session(user);
-  expect((await page.request.patch(`${API_URL}/api/me/landing`, { data: { linkLayout: 'grid' } })).status()).toBe(200);
+  expect(
+    (await page.request.patch(`${API_URL}/api/me/landing`, { data: { linkLayout: 'grid', listDensity: 12 } })).status(),
+  ).toBe(200);
   await page.goto(`/me/landings/${user.publicId}`);
   await page.getByRole('button', { name: '외부 링크 구역 편집', exact: true }).click();
   await page.getByText('Instabio에서 가져오기', { exact: true }).click();
@@ -47,6 +49,7 @@ test('Instabio 외부 합성 원본: 기존 프로필·링크·표시 방식 보
   await page.reload();
   const state = await (await page.request.get(`${API_URL}/api/me/landing`)).json();
   expect(state.landing.linkLayout).toBe('grid');
+  expect(state.landing.listDensity).toBe(12);
   expect(state.landing).toMatchObject({ displayName: '기존 프로필', bio: '기존 소개와 광고 고지' });
   expect(state.links.map((link: { title: string; url: string }) => ({ title: link.title, url: link.url }))).toEqual([
     { title: '기존 작업', url: 'https://import.e2e.test/existing' },
