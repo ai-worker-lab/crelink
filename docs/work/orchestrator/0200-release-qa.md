@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 진행
+- 상태: 완료
 - 종류: 유지보수
 - 우선순위: P1
 - 작성일: 2026-11-06
@@ -16,8 +16,8 @@
 - [x] 320px 이상 카드2열, 기본 리스트·콘텐츠·선택 저장·새로고침·공개/미리보기 일치를 실제로 확인한다.
 - [x] 실제 localhost API/PostgreSQL에서 첫 저장→공개→방문/클릭→본인 통계, 타 계정 권한·만료 세션·실패/재시도·Instabio 보존을 확인한다.
 - [x] Chromium/WebKit/Firefox의 analytics-responsive/link-layout 및 핵심 E2E가 PR CI 필수 gate에 연결되고 실패 report/trace/PNG가 보관된다.
-- [ ] 격리된 음성 CI에서 실제 gate 실패를 관측하고 정상 복원 SHA의 성공을 확인한다.
-- [ ] 최소 시각 회귀·접근성 검사와 viewport320/390/768/1280·회전/확대 증거를 남긴다.
+- [x] 격리된 음성 CI에서 실제 gate 실패를 관측하고 정상 복원 SHA의 성공을 확인한다.
+- [x] 최소 시각 회귀·접근성 검사와 viewport320/390/768/1280·회전/확대 증거를 남긴다.
 - [x] verify/smoke/scope/비밀값 검토 후 draft PR과 실제 CI URL을 남긴다. main 병합·배포는 하지 않는다.
 
 ## 범위
@@ -70,3 +70,5 @@
 - 2026-11-07: 일회성 루프백 proxy가 특정 미래기간 analytics 요청만 HTTP500 또는 연결 종료로 만들고 그 밖의 내부 요청은 실제 API/DB로 전달하게 해 오류→다시 시도를 검증했다. 복구 뒤 mouse/touch 재시도 모두 문서 reload 유지·기존 기간값 보존·실제 API200/pageViews0으로2 passed(3.4초)였다. 이것은 서버/네트워크 오류 주입·복구 시험이며 운영 오류나 외부 서비스 시험이 아니다. 관련 임시spec2개·proxy source·프로세스는 삭제/종료했다.
 - 2026-11-07: 수정된 production 실제 API 직결에서 WebKit4화면×3회12 passed(49.8초), 이어 Chromium/WebKit/Firefox12 passed(39.9초)를 확인했다. 원본 `.local/ci/reset-{before,after}/`, `.local/ci/analytics-retry-preserved/`, `.local/ci/creator-recovery-{webkit-repeat,three-engine}/`에 보존한다. production 빌드도 통과했고 전용 진단 웹은 종료 후 Next dev로 복원했다. console/error 필터·retry·skip·기준선 픽셀 허용치는 바꾸지 않았다.
 - 2026-11-07: 독립 QA 읽기전용 교차 검토를 인수했다.400/404 내부 이동·나머지 문서 재조회는 기존 AdminShell/ErrorPanel 의미와 일치하는 최소 수정이며 실제 click·기본 URL/기간 assertion과 별도 tap 관측은 상호 보완적이라고 검토했다. 과거 마지막 원격 실패에서는 두 networkidle이 실제 완료되고 복구 UI assertion도 통과했으므로 대기 미실행/UI복구 실패 또는 CORS정책 결함으로 단정하지 않는다. 해당 마지막 원격 trace에는 요청/오류 시각이 없어 이전 계측의 취소 인과를 그대로 확정 적용하지 않으며, 재발 해소는 새 Linux 최종 전체 gate 결과로 판단한다. 검토자는 artifact/code 읽기만 했고 런타임/파일을 변경하지 않았다.
+- 2026-11-07: 제품 복구 수정 SHA `21622f5fbcbde93e7d073f8ae7ae1652120bd89e`의 [CI42330579523](https://github.com/ai-worker-lab/crelink/actions/runs/42330579523)이 success다. Node24/26 verify·이미지2종·scope·smoke·required gate가 통과했고 원격 suite JSON은 core9/personas4/analytics12/layout3, 총28 passed·failed/flaky/skipped/errors0이다. Linux Chromium 승인 기준선0픽셀 허용 비교·axe 및 WebKit/Firefox까지 정상이다. artifact `13557381713`(`browser-qa-42330579523-1`,17,218,790bytes)을 `.local/ci/remote-42330579523/`로 다운로드해 직접 대조했다.
+- 2026-11-07: 로컬 full verify8단계·smoke5개와 최신 최소 제품 수정의 build/production 반복/3엔진/verify-fast6단계·scope31·diff check·credential 패턴 검토를 합쳐 이번 개발·draft PR 수용 기준을 완료했다. 실제 OAuth·Instagram 인앱·실물 iOS/Android·OS/브라우저 배율·외부 Instabio live는 not-run이며, 과거 실패/일회성 음성 주입은 위 기록과 artifact에 보존한다. 이 완료 기록만 반영한 최종 문서 SHA의 원격 CI/head 일치는 [draft PR148](https://github.com/ai-worker-lab/crelink/pull/148)의 최종 본문·필수 검사에서 확인한다. main 병합·배포·자동 merge는 하지 않는다.
