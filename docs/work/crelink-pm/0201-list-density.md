@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: crelink-pm
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-11-07
@@ -16,8 +16,8 @@
 - [x] 기본8·세 옵션 API/DB 영속·편집 reload/새 세션/공개·권한 격리·invalid 거부 근거가 있다. live OAuth 자체는 미검증이다.
 - [x] 리스트만 변경하며 list/grid 왕복·가져오기·다른 콘텐츠·배너와2열 카드를 보존한다.
 - [x] 실패 복구/재시도·중복 방지·긴 글자·200%·폭320/390/768/1280·3엔진 검증과 실제8/10/12 캡처·비교 근거를 남긴다.
-- [ ] pnpm verify·smoke·통합 E2E·scope·문서와 최종 원격 SHA의 동일 `CI 통과` job이 통과한다. stacked branch에 main ruleset 보호가 설정됐다는 뜻은 아니다.
-- [ ] PR148 의존성을 명시한 후속 PR과 최종 SHA/CI를 전달하고 사람의 merge 검토에 인계한다.
+- [x] pnpm verify·smoke·통합 E2E·scope·문서와 원격 SHA의 동일 `CI 통과` job이 통과한다. stacked branch에 main ruleset 보호가 설정됐다는 뜻은 아니다.
+- [x] PR148 의존성을 명시한 후속 PR과 SHA/CI를 전달하고 사람의 merge 검토에 인계한다. 마지막 근거 기록 commit도 push 뒤 CI를 확인한다.
 
 ## 범위
 
@@ -51,3 +51,6 @@
 - 2026-11-07: ready 전 pending click을 pageview 응답 뒤에만 보내는 VisitorTracker와 즉시 외부 이동 사이의 유실 가능성을 확인했다. [0205 Web 결함](../web/0205-pending-click-delivery.md)으로 추적하며 부모가 Web ctx_467cdd117834 단일 편집자·슬롯2 runtime 단독소유와 API ctx_43d1828b352b 읽기전용 교차검토를 시작했다. 사용자 이동지연·테스트wait/retry/filter/skip·두beacon병렬·Nest/shared/DB변경은 하지 않는다. PM은 두 결과/런타임 반환까지 빌드·서버·브라우저·DB를 중복 조작하지 않는다.
 - 2026-11-07: 0205 Web과 API 최종 읽기대조 모두 succeeded/settled 인수 완료, blocker0. PM이 원본 등록 payload·BFF204후 순차중계·실패/바인딩/보안/16KiB/rate 경계와 기존SIM01불변을 읽고, 실제 수정후 personas5 및 SIM05/지연upstream 각3엔진 JSON expected5/3/3·unexpected/flaky/skipped0을 대조했다. 정확한 경로·수정전 실패·영속전달/오프라인 한계는 [영역 근거](../../../apps/web/docs/visitor-telemetry.md)에 있다.
 - 2026-11-07: runtime 반환 뒤 PID67490 next-server를 확인·종료하고 최종 pnpm verify8단계(API32 suites263/Web99/guard18)와 production Web density-final-web5393 재기동 뒤 smoke5/5·scope57파일·actionlint를 통과했다. 임시proxy3221·계측파일5개·수동계정·Ego 정리를 인수했고 API3220/DB5652를 유지했다. 기존 QA34개와 SIM05 추가 후 현재 예상35개를 문서에서 구분했다. 최종 CI는 동일PR149·선행base에서 실제 실행/JSON으로 확인한다.
+- 2026-11-07: 수정 commit4a27c9b424c6caaba5cbeea5dcd8666ad1e4fcca를 push한 [CI42356688161](https://github.com/ai-worker-lab/crelink/actions/runs/42356688161)이 전체 success였다. PR/실행 head는4a27c9b424c6caaba5cbeea5dcd8666ad1e4fcca, 실제base는22cffa10bd4d59d21b4bb0f127ffaefa2c0375a4, smoke checkout log가 확인한 refs/pull/149/merge는446c14124bcb3525ed3feb7980ec9081e5e559bf이다. Node24/26·이미지API/Web·scope·smoke·CI 통과 job 성공, docs job만 코드변경 조건으로 정상 skip이었다.
+- 2026-11-07: [성공 artifact13567782306](https://github.com/ai-worker-lab/crelink/actions/runs/42356688161/artifacts/13567782306)을 .local/ci149-success에 내려받아 core9/personas5/analytics12/layout9의 실제 JSON을 직접 대조했다. 고유35개 전부expected/pass·unexpected/flaky/skipped/errors0이었다. Ubuntu24.04 Linux Chromium의 기존 maxDiffPixels0 grid baseline·axe와3엔진 밀도 검사가 통과했고 Linux12 원본PNG도 직접 검토했다. 기존 baseline/조건/허용치를 변경하지 않았다.
+- 2026-11-07: 기능 구현·로컬/실제CI 검증·사람 검토용 draft PR149까지 완료했다. 이 근거/상태만 기록하는 마지막 문서 commit의 최종 head/base/merge SHA와 CI는 PR149 최신 체크/본문에 이어 기록하고 확인한다. 선행PR148은 미병합이며 사람이 병합하면 밀도변경을 보존해 main 기준으로 정합화하고 CI를 다시 확인해야 한다. 자동merge/deploy·운영credential/guard·운영데이터쓰기는 하지 않았다. 실물iPhone/인앱/OS확대/liveOAuth·외부Instabio/CDN·강제종료/오프라인영속전달은 미검증이다.

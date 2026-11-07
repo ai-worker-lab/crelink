@@ -134,3 +134,5 @@ pnpm e2e --config tests/e2e/link-layout.config.ts
 ## PM 후속 통합 경계
 
 위34개는0204 실행 당시의 고유 시나리오다. 이후 PR149 Linux CI에서 기존 SIM-01 빠른 이탈의 pageview 등록 대기 클릭 유실이 드러나 [0205](../work/web/0205-pending-click-delivery.md)로 제품 경합을 수정했다. 기존 SIM-01 assertion은 유지했고 SIM-05 실제 문서 이탈 회귀1개를 추가했으므로 현재 PR 선택 예상은 core9+personas5+analytics12+layout9=35개다. 최종 실제 개수·Linux baseline·원격 SHA/CI는 [0201](../work/crelink-pm/0201-list-density.md)과 PR149에서 확인한다. 과거34개 근거를35개가 실행됐다는 주장으로 바꾸지 않는다.
+
+PM은 수정 commit4a27c9b424c6caaba5cbeea5dcd8666ad1e4fcca의 [실제 Linux CI42356688161](https://github.com/ai-worker-lab/crelink/actions/runs/42356688161) 성공과 다운로드 [artifact13567782306](https://github.com/ai-worker-lab/crelink/actions/runs/42356688161/artifacts/13567782306)의 core9/personas5/analytics12/layout9 JSON을 직접 대조했다.35개 모두 expected/pass·unexpected/flaky/skipped/errors0이며 기존 Linux Chromium maxDiffPixels0 baseline·axe·3엔진 밀도 검사도 통과했다. 최종 근거 문서 commit의 CI/HEAD는 PR149 최신체크와0201 인계에 연결하며 실물/live외부 미검증은 그대로다.
