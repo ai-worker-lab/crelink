@@ -1,6 +1,6 @@
 # 출시 준비와 PR 브라우저 QA
 
-- 상태: 구현·localhost/PR CI 검증 완료, 미배포
+- 상태: 구현·localhost 검증, 최종 PR head 회귀 재검증
 - 작성일: 2026-11-06
 - 근거: 사용자 명시 요청은 기존 출시 준비·자동 QA 연결과 카드2열, localhost 검증, review 가능한 draft PR까지다. main 병합·배포·신규 기능 구현·주기 자동화 변경은 포함하지 않는다.
 - 연결: [0200 실행·결과](../work/orchestrator/0200-release-qa.md), [PRD](../product/crelink.md), [디자인 기준](../../design/system/DESIGN.md), [E2E 계약](../../tests/e2e/README.md).

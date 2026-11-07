@@ -140,10 +140,12 @@ for (const role of ['creator', 'operator'] as const) {
         `${base}?from=2026-11-06&to=2026-11-05${role === 'operator' ? `&creatorId=${creator.userId}` : ''}`,
       );
       await expect(page.getByText('조회 조건을 확인해 주세요.', { exact: true })).toBeVisible();
-      // 잘못된 기간 화면의 요청도 초기화 탐색 전에 완료시켜 두 검사를 분리합니다.
-      await page.waitForLoadState('networkidle');
       await page.getByRole('link', { name: '조회 조건 초기화', exact: true }).click();
       await expect(filters).toBeVisible();
+      expect(new URL(page.url()).pathname).toBe(base);
+      expect(new URL(page.url()).searchParams.has('from')).toBe(false);
+      await expect(filters.getByLabel('시작일', { exact: true })).toHaveValue(recentRange(30).from);
+      await expect(filters.getByLabel('종료일', { exact: true })).toHaveValue(recentRange(30).to);
 
       const desktopName =
         browserName === 'webkit' ? 'Desktop Safari' : browserName === 'firefox' ? 'Desktop Firefox' : 'Desktop Chrome';

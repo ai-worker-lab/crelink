@@ -25,6 +25,8 @@ Next.js App Router와 TypeScript 기반 크리링(CreLink) 웹 클라이언트�
 
 방문자 분석 화면은 크리에이터 `/me/landings/[publicId]/metrics`·`stats`, 관리자 `/admin/metrics`·`stats`입니다. 기존 관리 메뉴·운영자 메뉴에서 이동하며 크리에이터 분석에서는 편집 미리보기 대신 본문 폭을 사용합니다. 조회는 `GET /api/me/analytics`·`GET /api/admin/analytics`, 관리자 운영 목표 카드는 별도 `GET /api/admin/metrics`입니다.
 
+잘못된 기간·없는 대상의 조건 초기화와 서버/네트워크 다시 시도는 [조회 오류 복구](docs/analytics.md#상태와-확인)에 따라 서로 다른 이동 방식을 사용합니다.
+
 ### 외부 링크 한도와 광고 블록(설계 `docs/specs/crelink-link-limit-ad-toggle.md`)
 
 - 외부 링크 한도는 숨긴·차단 링크를 포함한 `limits.totalUsed/totalMax` 하나입니다(`components/manage/limits.ts`). `외부 링크` 패널 배지·처음 패널 구역 요약은 `링크 n/50`, 상한에 닿으면 `링크 추가` 대신 안내(미리보기 `+ 링크 추가` 자리도 같은 문장)이고, 숨긴 링크를 다시 보이게 하는 것은 한도와 관계없습니다.

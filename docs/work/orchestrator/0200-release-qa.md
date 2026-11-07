@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 완료
+- 상태: 진행
 - 종류: 유지보수
 - 우선순위: P1
 - 작성일: 2026-11-06
@@ -16,8 +16,8 @@
 - [x] 320px 이상 카드2열, 기본 리스트·콘텐츠·선택 저장·새로고침·공개/미리보기 일치를 실제로 확인한다.
 - [x] 실제 localhost API/PostgreSQL에서 첫 저장→공개→방문/클릭→본인 통계, 타 계정 권한·만료 세션·실패/재시도·Instabio 보존을 확인한다.
 - [x] Chromium/WebKit/Firefox의 analytics-responsive/link-layout 및 핵심 E2E가 PR CI 필수 gate에 연결되고 실패 report/trace/PNG가 보관된다.
-- [x] 격리된 음성 CI에서 실제 gate 실패를 관측하고 정상 복원 SHA의 성공을 확인한다.
-- [x] 최소 시각 회귀·접근성 검사와 viewport320/390/768/1280·회전/확대 증거를 남긴다.
+- [ ] 격리된 음성 CI에서 실제 gate 실패를 관측하고 정상 복원 SHA의 성공을 확인한다.
+- [ ] 최소 시각 회귀·접근성 검사와 viewport320/390/768/1280·회전/확대 증거를 남긴다.
 - [x] verify/smoke/scope/비밀값 검토 후 draft PR과 실제 CI URL을 남긴다. main 병합·배포는 하지 않는다.
 
 ## 범위
@@ -64,3 +64,9 @@
 - 2026-11-07: 두 탐색 경계 동기화 후 production analytics Chromium/WebKit/Firefox12개가43.5초에12 passed·failed/flaky0으로 통과했고 scoped Prettier·ESLint도 통과했다. 원본 JSON/HTML/PNG는 `.local/ci/analytics-production-final/`이다. 임시 production 서비스는 종료하고 `make web-up`으로 원래 checkout 전용 Next dev를 복원했다. localhost 웹/API readiness 모두200, E2E 합성 사용자 잔여0, scope29파일·diff check 통과를 확인했다. API preload는 제거 상태이며 추가 진단 계측은 남기지 않았다.
 - 2026-11-07: [정상 CI42242157268](https://github.com/ai-worker-lab/crelink/actions/runs/42242157268)(`f49109f27d65f3f88ee1330afc0038e6e02a1271`)에서 Node24/26 verify·이미지2종·smoke·scope·required `CI 통과`가 모두 success다(문서전용 job만 조건상 skipped). 원격 JSON을 다운로드해 core9/personas4/analytics12/layout3, 총28 passed·failed/flaky/skipped/errors0을 직접 확인했다. Linux Chromium의 승인 기준선 픽셀비교0허용·axe·WebKit/Firefox까지 정상이다. 초기 음성 gate failure→별도시험결함수정→정상 gate 복원을 실제 관측해 이번 개발·QA 연결 수용 기준을 완료했다. main 병합·배포는 하지 않았다.
 - 2026-11-07: 정상 artifact `13515772035`(`browser-qa-42242157268-1`,17,109,146bytes), 원본 `.local/ci/remote-42242157268/ci/e2e/{core,personas,analytics,layout}/results.json`, suite별 `report/index.html` 및 `results/`의 PNG/axe/환경 attachment를 보존한다. 실패 trace/PNG는 이전 음성/복원 실패 artifact에 남아 있다. 이번 기록 반영 후 최종 문서 SHA의 required gate와 원격 head 일치는 PR148의 최종 검사 결과/본문에서 확인한다.
+- 2026-11-07: 최종 문서 SHA `08a667e44a84be4a0f02c8c855cb48122c467a9c`의 [CI42243215258](https://github.com/ai-worker-lab/crelink/actions/runs/42243215258)은 analytics11 passed/1 failed(WebKit creator stats의 잘못된기간 화면에서 동일 RSC access-control pageerror), layout not-run이다. 직전 코드 SHA의 전체 성공을 최종 head 성공으로 대체하지 않고 완료 상태와 gate 체크를 다시 진행으로 돌렸다. 증거는 `.local/ci/remote-42243215258/`에 다운로드했다.
+- 2026-11-07: 부모가 Creator400/404 초기화의 최소 제품 수정과 영역 문서 소유권을 PM에게 이전했고 QA 읽기전용 교차 검토 Task `task_53b71a53feb6`/Dispatch `ctx_b02bae91783f`를 시작했다. 코드상 Creator는400/404까지 `reload:true` 고정이지만 AdminShell은400/404를 내부 Link로 처리했다. `CreatorAnalyticsPage`의 reload를400/404에서만 false로 맞추고500/네트워크 다시 시도의 full reload는 보존했다.
+- 2026-11-07: production WebKit의 별도 안정화된 초기화 probe에서 mouse click/touch tap 각3회씩 수정 전6회 모두 문서 요청·timeOrigin 변경(reload=true), 수정 후6회 모두 같은 문서의 내부 이동(reload=false)을 관측했다. 이 단독 probe 자체는 수정 전에도6 passed였으므로 console 실패 재현으로 과장하지 않는다. 오류 자체의 수정 전 근거는 위 원격 전체 흐름과 취소 시각 계측이다. 초기화 직전 임시 networkidle은 제거하고, 다른 독립 invalid URL로 강제 이동하기 전 대기1개만 유지했다. 영구 시나리오는 초기화 URL·기본 시작/종료일을 실제 화면에서 확인한다.
+- 2026-11-07: 일회성 루프백 proxy가 특정 미래기간 analytics 요청만 HTTP500 또는 연결 종료로 만들고 그 밖의 내부 요청은 실제 API/DB로 전달하게 해 오류→다시 시도를 검증했다. 복구 뒤 mouse/touch 재시도 모두 문서 reload 유지·기존 기간값 보존·실제 API200/pageViews0으로2 passed(3.4초)였다. 이것은 서버/네트워크 오류 주입·복구 시험이며 운영 오류나 외부 서비스 시험이 아니다. 관련 임시spec2개·proxy source·프로세스는 삭제/종료했다.
+- 2026-11-07: 수정된 production 실제 API 직결에서 WebKit4화면×3회12 passed(49.8초), 이어 Chromium/WebKit/Firefox12 passed(39.9초)를 확인했다. 원본 `.local/ci/reset-{before,after}/`, `.local/ci/analytics-retry-preserved/`, `.local/ci/creator-recovery-{webkit-repeat,three-engine}/`에 보존한다. production 빌드도 통과했고 전용 진단 웹은 종료 후 Next dev로 복원했다. console/error 필터·retry·skip·기준선 픽셀 허용치는 바꾸지 않았다.
+- 2026-11-07: 독립 QA 읽기전용 교차 검토를 인수했다.400/404 내부 이동·나머지 문서 재조회는 기존 AdminShell/ErrorPanel 의미와 일치하는 최소 수정이며 실제 click·기본 URL/기간 assertion과 별도 tap 관측은 상호 보완적이라고 검토했다. 과거 마지막 원격 실패에서는 두 networkidle이 실제 완료되고 복구 UI assertion도 통과했으므로 대기 미실행/UI복구 실패 또는 CORS정책 결함으로 단정하지 않는다. 해당 마지막 원격 trace에는 요청/오류 시각이 없어 이전 계측의 취소 인과를 그대로 확정 적용하지 않으며, 재발 해소는 새 Linux 최종 전체 gate 결과로 판단한다. 검토자는 artifact/code 읽기만 했고 런타임/파일을 변경하지 않았다.
