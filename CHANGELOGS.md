@@ -4,6 +4,10 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-11-07
+
+- 통계 배포 티켓에 기존 브랜치 원격 HEAD·PR CI·main 병합 결과를 기록하고 관련 수용 기준을 반영했습니다. 근거: [0193](docs/work/orchestrator/0193-analytics-release.md).
+
 ## 2026-11-06
 
 - 카드형 그리드3열(0199): 사용자 요청으로 공개/미리보기 그리드 열 수를3으로 바꾸고3엔진 검증과 현재 디자인 기준을 맞췄습니다. [0199](docs/work/orchestrator/0199-grid-three-columns.md).
