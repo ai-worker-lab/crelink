@@ -48,7 +48,7 @@ settings-sync `research/crelink-ui-ux/2026-11-07/list-density/README.md`, `compa
 
 API는 실제 격리 PostgreSQL에서 기본값·세값 PATCH→DB→creator/public·invalid 입력·401·타인/관리자 권한·프로필/가져오기 보존을 검증한다. Web은 미수신 기본8·미리보기 전환·save 응답 검증과 field-only rollback을 증명한다. QA는 실제 API/DB 합성 계정으로 reload·재로그인·공개/미리보기 일치·list/grid 왕복·가져오기 보존·오류/복구·동기 중복을 검사한다. 일반 한줄·동일 사진12개 이상으로 목록 시작부터740px 영역의 완전 노출수를 실측하고8/10/12 캡처와 나란한 비교 자료를 남긴다. 긴 제목/설명·사진 없음·배너·200% 글자·가로넘침·44px을3엔진과 지정 폭에서 확인한다. 기존 Linux grid baseline·retry/skip/오류필터/허용치는 바꾸지 않는다.
 
-PM은 pnpm verify·smoke·영향 E2E·docs/scope와 최종 원격 SHA required CI success를 확인한다. PR148은 사람 검토 대상으로 보존하며 이 checkout은 그 checkout/런타임을 수정하지 않는다. 미병합 동안 후속 PR base는 work/0200-release-qa이고 본문에 의존성을 밝힌다. 사람이 선행 PR을 병합하면 변경을 보존하며 main 기준으로 정합화한다. 자동 merge/deploy·운영 credential/precheck/start/guard·운영 데이터 쓰기·별도 운영 방문 시험·자동화 설정 변경은 이번 범위가 아니다.
+PM은 pnpm verify·smoke·영향 E2E·docs/scope와 최종 main 대상 원격 SHA의 필수 CI success를 확인한다. 선행 PR148은2026-11-07 main에 squash 병합됐으며 기준은 b95142d532d6008c6c61b550cca63c238025d450이다. PR149는 기존 feature branch에 origin/main을 정상 merge해 밀도·0205 수정과 선행 회귀를 보존한 뒤 main 기준으로 검증한다. 목적이 끝난 stacked branch CI trigger는 제거하고 기존 main 대상 CI·job·권한·보호규칙을 유지한다. 자동 PR merge/deploy·운영 credential/precheck/start/guard·운영 데이터 쓰기·별도 운영 방문 시험·자동화 설정 변경은 이번 범위가 아니다.
 
 ## 위험·복구
 

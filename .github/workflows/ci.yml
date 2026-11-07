@@ -1,10 +1,10 @@
-# main과 밀도 기능의 선행 work/0200-release-qa 대상 PR에서 저장소 검사와 smoke 테스트를 실행합니다.
-# main push에서는 다시 돌리지 않습니다(0060). main push는 deploy.yml이 받습니다. 기준: docs/development/verification.md#ci
+# main 대상 PR에서 저장소 검사와 smoke 테스트를 실행합니다. main push에서는 다시 돌리지 않습니다(같은 내용을 PR에서 검사했고,
+# Actions 무료 몫을 아끼기 위함, 0060). main push는 deploy.yml이 받습니다. 기준: docs/development/verification.md#ci
 name: CI
 
 on:
   pull_request:
-    branches: [main, work/0200-release-qa]
+    branches: [main]
 
 permissions:
   contents: read
