@@ -353,7 +353,24 @@ async function removeUsers(db: pg.Pool, where: string, values: unknown[]) {
     values,
   );
   await Promise.all(rows.map((row) => rm(join(UPLOAD_DIR, row.storage_key), { force: true })));
-  await db.query(`DELETE FROM users u WHERE ${where}`, values);
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    // 종료 직전 beacon도 anchor→short_link 순서로 잠급니다. CASCADE를 반대 순서로 시작하면 교착할 수 있습니다.
+    await client.query(
+      `SELECT e.event_id FROM landing_events e JOIN short_links sl ON sl.id=e.short_link_id
+       JOIN landings l ON l.id=sl.landing_id JOIN users u ON u.id=l.user_id
+       WHERE ${where} ORDER BY e.event_id FOR UPDATE OF e`,
+      values,
+    );
+    await client.query(`DELETE FROM users u WHERE ${where}`, values);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export const test = base.extend<{ data: E2EData }, { db: pg.Pool }>({

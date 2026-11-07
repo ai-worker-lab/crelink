@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { devices } from '@playwright/test';
 import { API_URL, expect, expectNoHorizontalOverflow, test, TINY_PNG } from './fixtures';
 
@@ -81,13 +82,52 @@ test('생성자 표시 설정: 저장·미리보기·공개 그리드·모바일
         objectFit: getComputedStyle(node.querySelector('.link-thumb')!).objectFit,
       };
     });
-    expect(metrics.columns).toBe(3);
+    expect(metrics.columns).toBe(2);
     expect(metrics.cardMin).toBeGreaterThanOrEqual(44);
     expect(metrics.fits).toBe(true);
     expect(Math.abs(metrics.bannerWidth - metrics.width)).toBeLessThan(2);
     expect(metrics.objectFit).toBe('contain');
     if ([390, 1280].includes(width))
       await visitor.page.screenshot({ path: info.outputPath(`visitor-${width}.png`), fullPage: true });
+  }
+  await visitor.page.setViewportSize({ width: 844, height: 390 });
+  await expectNoHorizontalOverflow(visitor.page, `grid/${browserName}/landscape`);
+  expect(await grid.evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)).toBe(2);
+  await visitor.page.screenshot({ path: info.outputPath('visitor-landscape-844x390.png'), fullPage: true });
+  // 200% 글자 확대: 페이지 배율/실물 OS 확대와 구분합니다.
+  await visitor.page.setViewportSize({ width: 320, height: 740 });
+  await visitor.page.addStyleTag({ content: '.link-card { font-size: 200%; } .link-title { font-size: inherit; }' });
+  await expectNoHorizontalOverflow(visitor.page, `grid/${browserName}/text-200-percent`);
+  expect(
+    await grid
+      .locator('.link-card')
+      .evaluateAll((cards) => cards.every((card) => card.scrollWidth <= card.clientWidth + 1)),
+  ).toBe(true);
+  await visitor.page.screenshot({ path: info.outputPath('visitor-text-200-percent-320.png'), fullPage: true });
+  await visitor.page.reload();
+  await expect(grid).toBeVisible();
+  const accessibility = await new AxeBuilder({ page: visitor.page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  await info.attach('public-grid-axe', { body: JSON.stringify(accessibility), contentType: 'application/json' });
+  expect(accessibility.violations).toEqual([]);
+  await info.attach('environment', {
+    body: JSON.stringify({
+      browserName,
+      version: visitor.context.browser()!.version(),
+      host: process.platform,
+      widths: [320, 390, 768, 1280],
+      landscape: [844, 390],
+      textScalePercent: 200,
+      visualComparison: process.platform === 'linux' && info.project.name === 'chromium' ? 'required' : 'not-run',
+    }),
+    contentType: 'application/json',
+  });
+  // Linux PR CI만 시각 비교합니다. macOS 결과를 Linux 기준선으로 승인하지 않습니다.
+  if (process.platform === 'linux' && info.project.name === 'chromium') {
+    await visitor.page.setViewportSize({ width: 390, height: 844 });
+    await visitor.page.evaluate(() => document.fonts.ready);
+    await expect(grid).toHaveScreenshot('public-two-column.png', { animations: 'disabled', maxDiffPixels: 0 });
   }
   await page.goto(url);
   await page.getByRole('button', { name: '외부 링크 구역 편집', exact: true }).click();
@@ -99,7 +139,8 @@ test('생성자 표시 설정: 저장·미리보기·공개 그리드·모바일
     delete current.landing.linkLayout;
     await route.fulfill({ status: 200, json: current });
   });
-  await page.getByRole('radio', { name: '리스트', exact: true }).check();
+  // 실패 응답이 즉시 grid로 복구하므로 check()의 최종 checked=true 조건은 이 전환과 모순됩니다.
+  await page.getByRole('radio', { name: '리스트', exact: true }).click();
   await expect(
     page.getByText('표시 방식을 저장하지 못했어요. 화면을 새로 고친 뒤 다시 시도해 주세요.', { exact: true }),
   ).toBeVisible();
@@ -111,5 +152,8 @@ test('생성자 표시 설정: 저장·미리보기·공개 그리드·모바일
   await expect(page.getByRole('radio', { name: '리스트', exact: true })).toBeFocused();
   await visitor.page.reload();
   await expect(visitor.page.locator('.link-grid')).toHaveCount(0);
+  await page.reload();
+  await page.getByRole('button', { name: '외부 링크 구역 편집', exact: true }).click();
+  await expect(page.getByRole('radio', { name: '리스트', exact: true })).toBeChecked();
   await expect(visitor.page.locator('a.link-card')).toHaveCount(4);
 });

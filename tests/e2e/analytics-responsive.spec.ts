@@ -134,12 +134,18 @@ for (const role of ['creator', 'operator'] as const) {
       await expect(page.getByRole('status')).toContainText('수집된 페이지 표시가 없어요');
       await expect(page.locator('.analytics-trend')).toHaveCount(0);
       await expect(filters.locator('[aria-current="date"]')).toHaveCount(0);
+      // 다음 독립 URL 검사로 강제 이동하기 전에 현 문서의 prefetch가 끝나야 WebKit이 이를 취소하지 않습니다.
+      await page.waitForLoadState('networkidle');
       await page.goto(
         `${base}?from=2026-11-06&to=2026-11-05${role === 'operator' ? `&creatorId=${creator.userId}` : ''}`,
       );
       await expect(page.getByText('조회 조건을 확인해 주세요.', { exact: true })).toBeVisible();
       await page.getByRole('link', { name: '조회 조건 초기화', exact: true }).click();
       await expect(filters).toBeVisible();
+      expect(new URL(page.url()).pathname).toBe(base);
+      expect(new URL(page.url()).searchParams.has('from')).toBe(false);
+      await expect(filters.getByLabel('시작일', { exact: true })).toHaveValue(recentRange(30).from);
+      await expect(filters.getByLabel('종료일', { exact: true })).toHaveValue(recentRange(30).to);
 
       const desktopName =
         browserName === 'webkit' ? 'Desktop Safari' : browserName === 'firefox' ? 'Desktop Firefox' : 'Desktop Chrome';

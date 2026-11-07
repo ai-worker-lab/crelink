@@ -18,6 +18,7 @@ import { BannerSlotNotice, BannerSlotSection } from './BannerSlotSection';
 import { EditSheet } from './EditSheet';
 import { FirstRunGuide } from './FirstRunGuide';
 import { GuestbookSwitch } from './GuestbookSwitch';
+import { useInstabioImportDraft } from './InstabioImport';
 import { LinkForm } from './LinkForm';
 import { LinksSection } from './LinksSection';
 import { useManager } from './ManagerContext';
@@ -52,6 +53,7 @@ export function PageEditor() {
   } = useManager();
   const formAction = useAction();
   const layoutAction = useAction();
+  const importDraft = useInstabioImportDraft();
   const pending = formAction.pending || layoutAction.pending;
   /** 폼 저장·삭제 결과 안내. 결과가 나온 구역 패널(열쇠가 같을 때)에서만 보여 줍니다. */
   const [doneNotice, setDoneNotice] = useState<{ key: string; text: string } | null>(null);
@@ -177,6 +179,7 @@ export function PageEditor() {
       body = (
         <LinksSection
           importAction={formAction}
+          importDraft={importDraft}
           layoutAction={layoutAction}
           notice={doneNotice?.key === formKey ? doneNotice.text : null}
           focusSlotHandle={slotHandleFocus}

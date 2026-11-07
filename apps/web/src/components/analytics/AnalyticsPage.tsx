@@ -45,7 +45,7 @@ export async function CreatorAnalyticsPage({
         action={{
           href: result.error.status === 400 || result.error.status === 404 ? base : analyticsHref(base, filters),
           label: result.error.status === 400 || result.error.status === 404 ? '조회 조건 초기화' : '다시 시도',
-          reload: true,
+          reload: result.error.status !== 400 && result.error.status !== 404,
         }}
       />
     );
