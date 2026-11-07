@@ -1,0 +1,128 @@
+[
+  {
+    "browserName": "chromium",
+    "version": "156.0.8078.4",
+    "measurements": [
+      {
+        "density": 8,
+        "count": 8,
+        "height": 82,
+        "gap": "12px",
+        "font": "16px",
+        "fit": "contain",
+        "preview": {
+          "count": 8,
+          "height": 82
+        }
+      },
+      {
+        "density": 10,
+        "count": 10,
+        "height": 66,
+        "gap": "8px",
+        "font": "16px",
+        "fit": "contain",
+        "preview": {
+          "count": 10,
+          "height": 66
+        }
+      },
+      {
+        "density": 12,
+        "count": 12,
+        "height": 54,
+        "gap": "8px",
+        "font": "16px",
+        "fit": "contain",
+        "preview": {
+          "count": 12,
+          "height": 54
+        }
+      }
+    ]
+  },
+  {
+    "browserName": "webkit",
+    "version": "27.2",
+    "measurements": [
+      {
+        "density": 8,
+        "count": 8,
+        "height": 82,
+        "gap": "12px",
+        "font": "16px",
+        "fit": "contain",
+        "preview": {
+          "count": 8,
+          "height": 82
+        }
+      },
+      {
+        "density": 10,
+        "count": 10,
+        "height": 66,
+        "gap": "8px",
+        "font": "16px",
+        "fit": "contain",
+        "preview": {
+          "count": 10,
+          "height": 66
+        }
+      },
+      {
+        "density": 12,
+        "count": 12,
+        "height": 54,
+        "gap": "8px",
+        "font": "16px",
+        "fit": "contain",
+        "preview": {
+          "count": 12,
+          "height": 54
+        }
+      }
+    ]
+  },
+  {
+    "browserName": "firefox",
+    "version": "157.0",
+    "measurements": [
+      {
+        "density": 8,
+        "count": 8,
+        "height": 82,
+        "gap": "12px",
+        "font": "16px",
+        "fit": "contain",
+        "preview": {
+          "count": 8,
+          "height": 82
+        }
+      },
+      {
+        "density": 10,
+        "count": 10,
+        "height": 66,
+        "gap": "8px",
+        "font": "16px",
+        "fit": "contain",
+        "preview": {
+          "count": 10,
+          "height": 66
+        }
+      },
+      {
+        "density": 12,
+        "count": 12,
+        "height": 54,
+        "gap": "8px",
+        "font": "16px",
+        "fit": "contain",
+        "preview": {
+          "count": 12,
+          "height": 54
+        }
+      }
+    ]
+  }
+]

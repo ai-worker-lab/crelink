@@ -4,6 +4,13 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-11-07
+
+- PR149 main 기준 병합 준비 재검토: 선행 PR148의 squash merge 뒤 기존 feature branch에 최신 main을 정상 merge하고8개 파일의 ancestry 충돌을 밀도·0205·기존 회귀 보존으로 해결합니다. 목적이 끝난 stacked CI trigger를 제거해 main 대상 원래 검증 계약으로 되돌리고 사람 병합 전 최종 SHA/merge ref·독립 검토·CI 근거는 [0201](docs/work/crelink-pm/0201-list-density.md)과 PR149에 연결합니다. 실제 PR merge/deploy는 수행하지 않습니다.
+
+- 리스트 밀도8개형·10개형·12개형을 기존 외부 링크 설정의 즉시 저장·페이지별 API/DB·공개/미리보기 공통 렌더러에 연결했습니다. 기본8·카드2열·배너·가져오기 값 보존과 실패 시 선택만 복구/재시도를 유지합니다. 추가형 migration0012와 엄격 숫자 검증을 적용했고 실제 API/DB·3엔진34개 통합시나리오 및740px 목록의8/10/12 실측·캡처를 [QA 근거](docs/reviews/0204-list-density-qa.md)에 남겼습니다. 후속 PR의 실제 선행 base에서 같은 CI를 실행하도록 trigger에 `work/0200-release-qa`만 추가하며 기존 job·권한·Deploy는 유지합니다. 통합/최종CI와 사람 검토 인계는 [0201](docs/work/crelink-pm/0201-list-density.md), 계약은 [설계](docs/specs/list-density.md)에 기록합니다.
+- PR149 초회 CI가 드러낸 빠른 외부 이동의 pending 클릭 유실을 수정했습니다(0205). 원본 pageview와 미등록 이탈 이벤트를 기존 BFF 요청 하나에 담고 실제 등록204 뒤 후속 이벤트를 순차 전달합니다. API/shared/DB·기존 SIM-01·navigation은 유지했고 수정전/후 실제DB1/0→1/1·지연upstream3엔진·중복/거절 경계를 확인했습니다. [영역 근거](apps/web/docs/visitor-telemetry.md), [결함 티켓](docs/work/web/0205-pending-click-delivery.md). SIM-05를 추가한 현재 CI 예상은35개이며 최종 원격 결과는0201/PR149에 연결합니다.
+
 ## 2026-11-06
 
 - 출시 QA 연결과 카드2열(0200): 최신 사용자 지시로320px 이상 카드2열 기준을 제품·설계·디자인에 맞추고, 기존 PR smoke job에 핵심 사용자·권한/세션·분석/배치3엔진 검사와 항상 업로드하는 HTML/JSON/PNG/trace 증거를 연결합니다. 접근성 검사를 위한 `@axe-core/playwright`4.14.0만 추가하며 실제 통합·CI 결과는 [0200](docs/work/orchestrator/0200-release-qa.md), 범위와 후속 기능 제안은 [설계](docs/specs/release-qa.md)에 남깁니다. main 병합·배포는 포함하지 않습니다.

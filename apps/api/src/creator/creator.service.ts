@@ -8,6 +8,7 @@ import {
   CRELINK_WEB_PATHS,
   LinkLayout,
   LinkLimits,
+  ListDensity,
   LinkView,
   PortfolioItemView,
   PublicBannerView,
@@ -107,6 +108,7 @@ export interface PublicLandingRow {
   avatar_file_id: string | null;
   guestbook_enabled: boolean;
   link_layout: LinkLayout;
+  list_density: ListDensity;
   /** 계정에 배너 슬롯이 부여됐는지(`users.banner_slot_granted_at IS NOT NULL`, R21 ①). */
   banner_slot_granted: boolean;
   /** 광고 블록을 그려도 되는지(R20 ⑩): 플랫폼 스위치와 크리에이터 스위치가 모두 켜짐. 배너 슬롯에는 쓰지 않습니다. */
@@ -126,7 +128,7 @@ export class CreatorService {
   async publicLanding(db: Queryable, publicId: string): Promise<PublicLandingRow> {
     const result = /^[a-z0-9]{10}$/.test(publicId)
       ? await db.query<PublicLandingRow & { suspended: boolean }>(
-          `SELECT l.id, l.user_id, l.display_name, l.bio, l.avatar_file_id, l.guestbook_enabled, l.link_layout,
+          `SELECT l.id, l.user_id, l.display_name, l.bio, l.avatar_file_id, l.guestbook_enabled, l.link_layout, l.list_density,
                   u.banner_slot_granted_at IS NOT NULL AS banner_slot_granted, u.suspended_at IS NOT NULL AS suspended,
                   u.ad_block_enabled AND coalesce((SELECT ad_block_enabled FROM platform_settings), false)
                     AS ad_block_enabled
@@ -354,8 +356,9 @@ export class CreatorService {
       avatar_file_id: string | null;
       guestbook_enabled: boolean;
       link_layout: LinkLayout;
+      list_density: ListDensity;
     }>(
-      'SELECT id, public_id, display_name, bio, avatar_file_id, guestbook_enabled, link_layout FROM landings WHERE user_id = $1',
+      'SELECT id, public_id, display_name, bio, avatar_file_id, guestbook_enabled, link_layout, list_density FROM landings WHERE user_id = $1',
       [userId],
     );
     const row = landing.rows[0];
@@ -381,6 +384,7 @@ export class CreatorService {
         avatar: this.files.imageRef(row.avatar_file_id),
         guestbookEnabled: row.guestbook_enabled,
         linkLayout: row.link_layout,
+        listDensity: row.list_density,
       },
       shortLink,
       links,

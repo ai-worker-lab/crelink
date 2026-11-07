@@ -121,7 +121,14 @@ export function Landing({
   }
 
   const linkList =
-    linkItems.length > 0 ? <ul className={grid ? 'link-list link-grid' : 'link-list'}>{linkItems}</ul> : null;
+    linkItems.length > 0 ? (
+      <ul
+        className={grid ? 'link-list link-grid' : 'link-list'}
+        data-list-density={grid ? undefined : (landing.listDensity ?? 8)}
+      >
+        {linkItems}
+      </ul>
+    ) : null;
 
   const portfolioList =
     landing.portfolio.length > 0 ? (

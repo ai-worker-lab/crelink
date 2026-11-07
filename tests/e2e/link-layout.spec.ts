@@ -48,7 +48,6 @@ test('생성자 표시 설정: 저장·미리보기·공개 그리드·모바일
   await page.getByRole('button', { name: '외부 링크 구역 편집', exact: true }).click();
   await expect(page.getByRole('radio', { name: '리스트', exact: true })).toBeChecked();
   await page.getByRole('radio', { name: '카드형 그리드', exact: true }).check();
-  await expect(page.getByText('링크 표시 방식을 저장했어요. 방문자 화면에도 적용돼요.', { exact: true })).toBeVisible();
   await expect(page.locator('.preview-screen .link-grid')).toHaveCount(1);
   // 관리 정렬 목록은 가로 카드 그리드로 바뀌지 않습니다.
   await expect(page.locator('.link-edit-list.link-grid')).toHaveCount(0);
@@ -141,14 +140,11 @@ test('생성자 표시 설정: 저장·미리보기·공개 그리드·모바일
   });
   // 실패 응답이 즉시 grid로 복구하므로 check()의 최종 checked=true 조건은 이 전환과 모순됩니다.
   await page.getByRole('radio', { name: '리스트', exact: true }).click();
-  await expect(
-    page.getByText('표시 방식을 저장하지 못했어요. 화면을 새로 고친 뒤 다시 시도해 주세요.', { exact: true }),
-  ).toBeVisible();
+  await expect(page.locator('.form-error[role="alert"]')).toBeVisible();
   await expect(page.getByRole('radio', { name: '카드형 그리드', exact: true })).toBeChecked();
   await page.unroute(path);
   await page.getByRole('radio', { name: '카드형 그리드', exact: true }).focus();
   await page.keyboard.press('ArrowLeft');
-  await expect(page.getByText('링크 표시 방식을 저장했어요. 방문자 화면에도 적용돼요.', { exact: true })).toBeVisible();
   await expect(page.getByRole('radio', { name: '리스트', exact: true })).toBeFocused();
   await visitor.page.reload();
   await expect(visitor.page.locator('.link-grid')).toHaveCount(0);

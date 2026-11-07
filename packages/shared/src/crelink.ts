@@ -269,6 +269,8 @@ export interface CreatorBannerView {
 
 export type LinkLayout = 'list' | 'grid';
 
+export type ListDensity = 8 | 10 | 12;
+
 /** `GET /api/me/landing` 응답. 편집 화면 전체 상태입니다. */
 export interface CreatorLandingState {
   landing: {
@@ -282,6 +284,8 @@ export interface CreatorLandingState {
     guestbookEnabled: boolean;
     /** 이전 API에서 없으면 list로 표시합니다. */
     linkLayout?: LinkLayout;
+    /** 이전 API에서 없으면 8로 표시합니다. 새 API는 항상 숫자를 반환합니다. */
+    listDensity?: ListDensity;
   };
   shortLink: ShortLinkView;
   links: LinkView[];
@@ -324,6 +328,8 @@ export interface SetAdBlockRequest {
 /** `PATCH /api/me/landing`. 빈 문자열·null은 비움입니다. 응답은 `CreatorLandingState`. */
 export interface UpdateLandingRequest {
   linkLayout?: LinkLayout;
+  /** 생략은 보존, 숫자 8·10·12만 허용합니다(null도 400 validation_failed). */
+  listDensity?: ListDensity;
   displayName?: string | null;
   bio?: string | null;
   avatarFileId?: string | null;
@@ -511,6 +517,8 @@ export function resolveBannerSlot<B>(input: ResolveBannerSlotInput<B>): Resolved
 export interface PublicLandingView {
   /** 생성자가 정한 표시 방식. 이전 응답에서 없으면 list입니다. */
   linkLayout?: LinkLayout;
+  /** 이전 응답에서 없으면 8입니다. 새 API는 항상 숫자를 반환합니다. */
+  listDensity?: ListDensity;
   publicId: string;
   displayName: string | null;
   bio: string | null;

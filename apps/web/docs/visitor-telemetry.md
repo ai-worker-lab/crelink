@@ -20,10 +20,38 @@
 
 ## 전송과 실패
 
-`POST /api/backend` 뒤의 공유 `landingEvents(publicId)` 경로를 사용합니다. 최초 `page_view`가 204로 수락될 때까지 후속 이벤트를 최대 256개만 메모리에 둡니다. 최초 등록의 네트워크 오류·5xx는 같은 `eventId`로 한 번 재시도하고, 입력 오류·서명 거절·429 등은 반복하지 않습니다. 후속 클릭·종료 전송은 JSON Blob의 `sendBeacon`, 큐에 넣지 못하면 `fetch`의 `keepalive`를 사용합니다. 그 밖의 전송도 실패를 화면이나 콘솔에 노출하지 않습니다.
+`POST /api/backend` 뒤의 공유 `landingEvents(publicId)` 경로를 사용합니다. 최초 `page_view`가204로 수락될 때까지 일반 후속 이벤트를 최대256개만 메모리에 둡니다. 최초 등록의 네트워크 오류·5xx는 같은 `eventId`로 한 번 재시도하고, 입력 오류·서명 거절·429 등은 반복하지 않습니다. 후속 클릭·종료 전송은 JSON Blob의 `sendBeacon`, 큐에 넣지 못하면 `fetch`의 `keepalive`를 사용합니다. 그 밖의 전송도 실패를 화면이나 콘솔에 노출하지 않습니다.
 
-BFF는 허용 경로와 같은 출처를 확인하고 JSON만 16KiB까지 읽습니다. 해당 경로에서만 Origin을 API로 전달하며 API가 설정된 웹 출처·서명·대상·입력 한도를 다시 확인합니다. 저장이나 네트워크가 막히거나 최초 등록 전에 문서가 종료되면 기록이 누락될 수 있습니다. Beacon의 큐 등록은 서버 저장 완료를 보장하지 않습니다. 영구 큐·무제한 재시도는 없습니다.
+등록 응답을 아직 받지 못한 클릭·종료 engagement는 메모리에서 응답을 기다리지 않고 원본 `page_view`와 이벤트 하나를 `{ pageView, event }`로 묶어 기존 BFF에 즉시 보냅니다(0205). BFF의 `forwardVisitorEvent`는 원본 등록을 기존 단일 이벤트 API로 보내 실제204를 기다린 뒤에만 후속 이벤트를 전달하고 최종 응답을 반환합니다. 원본 토큰·세션·페이지뷰 ID가 같고 eventId가 달라야 하며, 두 번째 타입은 click/engagement만 허용합니다. 최초 등록의 metadata·UTM·eventId를 재생성하지 않습니다. 최초 등록이204가 아니면 후속 호출 없이 원오류를 반환하며 중계 안에서 재시도를 추가하지 않습니다.
+
+BFF는 허용 경로와 같은 출처를 확인하고 **묶음 전체**를 JSON16KiB까지 읽습니다. 해당 경로에서만 Origin을 API로 전달하고 쿠키·클라이언트 IP를 전달하지 않으며 API가 설정된 웹 출처·서명·대상·권한·만료·입력 한도·rate limit을 각 단일 이벤트에 그대로 적용합니다. 원본 등록과 중계 등록이 겹쳐도 기존 eventId/pageViewId 멱등 처리가 중복 행을 막지만 중복 등록도 rate 예산을 소비하므로 등록 완료 뒤에는 묶지 않습니다.
+
+보장 범위는 **BFF가 수신한 한 요청 안에서 성공한 page_view → 후속 이벤트의 순서**입니다. 링크 기본 이동을 취소하거나 등록 완료까지 지연하지 않습니다. Beacon의 큐 수락은 BFF 수신이나 DB 저장 ACK가 아니며, 브라우저 강제종료·오프라인·서버 종료·네트워크 실패까지 영속 전달을 보장하지 않습니다. 첫 등록만 저장되고 뒤 이벤트가 실패할 수도 있으며 원자적 일괄 저장이 아닙니다. 등록 대기 중 일반 노출 등 메모리 이벤트는 여전히 종료 시 누락될 수 있습니다. 영구 큐·서비스워커·무제한 재시도는 없습니다.
 
 ## 확인
 
-`node --test src/lib/visitor-telemetry.spec.ts src/lib/api/visitor-event.spec.ts`를 `apps/web`에서 실행합니다. 30분 경계·저장소 거부/손상·StrictMode 재설치의 중복 등록 방지·BFCache의 새 페이지뷰·숨긴 시간 제외·누적 상한·대상 노출 중복·환경 메타데이터 허용 목록·등록 재시도·JSON/UTF-8 16KiB 경계를 검사합니다. 실제 브라우저 이벤트 순서와 행 저장은 통합 담당이 격리 환경에서 확인하고 [0181](../../../docs/work/orchestrator/0181-visitor-data.md)에 남깁니다.
+`node --test src/lib/visitor-telemetry.spec.ts src/lib/api/visitor-event.spec.ts`를 `apps/web`에서 실행합니다.30분 경계·저장소 거부/손상·StrictMode 재설치·BFCache·체류·노출·메타데이터·등록 재시도·JSON/UTF-8 16KiB와 BFF의204 순서·첫 실패 원오류 보존·잘못된 묶음의 upstream 호출 금지를 검사합니다. 실제 브라우저 이벤트 순서와 행 저장은 격리 환경에서 검증하며 기존 [0181](../../../docs/work/orchestrator/0181-visitor-data.md)과 후속 [0205](../../../docs/work/web/0205-pending-click-delivery.md)에 연결합니다.
+
+### 0205 실제 실행 근거(2026-11-07)
+
+- 환경: density checkout 슬롯2, macOS arm64·Node24.18.0·Next16.4.1 production `next build`/`next start`, 실제 API3220·PostgreSQL5652·Web5393. 실제 휴대폰이나 운영 데이터가 아니다.
+- 수정 전: `pnpm e2e personas --project=personas --no-deps -g SIM-05`에 HTML/JSON reporter와 output 경로를 지정했다. 실제 pageview 등록204를 브라우저 fetch 반환 직전에 보류하고 다른 origin의 실제 루프백 HTTP 문서로 이동했다. PostgreSQL page_view1/click0에서 실패했다. 단순 코드 추론이 아닌 문서 이탈/DB 관찰이다.
+- 수정 후: 같은 원인 회귀에서 원본 요청 전 보류(DB anchor0)와 실제204 반환 후 보류(anchor1)를 구분했고 두 경우 모두 외부 문서 이동 뒤 page_view1/click1·정확한 링크 target·동일 visitor/session/pageview/source 바인딩을 확인했다. 동일 eventId를 두 번 재전송해도 한 행씩이며 첫 등록의 잘못된 서명403에서는 후속 행0이었다.
+- 추가 실제 중계 검증: Web 프로세스의 API_INTERNAL_URL만 루프백 timing proxy3221로 향하게 했다. 실제 API 등록 **전**과 실제204 응답 **후**를 각각 보류한 상태에서 외부 문서 이동 완료·DB click0를 확인하고, 그 뒤 upstream을 해제해1/1 저장을 Chromium/WebKit/Firefox에서 확인했다. 브라우저 문서가 파괴된 뒤에도 수신한 BFF 요청이 순차 전달을 마친 증거이며 영속 큐 증거는 아니다. 임시 proxy·설정/spec은 검사 후 제거했다.
+
+| 검사 | 결과 | 실제 JSON 경로(checkout 상대) |
+| --- | --- | --- |
+| 수정 전 DB 재현 | expected0/unexpected1 | `tests/e2e/.local/telemetry0205/before-db/report.json` |
+| 기존 SIM01 불변 포함 personas | expected5/unexpected0/flaky0/skipped0 | `tests/e2e/.local/telemetry0205/after-personas-final/report.json` |
+| 신규 SIM05 3엔진(각 요청/응답 보류) | expected3/unexpected0/flaky0/skipped0 | `.local/telemetry0205/.local/telemetry0205/three-engines/report.json` |
+| 실제 upstream 지연 3엔진(각 등록 전/응답 후) | expected3/unexpected0/flaky0/skipped0 | `.local/telemetry0205/.local/telemetry0205/upstream-three-engines/report.json` |
+
+HTML은 `.local/telemetry0205/{before-db,after-personas-final,three-engines,upstream-three-engines}/html/index.html`, PNG/trace/첨부 DB·중계 순서 JSON은 각 같은 이름의 `results/`에 있다. JSON reporter의 상대 경로는 config 위치 기준이어서 표의 중첩 경로에 실제 저장됐다. 후속 실행은 절대 JSON 경로를 사용한다.3엔진은 기존 personas spec의 SIM05만 일회성 config로 선택했으며 CI 선택·기존 SIM01 assertions·기본 timeout/retry/filter/skip을 바꾸지 않았다.
+
+영역 검사: `pnpm --filter @crelink/web build`, `pnpm --filter @crelink/web typecheck`, 변경 TS5개의 `pnpm exec eslint`·`prettier --check`가 최종 exit0, `pnpm --filter @crelink/web test`99/99, 영향 telemetry unit16/16이었다. 전체 final verify·원격 CI는 PM 담당이다. 최초 타입 검사1회는 테스트에서 ES2022 lib에 없는 Promise.withResolvers를 써 실패했고 기존 target 호환 코드로 고쳤다. 초기 재현2회는 합성 HTTP 문서 charset 누락으로, 중간 수정 후1회는 Playwright beacon 요청 관찰에 의존한 테스트로 실패했으며 원본 pageview 캡처+DB eventId 재전송으로 보강했다. 이 실패들을 최종 통과로 집계하지 않고 원본 artifact를 보존했다.
+
+수동 Ego TaskSpace3에서 합성 공개 랜딩→개인정보 안내 링크 이동과 실제 DB page_view1/click1도 확인했다. `.local/telemetry0205/manual-public.png`를 직접 검토했고 TaskSpace는 finish했다. 전용 수동 합성 user1개는 정확한 ID로 정리해 잔여0(`manual-cleanup.json`), E2E 계정은 fixture가 정리했다. 정리 중 DB5652 연결 거절과 host Docker socket 부재를 관찰했으나 전역 데몬은 조작하지 않았다. 부모의 환경 복구 관측 뒤 해당 ID 잔여1을 확인해1개 삭제했으며 원인은 미확정이다.
+
+마지막에는 proxy3221·계측용 Web을 종료하고 일반 API 경로의 production Web 서비스 `telemetry0205-web-final`을 유지했다. API readiness200, Web privacy200, Web BFF health200을 관찰했다. 기존 API 프로세스32402의 일반 dist/main 호출은 변경하지 않았고 preload는 추가하지 않았다. 런타임을 PM에 반환하며 다시 빌드하기 전 이 Web 서비스를 중지해야 한다. 브라우저/서버 강제종료·오프라인·실물 휴대폰은 미검증이며 자동 merge/deploy를 하지 않았다.
+
+최종 정리 뒤 `pnpm docs:check`는 Markdown304개 검사 exit0, 변경 TS5개의 `prettier --check`도 exit0이었다. 일반 Web 서비스는 persistent로 인계한다.

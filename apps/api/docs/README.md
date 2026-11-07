@@ -300,3 +300,5 @@ pnpm --filter @crelink/api --silent ai-operator list-tokens   # 또는 node apps
 ## 링크 표시 방식
 
 기존 본인 랜딩 `PATCH /api/me/landing`의 `linkLayout`은 `list`/`grid`만 허용합니다. migration0011이 기존 랜딩을 기본 list로 유지하며 편집·공개 조회에도 반환합니다. 이전 응답에 필드가 없으면 list로 표시하고 저장 응답이 요청과 일치할 때만 성공 안내합니다. rollback 때 컬럼과 값을 삭제하지 않습니다. [0198](../../../docs/specs/link-grid-layout.md).
+
+같은 PATCH의 `listDensity`는 JSON 숫자8·10·12만 허용하며, 생략하면 현재 값을 보존합니다. null·문자열·불리언·배열·객체·다른 숫자는400 `validation_failed`입니다. migration `0012_list_density.sql`은 `smallint NOT NULL DEFAULT 8`과 CHECK로 기존 데이터를8개형으로 확장합니다. 편집 상태와 공개 조회는 항상 숫자를 반환하며 이전 API 응답에 필드가 없으면 소비자는8로 표시합니다. list/grid 전환·프로필·링크·Instabio 가져오기는 밀도를 바꾸지 않습니다. 이전 서버로 rollback할 때도 추가 컬럼과 저장값을 남깁니다. 구현 원본은 `src/creator/profile.service.ts`·`creator.service.ts`·`public-landing.controller.ts`, 계약은 `packages/shared/src/crelink.ts`입니다. [리스트 밀도 설계](../../../docs/specs/list-density.md).

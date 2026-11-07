@@ -3721,6 +3721,29 @@ body:has(.sheet[open]) {
 .link-layout-picker legend {
   font-weight: var(--ds-font-weight-bold);
 }
+.link-list[data-list-density] .link-thumb {
+  object-fit: contain;
+}
+.link-list[data-list-density='10'],
+.link-list[data-list-density='12'] {
+  gap: var(--ds-space-8);
+}
+.link-list[data-list-density='10'] .link-card {
+  min-height: calc(var(--ds-space-48) + var(--ds-space-8) * 2 + 2px);
+  padding-block: var(--ds-space-8);
+}
+.link-list[data-list-density='10'] .link-thumb {
+  width: var(--ds-space-48);
+  height: var(--ds-space-48);
+}
+.link-list[data-list-density='12'] .link-card {
+  min-height: calc(var(--ds-space-40) + var(--ds-space-6) * 2 + 2px);
+  padding-block: var(--ds-space-6);
+}
+.link-list[data-list-density='12'] .link-thumb {
+  width: var(--ds-space-40);
+  height: var(--ds-space-40);
+}
 .link-list.link-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
