@@ -39,3 +39,38 @@ export async function readVisitorEventBody(request: Request): Promise<string | R
   }
   return new TextDecoder().decode(bytes);
 }
+
+/** 미등록 이탈 이벤트 하나만 원본 page_view의 실제204 뒤 전달합니다. API의 단일 이벤트 계약은 바꾸지 않습니다. */
+export async function forwardVisitorEvent(body: string, send: (body: string) => Promise<Response>): Promise<Response> {
+  let input: unknown;
+  try {
+    input = JSON.parse(body);
+  } catch {
+    return send(body);
+  }
+  const object = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+  if (!object(input) || !('pageView' in input)) return send(body);
+  const { pageView, event } = input;
+  if (
+    Object.keys(input).some((key) => key !== 'pageView' && key !== 'event') ||
+    !object(pageView) ||
+    !object(event) ||
+    pageView.type !== 'page_view' ||
+    (event.type !== 'click' && event.type !== 'engagement') ||
+    !['token', 'sessionId', 'pageViewId'].every(
+      (key) => typeof pageView[key] === 'string' && pageView[key] === event[key],
+    ) ||
+    typeof pageView.eventId !== 'string' ||
+    typeof event.eventId !== 'string' ||
+    pageView.eventId.toLowerCase() === event.eventId.toLowerCase()
+  ) {
+    return Response.json(
+      { code: 'validation_failed', message: '방문 이벤트 연결이 올바르지 않아요.' },
+      { status: 400 },
+    );
+  }
+  const registered = await send(JSON.stringify(pageView));
+  if (registered.status !== 204) return registered;
+  return send(JSON.stringify(event));
+}

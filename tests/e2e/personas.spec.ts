@@ -1,7 +1,10 @@
 // localhost 가상 사용자 시나리오. 실제 수요/성장 증거가 아니라 동작·권한·지표 분리를 검증합니다.
 // metrics 대조군이 다른 시나리오에 섞이지 않도록 personas 프로젝트는 기존 프로젝트 뒤에 실행합니다.
-import type { AiOperatorMetrics } from '@crelink/shared';
+import type { AiOperatorMetrics, LandingEventRequest } from '@crelink/shared';
 import type { Page } from '@playwright/test';
+import { createServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
+import { once } from 'node:events';
 import { API_URL, expect, expectNoHorizontalOverflow, SHORT_URL, test, waitForCount, WEB_URL } from './fixtures';
 
 async function growthMetrics(page: Page) {
@@ -222,4 +225,144 @@ test('SIM-04 만료 세션의 재시도는 마지막 저장값을 덮어쓰지 �
   expect(expired.status()).toBe(401);
   const { rows } = await data.db.query('SELECT title FROM links WHERE id = $1', [creator.links[0].id]);
   expect(rows).toEqual([{ title: '마지막 저장값' }]);
+});
+
+test('SIM-05 등록 요청·응답 대기 중 외부 문서로 떠나도 행동 클릭을 보존한다', async ({ data }, testInfo) => {
+  const destination = createServer((_request, response) => {
+    response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    response.end('<!doctype html><title>외부 문서</title><h1>이동 완료</h1>');
+  });
+  const listening = once(destination, 'listening');
+  destination.listen(0, '127.0.0.1');
+  await listening;
+  const address = destination.address();
+  if (!address || typeof address === 'string') throw new Error('외부 문서 서버 포트를 찾지 못했습니다.');
+  const url = `http://127.0.0.1:${address.port}/destination`;
+  try {
+    for (const phase of ['response', 'request'] as const) {
+      const creator = await data.user({ links: [{ title: '바로 이동', url }] });
+      const visitor = await data.session();
+      // 외부 루프백 목적지까지 실제 HTTP로 이동합니다. 공용 fixture의 외부 응답 대체만 이 컨텍스트에서 해제합니다.
+      await visitor.context.unrouteAll();
+      await visitor.context.addInitScript(
+        ({ phase }) => {
+          const original = window.fetch;
+          window.fetch = async (input, init) => {
+            const body = typeof init?.body === 'string' ? JSON.parse(init.body) : null;
+            if (body?.type !== 'page_view') return original(input, init);
+            Object.assign(window, { heldPageView: body });
+            if (phase === 'response') {
+              const response = await original(input, init);
+              if (response.status !== 204) throw new Error('실제 페이지뷰 등록이 실패했습니다.');
+            }
+            // 원본 요청을 보내기 전 또는 실제204 응답 뒤에서만 보류합니다. 클릭/Beacon은 가로채지 않습니다.
+            document.documentElement.dataset.registrationHeld = phase;
+            return new Promise<Response>(() => {});
+          };
+        },
+        { phase },
+      );
+      await visitor.page.goto(creator.shortUrl);
+      await expect(visitor.page.locator('html')).toHaveAttribute('data-registration-held', phase);
+      const pageView = await visitor.page.evaluate(
+        () => (window as typeof window & { heldPageView: LandingEventRequest }).heldPageView,
+      );
+      const before = await data.db.query(
+        "SELECT kind FROM landing_events WHERE short_link_id=$1 AND kind IN ('page_view','click')",
+        [creator.shortLinkId],
+      );
+      expect(before.rows).toEqual(phase === 'request' ? [] : [{ kind: 'page_view' }]);
+      await visitor.page.getByRole('link', { name: '바로 이동', exact: true }).click();
+      await expect(visitor.page).toHaveURL(url);
+      await expect(visitor.page.getByRole('heading', { name: '이동 완료' })).toBeVisible();
+      await expect
+        .poll(
+          async () =>
+            (
+              await data.db.query(
+                `SELECT kind, count(*)::int AS count FROM landing_events
+         WHERE short_link_id=$1 AND kind IN ('page_view','click') GROUP BY kind ORDER BY kind`,
+                [creator.shortLinkId],
+              )
+            ).rows,
+        )
+        .toEqual([
+          { kind: 'click', count: 1 },
+          { kind: 'page_view', count: 1 },
+        ]);
+      const clicked = await data.db.query(
+        "SELECT event_id, target_kind, target_id FROM landing_events WHERE short_link_id=$1 AND kind='click'",
+        [creator.shortLinkId],
+      );
+      expect(clicked.rows[0]).toMatchObject({ target_kind: 'link', target_id: creator.links[0].publicId });
+      const binding = await data.db.query(
+        `SELECT count(DISTINCT page_view_id)::int AS views, count(DISTINCT session_id)::int AS sessions,
+         count(DISTINCT visitor_id)::int AS visitors, count(DISTINCT source_visit_id)::int AS sources
+         FROM landing_events WHERE short_link_id=$1`,
+        [creator.shortLinkId],
+      );
+      const clickDelivery = {
+        pageView,
+        event: {
+          token: pageView.token,
+          sessionId: pageView.sessionId,
+          pageViewId: pageView.pageViewId,
+          eventId: clicked.rows[0].event_id,
+          type: 'click',
+          targetKind: 'link',
+          targetId: creator.links[0].publicId,
+        },
+      };
+      // 같은 eventId를 실제 BFF/API에 다시 전달해도 pageview·click은 한 행씩입니다.
+      const endpoint = backend(`/api/landings/${creator.publicId}/events`);
+      for (let repeat = 0; repeat < 2; repeat++) {
+        const response = await visitor.page.request.post(endpoint, {
+          headers: { Origin: WEB_URL },
+          data: clickDelivery,
+        });
+        expect(response.status()).toBe(204);
+      }
+      const duplicate = await data.db.query(
+        "SELECT kind, count(*)::int AS count FROM landing_events WHERE short_link_id=$1 AND kind IN ('page_view','click') GROUP BY kind ORDER BY kind",
+        [creator.shortLinkId],
+      );
+      expect(duplicate.rows).toEqual([
+        { kind: 'click', count: 1 },
+        { kind: 'page_view', count: 1 },
+      ]);
+      // 첫 등록 서명을 거부하면 뒤의 click을 성공으로 꾸미거나 행을 남기면 안 됩니다.
+      const rejectedView = randomUUID();
+      const rejected = await visitor.page.request.post(endpoint, {
+        headers: { Origin: WEB_URL },
+        data: {
+          pageView: { ...clickDelivery.pageView, pageViewId: rejectedView, eventId: randomUUID(), token: 'invalid' },
+          event: { ...clickDelivery.event, pageViewId: rejectedView, eventId: randomUUID(), token: 'invalid' },
+        },
+      });
+      expect(rejected.status()).toBe(403);
+      expect(
+        (await data.db.query('SELECT kind FROM landing_events WHERE page_view_id=$1', [rejectedView])).rows,
+      ).toEqual([]);
+      await testInfo.attach(`pending-${phase}-db`, {
+        body: JSON.stringify({
+          phase,
+          before: before.rows,
+          after: duplicate.rows,
+          binding: binding.rows,
+          firstFailure: rejected.status(),
+        }),
+        contentType: 'application/json',
+      });
+      expect(binding.rows).toEqual([{ views: 1, sessions: 1, visitors: 1, sources: 1 }]);
+      await waitForCount(data, 'link_clicks', creator.shortLinkId, 1);
+      await testInfo.attach(`pending-${phase}-external-document`, {
+        body: await visitor.page.screenshot(),
+        contentType: 'image/png',
+      });
+    }
+  } finally {
+    const closed = once(destination, 'close');
+    destination.close();
+    await closed;
+  }
 });

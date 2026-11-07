@@ -59,3 +59,11 @@ PM은 pnpm verify·smoke·영향 E2E·docs/scope와 최종 원격 SHA required C
 - 2026-11-07 PM: 기존 PATCH partial update·user_id 조건·공개/미리보기 공통 Landing·ActionState 패턴 확인. API/Web 전문 worker는 착수 시 이 계약을 검토하고 충돌만 부모에게 보고한다.
 - 2026-11-07 API/Web 구현 인수: 공유 계약·migration0012와 기존 PATCH/공개/creator 직렬화를 연결했고 필드만 갱신/복구·동기 ref 잠금·list 전용 CSS를 적용했다. 실제 구현 원본은 packages/shared/src/crelink.ts, apps/api/migrations/0012_list_density.sql, apps/web/src/components/manage/LinkLayoutPicker.tsx·Landing.tsx·styles.css이다.
 - 2026-11-07 QA 인수: [실제3엔진 측정/캡처](../reviews/0204-list-density-qa.md)에서82/66/54px 카드·12/8/8px 간격·16px 제목 유지·contain·목록740px의8/10/12 완전행과 공개/미리보기 일치를 확인했다.34개 고유 통합시나리오와 보강 후 동일 layout9개 재실행이 통과했으며 실물/OAuth/live외부와 Linux baseline의 검증 한계를 분리했다.
+
+## 최종 CI에서 발견한 기존 클릭 회귀
+
+PR149 초회 실제 CI42347875468에서 persona SIM-01의 legacy link_clicks1과 analytics pageViews1/clicks0을 관찰했다. trace는 pageview POST 뒤 응답 전 클릭·외부 이동, click POST 부재를 보였다. 기존 클라이언트는 등록204 전 이벤트를 메모리 pending에 두고 응답 후 drain하지만 문서 종료 때 drain이 사라질 수 있다. API는 anchor 없는 비pageview를 거부하므로 두 beacon 병렬 전송만으로는 해결하지 않는다.
+
+[0205](../work/web/0205-pending-click-delivery.md)에서 기존 API 계약을 유지한 최소 Web/BFF 순차 전달을 검토한다. 사용자 이동지연·테스트 대기/재시도/필터·통계 대체·API/shared/DB 변경은 금지하며, 수정 전/후 지연등록+즉시 이동을 실제DB·3엔진에서 증명한다. 이 결함은 밀도 기능 확대가 아니라 기존 수용 회귀 통과의 선행이다. Web은 제품/E2E 단일 편집자와 슬롯2 runtime을 소유하고 API 검토는 읽기 전용이다.
+
+실제 수정은 기존 BFF의 `{pageView,event}` 좁은 묶음을 pageview204 뒤 click/engagement 순서로 중계한다. 개별 이벤트의 API 검증·rate·멱등은 그대로이며 묶음 전체16KiB·Origin·쿠키 미전달과 첫 실패 원오류 반환을 유지한다. 링크 이동은 취소/지연하지 않는다. 수정전 DB1/0, 수정후1/1·지연 upstream3엔진·중복/거절 검증은 [Web 근거](../../apps/web/docs/visitor-telemetry.md)에 연결한다. BFF 수신 후 요청 안의 순서 보장이지 오프라인·프로세스 강제종료·원자적 영속 전달 보장은 아니다.

@@ -2,7 +2,7 @@ import { COOKIE_NAMES } from '@crelink/shared';
 import type { NextRequest } from 'next/server';
 import { forwardToApi, proxyErrorResponse } from '../../../../lib/api/proxy';
 import { apiOrigin, apiRequestHeaders } from '../../../../lib/api/server';
-import { readVisitorEventBody } from '../../../../lib/api/visitor-event';
+import { forwardVisitorEvent, readVisitorEventBody } from '../../../../lib/api/visitor-event';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,9 +90,11 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
     if (rule.visitorEvent) {
       const eventBody = await readVisitorEventBody(request);
       if (eventBody instanceof Response) return eventBody;
-      body = eventBody;
       headers.set('Content-Type', 'application/json');
       headers.set('Origin', request.headers.get('origin')!);
+      return forwardVisitorEvent(eventBody, (event) =>
+        forwardToApi(target, { method: request.method, headers, body: event }, { setCookie: true }),
+      );
     } else if (rule.upload) {
       if (contentType) headers.set('Content-Type', contentType);
       body = await request.arrayBuffer();

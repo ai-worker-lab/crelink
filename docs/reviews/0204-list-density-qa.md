@@ -130,3 +130,7 @@ pnpm e2e --config tests/e2e/link-layout.config.ts
 - 실물 iPhone13Pro/Android·Instagram 인앱·실제 OS/브라우저 확대·live Google OAuth·live 외부Instabio/CDN 가용성은 **미검증**. CSS 글자200%·모바일 프리셋을 실물 증거로 설명하지 않는다.
 - API worker가 이미 확인한 invalid 입력 표·타인/운영자 권한·구버전 서버 migration 호환을 의미 없이 재실행하지 않았다. 이번 브라우저의 새 세션/실제401·DB/공개·기존 personas 권한 회귀로 연결을 확인했다. 상세 API 증거는0202 티켓이다.
 - PM은 티켓 상태·루트 변경 기록·review 색인 연결, 전체 verify/smoke, PR/CI를 처리한다. 새 config의 밀도 오류 suite도Instabio preload가 필요하므로 기존CI의 API 전용 preload를 유지한다. 자동 merge/deploy 대상이 아니다.
+
+## PM 후속 통합 경계
+
+위34개는0204 실행 당시의 고유 시나리오다. 이후 PR149 Linux CI에서 기존 SIM-01 빠른 이탈의 pageview 등록 대기 클릭 유실이 드러나 [0205](../work/web/0205-pending-click-delivery.md)로 제품 경합을 수정했다. 기존 SIM-01 assertion은 유지했고 SIM-05 실제 문서 이탈 회귀1개를 추가했으므로 현재 PR 선택 예상은 core9+personas5+analytics12+layout9=35개다. 최종 실제 개수·Linux baseline·원격 SHA/CI는 [0201](../work/crelink-pm/0201-list-density.md)과 PR149에서 확인한다. 과거34개 근거를35개가 실행됐다는 주장으로 바꾸지 않는다.

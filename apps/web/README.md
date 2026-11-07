@@ -48,6 +48,8 @@ SNS 채널 아이콘 자산의 출처·상표 사용 규칙은 [SNS 채널 아�
 
 유효한 단축 진입 표시를 API가 확인하고 `telemetryToken`을 준 공개 랜딩에만 `VisitorTracker`를 마운트합니다. 공개 열람·명시한 링크 클릭·화면에 보인 대상·보이는 동안의 체류와 최대 스크롤, 언어·시간대·화면 크기·화이트리스트 UTM을 수집합니다. 관리 미리보기·내부 공개 페이지 열기는 계측하지 않습니다. 저장소를 쓸 수 없으면 문서 메모리의 익명 세션을 사용하고, 전송 실패는 화면·탐색을 막지 않습니다. 구현 경계·이벤트 정의·시험은 [방문 계측 안내](docs/visitor-telemetry.md)에 있습니다. 기존 리디렉트 클릭 집계와 신규 행동 이벤트는 합산하지 않습니다.
 
+등록 응답 대기 중 외부 이동의 클릭·종료 이벤트는 원본 page_view와 한 요청으로 기존 BFF에 전달합니다(0205). BFF는 기존 API의 실제 등록204 뒤에만 후속 이벤트를 보내며 첫 실패는 원오류를 반환합니다. 사용자 이동을 지연하지 않으며 브라우저 큐 수락을 DB 저장으로 간주하지 않습니다. 묶음 전체16KiB·같은 출처·쿠키 미전달·API의 서명/권한/만료/rate 경계와 전달 한계는 [전송과 실패](docs/visitor-telemetry.md#전송과-실패)에 있습니다.
+
 ## AI 토큰 경로(`src/app/api/agent/[...path]/route.ts`)
 
 AI 운영자 실행 호스트가 `Authorization: Bearer <토큰>`으로 운영 API를 부르는 경로입니다(`AI_AGENT_PROXY_PATH`, 설계 `docs/specs/crelink-ai-operator.md` `웹 토큰 경로`). 판정은 `next`·`server-only`를 부르지 않는 `src/lib/api/agent-proxy.ts`이고 `agent-proxy.spec.ts`가 규칙마다 시험합니다.

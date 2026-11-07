@@ -25,6 +25,7 @@ type ViewState = {
   ready: boolean;
   failed: boolean;
   pending: LandingEventRequest[];
+  registration: LandingEventRequest | null;
   last: { activeMs: number; scrollPercent: number };
 };
 
@@ -88,6 +89,7 @@ export function VisitorTracker({
         ready: false,
         failed: false,
         pending: [],
+        registration: null,
         last: view.snapshot(performance.now(), depth()),
       };
     };
@@ -101,11 +103,12 @@ export function VisitorTracker({
     let state = current.current;
     state.view.setVisible(document.visibilityState === 'visible', performance.now());
 
-    async function post(payload: LandingEventRequest, beacon = false): Promise<number> {
-      const body = JSON.stringify(payload);
+    async function post(payload: LandingEventRequest, beacon = false, pageView?: LandingEventRequest): Promise<number> {
+      const body = JSON.stringify(pageView ? { pageView, event: payload } : payload);
       if (beacon) {
         try {
-          if (navigator.sendBeacon?.(endpoint, new Blob([body], { type: 'application/json' }))) return 204;
+          // 큐 수락은 DB 저장 응답이 아닙니다. 등록 판정에는 beacon을 사용하지 않습니다.
+          if (navigator.sendBeacon?.(endpoint, new Blob([body], { type: 'application/json' }))) return 0;
         } catch {
           // 큐에 넣지 못한 beacon만 keepalive로 다시 시도합니다.
         }
@@ -156,6 +159,7 @@ export function VisitorTracker({
         }),
         utm,
       });
+      registered.registration = event;
       void registerVisitorPageView(event, post).then((accepted) => {
         registered.ready = accepted;
         registered.failed = !accepted;
@@ -168,7 +172,10 @@ export function VisitorTracker({
       if (state.failed) return;
       const event = payload(type, extra);
       if (state.ready) void post(event, beacon);
-      else if (state.pending.length < 256) state.pending.push(event);
+      else if (beacon && state.registration && (type === 'click' || type === 'engagement')) {
+        // 문서가 사라져도 BFF가 원본 등록204 → 이 이벤트 순서를 끝낼 수 있게 한 요청으로 보냅니다.
+        void post(event, true, state.registration);
+      } else if (state.pending.length < 256) state.pending.push(event);
     }
 
     function flush(beacon = false) {

@@ -7,6 +7,7 @@
 ## 2026-11-07
 
 - 리스트 밀도8개형·10개형·12개형을 기존 외부 링크 설정의 즉시 저장·페이지별 API/DB·공개/미리보기 공통 렌더러에 연결했습니다. 기본8·카드2열·배너·가져오기 값 보존과 실패 시 선택만 복구/재시도를 유지합니다. 추가형 migration0012와 엄격 숫자 검증을 적용했고 실제 API/DB·3엔진34개 통합시나리오 및740px 목록의8/10/12 실측·캡처를 [QA 근거](docs/reviews/0204-list-density-qa.md)에 남겼습니다. 후속 PR의 실제 선행 base에서 같은 CI를 실행하도록 trigger에 `work/0200-release-qa`만 추가하며 기존 job·권한·Deploy는 유지합니다. 통합/최종CI와 사람 검토 인계는 [0201](docs/work/crelink-pm/0201-list-density.md), 계약은 [설계](docs/specs/list-density.md)에 기록합니다.
+- PR149 초회 CI가 드러낸 빠른 외부 이동의 pending 클릭 유실을 수정했습니다(0205). 원본 pageview와 미등록 이탈 이벤트를 기존 BFF 요청 하나에 담고 실제 등록204 뒤 후속 이벤트를 순차 전달합니다. API/shared/DB·기존 SIM-01·navigation은 유지했고 수정전/후 실제DB1/0→1/1·지연upstream3엔진·중복/거절 경계를 확인했습니다. [영역 근거](apps/web/docs/visitor-telemetry.md), [결함 티켓](docs/work/web/0205-pending-click-delivery.md). SIM-05를 추가한 현재 CI 예상은35개이며 최종 원격 결과는0201/PR149에 연결합니다.
 
 ## 2026-11-06
 
