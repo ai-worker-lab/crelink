@@ -6,6 +6,7 @@
 
 ## 2026-11-10
 
+- 방문자 지표 보강(0232): `packages/shared`에 봇 판별 `isBotUserAgent`와 계약 `sources`·`visitorRecency`·`botExclusions`를 추가했습니다. 새 수집·컬럼·migration은 없습니다. `tests/e2e/fixtures.ts` 세션의 크로미움 기본 UA를 사람 브라우저 값으로 고정했습니다. 세부는 [백엔드 로그](apps/api/CHANGELOGS.md)와 [웹 로그](apps/web/CHANGELOGS.md), 근거는 [0232](docs/work/orchestrator/0232-visitor-metrics.md)에 있습니다.
 - 앱 내 브라우저 가입 안내와 가입 경로 계측(0231): 공유 계약 `packages/shared/src/signup-funnel.ts`를 추가하고 `tests/e2e/ego/signup-funnel.mjs`를 `pnpm ci:local`의 ego 시험 모음에 넣었습니다. 세부는 [백엔드 로그](apps/api/CHANGELOGS.md)와 [웹 로그](apps/web/CHANGELOGS.md), 판단과 범위는 [0231](docs/work/orchestrator/0231-inapp-signup-funnel.md)에 있습니다.
 - `tests/smoke/smoke.spec.ts`와 `tests/e2e/visitor.spec.ts`를 ego-lite로 옮겼습니다(0230). `tests/e2e/ego/smoke.mjs`·`visitor.mjs`를 `pnpm ci:local`의 ego 시험 모음에 추가했습니다. 기존 Playwright spec·`ci.yml`은 바꾸지 않습니다. 옮기지 못한 검사와 `Fetch` 시험 결과는 [0230](docs/work/orchestrator/0230-ego-smoke-core.md)에 있습니다.
 - 로컬 CI 명령 추가(0210): `pnpm ci:local`이 `ci.yml`의 변경 판정과 job을 이 기기에서 재현하고, `--report`로 통과한 커밋에 commit status `CI 통과`를 기록합니다. 이미지 단계는 기기 고유 플랫폼으로 빌드하고 amd64 빌드는 Deploy에서 검증합니다. ADR 0016 결정 5의 1단계이며 `ci.yml`과 ruleset은 바꾸지 않습니다. 사용법은 [검증 루프](docs/development/verification.md#로컬-ci), 근거는 `docs/work/orchestrator/0210-local-ci.md`.

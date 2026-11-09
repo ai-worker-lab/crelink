@@ -1,6 +1,7 @@
 // E2E 공용 fixture. 구글 로그인 대신 개발 DB에 가입 결과 행과 세션 행을 직접 넣고, 브라우저 컨텍스트에 cl_session 쿠키를 심습니다.
 // 만든 사용자·차단 도메인은 테스트가 끝나면 지웁니다. 원리와 실행 방법: tests/e2e/README.md
 import {
+  devices,
   expect,
   test as base,
   type Browser,
@@ -274,7 +275,10 @@ export class E2EData {
    */
   async session(user?: SeededUser, options: BrowserContextOptions = {}): Promise<Session> {
     // 데스크톱 1280px 기본. 390px 확인은 expectMobileFits가 폭을 바꿔 다시 엽니다.
-    const context = await this.browser.newContext({ viewport: { width: 1280, height: 800 }, ...options });
+    // 크로미움 헤드리스 기본 User-Agent(HeadlessChrome)는 방문자 지표에서 자동화로 제외되므로(0232) 사람 브라우저 값을 씁니다.
+    const userAgent =
+      this.browser.browserType().name() === 'chromium' ? { userAgent: devices['Desktop Chrome'].userAgent } : {};
+    const context = await this.browser.newContext({ viewport: { width: 1280, height: 800 }, ...userAgent, ...options });
     this.contexts.push(context);
     await context.route(
       (url) => !isLocal(url.href),

@@ -8,6 +8,8 @@ import {
   analyticsFilters,
   analyticsHref,
   analyticsPercent,
+  analyticsRawCount,
+  analyticsRawPercent,
 } from './analytics.ts';
 
 describe('분석 화면 조회 범위', () => {
@@ -68,6 +70,15 @@ describe('분석 수치와 미수집 표기', () => {
     assert.equal(analyticsDuration(0), '0초');
     assert.equal(analyticsDuration(null), '계산 불가');
     assert.equal(analyticsDuration(125000), '2분 5초');
+  });
+
+  it('원본에서만 계산하는 값의 null은 집계 불가로, 0은 0으로 표시한다', () => {
+    assert.equal(analyticsRawCount(0), '0');
+    assert.equal(analyticsRawCount(1234), '1,234');
+    assert.equal(analyticsRawCount(null), '집계 불가');
+    assert.equal(analyticsRawPercent(0), '0%');
+    assert.equal(analyticsRawPercent(0.5), '50%');
+    assert.equal(analyticsRawPercent(null), '집계 불가');
   });
 
   it('미상과 상위 분포 밖 기타를 구분한다', () => {

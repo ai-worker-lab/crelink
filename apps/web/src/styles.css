@@ -3614,6 +3614,10 @@ body:has(.sheet[open]) {
 .analytics-distributions {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
 }
+.analytics-source-tables {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  margin-bottom: var(--ds-space-16);
+}
 .analytics-distributions h3 {
   margin: 0 0 var(--ds-space-8);
   font-size: var(--ds-font-size-15);

@@ -2,9 +2,11 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   ANALYTICS_LIMITS,
   CRELINK_LIMITS,
+  isBotUserAgent,
   type AnalyticsBreakdowns,
   type AnalyticsDaily,
   type AnalyticsReport,
+  type AnalyticsSourceRow,
   type AnalyticsTarget,
   type AnalyticsTotals,
   type CountByValue,
@@ -41,6 +43,7 @@ type TargetRow = {
   incomplete: boolean;
 };
 type DimensionRow = { dimension: string; value: string; count: string };
+type RawDimensionRow = DimensionRow & { clicked: string };
 
 const invalid = () => apiError(HttpStatus.BAD_REQUEST, 'validation_failed', '통계 조회 조건을 확인해 주세요.');
 const emptyTotals = (): AnalyticsTotals => ({
@@ -108,6 +111,20 @@ export class AnalyticsService {
         AND e.occurred_at >= ($3::date::timestamp AT TIME ZONE $5)
         AND e.occurred_at < (($4::date+1)::timestamp AT TIME ZONE $5)`;
       const rolledRange = `short_link_id IN (SELECT id FROM scope) AND day BETWEEN $3::date AND $4::date`;
+      // 합계에서 뺄 User-Agent를 판별 함수 하나로 고릅니다. SQL은 값 비교만 하고 원문은 응답에 넣지 않습니다.
+      const agents = await db.query<{ user_agent: string }>(
+        `${scope}
+          SELECT DISTINCT user_agent FROM (
+            SELECT e.user_agent FROM landing_events e WHERE e.short_link_id IN (SELECT id FROM scope)
+              AND e.occurred_at < (($4::date+1)::timestamp AT TIME ZONE $5)
+            UNION ALL SELECT e.user_agent FROM visits e WHERE ${rawRange}
+            UNION ALL SELECT e.user_agent FROM link_clicks e WHERE ${rawRange}
+            UNION ALL SELECT e.user_agent FROM creator_banner_clicks e WHERE ${rawRange}
+          ) stored WHERE user_agent IS NOT NULL`,
+        params,
+      );
+      const rawParams = [...params, agents.rows.map((row) => row.user_agent).filter((agent) => isBotUserAgent(agent))];
+      const isBot = `coalesce(e.user_agent = ANY($6::text[]),false)`;
       const rawDaily = await db.query<DailyRow>(
         `${scope}
           SELECT (e.occurred_at AT TIME ZONE $5)::date::text AS day,
@@ -126,8 +143,8 @@ export class AnalyticsService {
             count(*) FILTER(WHERE e.kind='page_view' AND e.scroll_percent>=75) AS scroll_75,
             count(*) FILTER(WHERE e.kind='page_view' AND e.scroll_percent>=100) AS scroll_100,
             false AS incomplete
-          FROM landing_events e WHERE ${rawRange} GROUP BY 1`,
-        params,
+          FROM landing_events e WHERE ${rawRange} AND NOT ${isBot} GROUP BY 1`,
+        rawParams,
       );
       const rolledDaily = await db.query<DailyRow>(
         `${scope}
@@ -155,18 +172,20 @@ export class AnalyticsService {
       }>(
         `${scope}, views AS (
           SELECT e.*,(e.occurred_at AT TIME ZONE $5)::date AS day FROM landing_events e
-          WHERE ${rawRange} AND e.kind='page_view'
+          WHERE ${rawRange} AND NOT ${isBot} AND e.kind='page_view'
         ) SELECT count(DISTINCT visitor_id) AS visitors,count(DISTINCT session_id) AS sessions,
           (SELECT coalesce(sum(n),0) FROM (SELECT count(DISTINCT visitor_id) n FROM views GROUP BY day,short_link_id) d) AS daily_visitors,
           (SELECT coalesce(sum(n),0) FROM (SELECT count(DISTINCT session_id) n FROM views GROUP BY day,short_link_id) d) AS daily_sessions FROM views`,
-        params,
+        rawParams,
       );
-      const rawDimensions = await db.query<DimensionRow>(
+      const rawDimensions = await db.query<RawDimensionRow>(
         `${scope}
-          SELECT d.dimension,coalesce(nullif(d.value,''),'unknown') AS value,count(*) AS count
+          SELECT d.dimension,coalesce(nullif(d.value,''),'unknown') AS value,count(*) AS count,
+            count(*) FILTER(WHERE d.dimension IN ('referrer_host','utm_source') AND EXISTS(SELECT 1 FROM landing_events c
+              WHERE c.page_view_id=e.page_view_id AND c.kind='click')) AS clicked
           FROM landing_events e,${ANALYTICS_DIMENSIONS_SQL}
-          WHERE ${rawRange} AND e.kind='page_view' GROUP BY 1,2`,
-        params,
+          WHERE ${rawRange} AND NOT ${isBot} AND e.kind='page_view' GROUP BY 1,2`,
+        rawParams,
       );
       const rolledDimensions = await db.query<DimensionRow>(
         `${scope} SELECT dimension,value,sum(page_views) AS count
@@ -180,7 +199,7 @@ export class AnalyticsService {
             count(*) FILTER(WHERE e.kind='impression' AND EXISTS(SELECT 1 FROM landing_events c
               WHERE c.page_view_id=e.page_view_id AND c.kind='click' AND c.target_kind=e.target_kind
                 AND c.target_id=e.target_id AND c.occurred_at>=e.occurred_at)) AS observed_clicks,false AS incomplete
-          FROM landing_events e WHERE ${rawRange} AND e.kind IN ('click','impression') GROUP BY 1,2
+          FROM landing_events e WHERE ${rawRange} AND NOT ${isBot} AND e.kind IN ('click','impression') GROUP BY 1,2
           UNION ALL
           SELECT target_kind,target_id,coalesce(sum(events) FILTER(WHERE kind='click'),0),
             coalesce(sum(events) FILTER(WHERE kind='impression'),0),
@@ -191,19 +210,47 @@ export class AnalyticsService {
             sum(observed_clicks) AS observed_clicks,bool_or(incomplete) AS incomplete
           FROM target_counts GROUP BY 1,2 ORDER BY sum(clicks) DESC,sum(impressions) DESC,target_kind,target_id
           LIMIT ${ANALYTICS_LIMITS.targets}`,
-        params,
+        rawParams,
       );
       const legacy = await db.query<{ day: string; kind: string; count: string }>(
         `${scope}, legacy AS (
           SELECT (e.occurred_at AT TIME ZONE $5)::date AS day,'visits' AS kind,count(*) AS count
-            FROM visits e WHERE ${rawRange} GROUP BY 1
-          UNION ALL SELECT (e.occurred_at AT TIME ZONE $5)::date,'linkClicks',count(*) FROM link_clicks e WHERE ${rawRange} GROUP BY 1
-          UNION ALL SELECT (e.occurred_at AT TIME ZONE $5)::date,'creatorBannerClicks',count(*) FROM creator_banner_clicks e WHERE ${rawRange} GROUP BY 1
+            FROM visits e WHERE ${rawRange} AND NOT ${isBot} GROUP BY 1
+          UNION ALL SELECT (e.occurred_at AT TIME ZONE $5)::date,'linkClicks',count(*) FROM link_clicks e WHERE ${rawRange} AND NOT ${isBot} GROUP BY 1
+          UNION ALL SELECT (e.occurred_at AT TIME ZONE $5)::date,'creatorBannerClicks',count(*) FROM creator_banner_clicks e WHERE ${rawRange} AND NOT ${isBot} GROUP BY 1
           UNION ALL SELECT day,'visits',visits FROM visit_daily_rollups WHERE ${rolledRange}
           UNION ALL SELECT day,'linkClicks',link_clicks FROM visit_daily_rollups WHERE ${rolledRange}
           UNION ALL SELECT day,'creatorBannerClicks',clicks FROM creator_banner_click_rollups WHERE ${rolledRange}
         ) SELECT day::text,kind,sum(count) AS count FROM legacy GROUP BY 1,2`,
-        params,
+        rawParams,
+      );
+      const excluded = await db.query<{
+        page_views: string;
+        visits: string;
+        redirect_clicks: string;
+        legacy_rollups: boolean;
+      }>(
+        `${scope} SELECT
+          (SELECT count(*) FROM landing_events e WHERE ${rawRange} AND ${isBot} AND e.kind='page_view') AS page_views,
+          (SELECT count(*) FROM visits e WHERE ${rawRange} AND ${isBot}) AS visits,
+          (SELECT count(*) FROM link_clicks e WHERE ${rawRange} AND ${isBot})
+            + (SELECT count(*) FROM creator_banner_clicks e WHERE ${rawRange} AND ${isBot}) AS redirect_clicks,
+          EXISTS(SELECT 1 FROM visit_daily_rollups WHERE ${rolledRange})
+            OR EXISTS(SELECT 1 FROM creator_banner_click_rollups WHERE ${rolledRange}) AS legacy_rollups`,
+        rawParams,
+      );
+      // 기간 안 방문자를 전에 본 적이 있는지로 나눕니다. 같은 소유 범위의 원본만 보므로 다른 크리에이터 방문은 재방문이 아닙니다.
+      const recency = await db.query<{ new_visitors: string; returning_visitors: string }>(
+        `${scope}, in_range AS (
+          SELECT DISTINCT e.visitor_id FROM landing_events e
+          WHERE ${rawRange} AND NOT ${isBot} AND e.kind='page_view'
+        ), earlier AS (
+          SELECT DISTINCT e.visitor_id FROM landing_events e
+          WHERE e.short_link_id IN (SELECT id FROM scope) AND NOT ${isBot} AND e.kind='page_view'
+            AND e.occurred_at < ($3::date::timestamp AT TIME ZONE $5)
+        ) SELECT count(*) FILTER(WHERE b.visitor_id IS NULL) AS new_visitors,count(b.visitor_id) AS returning_visitors
+          FROM in_range a LEFT JOIN earlier b USING (visitor_id)`,
+        rawParams,
       );
       const coverage = await db.query<{ generated_at: Date; raw_from: string; first_day: string | null }>(
         `${scope}
@@ -339,6 +386,21 @@ export class AnalyticsService {
           id: values('utm_id'),
         },
       };
+      const clickedSources = new Map<string, Map<string, number>>([
+        ['referrer_host', new Map()],
+        ['utm_source', new Map()],
+      ]);
+      for (const row of rawDimensions.rows) clickedSources.get(row.dimension)?.set(row.value, Number(row.clicked));
+      const sourceRows = (dimension: 'referrer_host' | 'utm_source'): AnalyticsSourceRow[] => {
+        const clicked = clickedSources.get(dimension)!;
+        const rows = values(dimension);
+        const named = rows.reduce((sum, row) => sum + (row.value === 'other' ? 0 : (clicked.get(row.value) ?? 0)), 0);
+        const total = [...clicked.values()].reduce((sum, count) => sum + count, 0);
+        return rows.map(({ value, count }) => {
+          const clickedPageViews = archived ? null : value === 'other' ? total - named : (clicked.get(value) ?? 0);
+          return { value, pageViews: count, clickedPageViews, clickThroughRate: ratio(clickedPageViews, count) };
+        });
+      };
       const ids = targets.rows.map((row) => row.target_id);
       const labels = ids.length
         ? await db.query<{ kind: string; id: string; label: string; owner: string | null }>(
@@ -380,6 +442,16 @@ export class AnalyticsService {
         daily: [...daily.values()],
         legacy: legacyTotals,
         breakdowns,
+        sources: { referrers: sourceRows('referrer_host'), utmSources: sourceRows('utm_source') },
+        visitorRecency: {
+          newVisitors: archived ? null : Number(recency.rows[0].new_visitors),
+          returningVisitors: archived ? null : Number(recency.rows[0].returning_visitors),
+        },
+        botExclusions: {
+          pageViews: archived ? null : Number(excluded.rows[0].page_views),
+          visits: excluded.rows[0].legacy_rollups ? null : Number(excluded.rows[0].visits),
+          redirectClicks: excluded.rows[0].legacy_rollups ? null : Number(excluded.rows[0].redirect_clicks),
+        },
         targets: targets.rows.map((row) => ({
           targetKind: row.target_kind,
           targetId: row.target_id,
