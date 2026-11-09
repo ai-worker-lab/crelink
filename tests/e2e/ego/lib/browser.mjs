@@ -1,15 +1,15 @@
 // ego-browser 런타임 안에서 쓰는 보조 함수. 이 파일은 Playwright를 쓰지 않으며 ego의 Page API와 page.cdp만 씁니다.
-// 쿠키는 프로필 전체가 아니라 대상 URL 범위로만 읽고 지웁니다(Network.clearBrowserCookies 금지).
+// 지우는 쿠키는 이 시험이 심는 cl_session 하나뿐입니다. 같은 프로필의 다른 쿠키·저장소는 어떤 경우에도 지우지 않습니다.
 /* global console, document, navigator, performance, requestAnimationFrame, setTimeout, CSSStyleSheet, URL */
 export const EXPECT_TIMEOUT = 15_000;
 export const NAVIGATION_TIMEOUT = 90_000;
 export const NETWORK_IDLE = { timeout: 30_000, idleMs: 500 };
-const SESSION_COOKIE = 'cl_session';
+export const SESSION_COOKIE = 'cl_session';
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
-/** 시나리오를 멈춰야 하는 실패. 뷰포트별 측정처럼 계속 볼 수 있는 실패는 Report.record로 남깁니다. */
-export class CheckFailure extends Error {}
+/** Report.must만 던지는, 이미 Report에 기록된 실패. 다른 예외는 시나리오 catch가 실패로 기록합니다. */
+export class RecordedFailure extends Error {}
 
 export class Report {
   passed = 0;
@@ -28,7 +28,7 @@ export class Report {
 
   /** 앞 단계가 성립해야 뒤 단계가 의미 있는 검사입니다. 실패하면 이 시나리오를 멈춥니다. */
   must(scope, ok, detail) {
-    if (!this.record(scope, ok, detail)) throw new CheckFailure(`${scope} ${detail}`);
+    if (!this.record(scope, ok, detail)) throw new RecordedFailure(`${scope} ${detail}`);
   }
 }
 
@@ -80,24 +80,18 @@ export async function applyDevice(page, emulation, width, height) {
 
 export const browserUserAgent = (page) => page.evaluate(() => navigator.userAgent);
 
-const cookieUrls = (config) => [config.webUrl, config.apiUrl];
-
-export async function listLocalCookies(page, config) {
-  const { cookies } = await page.cdp('Network.getCookies', { urls: cookieUrls(config) });
-  return cookies;
+/** 대상 주소에 남은 cl_session. 다른 이름의 쿠키는 결과에서 바로 버립니다. */
+export async function sessionCookies(page, config) {
+  const { cookies } = await page.cdp('Network.getCookies', { urls: [config.webUrl, config.apiUrl] });
+  return cookies.filter((cookie) => cookie.name === SESSION_COOKIE);
 }
 
-/** 대상 주소의 쿠키만 지웁니다. 같은 프로필의 다른 사이트 세션은 건드리지 않습니다. */
-export async function clearLocalCookies(page, config) {
-  for (const cookie of await listLocalCookies(page, config)) {
-    await page.cdp('Network.deleteCookies', { name: cookie.name, domain: cookie.domain, path: cookie.path });
-  }
-}
-
-export async function clearOriginStorage(page, config) {
-  await page.cdp('Storage.clearDataForOrigin', {
-    origin: new URL(config.webUrl).origin,
-    storageTypes: 'local_storage,indexeddb,cache_storage,service_workers',
+/** 이 시험이 심는 쿠키(이름·호스트·경로가 모두 같은 것)만 지웁니다. */
+export async function clearSessionCookie(page, config) {
+  await page.cdp('Network.deleteCookies', {
+    name: SESSION_COOKIE,
+    domain: new URL(config.webUrl).hostname,
+    path: '/',
   });
 }
 
@@ -123,7 +117,7 @@ export async function tap(page, target) {
     const rect = matches[0].getBoundingClientRect();
     return { count: 1, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
   }, target);
-  if (point.count !== 1) throw new CheckFailure(`탭 대상 ${JSON.stringify(target)}: ${point.count}개 일치`);
+  if (point.count !== 1) throw new Error(`탭 대상 ${JSON.stringify(target)}: ${point.count}개 일치`);
   await page.cdp('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: point.x, y: point.y }] });
   await page.cdp('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }

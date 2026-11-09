@@ -7,6 +7,7 @@
 ## 2026-11-09
 
 - 분석 반응형 검사의 ego-lite 시범 전환(0206): `tests/e2e/analytics-responsive.spec.ts`의 chromium 검사 4개를 `ego-browser`로 실행하는 `tests/e2e/ego/`를 추가하고, 날짜 입력 경계 검사를 좌우 네 변 비교로 고쳤습니다. 기존 Playwright spec·config·CI·`apps/web`은 바꾸지 않습니다. 옮기지 못한 검사와 근거: `docs/work/crelink-qa/0206-ego-analytics-responsive.md`.
+- 0206 ego-lite 시험 수정: QA가 찾은 예외 미기록(요소 없음이 종료 코드 0), 잘못된 시나리오 필터 통과, 호스트 단위 쿠키 삭제, 신호 시 정리 누락을 고쳤습니다. 지우는 쿠키는 시험이 심은 `cl_session` 하나로 좁혔습니다. 근거는 같은 work item입니다.
 
 ## 2026-11-07
 

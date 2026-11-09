@@ -29,16 +29,18 @@
 | 대상 | 이유 |
 | --- | --- |
 | `webkit`·`firefox` 프로젝트(원본 12개 테스트 중 8개) | ego-lite는 Chromium이다. iOS 조건 WebKit의 스크롤 분기(원본 90행)와 `Desktop Firefox` 터치 조합은 검증하지 못한다. |
-| 사용자별 독립 브라우저 컨텍스트 | TaskSpace는 프로필 쿠키 저장소를 공유한다. 익명 방문 → 세션 쿠키 설정 → 데스크톱 전환을 한 탭에서 순서대로 수행해 대체했다. 동시에 여러 세션을 띄우는 검사는 아니므로 이 spec의 결과는 유지되지만 병렬 실행은 할 수 없다. |
+| 사용자별 독립 브라우저 컨텍스트 | TaskSpace는 프로필 쿠키 저장소를 공유한다. 익명 방문 → 세션 쿠키 설정 → 데스크톱 전환을 한 탭에서 순서대로 수행해 대체했다. 동시에 여러 세션을 띄우는 검사는 아니므로 이 spec의 결과는 유지되지만 병렬 실행은 할 수 없다. 시나리오 사이에 지우는 쿠키는 `cl_session`뿐이라 앱이 익명 방문에서 심는 `cl_vid`는 유지되고, 원본의 새 컨텍스트처럼 첫 방문자 상태가 되지는 않는다. |
 | `context.route` 외부 요청 가짜 응답 | ego Page API에 route가 없다. 이 spec에는 외부 요청이 없어 대신 `Network.requestWillBeSent`로 로컬 밖 요청이 0건인지 검사한다. |
 | `trace`·HTML report·`testInfo.attach('environment')` | Playwright 러너 기능이다. 실패 시 캡처와 `.local/e2e/ego/analytics-responsive/result.json`만 남기며, 브라우저 버전·기기 정보 첨부는 없다. |
 | `caret: 'initial'` 캡처 옵션 | ego `screenshot`에 없는 옵션이다. 검사 조건이 아니라 캡처 안정화 옵션이다. |
 
 `page.request`는 Node `fetch`에 세션 쿠키를 넣어, `tap()`은 `Input.dispatchTouchEvent`로, 뷰포트·터치는 CDP `Emulation`으로 옮겼으며 이는 이식 완료다.
 
+`getByRole('status')`는 숨겨지지 않은 `[role="status"]`·`output`이 정확히 1개인지로, `getByText(..., { exact: true })`는 요소 전체 글자를 비교하는 `summary:text-is`로 옮겼다. 열린 shadow DOM 안의 status를 찾지 않는 점만 원본과 다르다.
+
 ## 위험·복구
 
-합성 사용자는 fixture와 같은 `@e2e.crelink.test` 지표 제외 계정이며 실행 끝에 지운다. 대상은 `scripts/lib/e2e-local.mjs`로 루프백만 허용한다. 쿠키는 `Network.getCookies`의 대상 URL 범위로만 지우며 프로필 전체를 지우는 CDP는 쓰지 않는다. `lib/data.mjs`는 `fixtures.ts`의 SQL을 옮긴 사본이라 가입 행 구조가 바뀌면 함께 고쳐야 한다.
+합성 사용자는 fixture와 같은 `@e2e.crelink.test` 지표 제외 계정이며 실행 끝에 지운다. 대상은 `scripts/lib/e2e-local.mjs`로 루프백만 허용한다. 지우는 쿠키는 이 시험이 심은 `cl_session`(이름·호스트·경로가 모두 일치하는 것)뿐이다. 다른 쿠키와 origin 저장소는 지우지 않으므로 앱이 심은 `cl_vid`는 실행 뒤 ego-lite 프로필에 남는다. 실행 중 `SIGINT`·`SIGTERM`을 받으면 종료 코드 130·143으로 끝나며 합성 데이터, ego 프로세스 그룹, `cl_session`, TaskSpace를 정리한다. `lib/data.mjs`는 `fixtures.ts`의 SQL을 옮긴 사본이라 가입 행 구조가 바뀌면 함께 고쳐야 한다.
 
 ## 연결
 
@@ -56,3 +58,7 @@
 - 2026-11-09: 변이 A(`from` 폭 +25px, 700px 이하)는 16개 뷰포트 결과 전부 `overflow=0 fits=false legacyFits=true`로 실패하고 종료 코드 1, 701px 이상은 통과. 변이 B(`to` 왼쪽 -25px, creator/metrics)도 4개 뷰포트 실패·종료 코드 1. `legacyFits=true`로 원본 조건이 두 변이를 놓치는 것을 확인했다.
 - 2026-11-09: Playwright 기준 시간은 측정하지 못했다. `pnpm e2e -c tests/e2e/analytics-responsive.config.ts --project chromium`이 브라우저 미설치(`chromium_headless_shell-1248` 없음)로 실행 전에 종료했고 `playwright install`은 이번 작업에서 금지다.
 - 2026-11-09: 최종 코드 기준 `node tests/e2e/ego/analytics-responsive.mjs` 종료 코드 0(통과 139, 실패 0, 약 19초, 뷰포트 결과 36줄)과 변이 A 종료 코드 1(`fits=false legacyFits=true overflow=0` 16건, 다른 실패 0)을 재확인했다. `pnpm verify` 통과(8단계, 34.3초).
+- 2026-11-09: QA 불합격으로 수정 착수. `e8e50ff`의 러너는 `127.0.0.1` 호스트의 쿠키를 이름과 관계없이 지웠고 `Storage.clearDataForOrigin`으로 `http://127.0.0.1:5193`의 local_storage·indexeddb·cache_storage·service_workers도 지웠다. 첫 탐색(실행 전)의 같은 쿠키 조회는 0개였지만, 이후 실행 사이에 지운 쿠키의 이름과 수는 남기지 않아 복구하거나 확인할 수 없다. 이제 `cl_session`만 지우고 origin 저장소 삭제는 분석 경로에 필요 없어 제거했다.
+- 2026-11-09: `tap()`의 예외가 기록되지 않던 결함을 고쳤다. `Report.must`만 `RecordedFailure`를 던지고 그 밖의 예외는 시나리오 실패로 기록하며, 시나리오별 최소 검사 수(34·33·36·35)를 단언한다. `EGO_TEST_FAULT=missing-tap-target`은 종료 코드 1(`탭 대상 …: 0개 일치`, `검사 24개 >= 최소 34개` 실패), `EGO_TEST_ONLY=nope`·`creator/metrics,nope`·빈 값은 ego 실행 전 종료 코드 1이다.
+- 2026-11-09: `task.finish`와 세션 쿠키 정리를 `finally`로 옮겼다. `EGO_TEST_FAULT=outside-scenario`는 종료 코드 1, `cl_session` 0개, TaskSpace 없음으로 끝났다. 실행 중 `SIGTERM`·`SIGINT`는 종료 코드 143·130, ego 프로세스 그룹 없음, 합성 사용자 0건, `cl_session` 0개, TaskSpace 없음을 확인했다. ego CLI의 출력은 파이프에서 끝날 때 한 번에 나와 중단하면 진행 로그가 남지 않는다.
+- 2026-11-09: `tests/e2e/ego` 최종 코드 기준 정상 실행 3회 종료 코드 0(통과 143, 실패 0, 뷰포트 결과 36줄, 약 20초), 변이 `from` 오른쪽·`to` 왼쪽 각 종료 코드 1(`overflow=0 fits=false legacyFits=true` 16건씩, 다른 실패 0).

@@ -6,18 +6,18 @@ import { dirname, join } from 'node:path';
 import {
   applyDevice,
   browserUserAgent,
-  CheckFailure,
-  clearLocalCookies,
-  clearOriginStorage,
+  clearSessionCookie,
   ConsoleWatch,
   framesPerHalfSecond,
   injectCss,
   injectedSheetCount,
-  listLocalCookies,
   NAVIGATION_TIMEOUT,
   NETWORK_IDLE,
   poll,
+  RecordedFailure,
   Report,
+  SESSION_COOKIE,
+  sessionCookies,
   setSessionCookie,
   setViewport,
   startFramePump,
@@ -31,8 +31,8 @@ const OLDER = '[role="region"][aria-label="이전 일별 데이터 가로 스크
 const PIXEL_7_USER_AGENT =
   'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Mobile Safari/537.36';
 const MOBILE = { mobile: true, hasTouch: true, deviceScaleFactor: 2.625, userAgent: PIXEL_7_USER_AGENT };
-// React가 '이전 ', 23, '일 데이터 보기'를 별도 텍스트 노드로 렌더링해 ego의 quoted text= 는 일치하지 않습니다.
-const OLDER_TOGGLE = 'summary:has-text("이전 23일 데이터 보기")';
+// React가 '이전 ', 23, '일 데이터 보기'를 별도 텍스트 노드로 렌더링해 ego의 quoted text= 는 일치하지 않습니다. :text-is는 요소 전체 글자를 정확히 비교합니다.
+const OLDER_TOGGLE = 'summary:text-is("이전 23일 데이터 보기")';
 const MOBILE_SIZES = [
   [320, 740],
   [360, 800],
@@ -42,6 +42,8 @@ const MOBILE_SIZES = [
   [768, 1024],
   [844, 390],
 ];
+// 시나리오가 끝까지 돌았을 때의 검사 수. 예외가 기록되지 않거나 단계가 조용히 건너뛰어지면 이 수를 밑돕니다.
+const MIN_CHECKS = { 'creator/metrics': 34, 'creator/stats': 33, 'operator/metrics': 36, 'operator/stats': 35 };
 
 const stamp = (from, to) => `from=${from}&to=${to}`;
 
@@ -64,8 +66,18 @@ const measureBounds = (page) =>
     };
   }, FILTERS);
 
-const textOf = (page, selector) =>
-  page.evaluate((target) => document.querySelector(target)?.textContent?.trim() ?? null, selector);
+/** getByRole('status')처럼 숨겨지지 않은 status 요소를 전부 읽습니다. 원본의 strict 동작에 맞춰 호출자가 1개인지 확인합니다. */
+const statusTexts = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('[role="status"], output')]
+      .filter(
+        (node) =>
+          node.getClientRects().length > 0 &&
+          getComputedStyle(node).visibility !== 'hidden' &&
+          !node.closest('[aria-hidden="true"]'),
+      )
+      .map((node) => node.textContent.trim()),
+  );
 const countOf = (page, selector) => page.evaluate((target) => document.querySelectorAll(target).length, selector);
 const filterLinkCurrent = (page, name) =>
   page.evaluate(
@@ -97,9 +109,8 @@ async function runScenario({ page, config, report, watch, desktop }, scenario) {
   const shot = (file) => join(config.outputDir, `${role}-${mode}-${file}.png`);
   const must = (ok, detail) => report.must(scope, ok, detail);
 
-  // Playwright의 독립 context 대신 같은 프로필에서 순서대로 익명 방문 → 사용자 세션으로 전환합니다.
-  await clearLocalCookies(page, config);
-  await clearOriginStorage(page, config);
+  // Playwright의 독립 context 대신 같은 프로필에서 순서대로 익명 방문 → 사용자 세션으로 전환합니다. 앱이 심은 다른 쿠키는 지우지 않습니다.
+  await clearSessionCookie(page, config);
   await applyDevice(page, desktop, 1280, 800);
   await page.goto(creator.landingUrl, { timeout: NAVIGATION_TIMEOUT });
   const views = await poll(
@@ -212,7 +223,8 @@ async function runScenario({ page, config, report, watch, desktop }, scenario) {
   const widthAfterShot = await page.evaluate(() => document.documentElement.clientWidth);
   must(widthAfterShot === 390, `전체 화면 캡처 뒤 폭 유지 ${widthAfterShot}`);
 
-  await tap(page, { selector: `${FILTERS} a`, text: '최근 7일' });
+  const presetSelector = config.fault === 'missing-tap-target' ? `${FILTERS} a.ego-no-such-target` : `${FILTERS} a`;
+  await tap(page, { selector: presetSelector, text: '최근 7일' });
   const preset = await poll(
     () => filterLinkCurrent(page, '최근 7일'),
     (value) => value === 'date',
@@ -233,10 +245,10 @@ async function runScenario({ page, config, report, watch, desktop }, scenario) {
   await page.fill('#analytics-to', '2020-01-02');
   await tap(page, { selector: `${FILTERS} .period-form button[type="submit"]`, text: '조회' });
   const empty = await poll(
-    () => textOf(page, '[role="status"]'),
-    (value) => typeof value === 'string' && value.includes('수집된 페이지 표시가 없어요'),
+    () => statusTexts(page),
+    (value) => value.length === 1 && value[0].includes('수집된 페이지 표시가 없어요'),
   );
-  must(empty.ok, `빈 기간 안내 ${JSON.stringify(empty.value)}`);
+  must(empty.ok, `빈 기간 안내(status 1개) ${JSON.stringify(empty.value)}`);
   must((await countOf(page, '.analytics-trend')) === 0, '빈 기간 차트 없음');
   must((await countOf(page, `${FILTERS} [aria-current="date"]`)) === 0, '빈 기간 빠른 선택 해제');
   await page.waitForLoadState('networkidle', NETWORK_IDLE);
@@ -301,40 +313,47 @@ export async function run({ taskSpace, config }) {
   const report = new Report();
   await mkdir(config.outputDir, { recursive: true });
   const task = await taskSpace(config.taskSpaceName);
-  // 새 TaskSpace의 p1은 chrome://newtab에서 시작합니다. 그 문서의 끝나지 않은 요청이 ego의 networkidle 추적에 남아 실행 내내 대기가 실패하므로
-  // (0206 반복 실행에서 8회 중 3회 재현) 요청 이력이 없는 빈 탭에서 시작합니다. p1은 finish가 닫습니다.
-  const page = await task.newPage();
-  console.log(`[ego] TaskSpace ${task.spaceId} (${config.scenarios.length}개 시나리오)`);
-  await page.goto(config.webUrl, { timeout: NAVIGATION_TIMEOUT });
-  const desktop = { mobile: false, hasTouch: false, deviceScaleFactor: 1, userAgent: await browserUserAgent(page) };
-  const watch = new ConsoleWatch(page, config);
-  await watch.start();
-  await startFramePump(page);
-  if (config.injectCss) {
-    await injectCss(page, config.injectCss);
-    console.log(`[ego] CSS 주입 ${await injectedSheetCount(page)}개 적용`);
-  }
-
-  for (const scenario of config.scenarios) {
-    const name = `${scenario.role}/${scenario.mode}`;
-    const scenarioStarted = Date.now();
-    try {
-      await runScenario({ page, config, report, watch, desktop }, scenario);
-    } catch (error) {
-      if (!(error instanceof CheckFailure)) report.record(`${name}/chromium`, false, `시나리오 오류: ${error.message}`);
-      await page
-        .screenshot({ path: join(config.outputDir, `${scenario.role}-${scenario.mode}-failure.png`) })
-        .catch(() => {});
-      await watch.drain().catch(() => {});
+  let page;
+  try {
+    // 새 TaskSpace의 p1은 chrome://newtab에서 시작합니다. 그 문서의 끝나지 않은 요청이 ego의 networkidle 추적에 남아 실행 내내 대기가 실패하므로
+    // (0206 반복 실행에서 8회 중 3회 재현) 요청 이력이 없는 빈 탭에서 시작합니다. p1은 finish가 닫습니다.
+    page = await task.newPage();
+    console.log(`[ego] TaskSpace ${task.spaceId} (${config.scenarios.length}개 시나리오)`);
+    if (config.fault === 'outside-scenario') throw new Error('EGO_TEST_FAULT로 일으킨 시나리오 밖 예외');
+    await page.goto(config.webUrl, { timeout: NAVIGATION_TIMEOUT });
+    const desktop = { mobile: false, hasTouch: false, deviceScaleFactor: 1, userAgent: await browserUserAgent(page) };
+    const watch = new ConsoleWatch(page, config);
+    await watch.start();
+    await startFramePump(page);
+    if (config.injectCss) {
+      await injectCss(page, config.injectCss);
+      console.log(`[ego] CSS 주입 ${await injectedSheetCount(page)}개 적용`);
     }
-    console.log(`[ego] ${name} ${((Date.now() - scenarioStarted) / 1000).toFixed(1)}s`);
-  }
 
-  await stopFramePump(page);
-  await clearLocalCookies(page, config);
-  await clearOriginStorage(page, config);
-  const remaining = await listLocalCookies(page, config);
-  report.record('cleanup', remaining.length === 0, `남은 로컬 쿠키 ${remaining.length}개`);
+    for (const scenario of config.scenarios) {
+      const name = `${scenario.role}/${scenario.mode}`;
+      const scenarioStarted = Date.now();
+      const checksBefore = report.passed + report.failed;
+      try {
+        await runScenario({ page, config, report, watch, desktop }, scenario);
+      } catch (error) {
+        if (!(error instanceof RecordedFailure)) {
+          report.record(`${name}/chromium`, false, `시나리오 오류: ${error.message}`);
+        }
+        await page
+          .screenshot({ path: join(config.outputDir, `${scenario.role}-${scenario.mode}-failure.png`) })
+          .catch(() => {});
+        await watch.drain().catch(() => {});
+      }
+      const checks = report.passed + report.failed - checksBefore;
+      report.record(`${name}/chromium`, checks >= MIN_CHECKS[name], `검사 ${checks}개 >= 최소 ${MIN_CHECKS[name]}개`);
+      console.log(`[ego] ${name} ${((Date.now() - scenarioStarted) / 1000).toFixed(1)}s`);
+    }
+  } catch (error) {
+    report.record('run', false, `실행 오류: ${error.message}`);
+  } finally {
+    await releaseBrowser({ task, page, config, report });
+  }
 
   const seconds = (Date.now() - started) / 1000;
   console.log(`[ego] 결과: 통과 ${report.passed}, 실패 ${report.failed}, ${seconds.toFixed(1)}s`);
@@ -344,6 +363,24 @@ export async function run({ taskSpace, config }) {
     config.resultPath,
     JSON.stringify({ passed: report.passed, failed: report.failed, failures: report.failures, seconds }, null, 2),
   );
-  await task.finish({ keep: [] });
   return report.failed === 0 ? 0 : 1;
+}
+
+/** 어떤 경로로 끝나든 세션 쿠키와 TaskSpace를 정리합니다. 정리 실패는 실패로 보고하되 나머지 정리를 막지 않습니다. */
+async function releaseBrowser({ task, page, config, report }) {
+  if (page) {
+    await stopFramePump(page).catch(() => {});
+    try {
+      await clearSessionCookie(page, config);
+      const remaining = await sessionCookies(page, config);
+      report.record('cleanup', remaining.length === 0, `남은 ${SESSION_COOKIE} ${remaining.length}개`);
+    } catch (error) {
+      report.record('cleanup', false, `세션 쿠키 정리 실패: ${error.message}`);
+    }
+  }
+  try {
+    await task.finish({ keep: [] });
+  } catch (error) {
+    report.record('cleanup', false, `TaskSpace 정리 실패: ${error.message}`);
+  }
 }
