@@ -1,7 +1,9 @@
 import {
   ANALYTICS_LIMITS,
+  CRELINK_LIMITS,
   type AnalyticsDaily,
   type AnalyticsReport,
+  type AnalyticsSourceRow,
   type AnalyticsTarget,
   type CountByValue,
 } from '@crelink/shared';
@@ -13,6 +15,8 @@ import {
   analyticsDuration,
   analyticsHref,
   analyticsPercent,
+  analyticsRawCount,
+  analyticsRawPercent,
   type AnalyticsFilters,
 } from '../../lib/analytics';
 import { formatDateTime, formatNumber, recentRange } from '../../lib/format';
@@ -148,6 +152,8 @@ export function AnalyticsDashboard({ report, mode }: { report: AnalyticsReport; 
           <dl className="stat-tiles analytics-tiles">
             <Tile title="수집된 페이지뷰" value={analyticsCount(summary.pageViews)} />
             <Tile title="익명 순 방문자" value={analyticsCount(summary.uniqueVisitors)} />
+            <Tile title="처음 본 방문자" value={analyticsRawCount(report.visitorRecency.newVisitors)} />
+            <Tile title="다시 온 방문자" value={analyticsRawCount(report.visitorRecency.returningVisitors)} />
             <Tile title="세션" value={analyticsCount(summary.sessions)} />
             <Tile title="클릭" value={analyticsCount(summary.clicks)} />
             <Tile title="가시 노출" value={analyticsCount(summary.impressions)} />
@@ -158,6 +164,10 @@ export function AnalyticsDashboard({ report, mode }: { report: AnalyticsReport; 
           <p className="field-help">
             클릭한 페이지뷰 비율은 한 번 이상 클릭한 페이지뷰 ÷ 페이지뷰예요. 클릭 횟수 ÷ 페이지뷰와 달라요. 체류·비율은
             페이지뷰 시작일 기준이에요.
+          </p>
+          <p className="field-help">
+            다시 온 방문자는 같은 조회 범위에서 기간 시작일 전에 본 적이 있는 익명 방문자예요. 원본이 남아 있는 최근{' '}
+            {CRELINK_LIMITS.rawLogRetentionDays}일 안에서만 비교해요.
           </p>
           {summary.uniqueVisitors === null || summary.sessions === null ? (
             <p className="section-help">
@@ -188,6 +198,12 @@ export function AnalyticsDashboard({ report, mode }: { report: AnalyticsReport; 
           보존 기준일 {report.coverage.rawFrom}. 분포는 남아 있는 원본과 보존 집계 기준이에요.
         </p>
       </details>
+      <p className="field-help">
+        봇·자동화 요청 제외: 페이지뷰 {analyticsRawCount(report.botExclusions.pageViews)} · 단축 주소 방문{' '}
+        {analyticsRawCount(report.botExclusions.visits)} · 리디렉트 클릭{' '}
+        {analyticsRawCount(report.botExclusions.redirectClicks)}. 알려진 크롤러·자동화 도구만 뺀 수이고, 보존 집계
+        구간은 구분할 수 없어 합계에 남아 있어요.
+      </p>
       {report.coverage.includesRollups ||
       (report.coverage.firstRecordedDay && report.from < report.coverage.firstRecordedDay) ? (
         <p className="field-help">
@@ -246,11 +262,14 @@ export function AnalyticsDashboard({ report, mode }: { report: AnalyticsReport; 
             <h2 id="analytics-sources-title">유입·캠페인</h2>
             <p className="field-help">
               분포는 페이지뷰 기준이며 상위 {ANALYTICS_LIMITS.breakdownValues}개 뒤 나머지는 기타로 묶어요. 값이
-              전달되지 않았거나 복원할 수 없으면 알 수 없음이에요.
+              전달되지 않았거나 복원할 수 없으면 알 수 없음이에요. 클릭률은 그 유입의 페이지뷰 중 한 번 이상 클릭한
+              페이지뷰의 비율이에요.
             </p>
+            <div className="distribution-grid analytics-distributions analytics-source-tables">
+              <SourceTable title="유입 사이트" rows={report.sources.referrers} />
+              <SourceTable title="UTM 소스" rows={report.sources.utmSources} />
+            </div>
             <div className="distribution-grid analytics-distributions">
-              <Distribution title="유입 사이트" rows={report.breakdowns.referrers} />
-              <Distribution title="UTM 소스" rows={report.breakdowns.utm.source} />
               <Distribution title="UTM 매체" rows={report.breakdowns.utm.medium} />
               <Distribution title="UTM 캠페인" rows={report.breakdowns.utm.campaign} />
             </div>
@@ -459,6 +478,47 @@ function TargetTable({ rows }: { rows: AnalyticsTarget[] }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+function SourceTable({ title, rows }: { title: string; rows: AnalyticsSourceRow[] }) {
+  return (
+    <section className="distribution">
+      <h3>{title}</h3>
+      {rows.length === 0 ? (
+        <p className="empty-text">분포 자료가 없어요.</p>
+      ) : (
+        <div className="table-scroll" tabIndex={0} role="region" aria-label={`${title}별 클릭률 가로 스크롤`}>
+          <table className="data-table compact">
+            <caption className="visually-hidden">{title}별 페이지뷰·클릭한 페이지뷰·클릭률</caption>
+            <thead>
+              <tr>
+                <th scope="col">분류</th>
+                <th scope="col" className="num">
+                  페이지뷰
+                </th>
+                <th scope="col" className="num">
+                  클릭한 페이지뷰
+                </th>
+                <th scope="col" className="num">
+                  클릭률
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.value}>
+                  <th scope="row">{analyticsDimension(row.value)}</th>
+                  <td className="num">{formatNumber(row.pageViews)}</td>
+                  <td className="num">{analyticsRawCount(row.clickedPageViews)}</td>
+                  <td className="num">{analyticsRawPercent(row.clickThroughRate)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 

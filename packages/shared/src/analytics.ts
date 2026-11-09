@@ -72,6 +72,15 @@ export interface AnalyticsBreakdowns {
   utm: Record<'source' | 'medium' | 'campaign' | 'term' | 'content' | 'id', CountByValue[]>;
 }
 
+/** 유입 값별 클릭 성과. 페이지뷰는 분포와 같은 합계이고 클릭 값은 원본에서만 계산합니다. */
+export interface AnalyticsSourceRow {
+  value: string;
+  pageViews: number;
+  /** 한 번 이상 클릭한 페이지뷰. 선택 기간에 보존 집계가 섞이면 null. */
+  clickedPageViews: number | null;
+  clickThroughRate: number | null;
+}
+
 /**
  * GET /api/me/analytics · /api/admin/analytics. 지표·통계 화면이 같은 응답을 사용합니다.
  * 일반 수량은 이벤트 발생일, CTR·체류·스크롤은 page_view/노출 시작일 기준입니다.
@@ -102,6 +111,18 @@ export interface AnalyticsReport {
   daily: AnalyticsDaily[];
   legacy: { visits: number; linkClicks: number; creatorBannerClicks: number };
   breakdowns: AnalyticsBreakdowns;
+  /** 유입 사이트·UTM 소스별 페이지뷰·클릭 성과. 값과 분모 규칙은 breakdowns와 같습니다. */
+  sources: { referrers: AnalyticsSourceRow[]; utmSources: AnalyticsSourceRow[] };
+  /**
+   * 선택 기간 익명 방문자(uniqueVisitors)를 기간 시작 전 page_view 유무로 나눈 수. 비교는 같은 소유 범위의 남아 있는 원본 안에서 합니다.
+   * 선택 기간에 보존 집계가 섞이면 null.
+   */
+  visitorRecency: { newVisitors: number | null; returningVisitors: number | null };
+  /**
+   * isBotUserAgent로 판별해 위 합계·분포·legacy에서 뺀 건수. 보존 집계는 User-Agent가 없어 구분할 수 없고 그대로 합계에 남으며,
+   * 그 구간이 섞이면 null입니다.
+   */
+  botExclusions: { pageViews: number | null; visits: number | null; redirectClicks: number | null };
   /** 클릭·노출 내림차순 상위 100개 대상. */
   targets: AnalyticsTarget[];
 }

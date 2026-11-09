@@ -47,6 +47,9 @@ describe('본인·관리자 방문 분석', () => {
       targetKind?: string;
       targetId?: string;
       context?: boolean;
+      userAgent?: string | null;
+      referrerHost?: string;
+      utmSource?: string;
     } = {},
   ) => {
     const pageViewId = options.pageViewId ?? randomUUID();
@@ -56,7 +59,7 @@ describe('본인·관리자 방문 분석', () => {
       `INSERT INTO landing_events(event_id,page_view_id,session_id,short_link_id,visitor_id,kind,target_kind,target_id,
         occurred_at,active_ms,scroll_percent,ip,user_agent,country,city,referrer_host,device_type,browser,os,language,time_zone,
         viewport_width,viewport_height,screen_width,screen_height,pixel_ratio,utm)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'192.0.2.77','private-raw-user-agent',
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'192.0.2.77',$26,
          $12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
       [
         randomUUID(),
@@ -74,7 +77,7 @@ describe('본인·관리자 방문 분석', () => {
           ? [
               'KR',
               'Seoul',
-              'instagram.com',
+              options.referrerHost ?? 'instagram.com',
               'mobile',
               'Safari',
               'iOS',
@@ -86,7 +89,7 @@ describe('본인·관리자 방문 분석', () => {
               844,
               3,
               {
-                source: 'instagram',
+                source: options.utmSource ?? 'instagram',
                 medium: 'social',
                 campaign: 'launch',
                 term: 'term',
@@ -95,10 +98,18 @@ describe('본인·관리자 방문 분석', () => {
               },
             ]
           : [null, null, null, null, null, null, null, null, null, null, null, null, null, {}]),
+        options.userAgent === undefined ? 'private-raw-user-agent' : options.userAgent,
       ],
     );
     return { pageViewId, visitorId, sessionId };
   };
+  const visit = (owner: Creator, at: string, userAgent: string | null) =>
+    t.pool.query("INSERT INTO visits(short_link_id,slug,visitor_id,occurred_at,user_agent) VALUES($1,'s',$2,$3,$4)", [
+      owner.shortId,
+      randomUUID(),
+      at,
+      userAgent,
+    ]);
   const report = (path: string, cookie = operator) => api<AnalyticsReport>(t.baseUrl, 'GET', path, { cookie });
   const mine = (owner: Creator, from = '2026-10-10', to = from) =>
     report(`/api/me/analytics?from=${from}&to=${to}`, owner.cookie);
@@ -383,6 +394,217 @@ describe('본인·관리자 방문 분석', () => {
     expect(result.targets[0].clickThroughRate).toBeNull();
     expect(result.coverage.hasMissingDimensions).toBe(true);
     expect(result.breakdowns.countries).toEqual([{ value: 'unknown', count: 3 }]);
+  });
+
+  const HUMAN_USER_AGENT =
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 339.0.2.12.87';
+  const BOT_USER_AGENT = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)';
+
+  it('저장된 UA로 크롤러를 합계·분포·legacy에서 빼고 제외 건수만 내보내며 다른 크리에이터의 봇을 섞지 않는다', async () => {
+    const owner = await creator();
+    const other = await creator();
+    const at = '2026-05-10 12:00+09';
+    const human = await event(owner, 'page_view', at, { context: true, userAgent: HUMAN_USER_AGENT, active: 10000 });
+    await event(owner, 'click', '2026-05-10 12:00:05+09', {
+      ...human,
+      targetKind: 'block',
+      targetId: owner.blockId,
+      userAgent: HUMAN_USER_AGENT,
+    });
+    await event(owner, 'page_view', at, { context: true, userAgent: null });
+    const bot = await event(owner, 'page_view', at, { context: true, userAgent: BOT_USER_AGENT, active: 50000 });
+    await event(owner, 'click', '2026-05-10 12:00:06+09', {
+      ...bot,
+      targetKind: 'block',
+      targetId: owner.blockId,
+      userAgent: BOT_USER_AGENT,
+    });
+    await event(owner, 'impression', '2026-05-10 12:00:07+09', {
+      ...bot,
+      targetKind: 'block',
+      targetId: owner.blockId,
+      userAgent: BOT_USER_AGENT,
+    });
+    await visit(owner, at, HUMAN_USER_AGENT);
+    await visit(owner, at, null);
+    await visit(owner, at, BOT_USER_AGENT);
+    await visit(owner, at, 'facebookexternalhit/1.1');
+    await t.pool.query(
+      `INSERT INTO link_clicks(short_link_id,link_public_id,visitor_id,occurred_at,user_agent)
+       VALUES($1,'deleted001',$2,$4,$5),($1,'deleted001',$3,$4,$6)`,
+      [owner.shortId, randomUUID(), randomUUID(), at, HUMAN_USER_AGENT, BOT_USER_AGENT],
+    );
+    await t.pool.query(
+      `INSERT INTO creator_banner_clicks(banner_public_id,short_link_id,visitor_id,occurred_at,user_agent)
+       VALUES('deleted002',$1,$2,$3,$4)`,
+      [owner.shortId, randomUUID(), at, 'curl/8.7.1'],
+    );
+    await event(other, 'page_view', at, { context: true, userAgent: BOT_USER_AGENT });
+    await visit(other, at, BOT_USER_AGENT);
+
+    const response = await mine(owner, '2026-05-10');
+    expect(response.status).toBe(200);
+    expect(response.body.summary).toMatchObject({
+      pageViews: 2,
+      clicks: 1,
+      impressions: 0,
+      activeMs: 10000,
+      uniqueVisitors: 2,
+      sessions: 2,
+      clickedPageViews: 1,
+      clickThroughRate: 0.5,
+    });
+    expect(response.body.legacy).toEqual({ visits: 2, linkClicks: 1, creatorBannerClicks: 0 });
+    expect(response.body.daily[0]).toMatchObject({ pageViews: 2, legacyVisits: 2, legacyLinkClicks: 1 });
+    expect(response.body.breakdowns.utm.source).toEqual([{ value: 'instagram', count: 2 }]);
+    expect(response.body.targets).toEqual([
+      expect.objectContaining({ targetId: owner.blockId, clicks: 1, impressions: 0 }),
+    ]);
+    expect(response.body.botExclusions).toEqual({ pageViews: 1, visits: 2, redirectClicks: 2 });
+    for (const secret of ['Googlebot', 'facebookexternalhit', 'curl/', 'Instagram 339', bot.visitorId])
+      expect(JSON.stringify(response.body)).not.toContain(secret);
+  });
+
+  it('유입 사이트·UTM 소스별로 클릭한 페이지뷰와 클릭률을 값별로 내고 다른 크리에이터 자료를 섞지 않는다', async () => {
+    const owner = await creator();
+    const other = await creator();
+    const clicked = async (referrerHost: string, utmSource: string, times = 1) => {
+      const view = await event(owner, 'page_view', '2026-04-10 12:00+09', { context: true, referrerHost, utmSource });
+      for (let n = 0; n < times; n++)
+        await event(owner, 'click', '2026-04-10 12:00:05+09', {
+          ...view,
+          targetKind: 'block',
+          targetId: owner.blockId,
+        });
+    };
+    await clicked('instagram.com', 'meta', 2);
+    await event(owner, 'page_view', '2026-04-10 12:01+09', {
+      context: true,
+      referrerHost: 'instagram.com',
+      utmSource: 'meta',
+    });
+    await clicked('naver.com', 'naver');
+    await event(owner, 'page_view', '2026-04-10 12:02+09');
+    await event(owner, 'page_view', '2026-04-10 12:03+09', {
+      context: true,
+      referrerHost: 'instagram.com',
+      utmSource: 'meta',
+      userAgent: BOT_USER_AGENT,
+    });
+    const theirs = await event(other, 'page_view', '2026-04-10 12:00+09', {
+      context: true,
+      referrerHost: 'instagram.com',
+      utmSource: 'meta',
+    });
+    await event(other, 'click', '2026-04-10 12:00:05+09', { ...theirs, targetKind: 'block', targetId: other.blockId });
+
+    const { sources, breakdowns } = (await mine(owner, '2026-04-10')).body;
+    expect(sources.referrers).toEqual([
+      { value: 'instagram.com', pageViews: 2, clickedPageViews: 1, clickThroughRate: 0.5 },
+      { value: 'naver.com', pageViews: 1, clickedPageViews: 1, clickThroughRate: 1 },
+      { value: 'unknown', pageViews: 1, clickedPageViews: 0, clickThroughRate: 0 },
+    ]);
+    expect(sources.utmSources).toEqual([
+      { value: 'meta', pageViews: 2, clickedPageViews: 1, clickThroughRate: 0.5 },
+      { value: 'naver', pageViews: 1, clickedPageViews: 1, clickThroughRate: 1 },
+      { value: 'unknown', pageViews: 1, clickedPageViews: 0, clickThroughRate: 0 },
+    ]);
+    expect(breakdowns.referrers.reduce((sum, row) => sum + row.count, 0)).toBe(4);
+  });
+
+  it('유입별 클릭률도 상위 20개 뒤 나머지를 기타로 합치고 분자를 보존한다', async () => {
+    const owner = await creator();
+    await t.pool.query(
+      `WITH views AS (
+         INSERT INTO landing_events(event_id,page_view_id,session_id,short_link_id,visitor_id,kind,occurred_at,utm)
+         SELECT gen_random_uuid(),gen_random_uuid(),gen_random_uuid(),$1,gen_random_uuid(),'page_view',
+           '2026-04-18 12:00+09'::timestamptz,jsonb_build_object('source',CASE WHEN n<=3 THEN 'other' ELSE 'source-'||n END)
+         FROM generate_series(1,25) n RETURNING *
+       )
+       INSERT INTO landing_events(event_id,page_view_id,session_id,short_link_id,visitor_id,kind,target_kind,target_id,occurred_at,utm)
+       SELECT gen_random_uuid(),page_view_id,session_id,short_link_id,visitor_id,'click','block',$2,occurred_at+interval '1 second',utm
+       FROM views WHERE utm->>'source' IN ('source-10','source-8') OR event_id=(SELECT min(event_id::text)::uuid FROM views WHERE utm->>'source'='other')`,
+      [owner.shortId, owner.blockId],
+    );
+    const { utmSources } = (await mine(owner, '2026-04-18')).body.sources;
+    expect(utmSources).toHaveLength(20);
+    expect(utmSources.reduce((sum, row) => sum + row.pageViews, 0)).toBe(25);
+    expect(utmSources.reduce((sum, row) => sum + (row.clickedPageViews ?? 0), 0)).toBe(3);
+    expect(utmSources.find((row) => row.value === 'other')).toEqual({
+      value: 'other',
+      pageViews: 6,
+      clickedPageViews: 2,
+      clickThroughRate: 2 / 6,
+    });
+    expect(utmSources.find((row) => row.value === 'source-10')).toMatchObject({
+      clickedPageViews: 1,
+      clickThroughRate: 1,
+    });
+  });
+
+  it('기간 시작 전에 본 적이 있는 익명 방문자만 재방문으로 나누고 소유 범위와 봇을 분리한다', async () => {
+    const owner = await creator();
+    const other = await creator();
+    const [returning, fresh, seenElsewhere, seenAsBot, wasBot] = Array.from({ length: 5 }, () => ({
+      visitorId: randomUUID(),
+      sessionId: randomUUID(),
+    }));
+    await event(owner, 'page_view', '2026-02-20 12:00+09', returning);
+    await event(owner, 'page_view', '2026-03-05 12:00+09', returning);
+    await event(owner, 'page_view', '2026-03-06 12:00+09', { ...returning, sessionId: randomUUID() });
+    await event(owner, 'page_view', '2026-03-05 13:00+09', fresh);
+    await event(other, 'page_view', '2026-02-20 12:00+09', seenElsewhere);
+    await event(owner, 'page_view', '2026-03-05 14:00+09', seenElsewhere);
+    await event(owner, 'page_view', '2026-02-20 12:00+09', { ...seenAsBot, userAgent: BOT_USER_AGENT });
+    await event(owner, 'page_view', '2026-03-05 15:00+09', seenAsBot);
+    await event(owner, 'page_view', '2026-03-05 16:00+09', { ...wasBot, userAgent: BOT_USER_AGENT });
+
+    const own = (await mine(owner, '2026-03-01', '2026-03-10')).body;
+    expect(own.summary.uniqueVisitors).toBe(4);
+    expect(own.visitorRecency).toEqual({ newVisitors: 3, returningVisitors: 1 });
+
+    const service = (await report('/api/admin/analytics?from=2026-03-01&to=2026-03-10')).body;
+    expect(service.visitorRecency).toEqual({ newVisitors: 2, returningVisitors: 2 });
+
+    const selected = (await report(`/api/admin/analytics?from=2026-03-01&to=2026-03-10&creatorId=${owner.userId}`))
+      .body;
+    expect(selected.visitorRecency).toEqual({ newVisitors: 3, returningVisitors: 1 });
+
+    const empty = (await mine(owner, '2026-03-20')).body;
+    expect(empty.visitorRecency).toEqual({ newVisitors: 0, returningVisitors: 0 });
+    expect(empty.sources).toEqual({ referrers: [], utmSources: [] });
+  });
+
+  it('보존 집계가 섞인 기간은 유입별 클릭·신규/재방문·봇 제외 건수를 null로 표시하고 수량은 유지한다', async () => {
+    const owner = await creator();
+    const old = (
+      await t.pool.query<{ day: string }>("SELECT ((now() AT TIME ZONE 'Asia/Seoul')::date-368)::text AS day")
+    ).rows[0].day;
+    const view = await event(owner, 'page_view', `${old} 12:00+09`, { context: true, userAgent: HUMAN_USER_AGENT });
+    await event(owner, 'click', `${old} 12:00:02+09`, { ...view, targetKind: 'block', targetId: owner.blockId });
+    await event(owner, 'page_view', `${old} 13:00+09`, { context: true, userAgent: BOT_USER_AGENT });
+    await visit(owner, `${old} 12:00+09`, BOT_USER_AGENT);
+    const before = (await mine(owner, old)).body;
+    expect(before.sources.referrers[0]).toEqual({
+      value: 'instagram.com',
+      pageViews: 1,
+      clickedPageViews: 1,
+      clickThroughRate: 1,
+    });
+    expect(before.visitorRecency).toEqual({ newVisitors: 1, returningVisitors: 0 });
+    expect(before.botExclusions).toEqual({ pageViews: 1, visits: 1, redirectClicks: 0 });
+
+    await t.app.get(RetentionService).runOnce();
+    const after = (await mine(owner, old)).body;
+    expect(after.coverage.includesRollups).toBe(true);
+    expect(after.sources.referrers[0]).toEqual({
+      value: 'instagram.com',
+      pageViews: 2,
+      clickedPageViews: null,
+      clickThroughRate: null,
+    });
+    expect(after.visitorRecency).toEqual({ newVisitors: null, returningVisitors: null });
+    expect(after.botExclusions).toEqual({ pageViews: null, visits: null, redirectClicks: null });
   });
 
   it('원본조회와집계조회사이보존커밋이있어도새analytics와기존stats는같은snapshot으로중복을막는다', async () => {

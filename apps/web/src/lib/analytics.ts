@@ -48,6 +48,12 @@ const decimal = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 });
 export const analyticsCount = (value: number | null) => (value === null ? '확인 불가' : formatNumber(value));
 export const analyticsPercent = (value: number | null) =>
   value === null ? '계산 불가' : `${decimal.format(value * 100)}%`;
+/** 원본에서만 계산하는 값(유입별 클릭·신규/재방문·봇 제외)은 보존 합계 구간이 섞이면 null이며 `집계 불가`로 표시합니다. */
+export const ANALYTICS_RAW_ONLY_UNAVAILABLE = '집계 불가';
+export const analyticsRawCount = (value: number | null) =>
+  value === null ? ANALYTICS_RAW_ONLY_UNAVAILABLE : formatNumber(value);
+export const analyticsRawPercent = (value: number | null) =>
+  value === null ? ANALYTICS_RAW_ONLY_UNAVAILABLE : `${decimal.format(value * 100)}%`;
 export function analyticsDuration(value: number | null): string {
   if (value === null) return '계산 불가';
   if (value < 60_000) return `${decimal.format(value / 1000)}초`;
