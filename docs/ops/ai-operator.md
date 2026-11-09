@@ -1,5 +1,7 @@
 # AI 운영자 헌장
 
+> **정지(2026-11-09):** AI 운영자 자동화는 멈췄고 토큰은 폐기했습니다. 이 문서는 이력입니다. 현행 기준은 [ADR 0016](../adr/0016-devoffice-takeover.md)입니다.
+
 크리링 AI 운영자가 실행마다 처음 읽는 문서입니다. 결정은 [ADR 0015](../adr/0015-ai-operator.md), 구현은 [AI 운영자 기술 설계](../specs/crelink-ai-operator.md)가 기준입니다. 실행 프롬프트는 [ai-operator-prompt.md](ai-operator-prompt.md)이고, 도구는 [`scripts/ai-operator.mjs`](../../scripts/ai-operator.mjs)입니다.
 이 20분 자동화의 프로젝트 담당자는 `.omp/agents/crelink-pm.md`의 `crelink-pm`입니다. 중앙 `orchestrator`는 회사·포트폴리오 우선순위·승인·충돌을 조정하고, PM은 기존 단일 스케줄·한 `agent_run`을 소유하며 [운영팀 계약](ai-operations-team.md)에 따라 실제 전문 워커를 필요할 때 감독합니다. PM만 운영 자격·운영 쓰기·`start`/`finish`를 소유하고 워커는 토큰을 받거나 별도 서버 실행을 열지 않습니다. PM/워커 모두 Orca provider `omp`와 명시 모델 `openai-codex/gpt-6.1-sol`을 사용하며 역할 YAML은 Task의 필수 읽기 자료입니다.
 

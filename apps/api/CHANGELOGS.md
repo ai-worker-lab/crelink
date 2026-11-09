@@ -2,6 +2,11 @@
 
 내부 참고용으로 백엔드 API의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-11-09
+
+- 문서: 단축 도메인 설명에 Nest가 등록하는 404 전용 핸들러를 적었습니다(0209).
+- Nest 12.4.0 보안 갱신(0207): `@nestjs/common`·`@nestjs/core`·`@nestjs/platform-express`·`@nestjs/testing`을 12.1.2에서 12.4.0으로 올려 전이 의존성 `multer` 2.5.0, `express` 5.3.0을 반영했습니다. Nest 12.2부터 제외 경로마다 404 전용 핸들러가 붙어 글자 그대로 `:`가 든 네 주소만 응답이 바뀝니다(`GET`·`HEAD` 외 HTML 404가 JSON `not_found`로, `OPTIONS` 200이 404로). 실제 단축 주소와 `/api` 응답, 인증 결과는 같습니다. `test/health.e2e-spec.ts`의 라우트 비교에서 `\:` 항목만 뺐습니다. [0207](../../docs/work/orchestrator/0207-nest-security-update.md).
+
 ## 2026-11-07
 
 - 리스트 밀도(0202): 공유 `ListDensity = 8 | 10 | 12`와 선택 `listDensity` 계약을 추가했습니다. 기존 PATCH는 엄격한 JSON 숫자만 저장하고 생략·소유권·인증 경계를 보존하며 편집/공개 조회는 항상 숫자를 반환합니다. 추가형 `0012_list_density.sql`은 기존 랜딩 기본8·NOT NULL·CHECK를 적용하고 구 서버 rollback 때도 값을 남깁니다. PostgreSQL·HTTP 회귀에 세 값 저장/공개 조회·잘못된 값·타인 격리·프로필/list-grid/가져오기 보존·기존 데이터 확장을 추가했습니다. [설계](../../docs/specs/list-density.md), [티켓](../../docs/work/api/0202-list-density-api.md).

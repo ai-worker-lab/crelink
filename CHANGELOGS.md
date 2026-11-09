@@ -8,6 +8,9 @@
 
 - 분석 반응형 검사의 ego-lite 시범 전환(0206): `tests/e2e/analytics-responsive.spec.ts`의 chromium 검사 4개를 `ego-browser`로 실행하는 `tests/e2e/ego/`를 추가하고, 날짜 입력 경계 검사를 좌우 네 변 비교로 고쳤습니다. 기존 Playwright spec·config·CI·`apps/web`은 바꾸지 않습니다. 옮기지 못한 검사와 근거: `docs/work/crelink-qa/0206-ego-analytics-responsive.md`.
 - 0206 ego-lite 시험 수정: QA가 찾은 예외 미기록(요소 없음이 종료 코드 0), 잘못된 시나리오 필터 통과, 호스트 단위 쿠키 삭제, 신호 시 정리 누락을 고쳤습니다. 지우는 쿠키는 시험이 심은 `cl_session` 하나로 좁혔습니다. 근거는 같은 work item입니다.
+- 개발실 인수 결정을 문서에 반영했습니다(ADR 0016, 0209). AI 운영자 자율 실행을 정지로 표시하고 0207·0208을 완료로 옮겼습니다.
+- Nest 12.4.0 보안 갱신(0207): `multer`를 2.5.0으로 올리기 위해 Nest 네 패키지와 잠금 파일을 갱신했습니다. Dependabot #139를 나눠 처리하는 첫 단계이며 세부는 [백엔드 로그](apps/api/CHANGELOGS.md), 응답 비교와 검증은 [0207](docs/work/orchestrator/0207-nest-security-update.md)에 있습니다. main 병합·배포는 포함하지 않습니다.
+- `.sops.yaml`의 operator 수신자를 새 키로 교체했습니다(0208).
 
 ## 2026-11-07
 

@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: crelink-qa
-- 상태: 검증
+- 상태: 완료
 - 종류: 유지보수
 - 우선순위: P2 (AI 제안)
 - 작성일: 2026-11-09
@@ -62,3 +62,4 @@
 - 2026-11-09: `tap()`의 예외가 기록되지 않던 결함을 고쳤다. `Report.must`만 `RecordedFailure`를 던지고 그 밖의 예외는 시나리오 실패로 기록하며, 시나리오별 최소 검사 수(34·33·36·35)를 단언한다. `EGO_TEST_FAULT=missing-tap-target`은 종료 코드 1(`탭 대상 …: 0개 일치`, `검사 24개 >= 최소 34개` 실패), `EGO_TEST_ONLY=nope`·`creator/metrics,nope`·빈 값은 ego 실행 전 종료 코드 1이다.
 - 2026-11-09: `task.finish`와 세션 쿠키 정리를 `finally`로 옮겼다. `EGO_TEST_FAULT=outside-scenario`는 종료 코드 1, `cl_session` 0개, TaskSpace 없음으로 끝났다. 실행 중 `SIGTERM`·`SIGINT`는 종료 코드 143·130, ego 프로세스 그룹 없음, 합성 사용자 0건, `cl_session` 0개, TaskSpace 없음을 확인했다. ego CLI의 출력은 파이프에서 끝날 때 한 번에 나와 중단하면 진행 로그가 남지 않는다.
 - 2026-11-09: `tests/e2e/ego` 최종 코드 기준 정상 실행 3회 종료 코드 0(통과 143, 실패 0, 뷰포트 결과 36줄, 약 20초), 변이 `from` 오른쪽·`to` 왼쪽 각 종료 코드 1(`overflow=0 fits=false legacyFits=true` 16건씩, 다른 실패 0).
+- 2026-11-10 완료: `qa` 1차 불합격 뒤 결함을 고친 `c90b759`가 재검수에 합격했습니다(143개 검사, 변이 2종 검출, `pnpm verify` 통과). 전체 전환 여부는 ADR 0016을 따릅니다.

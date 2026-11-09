@@ -25,8 +25,8 @@
 | 정지·헬스(api·web) | compose `stop_grace_period: 30s`(SIGTERM 뒤 진행 중 요청을 마칠 시간, 넘으면 SIGKILL. 기본 10초, Cloudflare 원본 응답 한도 100초(524)보다 짧게), `healthcheck.start_interval: 1s`(기동 중 1초마다 검사해 준비되자마자 healthy)와 Compose가 함께 요구하는 `start_period`(api 30초·web 20초, 이미지와 같은 값). test·interval(10초)·timeout·retries는 이미지 `HEALTHCHECK`(확인: [6](#6-운영-확인)). Docker Engine 25 이상 |
 | DB pool 상한 | 암호문 평문 `DATABASE_POOL_MAX=6`(API pg Pool `max`, 비면 15). 산정·확인은 [12](#12-supabase-주의사항) |
 | GitHub | variables `TS_OIDC_CLIENT_ID`·`TS_OIDC_AUDIENCE`, Sentry `SENTRY_ORG`·`SENTRY_PROJECT_API`·`SENTRY_PROJECT_WEB`·`SENTRY_WEB_DSN`, secret `DEPLOY_SSH_KEY`·`SENTRY_AUTH_TOKEN`(소스맵 업로드 전용, [15](#15-sentry-오류성능-모니터링)). 그 밖의 배포 secret 없음 |
-| Sentry | 조직 `crelink`(제안, 미국 데이터 저장 위치), 프로젝트 `crelink-api`·`crelink-web`. API DSN은 암호문 평문 키 `SENTRY_DSN`·`SENTRY_ENVIRONMENT`, 웹 DSN은 이미지 빌드 인자. 비어 있으면 꺼짐. [15](#15-sentry-오류성능-모니터링) |
-| AI 운영자 토큰 | 운영자 Mac `~/.config/crelink/ai-operator.env`(권한 600: `CRELINK_AI_BASE_URL`·`CRELINK_AI_TOKEN`·`CRELINK_AI_HOST`)에만 원문. DB(`api_tokens`)에는 SHA-256 해시만. 발급·목록·폐기는 활성 색 API 컨테이너의 CLI(`apps/api/dist/cli/ai-operator.js`), 폐기는 운영자 화면 `/admin/agent-runs`에서도. SOPS 암호문·CI·GitHub secret에 넣지 않음. [17](#17-ai-운영자-토큰) |
+| Sentry | 조직 `ai-worker-lab`(미국 데이터 저장 위치), 프로젝트 `crelink-api`·`crelink-web`. API DSN은 암호문 평문 키 `SENTRY_DSN`·`SENTRY_ENVIRONMENT`, 웹 DSN은 이미지 빌드 인자. 비어 있으면 꺼짐. [15](#15-sentry-오류성능-모니터링) |
+| AI 운영자 토큰 | 2026-11-09 폐기, 유효 토큰 없음([ADR 0016](../../docs/adr/0016-devoffice-takeover.md)). 기존 위치: 운영자 Mac `~/.config/crelink/ai-operator.env`(권한 600: `CRELINK_AI_BASE_URL`·`CRELINK_AI_TOKEN`·`CRELINK_AI_HOST`)에만 원문. DB(`api_tokens`)에는 SHA-256 해시만. 발급·목록·폐기는 활성 색 API 컨테이너의 CLI(`apps/api/dist/cli/ai-operator.js`), 폐기는 운영자 화면 `/admin/agent-runs`에서도. SOPS 암호문·CI·GitHub secret에 넣지 않음. [17](#17-ai-운영자-토큰) |
 
 ## 1. 서버 준비 (bootstrap)
 
@@ -172,7 +172,7 @@ SOPS_AGE_KEY_CMD='security find-generic-password -s crelink-sops-age -a operator
 | 대상 | 절차 |
 | --- | --- |
 | 앱 비밀값(DB 비밀번호, Google 클라이언트 비밀번호) | 제공자에서 새 값 발급(Google은 새 비밀번호를 추가해 둘 다 유효하게) → 4-3으로 편집 → 병합·배포 → 확인 → 옛 값 폐기 |
-| 운영자 age 키 | 새 키를 4-2로 만들고 `.sops.yaml`에 수신자로 추가 → 모든 암호문 `updatekeys` → 옛 수신자 삭제 → 다시 `updatekeys` → 병합. Git 이력의 옛 암호문은 옛 키로 계속 풀리므로, 키가 샜다면 안의 비밀값도 회전합니다 |
+| 운영자 age 키 | 새 키를 4-2로 만들고 `.sops.yaml`에 수신자로 추가 → 모든 암호문 `updatekeys` → 옛 수신자 삭제 → 다시 `updatekeys` → 병합. Git 이력의 옛 암호문은 옛 키로 계속 풀리므로, 키가 샜다면 안의 비밀값도 회전합니다. 옛 운영자 키를 잃었으면 `.sops.yaml`과 암호문을 서버로 복사해 `SOPS_AGE_KEY_FILE=/etc/crelink/age.key sops updatekeys -y <파일>`로 수신자를 바꾸고 결과를 가져옵니다 |
 | 서버 age 키 | 서버에서 `sudo age-keygen -o /etc/crelink/age.key.new` → 공개키를 수신자에 **추가**하고 `updatekeys`·병합·배포 → 서버에서 새 파일을 `age.key`로 바꾸고 `chown root:deploy`·`chmod 640` → 옛 수신자 삭제·`updatekeys`·병합·배포. 바꾼 뒤에는 그 전 릴리스로 롤백하면 복호화가 실패합니다 |
 | `DEPLOY_SSH_KEY` | 1-1로 새 키 → 1-2로 bootstrap을 `DEPLOY_SSH_PUBKEY=<새 공개키>`로 다시 실행(줄 추가) → 2-4로 secret 교체 → `ssh -i <새 키> deploy@<host> status` 확인 → 서버 `/home/deploy/.ssh/authorized_keys`에서 옛 줄 삭제 |
 | Tailscale WIF 자격 증명 | Trust credentials에서 새로 만들고 2-3으로 variables 교체 → 옛 자격 증명 삭제 |
@@ -464,7 +464,7 @@ DB 백업은 [12](#12-supabase-주의사항)입니다.
   - 운영값 6(2026-10-07): 운영 DB `max_connections` 60(Nano·Micro compute의 기본값), Pool Size 15(대시보드 확인, 2026-10-07)로 `2 × 6 = 12 ≤ 15 − 2`. Pool Size가 바뀌면 같은 식으로 다시 정합니다(예: 20이면 9). Pool Size는 `max_connections`의 40~80%까지 올릴 수 있지만 Supabase 서비스(Auth·Storage·PostgREST 등)도 같은 `max_connections`를 씁니다. 대시보드 첫 화면의 `연결 수/60`은 DB 전체 연결(`max_connections`)이고 Pool Size가 아닙니다.
   - 바꾸기: 저장소 루트에서 [9-2](#9-2-암호문에-키-넣기)의 `SOPS_AGE_KEY_CMD`·`f`를 정한 뒤 `sops set "$f" '["DATABASE_POOL_MAX"]' '"6"'`(평문 키라 diff에 보임) → 병합·배포. 키를 정규식에 넣은 뒤 처음 한 번은 9-2처럼 먼저 다시 암호화합니다(`grep -q '^sops_unencrypted_regex=.*DATABASE_POOL_MAX' "$f"`로 확인). 값이 너무 낮으면 피크 때 쿼리가 pool에서 기다려 API 지연이 늘므로, 그때는 Pool Size(필요하면 compute)를 올리고 값을 함께 올립니다.
   - 확인: SQL Editor에서 `show max_connections;`와 `select usename, application_name, state, count(*) from pg_stat_activity group by 1, 2, 3 order by 4 desc;`(Supabase 문서의 실시간 확인 방법). Supavisor 세션 모드 연결이 어느 행(`usename`·`application_name`)으로 보이는지와 클라이언트가 끊은 뒤 Supavisor가 Postgres 연결을 얼마나 유지하는지는 `[확인 못 함]`이라, 배포 전·배포 중·배포 뒤에 같은 쿼리로 비교해 API 몫이 6(겹치는 동안 12)을 넘지 않는지 봅니다. 대시보드 Observability > Database Connections·Shared Pooler (Supavisor) Client Connections 보고서도 같은 수를 보입니다(실시간 아님).
-- Free 플랜은 7일 동안 활동이 적으면 일시정지되고 자동 백업이 없습니다. 출시 전 Pro로 전환합니다(일일 백업 7일 보관, PITR은 별도 애드온). 그 전까지는 아래 `pg_dump`를 정기적으로 합니다.
+- Free 플랜은 7일 동안 활동이 적으면 일시정지되고 자동 백업이 없습니다. 출시 전 Pro로 전환합니다(일일 백업 7일 보관, PITR은 별도 애드온). 그 전까지는 아래 `pg_dump`를 정기적으로 합니다. 2026-11-09부터 서버에서 DB와 업로드를 매일 백업해 종류별 최근 7개를 보관합니다(복원 시험 완료). 세부는 운영자 비공개 기록에 있습니다.
 
 ```bash
 # 로컬에서. Supabase Postgres 메이저와 같은 pg_dump(대시보드에서 버전 확인).
@@ -690,6 +690,8 @@ GitHub Actions 사용량 한도 초과·장애로 `.github/workflows/deploy.yml`
 주의: 이렇게 만든 이미지는 그 서버에만 있습니다. GitHub Actions의 롤백(`rollback.yml`, GHCR pull)이나 다른 대상 배포는 이 이미지를 받을 수 없으니, Actions가 돌아오면 `deploy.yml`을 `force`로 한 번 실행해 GHCR 이미지를 다시 만듭니다. 서버 롤백(`rollback.sh`)은 서버에 남은 이미지로 됩니다(이미지는 지우지 않음).
 
 ## 17. AI 운영자 토큰
+
+> 2026-11-09 AI 운영자 자동화를 정지하고 토큰을 폐기했습니다([ADR 0016](../../docs/adr/0016-devoffice-takeover.md)). 이 절은 이력입니다.
 
 AI 운영자([헌장](../../docs/ops/ai-operator.md), [ADR 0015](../../docs/adr/0015-ai-operator.md))가 운영 API를 부를 때 쓰는 토큰입니다. 사람 로그인이나 HTTP 발급 경로는 없고, 활성 색 API 컨테이너 안의 CLI로만 발급합니다. 명령·출력 형식의 원본은 [AI 운영자 설계 `CLI(토큰 발급)`](../../docs/specs/crelink-ai-operator.md#cli토큰-발급)와 `apps/api/src/cli/ai-operator.ts`입니다.
 
