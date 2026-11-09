@@ -57,6 +57,7 @@ pnpm instance      # 이 checkout의 포트·주소·Compose project 출력(work
 pnpm logs api      # 서비스 최근 로그 (api|web|app|infra, --lines N, --follow)
 pnpm verify        # CI와 같은 전체 검증: 토큰·work item·문서·lint·타입·빌드·테스트
 pnpm verify --fast # 빌드·테스트를 뺀 빠른 검증
+pnpm ci:local      # ci.yml의 판정과 job을 이 기기에서 재현
 pnpm smoke         # 실행 중인 API·웹에 Playwright smoke 테스트
 pnpm docs:check    # 문서 링크·형식 검사
 pnpm design:sync   # design/system 디자인 시스템을 로컬 OpenDesign에 설치
