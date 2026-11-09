@@ -1,6 +1,6 @@
 // ego-lite 시험의 Node 쪽 실행기. 로컬 대상을 검사하고 시나리오를 `ego-browser nodejs`에 넘겨 종료 코드로 성패를 돌려줍니다.
 // ego-browser 스크립트는 셸 환경변수와 작업 디렉터리를 물려받지 않으므로 설정 전부를 stdin 스크립트에 담습니다(argv에 세션 값을 두지 않음).
-/* global console, fetch, AbortSignal, URL, setTimeout, clearTimeout */
+/* global console, fetch, AbortController, AbortSignal, URL, setTimeout, clearTimeout */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -116,3 +116,50 @@ await task.finish({ keep: [] });
 }
 
 export const moduleUrlOf = (path) => pathToFileURL(path).href;
+
+/** 신호를 바로 끝내지 않고 진행 중인 단계를 abort해 main의 finally가 합성 데이터를 지우게 합니다. */
+export function interruptController() {
+  const controller = new AbortController();
+  let exitCode;
+  for (const [name, code] of [
+    ['SIGINT', 130],
+    ['SIGTERM', 143],
+  ]) {
+    process.on(name, () => {
+      exitCode ??= code;
+      console.error(`[ego] ${name} 수신: 합성 데이터와 브라우저를 정리합니다.`);
+      controller.abort();
+    });
+  }
+  return { signal: controller.signal, exitCode: () => exitCode };
+}
+
+/** EGO_TEST_ONLY·EGO_TEST_FAULT를 읽습니다. 없는 이름은 시험을 건너뛰지 않고 ego 실행 전에 실패합니다. */
+export function readRunOptions({ scenarios, faults }) {
+  const only = process.env.EGO_TEST_ONLY?.split(',').map((value) => value.trim());
+  const fault = process.env.EGO_TEST_FAULT || null;
+  const unknown = (only ?? []).filter((name) => !scenarios.includes(name));
+  if (unknown.length > 0)
+    throw new Error(`EGO_TEST_ONLY에 없는 시나리오: ${unknown.join(', ')}. 가능한 값: ${scenarios.join(', ')}`);
+  if (fault && !faults.includes(fault))
+    throw new Error(`알 수 없는 EGO_TEST_FAULT: ${fault}. 가능한 값: ${faults.join(', ')}`);
+  return { selected: scenarios.filter((name) => !only || only.includes(name)), fault };
+}
+
+/** 쿠키 저장소가 호스트 단위라는 점을 이용해, 같은 프로필 안에서 다른 방문자로 보이는 단축 주소를 만듭니다. */
+export function aliasLoopback(url) {
+  const alias = new URL(url);
+  alias.hostname = alias.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
+  return alias.href.replace(/\/$/, '');
+}
+
+/** 실행기 공통 끝맺음. 신호 종료 코드를 우선합니다. */
+export function finishProcess(promise, interrupt) {
+  promise.then(
+    (code) => process.exit(interrupt.exitCode() ?? code),
+    (error) => {
+      console.error(`[ego] 실행 실패: ${error.message}`);
+      process.exit(interrupt.exitCode() ?? 1);
+    },
+  );
+}
