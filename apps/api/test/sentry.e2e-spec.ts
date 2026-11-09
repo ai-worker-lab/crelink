@@ -2,7 +2,8 @@ import * as Sentry from '@sentry/nestjs';
 import type { Event } from '@sentry/nestjs';
 import { CreatorService } from '../src/creator/creator.service';
 import { sentryOptions } from '../src/monitoring/sentry';
-import { createTestApp, login, TestApp } from './test-app';
+import { LandingPassService } from '../src/short-link/landing-pass.service';
+import { api, createTestApp, login, TestApp, WEB_URL } from './test-app';
 
 /** 보낸 envelope 원문(쿠키 원문 검사용)과 그 안의 오류 이벤트·span. */
 const envelopes: string[] = [];
@@ -124,6 +125,57 @@ describe('Sentry 오류 모니터링', () => {
     expect([unauthenticated.status, notFound.status, tooLarge.status, badJson.status]).toEqual([401, 404, 413, 400]);
     await Sentry.flush(2000);
     expect(events).toHaveLength(0);
+  });
+
+  it('사전 신청 연락처는 성공·DB 오류 어느 경로의 전송 페이로드에도 없다', async () => {
+    process.env.RESERVATIONS_ENABLED = 'true';
+    const contact = 'sentry-leak-check@example.com';
+    const phone = '01055556666';
+    try {
+      const state = (await api<{ landing: { publicId: string } }>(t.baseUrl, 'GET', '/api/me/landing', { cookie }))
+        .body;
+      const link = (
+        await api<{ id: string }>(t.baseUrl, 'POST', '/api/me/links', {
+          cookie,
+          body: { title: '링크', url: 'https://example.test/' },
+        })
+      ).body;
+      await api(t.baseUrl, 'PUT', `/api/me/links/${link.id}/reservation`, {
+        cookie,
+        body: { state: 'open', methods: ['email', 'phone'] },
+      });
+      const linkPublicId = (
+        await t.pool.query<{ public_id: string }>('SELECT public_id FROM links WHERE id=$1', [link.id])
+      ).rows[0].public_id;
+      const passes = t.app.get(LandingPassService);
+      const issuedAt = Date.now() - 10_000;
+      const token = (visitor: string) =>
+        passes.telemetryToken(
+          state.landing.publicId,
+          passes.issue(state.landing.publicId, issuedAt, visitor),
+          issuedAt,
+        )!;
+      const submit = (visitor: string, method: string, value: string) =>
+        api(t.baseUrl, 'POST', `/api/landings/${state.landing.publicId}/links/${linkPublicId}/reservations`, {
+          body: { token: token(visitor), method, contact: value, consent: true },
+          headers: { origin: WEB_URL },
+        });
+      expect((await submit('00000000-0000-4000-8000-000000000001', 'email', contact)).status).toBe(201);
+      await t.pool.query('ALTER TABLE link_reservations RENAME TO link_reservations_gone');
+      try {
+        expect((await submit('00000000-0000-4000-8000-000000000002', 'phone', phone)).status).toBe(500);
+      } finally {
+        await t.pool.query('ALTER TABLE link_reservations_gone RENAME TO link_reservations');
+      }
+      await Sentry.flush(2000);
+      expect(events.length).toBeGreaterThan(0);
+      const sent = envelopes.join('\n');
+      expect(sent).not.toContain(contact);
+      expect(sent).not.toContain(phone);
+      expect(sent).not.toContain('010-5555-6666');
+    } finally {
+      delete process.env.RESERVATIONS_ENABLED;
+    }
   });
 
   it('성능 span에는 요청 user(내부 ID·IP)가 붙고 쿠키 헤더는 없다', async () => {

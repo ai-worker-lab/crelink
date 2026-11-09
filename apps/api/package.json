@@ -39,6 +39,7 @@
   },
   "jest": {
     "testEnvironment": "node",
+    "maxWorkers": "50%",
     "rootDir": ".",
     "testRegex": "test/.*\\.e2e-spec\\.ts$|src/.*\\.spec\\.ts$",
     "transform": {

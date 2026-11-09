@@ -6,6 +6,7 @@
 
 ## 2026-11-10
 
+- 링크별 사전 신청 API(0212 에픽, 0213): `docs/product/crelink.md`에 R29~R32 `[AI 제안]`, [설계](docs/specs/crelink-reservations.md), `packages/shared` 계약, API를 더했습니다. `RESERVATIONS_ENABLED`가 정확히 `true`가 아니면 새 경로가 모두 404이고 공개 응답에 필드가 없습니다. 운영에는 이 값을 넣지 않습니다. 세부는 [백엔드 로그](apps/api/CHANGELOGS.md), 근거는 `docs/work/orchestrator/0213-reservation-api.md`. 웹 화면은 다음 PR입니다. main 병합·배포는 포함하지 않습니다.
 - 로컬 CI 명령 추가(0210): `pnpm ci:local`이 `ci.yml`의 변경 판정과 job을 이 기기에서 재현하고, `--report`로 통과한 커밋에 commit status `CI 통과`를 기록합니다. 이미지 단계는 기기 고유 플랫폼으로 빌드하고 amd64 빌드는 Deploy에서 검증합니다. ADR 0016 결정 5의 1단계이며 `ci.yml`과 ruleset은 바꾸지 않습니다. 사용법은 [검증 루프](docs/development/verification.md#로컬-ci), 근거는 `docs/work/orchestrator/0210-local-ci.md`.
 - Dependabot #139 나머지 갱신(0211): Nest 네 패키지와 `@playwright/test`를 뺀 17개 패키지를 #139의 대상 버전으로 올리고, 전이 의존성 `node-forge` 1.4.3·`undici` 6.29.1·`follow-redirects` 1.16.3·`body-parser` 2.4.0·`zod` 4.6.7을 잠금 파일에서 올렸습니다. `pnpm audit --prod`의 high는 9건에서 2건이 됐고, 남은 `zod`·`decode-uri-component`는 major 또는 Expo SDK 단위 갱신이 필요합니다. 근거는 [0211](docs/work/orchestrator/0211-deps-minor-patch.md)에 있습니다. main 병합·배포는 포함하지 않습니다.
 

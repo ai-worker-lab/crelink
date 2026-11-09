@@ -52,7 +52,7 @@ export class RetentionService implements OnApplicationBootstrap, OnModuleDestroy
   }
 
   /** 한 번 실행합니다. 다른 인스턴스가 실행 중이면 끝날 때까지 기다렸다가 남은 것만 처리합니다. */
-  async runOnce(): Promise<{ visits: number; linkClicks: number; bannerClicks: number }> {
+  async runOnce(): Promise<{ visits: number; linkClicks: number; bannerClicks: number; reservations: number }> {
     const moved = await this.database.transaction(async (client) => {
       await client.query('SELECT pg_advisory_xact_lock($1)', [RETENTION_LOCK_KEY]);
       // 오늘(Asia/Seoul) - 365일 0시보다 이전 원본이 대상입니다.
@@ -156,14 +156,20 @@ export class RetentionService implements OnApplicationBootstrap, OnModuleDestroy
       const bannerClicks = await client.query('DELETE FROM creator_banner_clicks WHERE occurred_at < $1', [
         boundary.rows[0].boundary,
       ]);
+      // 사전 신청(R30)은 집계 없이 보관 기간이 지나면 지웁니다. 기능 플래그와 무관하게 돕니다.
+      const reservations = await client.query(
+        'DELETE FROM link_reservations WHERE created_at < now() - make_interval(days => $1)',
+        [CRELINK_LIMITS.reservationRetentionDays],
+      );
       return {
         visits: visits.rowCount ?? 0,
         linkClicks: clicks.rowCount ?? 0,
         bannerClicks: bannerClicks.rowCount ?? 0,
+        reservations: reservations.rowCount ?? 0,
       };
     });
     this.logger.log(
-      `보존 작업 완료: 방문 원본 ${moved.visits}건, 클릭 원본 ${moved.linkClicks}건, 배너 클릭 원본 ${moved.bannerClicks}건을 집계로 옮기고 지웠습니다.`,
+      `보존 작업 완료: 방문 원본 ${moved.visits}건, 클릭 원본 ${moved.linkClicks}건, 배너 클릭 원본 ${moved.bannerClicks}건을 집계로 옮기고 지웠습니다. 사전 신청 ${moved.reservations}건을 지웠습니다.`,
     );
     return moved;
   }

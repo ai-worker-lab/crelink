@@ -12,6 +12,9 @@ import {
   LinkView,
   PortfolioItemView,
   PublicBannerView,
+  PublicLinkReservation,
+  ReservationMethod,
+  ReservationState,
   ShortLinkView,
   SocialLinkView,
 } from '@crelink/shared';
@@ -31,11 +34,13 @@ export interface LinkRow {
   blocked: boolean;
   blocked_reason: string | null;
   position: number;
+  reservation_state: ReservationState;
+  reservation_methods: ReservationMethod[];
 }
 
 /** LinkView로 바꿀 때 읽는 links 컬럼. */
 export const LINK_COLUMNS =
-  'id, title, url, host, description, thumbnail_file_id, hidden, blocked_at IS NOT NULL AS blocked, blocked_reason, position';
+  'id, title, url, host, description, thumbnail_file_id, hidden, blocked_at IS NOT NULL AS blocked, blocked_reason, position, reservation_state, reservation_methods';
 
 /**
  * 방문자에게 보이는 링크(숨기지 않았고 운영자가 차단하지 않음). links 별칭은 `l`이어야 합니다.
@@ -172,7 +177,19 @@ export class CreatorService {
       blocked: row.blocked,
       blockedReason: row.blocked_reason,
       position: row.position,
+      ...(this.config.reservationsEnabled
+        ? { reservation: { state: row.reservation_state, methods: row.reservation_methods } }
+        : {}),
     };
+  }
+
+  /** 공개 응답의 사전 신청 필드(R29). 기능이 꺼졌거나 `off`면 null이고, 호출하는 쪽은 필드를 넣지 않습니다. */
+  publicReservation(row: {
+    reservation_state: ReservationState;
+    reservation_methods: ReservationMethod[];
+  }): PublicLinkReservation | null {
+    if (!this.config.reservationsEnabled || row.reservation_state === 'off') return null;
+    return { state: row.reservation_state, methods: row.reservation_methods };
   }
 
   async links(db: Queryable, userId: string): Promise<LinkView[]> {
@@ -397,6 +414,7 @@ export class CreatorService {
       banners,
       bannerLimits,
       adBlock,
+      ...(this.config.reservationsEnabled ? { reservationsAvailable: true as const } : {}),
     };
   }
 }

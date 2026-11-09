@@ -4,6 +4,7 @@
 
 ## 2026-11-10
 
+- 링크별 사전 신청 API(0213): migration `0013_link_reservations`(추가 전용), `RESERVATIONS_ENABLED` 플래그, 설정 PUT, 공개 제출(서명 토큰·Origin·레이트 리밋 `reservation:` 버킷·봇 판정·링크별 advisory lock·중복 무음), 목록·CSV(수식 주입 방지)·건별·링크별 삭제, 보존 90일, Sentry 로그의 휴대폰 패턴. 방문 이벤트의 제한은 `telemetry/landing-limits.ts`로 공용화했고 한도는 그대로입니다. Jest `maxWorkers`를 `50%`로 제한했습니다(12코어에서 `too many clients` 재현 해소). [0213](../../docs/work/orchestrator/0213-reservation-api.md).
 - 의존성 minor·patch 갱신(0211). API 패키지를 Dependabot #139 대상 버전으로 올렸습니다. 세부는 루트 변경 기록을 봅니다.
 
 ## 2026-11-09

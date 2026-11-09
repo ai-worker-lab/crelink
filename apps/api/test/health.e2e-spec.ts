@@ -97,6 +97,7 @@ describe('API 기동과 health', () => {
         'landings',
         'link_click_rollups',
         'link_clicks',
+        'link_reservations',
         'links',
         'operator_actions',
         'platform_settings',
@@ -126,6 +127,7 @@ describe('API 기동과 health', () => {
         { version: '0010_analytics_rollups' },
         { version: '0011_link_layout' },
         { version: '0012_list_density' },
+        { version: '0013_link_reservations' },
       ]);
     } finally {
       await client.end();

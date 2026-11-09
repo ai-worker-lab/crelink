@@ -142,6 +142,58 @@ describe('runMigrations', () => {
     expect((await pool.query('SELECT list_density FROM landings')).rows).toEqual([{ list_density: 12 }]);
   });
 
+  it('0013은 기존 링크를 off로 두고 다른 컬럼을 바꾸지 않으며 신청은 링크·방식·연락처당 1건이고 링크 삭제에 함께 지워진다', async () => {
+    const source = join(__dirname, '../migrations');
+    for (const file of readdirSync(source).filter((name) => name.endsWith('.sql') && name < '0013')) {
+      copyFileSync(join(source, file), join(directory, file));
+    }
+    await runMigrations(pool, directory);
+    const userId = (
+      await pool.query<{ id: string }>("INSERT INTO users(email) VALUES('reserve@example.com') RETURNING id")
+    ).rows[0].id;
+    const landingId = (
+      await pool.query<{ id: string }>("INSERT INTO landings(user_id,public_id) VALUES($1,'abcdefghij') RETURNING id", [
+        userId,
+      ])
+    ).rows[0].id;
+    const blockId = (
+      await pool.query<{ id: string }>(
+        "INSERT INTO landing_blocks(landing_id,type,position) VALUES($1,'list',0) RETURNING id",
+        [landingId],
+      )
+    ).rows[0].id;
+    const linkId = (
+      await pool.query<{ id: string }>(
+        "INSERT INTO links(public_id,user_id,block_id,title,url,host,position,hidden) VALUES('link000001',$1,$2,'기존','https://a.example/','a.example',3,true) RETURNING id",
+        [userId, blockId],
+      )
+    ).rows[0].id;
+    const before = (await pool.query('SELECT * FROM links WHERE id=$1', [linkId])).rows[0];
+
+    copyFileSync(join(source, '0013_link_reservations.sql'), join(directory, '0013_link_reservations.sql'));
+    await runMigrations(pool, directory);
+
+    const after = (await pool.query('SELECT * FROM links WHERE id=$1', [linkId])).rows[0];
+    expect(after).toEqual({ ...before, reservation_state: 'off', reservation_methods: [] });
+    await expect(pool.query("UPDATE links SET reservation_state='other'")).rejects.toThrow(/reservation_state_check/);
+    await expect(pool.query("UPDATE links SET reservation_methods='{fax}'")).rejects.toThrow(
+      /reservation_methods_check/,
+    );
+    const insert = (method: string, contact: string) =>
+      pool.query(
+        "INSERT INTO link_reservations(link_id,method,contact,consent_version) VALUES($1,$2,$3,'v') RETURNING id",
+        [linkId, method, contact],
+      );
+    await insert('email', 'a@example.com');
+    await expect(insert('email', 'a@example.com')).rejects.toThrow(/link_reservations_link_id_method_contact_key/);
+    await expect(insert('fax', 'a@example.com')).rejects.toThrow(/link_reservations_method_check/);
+    await insert('phone', '01012345678');
+    await pool.query('DELETE FROM links WHERE id=$1', [linkId]);
+    expect((await pool.query('SELECT 1 FROM link_reservations')).rowCount).toBe(0);
+    const timeout = await pool.query<{ lock_timeout: string }>('SHOW lock_timeout');
+    expect(timeout.rows[0].lock_timeout).toBe('0');
+  });
+
   describe('0003_ad_banner', () => {
     const source = join(__dirname, '../migrations');
     let fileSeq = 0;

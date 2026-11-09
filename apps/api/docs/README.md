@@ -34,6 +34,7 @@
 | `S3_BUCKET` | `s3`면 필수 | 버킷 이름. 운영 `crelink-uploads`. API는 버킷을 만들지 않습니다. |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | `s3`면 필수(비밀) | 버킷 범위 읽기·쓰기 자격 증명. 운영 값은 SeaweedFS `s3.json`의 identity `crelink`이고 대상별 SOPS 암호문에만 둡니다. |
 | `GEOIP_MMDB_PATH` | 아니오 | mmdb(DB-IP Lite City 등, CC BY 4.0이라 웹 `/privacy`에 출처 표시) 경로. 비면 국가·도시를 null로 두고 기동 시 경고를 한 번 남김. 파일을 열지 못해도 같은 동작에 오류 로그. 컨테이너는 볼륨 `/data/geoip`. |
+| `RESERVATIONS_ENABLED` | 아니오 | 링크별 사전 신청(R29~R31). 값이 정확히 `true`일 때만 켜지고, 그 밖의 값(미설정, `TRUE`, `1`, ` true`)이면 새 경로가 모두 404이고 응답에 필드가 없습니다([사전 신청](#사전-신청)). 운영에는 법률 검토와 처리방침 반영 전까지 넣지 않습니다. |
 | `TRUSTED_PROXY_HOPS` | 아니오 | 앞단의 신뢰할 리버스 프록시 수(기본 0). 0이면 소켓 주소, N이면 `X-Forwarded-For`의 오른쪽에서 N번째 값을 방문·클릭 IP로 씁니다([방문자 IP](#방문자-ip)). 운영(Caddy 1단)은 `1`. 0 이상의 정수가 아니면 기동 거부. |
 | `BANNER_SLOT_MAX` | 아니오 | 크리에이터 배너 슬롯에서 보이게(숨김·차단 아님) 둘 수 있는 배너 수 n, 랜딩마다(기본 5, `[임시값]`). 1 이상의 정수가 아니면 기동 거부. 지금 장수보다 낮추면 있는 배너는 그대로 두고 추가·숨김 해제만 막습니다. 응답 `bannerLimits.visibleMax`. |
 | `BANNER_SLOT_TOTAL_MAX` | 아니오 | 숨김·차단 포함 크리에이터 배너 보관 상한, 랜딩마다(기본 20, `[임시값]`). `BANNER_SLOT_MAX` 이상의 정수가 아니면 기동 거부. 응답 `bannerLimits.totalMax`. 운영 값을 바꿀 때는 비밀이 아니므로 `.sops.yaml` `unencrypted_regex`에 키를 먼저 더합니다(`DATABASE_POOL_MAX`와 같은 절차, [설계](../../../docs/specs/crelink-ad-banner.md#설정값)). |
@@ -251,6 +252,18 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 - 내리기 `PUT …/{id}/end`: `ends_at = least(coalesce(ends_at, now()), now())`, 예약 배너는 `starts_at = least(starts_at, now())`도 함께 당깁니다. 이미 끝난 배너는 바꾸지 않고 200(멱등). 수정·내리기는 배너 행 잠금(`FOR UPDATE`)으로 줄 섭니다.
 - 정렬 `PUT …/order`: 전체 id를 받아(아니면 400 `order_mismatch`) 0..n-1로 다시 매기고 새 순서의 목록을 돌려줍니다.
 - 등록·정렬·내리기는 트랜잭션 advisory lock(`pg_advisory_xact_lock(931475212)`, 보존 작업 931475211·migration 931475210과 다른 키)으로 줄 세워 맨 뒤 순서와 정렬이 동시 요청에 섞이지 않습니다.
+
+## 사전 신청
+
+링크별 사전 신청(R29~R31, [설계](../../../docs/specs/crelink-reservations.md)). 구현은 `src/reservations/`, 계약은 `packages/shared/src/crelink.ts`입니다.
+
+- 플래그: `ReservationsEnabledGuard`가 세션 검사보다 먼저 `RESERVATIONS_ENABLED`를 봅니다. 꺼지면 비로그인 요청도 없는 경로와 같은 404(`not_found`)입니다. 공개 응답의 `reservation`, 편집 상태의 `reservationsAvailable`도 사라집니다.
+- 공개 제출 순서: Origin·JSON → 본문 크기·입력 키 → 서명 토큰(403 `reservation_session_expired`) → 제한(10분에 방문자 5, IP 30, 링크 600 `[임시값]`, 버킷 접두사 `reservation:`, 방문 이벤트 한도와 분리) → 봇 판정(숨김 필드 `website`, 서명된 방문 시각에서 3초 미만이면 201·저장 안 함) → 입력 형식 → 트랜잭션. IP는 서명 토큰과 연결한 기존 `visits`로만 얻습니다.
+- 저장: `pg_advisory_xact_lock(213, hashtext(linkPublicId))` 안에서 링크를 `FOR SHARE`로 다시 읽고 5,000건 상한을 검사한 뒤 `ON CONFLICT DO NOTHING`입니다. 서버는 중복을 알리지 않습니다(201).
+- 권한: `me` 경로는 전부 `@ActorKinds('human')`과 소유자 조건을 둡니다. 남의 링크·신청은 403이 아니라 404입니다. 운영자 경로는 없습니다.
+- CSV: UTF-8 BOM, 모든 셀 큰따옴표, 첫 글자가 `=+-@`·전각 `＝＋－＠`·탭·CR이면 `'`를 붙입니다. 시각은 서울 기준, 휴대폰은 `010-1234-5678` 형식, 파일 이름은 ASCII입니다.
+- 보존: `RetentionService.runOnce`의 같은 트랜잭션에서 90일(`CRELINK_LIMITS.reservationRetentionDays`) 지난 행을 지웁니다. 플래그와 무관합니다. 링크 삭제는 CASCADE입니다.
+- 값 차단: 연락처는 POST 본문에만 두고 로그·오류 메시지·URL에 쓰지 않습니다. Sentry 로그 정리(`scrubLog`)가 이메일에 더해 휴대폰 패턴과 `phone`·`contact` 속성을 가립니다.
 
 ## 통계와 보존 작업
 

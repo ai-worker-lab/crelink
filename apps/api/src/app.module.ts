@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { FilesModule } from './files/files.module';
 import { CreatorModule } from './creator/creator.module';
 import { GuestbookModule } from './guestbook/guestbook.module';
+import { ReservationsModule } from './reservations/reservations.module';
 import { AdminModule } from './admin/admin.module';
 import { AiOperatorModule } from './ai-operator/ai-operator.module';
 import { RetentionModule } from './retention/retention.module';
@@ -23,6 +24,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     FilesModule,
     CreatorModule,
     GuestbookModule,
+    ReservationsModule,
     AdminModule,
     AiOperatorModule,
     RetentionModule,

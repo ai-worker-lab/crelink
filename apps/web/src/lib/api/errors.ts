@@ -56,6 +56,13 @@ const API_ERROR_MESSAGES: Record<CrelinkErrorCode, string> = {
   agent_run_required: '진행 중인 AI 실행 기록이 필요해요.',
   ai_operator_paused: 'AI 운영자가 멈춤 상태예요.',
   api_token_not_found: '토큰을 찾을 수 없어요. 화면을 새로 고쳐 주세요.',
+  // 사전 신청(R29~R31). 계약 타입 컴파일에 필요한 문구입니다. 화면 연결은 0219·0220에서 합니다.
+  reservation_contact_invalid: '연락처를 확인해 주세요.',
+  reservation_session_expired: '페이지를 다시 열어 주세요.',
+  reservation_unavailable: '지금은 신청할 수 없어요.',
+  reservation_closed: '신청이 마감되었어요.',
+  reservation_rate_limited: '신청이 많아요. 잠시 후 다시 시도해 주세요.',
+  reservation_not_found: '신청을 찾을 수 없어요. 화면을 새로 고쳐 주세요.',
 };
 
 /** 웹(BFF·클라이언트)에서만 생기는 오류 코드. */

@@ -41,6 +41,14 @@ export const CRELINK_LIMITS = {
   guestbookPageSize: 20,
   /** 배너 대체 문구 최대 길이(R20 ④, R21 ②). 한도 n·보관 상한은 공유 상수가 아니라 API 설정값이며 웹은 `BannerLimits`만 씁니다. */
   bannerAltMax: 100,
+  /** 사전 신청 보관 기간(일, R30). 지나면 보존 작업이 지웁니다. `[임시값]` */
+  reservationRetentionDays: 90,
+  /** 링크 하나의 사전 신청 상한(R29). 도달하면 409 `reservation_closed`. `[임시값]` */
+  reservationsPerLink: 5000,
+  /** 사전 신청 목록 한 쪽 크기(R30). `[임시값]` */
+  reservationPageSize: 50,
+  /** 사전 신청 이메일 최대 길이(R29). */
+  reservationEmailMax: 254,
 } as const;
 
 /** 배너 비율(가로:세로). 공개 랜딩·관리 미리보기·운영자 미리보기·정지 이미지 자르기가 같은 값을 씁니다. 근거: docs/specs/crelink-ad-banner.md. */
@@ -129,6 +137,13 @@ export type CrelinkErrorCode =
   | 'banner_period_invalid'
   // 광고 블록 켜고 끄기(R20 ⑩)
   | 'ad_block_unavailable'
+  // 링크별 사전 신청(R29~R31). 근거: docs/specs/crelink-reservations.md
+  | 'reservation_contact_invalid'
+  | 'reservation_session_expired'
+  | 'reservation_unavailable'
+  | 'reservation_closed'
+  | 'reservation_rate_limited'
+  | 'reservation_not_found'
   // AI 운영자(R23). 근거: docs/specs/crelink-ai-operator.md `오류 코드`.
   | 'agent_run_not_found'
   | 'agent_run_in_progress'
@@ -213,6 +228,8 @@ export interface LinkView {
   blocked: boolean;
   blockedReason: string | null;
   position: number;
+  /** 사전 신청 설정(R29). 기능이 꺼진 서버(`RESERVATIONS_ENABLED`)에서는 필드가 없습니다. */
+  reservation?: LinkReservationSetting;
 }
 
 export interface SocialLinkView {
@@ -304,6 +321,8 @@ export interface CreatorLandingState {
   bannerLimits: BannerLimits;
   /** 광고 블록 켜고 끄기(R20 ⑩). slot.kind = 'ad'일 때만 뜻이 있습니다. 배너 슬롯이 부여된 계정에는 쓰지 않습니다. */
   adBlock: CreatorAdBlockState;
+  /** 사전 신청 기능을 쓸 수 있는 서버면 true(R31). 꺼져 있으면 필드가 없고 웹은 메뉴를 그리지 않습니다. */
+  reservationsAvailable?: true;
 }
 
 /**
@@ -429,6 +448,8 @@ export interface PublicLinkView {
   faviconUrl: string;
   /** 단축 도메인 클릭 기록 주소 `{SHORT}/c/{linkPublicId}`. 방문자는 이 주소로 이동합니다. */
   clickUrl: string;
+  /** 사전 신청(R29). 기능이 꺼졌거나 이 링크가 `off`면 필드가 없습니다. */
+  reservation?: PublicLinkReservation;
 }
 
 /** 'ad' = 크리링 광고 블록(R20), 'creator' = 크리에이터 배너 슬롯(R21). */
@@ -602,6 +623,108 @@ export interface CreateGuestbookEntryRequest {
  */
 export interface SetGuestbookEntryHiddenRequest {
   hidden: boolean;
+}
+
+// ---------- 링크별 사전 신청 (R29~R31) ----------
+// 근거: docs/specs/crelink-reservations.md. `RESERVATIONS_ENABLED`가 정확히 `true`가 아니면 아래 경로는 모두 404이고 응답에 필드가 없습니다.
+
+export const RESERVATION_STATES = ['off', 'open', 'closed'] as const;
+/** `off` 받지 않음, `open` 받는 중, `closed` 마감. */
+export type ReservationState = (typeof RESERVATION_STATES)[number];
+
+export const RESERVATION_METHODS = ['email', 'phone'] as const;
+export type ReservationMethod = (typeof RESERVATION_METHODS)[number];
+
+/** 방문자가 동의한 문구의 판. 문구를 바꾸면 이 값도 바꿔 신청 행의 `consent_version`으로 구분합니다. */
+export const RESERVATION_CONSENT_VERSION = '2026-11-10';
+
+/** 크리에이터의 링크 설정. `open`·`closed`는 방식 1개 이상이 필요합니다. */
+export interface LinkReservationSetting {
+  state: ReservationState;
+  methods: ReservationMethod[];
+}
+
+/** 공개 랜딩의 사전 신청 표시. `off`인 링크에는 이 필드가 없습니다. */
+export interface PublicLinkReservation {
+  state: Exclude<ReservationState, 'off'>;
+  methods: ReservationMethod[];
+}
+
+/** `PUT /api/me/links/{id}/reservation`. 응답은 `LinkReservationSetting`. 400 `validation_failed`, 404 `link_not_found`. */
+export type SetLinkReservationRequest = LinkReservationSetting;
+
+/**
+ * `POST /api/landings/{publicId}/links/{linkPublicId}/reservations`(공개). 응답은 `CreateReservationResponse`(201).
+ * 같은 링크·같은 연락처는 1건이고 서버는 중복을 알리지 않습니다(201).
+ * 400 `validation_failed`·`reservation_contact_invalid`, 403 `forbidden`(Origin)·`reservation_session_expired`(토큰),
+ * 404 `reservation_unavailable`, 409 `reservation_closed`(마감·상한), 410 `creator_suspended`, 413, 429 `reservation_rate_limited`.
+ */
+export interface CreateReservationRequest {
+  /** 공개 랜딩 응답의 `telemetryToken`. */
+  token: string;
+  method: ReservationMethod;
+  contact: string;
+  consent: true;
+  /** 사람에게 보이지 않는 입력. 값이 있으면 저장하지 않고 201로 답합니다. */
+  website?: string;
+}
+
+export interface CreateReservationResponse {
+  status: 'received';
+}
+
+/** 크리에이터가 보는 신청 한 건. 연락처는 본인 링크의 신청에만 내려갑니다. */
+export interface ReservationView {
+  id: string;
+  /** 링크 uuid(`LinkView.id`). */
+  linkId: string;
+  linkTitle: string;
+  method: ReservationMethod;
+  /** 정규화한 값. 휴대폰은 `010-1234-5678` 형식입니다. */
+  contact: string;
+  createdAt: string;
+}
+
+export interface ReservationLinkSummary {
+  id: string;
+  title: string;
+  state: ReservationState;
+  count: number;
+}
+
+/**
+ * `GET /api/me/reservations?linkId=&cursor=` 응답. 최신순 `CRELINK_LIMITS.reservationPageSize`개.
+ * `links`는 `off`가 아니거나 신청이 남아 있는 내 링크입니다. 400 `validation_failed`(커서), 404 `link_not_found`(내 링크가 아닌 linkId).
+ */
+export interface ReservationPage {
+  items: ReservationView[];
+  nextCursor: string | null;
+  links: ReservationLinkSummary[];
+}
+
+const RESERVATION_EMAIL_PATTERN = /^[a-z0-9][a-z0-9._%+'-]*@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/;
+const RESERVATION_PHONE_PATTERN = /^01[016-9]\d{7,8}$/;
+
+/**
+ * 사전 신청 연락처를 저장 형식으로 바꿉니다(R29). 형식이 틀리면 null입니다. 웹 입력 검증과 API가 같은 규칙을 씁니다.
+ * 이메일: 소문자, 254자 이하, 첫 글자 영숫자. 휴대폰: `01[016-9]` 숫자만, `+82`는 `0`으로 바꿉니다(해외 번호는 비목표).
+ */
+export function normalizeReservationContact(method: ReservationMethod, value: string): string | null {
+  const text = value.trim();
+  if (method === 'email') {
+    const email = text.toLowerCase();
+    return email.length <= CRELINK_LIMITS.reservationEmailMax && RESERVATION_EMAIL_PATTERN.test(email) ? email : null;
+  }
+  const phone = text.replace(/[\s-]/g, '').replace(/^\+820?/, '0');
+  return RESERVATION_PHONE_PATTERN.test(phone) ? phone : null;
+}
+
+/** 저장한 연락처를 표시 형식으로 바꿉니다. 휴대폰은 `010-1234-5678`, 이메일은 그대로입니다. */
+export function formatReservationContact(method: ReservationMethod, contact: string): string {
+  if (method !== 'phone') return contact;
+  return contact.length === 11
+    ? `${contact.slice(0, 3)}-${contact.slice(3, 7)}-${contact.slice(7)}`
+    : `${contact.slice(0, 3)}-${contact.slice(3, 6)}-${contact.slice(6)}`;
 }
 
 // ---------- 운영자 (R10, R13, R14) ----------
@@ -1022,6 +1145,21 @@ export const CRELINK_API_PATHS = {
   meBanners: '/api/me/banners',
   meBanner: (id: string) => `/api/me/banners/${encodeURIComponent(id)}`,
   meBannersOrder: '/api/me/banners/order',
+  // 링크별 사전 신청(R29~R31)
+  landingLinkReservations: (publicId: string, linkPublicId: string) =>
+    `/api/landings/${encodeURIComponent(publicId)}/links/${encodeURIComponent(linkPublicId)}/reservations`,
+  meLinkReservation: (id: string) => `/api/me/links/${encodeURIComponent(id)}/reservation`,
+  meLinkReservations: (id: string) => `/api/me/links/${encodeURIComponent(id)}/reservations`,
+  meReservations: (options: { linkId?: string | null; cursor?: string | null } = {}) => {
+    const query = new URLSearchParams();
+    if (options.linkId) query.set('linkId', options.linkId);
+    if (options.cursor) query.set('cursor', options.cursor);
+    const text = query.toString();
+    return `/api/me/reservations${text ? `?${text}` : ''}`;
+  },
+  meReservationsExport: (linkId?: string | null) =>
+    `/api/me/reservations/export${linkId ? `?linkId=${encodeURIComponent(linkId)}` : ''}`,
+  meReservation: (id: string) => `/api/me/reservations/${encodeURIComponent(id)}`,
   file: (id: string) => `/api/files/${encodeURIComponent(id)}`,
   /** `pass`: 단축 주소 리디렉트가 랜딩 주소에 붙인 통과 표시(`LANDING_PASS_PARAM`). 있으면 그대로 넘겨 검증을 받습니다. */
   publicLanding: (publicId: string, pass?: string) =>

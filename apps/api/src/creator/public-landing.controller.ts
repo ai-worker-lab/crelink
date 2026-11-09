@@ -4,6 +4,8 @@ import {
   PublicBannerSlotView,
   PublicLandingResponse,
   PublicLinkView,
+  ReservationMethod,
+  ReservationState,
   resolveBannerSlot,
   ResolveBannerSlotInput,
 } from '@crelink/shared';
@@ -55,9 +57,11 @@ export class PublicLandingController {
         host: string;
         position: number;
         visible: boolean;
+        reservation_state: ReservationState;
+        reservation_methods: ReservationMethod[];
       }>(
         `SELECT l.block_id, l.public_id, l.title, l.description, l.thumbnail_file_id, l.host, l.position,
-                ${VISIBLE_LINK_CONDITION} AS visible
+                ${VISIBLE_LINK_CONDITION} AS visible, l.reservation_state, l.reservation_methods
          FROM links l WHERE l.user_id = $1 ORDER BY l.position, l.created_at`,
         [landing.user_id],
       ),
@@ -98,14 +102,18 @@ export class PublicLandingController {
           type: 'list',
           links: blockLinks
             .filter((link) => link.visible)
-            .map((link): PublicLinkView => ({
-              id: link.public_id,
-              title: link.title,
-              description: link.description,
-              thumbnailUrl: link.thumbnail_file_id ? this.files.imageUrl(link.thumbnail_file_id) : null,
-              faviconUrl: `https://${link.host}/favicon.ico`,
-              clickUrl: `${this.config.shortLinkBaseUrl}/c/${link.public_id}`,
-            })),
+            .map((link): PublicLinkView => {
+              const reservation = this.creator.publicReservation(link);
+              return {
+                id: link.public_id,
+                title: link.title,
+                description: link.description,
+                thumbnailUrl: link.thumbnail_file_id ? this.files.imageUrl(link.thumbnail_file_id) : null,
+                faviconUrl: `https://${link.host}/favicon.ico`,
+                clickUrl: `${this.config.shortLinkBaseUrl}/c/${link.public_id}`,
+                ...(reservation ? { reservation } : {}),
+              };
+            }),
           slot:
             block.id === slotBlockId
               ? this.slot(publicId, passAccepted, {

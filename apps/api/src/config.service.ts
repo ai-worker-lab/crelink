@@ -197,6 +197,11 @@ export class AppConfig implements OnModuleInit {
     return parseBannerSlotLimits(process.env);
   }
 
+  /** 링크별 사전 신청 기능(R31). 값이 정확히 `true`일 때만 켜집니다. 운영에는 법률 검토와 처리방침 반영 전까지 넣지 않습니다. */
+  get reservationsEnabled(): boolean {
+    return process.env.RESERVATIONS_ENABLED === 'true';
+  }
+
   /** 앞단의 신뢰할 리버스 프록시 수. 방문·클릭 IP를 `X-Forwarded-For`에서 고르는 기준(`clientIp`). */
   get trustedProxyHops(): number {
     return parseTrustedProxyHops(process.env.TRUSTED_PROXY_HOPS);

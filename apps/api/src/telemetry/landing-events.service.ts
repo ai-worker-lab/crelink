@@ -16,6 +16,7 @@ import { bodyObject } from '../common/input';
 import { Database } from '../database';
 import { LandingPassService } from '../short-link/landing-pass.service';
 import { VISIBLE_LINK_CONDITION } from '../creator/creator.service';
+import { consumeLimitBuckets, SOURCE_VISIT_SQL } from './landing-limits';
 
 const INPUT_KEYS = new Set([
   'token',
@@ -158,22 +159,9 @@ export class LandingEventsService {
 
   private async rate(visitorId: string, sourceIp: string | null): Promise<void> {
     // BFF 소켓·임의 XFF는 방문자 IP가 아닙니다. 서명과 연결한 기존 방문 IP만 제한에 씁니다.
-    const allowed = await this.database.transaction(async (client) => {
-      await client.query("DELETE FROM landing_event_limits WHERE window_start < now() - interval '15 minutes'");
-      const buckets: Array<readonly [string, number]> = [[`visitor:${hash(visitorId)}`, 120]];
-      if (sourceIp) buckets.push([`source:${hash(sourceIp)}`, 240]);
-      for (const [bucket, max] of buckets) {
-        const result = await client.query<{ used: number }>(
-          `INSERT INTO landing_event_limits(bucket,used) VALUES($1,1)
-           ON CONFLICT(bucket) DO UPDATE SET used = CASE WHEN landing_event_limits.window_start < now() - interval '1 minute' THEN 1 ELSE landing_event_limits.used + 1 END,
-           window_start = CASE WHEN landing_event_limits.window_start < now() - interval '1 minute' THEN now() ELSE landing_event_limits.window_start END RETURNING used`,
-          [bucket],
-        );
-        if (result.rows[0].used > max) return false;
-      }
-      return true;
-    });
-    if (!allowed) limited();
+    const buckets: Array<readonly [string, number]> = [[`visitor:${hash(visitorId)}`, 120]];
+    if (sourceIp) buckets.push([`source:${hash(sourceIp)}`, 240]);
+    if (!(await consumeLimitBuckets(this.database, buckets, 1))) limited();
   }
 
   private async target(
@@ -223,14 +211,10 @@ export class LandingEventsService {
       forbidden();
     const event = this.input(body);
     const binding = this.passes.verifyTelemetry(publicId, event.token) ?? forbidden();
-    // shortcut: 시각으로 연결해 동시 진입은 구분 못 함, 진입별 정확한 연결이 필요하면 방문 ID를 서명에 포함합니다.
     const shortSource = (
       await this.database.query<EventRow>(
         `SELECT v.id AS source_visit_id, v.ip, v.country, v.city, v.referrer_host, v.user_agent, v.device_type, v.browser, v.os, v.utm
-       FROM visits v JOIN short_links sl ON sl.id=v.short_link_id JOIN landings l ON l.id=sl.landing_id
-       WHERE l.public_id=$1 AND v.visitor_id=$2
-         AND v.occurred_at BETWEEN to_timestamp($3::double precision-5) AND to_timestamp($3::double precision+60)
-       ORDER BY abs(extract(epoch FROM v.occurred_at)-$3::double precision) LIMIT 1`,
+       ${SOURCE_VISIT_SQL}`,
         [publicId, binding.visitorId, binding.sourceAt],
       )
     ).rows[0];

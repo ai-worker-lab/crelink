@@ -18,17 +18,18 @@ const SCRUBBED_QUERY_PARAMS = ['code', 'state', 'pass'];
 const SCRUBBED_SPAN_ATTRIBUTE = new RegExp(`^http\\.(request|response)\\.header\\.(${SCRUBBED_HEADERS.join('|')})$`);
 
 /**
- * Sentry Logs 속성에서 지우는 이름: 쿠키·인증 헤더·토큰·비밀값·비밀번호·이메일. 스코프 user에서 SDK가 더하는 `user.email`·`user.name`도
+ * Sentry Logs 속성에서 지우는 이름: 쿠키·인증 헤더·토큰·비밀값·비밀번호·이메일·휴대폰·연락처. 스코프 user에서 SDK가 더하는 `user.email`·`user.name`도
  * 지웁니다. `user.id`(내부 UUID)는 오류 이벤트와 같이 남깁니다.
  */
-const SCRUBBED_LOG_ATTRIBUTE = /cookie|authorization|token|secret|password|email/i;
+const SCRUBBED_LOG_ATTRIBUTE = /cookie|authorization|token|secret|password|email|phone|contact/i;
 const SCRUBBED_LOG_USER_ATTRIBUTES = ['user.email', 'user.name'];
 
 /** Sentry Metrics 속성에서 지우는 이름: 스코프 user(`user.id`·`user.email`·`user.name` 등)와 이메일·IP 속성. */
 const SCRUBBED_METRIC_ATTRIBUTE = /^user\.|email|(^|[._-])ip([._-]|$)|ip_?address|client\.address|remote_?addr/i;
 
-/** 로그 본문·문자열 속성에서 가리는 값: 이메일 주소와 JWT(라이브러리 오류 문구에 섞여 들어오는 경우의 마지막 방어). */
+/** 로그 본문·문자열 속성에서 가리는 값: 이메일 주소·휴대폰 번호·JWT(라이브러리 오류 문구에 섞여 들어오는 경우의 마지막 방어). */
 const EMAIL_PATTERN = /[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[A-Za-z]{2,}/g;
+const PHONE_PATTERN = /(?<![\d.-])(?:\+82[-.\s]?0?1|01)[016-9][-.\s]?\d{3,4}[-.\s]?\d{4}(?!\d)/g;
 const JWT_PATTERN = /eyJ[\w-]{10,}(?:\.[\w-]+){0,2}/g;
 
 /** `SENTRY_TRACES_SAMPLE_RATE`: 비면 0.1, 0~1 사이 수가 아니면 오류(기동 거부). */
@@ -98,19 +99,22 @@ export function scrubSpan(span: StreamedSpan): StreamedSpan {
   return span;
 }
 
+/** 본문·문자열 속성의 이메일 주소를 `[email]`, 휴대폰 번호를 `[phone]`, JWT를 `[token]`으로 가립니다. */
+function maskLogText(text: string): string {
+  return text.replace(EMAIL_PATTERN, '[email]').replace(PHONE_PATTERN, '[phone]').replace(JWT_PATTERN, '[token]');
+}
+
 /**
- * 로그에서 쿠키·인증·토큰·비밀값·이메일 속성과 `user.email`·`user.name`을 지우고, 본문과 남은 문자열 속성의 이메일 주소를 `[email]`,
- * JWT를 `[token]`으로 가립니다. `user.id`(내부 UUID)와 `nest.context` 같은 나머지 속성은 남깁니다.
+ * 로그에서 쿠키·인증·토큰·비밀값·이메일·휴대폰·연락처 속성과 `user.email`·`user.name`을 지우고, 본문과 남은 문자열 속성의 값을 `maskLogText`로
+ * 가립니다. `user.id`(내부 UUID)와 `nest.context` 같은 나머지 속성은 남깁니다.
  */
 export function scrubLog(log: Log): Log {
   const attributes: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(log.attributes ?? {})) {
     if (SCRUBBED_LOG_ATTRIBUTE.test(key) || SCRUBBED_LOG_USER_ATTRIBUTES.includes(key)) continue;
-    attributes[key] =
-      typeof value === 'string' ? value.replace(EMAIL_PATTERN, '[email]').replace(JWT_PATTERN, '[token]') : value;
+    attributes[key] = typeof value === 'string' ? maskLogText(value) : value;
   }
-  const message = String(log.message).replace(EMAIL_PATTERN, '[email]').replace(JWT_PATTERN, '[token]');
-  return { ...log, message, attributes };
+  return { ...log, message: maskLogText(String(log.message)), attributes };
 }
 
 /** 지표 속성에서 스코프 user(`user.id`·`user.email`·`user.name` 등)와 이메일·IP 속성을 지웁니다. 지표 속성은 낮은 카디널리티 값만 둡니다. */

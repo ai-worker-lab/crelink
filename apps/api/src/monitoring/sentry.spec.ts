@@ -106,6 +106,33 @@ describe('Sentry 설정', () => {
     });
   });
 
+  it('로그 본문·문자열 속성의 휴대폰 번호를 가리고 연락처·휴대폰 속성을 지우며 UUID·타임스탬프는 그대로 둔다', () => {
+    const log = scrubLog({
+      level: 'error',
+      message: 'INSERT 실패: 010-1234-5678 / 01098765432 / +82 10 1234 5678 / 011-234-5678',
+      attributes: {
+        'nest.context': 'ReservationsService',
+        'nest.stack': 'Error: 신청 실패 0101234567 (반복)\n    at submit (reservations.service.ts:1:1)',
+        phoneNumber: '01012345678',
+        contact: 'fan@example.com',
+        'user.id': USER_ID,
+        'event.timestamp': '20261110091512',
+        'event.epoch': '1762732512000',
+      },
+    });
+    expect(log.message).toBe('INSERT 실패: [phone] / [phone] / [phone] / [phone]');
+    expect(log.attributes).toEqual({
+      'nest.context': 'ReservationsService',
+      'nest.stack': 'Error: 신청 실패 [phone] (반복)\n    at submit (reservations.service.ts:1:1)',
+      'user.id': USER_ID,
+      'event.timestamp': '20261110091512',
+      'event.epoch': '1762732512000',
+    });
+    expect(scrubLog({ level: 'info', message: `요청 ${USER_ID} 처리`, attributes: {} }).message).toBe(
+      `요청 ${USER_ID} 처리`,
+    );
+  });
+
   it('지표 속성에서 사용자 ID·이메일·이름·IP를 지우고 열거값은 남긴다', () => {
     const metric = scrubMetric({
       name: 'crelink.auth.login',
