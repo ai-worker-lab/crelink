@@ -4,6 +4,10 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-11-09
+
+- Nest 12.4.0 보안 갱신(0207): `multer`를 2.5.0으로 올리기 위해 Nest 네 패키지와 잠금 파일을 갱신했습니다. Dependabot #139를 나눠 처리하는 첫 단계이며 세부는 [백엔드 로그](apps/api/CHANGELOGS.md), 응답 비교와 검증은 [0207](docs/work/orchestrator/0207-nest-security-update.md)에 있습니다. main 병합·배포는 포함하지 않습니다.
+
 ## 2026-11-07
 
 - PR149 main 기준 병합 준비 재검토: 선행 PR148의 squash merge 뒤 기존 feature branch에 최신 main을 정상 merge하고8개 파일의 ancestry 충돌을 밀도·0205·기존 회귀 보존으로 해결합니다. 목적이 끝난 stacked CI trigger를 제거해 main 대상 원래 검증 계약으로 되돌리고 사람 병합 전 최종 SHA/merge ref·독립 검토·CI 근거는 [0201](docs/work/crelink-pm/0201-list-density.md)과 PR149에 연결합니다. 실제 PR merge/deploy는 수행하지 않습니다.
