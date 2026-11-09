@@ -1,12 +1,14 @@
 // ego-lite 시험의 합성 사용자·세션. tests/e2e/fixtures.ts의 E2EData.user·removeUsers와 같은 행을 같은 순서로 만들고 지웁니다.
 // fixtures.ts는 Playwright와 CommonJS(__dirname)·비소거 TS 문법에 묶여 일반 Node에서 불러올 수 없어 필요한 부분만 옮겼습니다.
 // 가입 행 구조가 바뀌면 fixtures.ts와 이 파일을 함께 고칩니다.
+/* global URL */
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
 
 export const TEST_EMAIL_DOMAIN = 'e2e.crelink.test';
+export const TEST_HOST_SUFFIX = 'e2e.test';
 const STALE_INTERVAL = '1 hour';
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -17,9 +19,10 @@ export class SyntheticData {
   users = [];
   sequence = 0;
 
-  constructor(db, { root, webUrl }) {
+  constructor(db, { root, webUrl, shortUrl }) {
     this.db = db;
     this.webUrl = webUrl;
+    this.shortUrl = shortUrl;
     this.uploadDir = process.env.UPLOAD_DIR?.trim()
       ? resolve(root, 'apps/api', process.env.UPLOAD_DIR.trim())
       : join(root, '.local/uploads');
@@ -30,8 +33,13 @@ export class SyntheticData {
     return `${prefix}-${this.run}${this.sequence}`;
   }
 
-  /** 가입 트랜잭션과 같은 행 + 세션. 기본값은 fixtures.ts와 같이 지표 제외 계정입니다. */
-  async user({ role = 'creator', displayName = null } = {}) {
+  /** 시험 전용 외부 링크 주소. `.test`는 DNS로 풀리지 않아 실제 외부 사이트로 나가지 않습니다. */
+  externalUrl(label) {
+    return `https://${this.unique('site')}.${TEST_HOST_SUFFIX}/${label}`;
+  }
+
+  /** 가입 트랜잭션과 같은 행 + 세션. 기본값은 fixtures.ts와 같이 지표 제외 계정입니다. renamed는 자동 주소를 방금 바꾼 상태입니다. */
+  async user({ role = 'creator', displayName = null, bio = null, links = [], renamed = false } = {}) {
     const email = `${this.unique(role)}@${TEST_EMAIL_DOMAIN}`;
     const sessionToken = randomBytes(32).toString('base64url');
     const client = await this.db.connect();
@@ -50,24 +58,76 @@ export class SyntheticData {
       const publicId = randomToken(10);
       const { rows: landings } = await client.query(
         'INSERT INTO landings (user_id, public_id, display_name, bio) VALUES ($1, $2, $3, $4) RETURNING id',
-        [userId, publicId, displayName, null],
+        [userId, publicId, displayName, bio],
       );
       const landingId = landings[0].id;
-      await client.query(`INSERT INTO landing_blocks (landing_id, type, position) VALUES ($1, 'list', 0)`, [landingId]);
-      const { rows: shortLinks } = await client.query(
-        `INSERT INTO short_links (user_id, landing_id, slug_changed_at) VALUES ($1, $2, NULL) RETURNING id`,
-        [userId, landingId],
+      const { rows: blocks } = await client.query(
+        `INSERT INTO landing_blocks (landing_id, type, position) VALUES ($1, 'list', 0) RETURNING id`,
+        [landingId],
       );
-      await client.query(`INSERT INTO short_slugs (slug, short_link_id, is_auto) VALUES ($1, $2, true)`, [
-        randomToken(7),
-        shortLinks[0].id,
+      const { rows: shortLinks } = await client.query(
+        `INSERT INTO short_links (user_id, landing_id, slug_changed_at) VALUES ($1, $2, $3) RETURNING id`,
+        [userId, landingId, renamed ? new Date() : null],
+      );
+      const shortLinkId = shortLinks[0].id;
+      const autoSlug = randomToken(7);
+      let slug = autoSlug;
+      let oldSlug = null;
+      if (renamed) {
+        slug = this.unique('e2e');
+        oldSlug = autoSlug;
+        await client.query(
+          `INSERT INTO short_slugs (slug, short_link_id, is_auto, retired_at) VALUES ($1, $2, true, now())`,
+          [autoSlug, shortLinkId],
+        );
+      }
+      await client.query(`INSERT INTO short_slugs (slug, short_link_id, is_auto) VALUES ($1, $2, $3)`, [
+        slug,
+        shortLinkId,
+        !renamed,
       ]);
+      const seededLinks = [];
+      for (const [position, link] of links.entries()) {
+        const linkPublicId = randomToken(10);
+        const { rows } = await client.query(
+          `INSERT INTO links (public_id, user_id, block_id, title, url, host, position, hidden)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+          [
+            linkPublicId,
+            userId,
+            blocks[0].id,
+            link.title,
+            link.url,
+            new URL(link.url).hostname,
+            position,
+            !!link.hidden,
+          ],
+        );
+        seededLinks.push({
+          ...link,
+          hidden: !!link.hidden,
+          id: rows[0].id,
+          publicId: linkPublicId,
+          clickUrl: `${this.shortUrl}/c/${linkPublicId}`,
+        });
+      }
       await client.query(
         `INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '1 day')`,
         [userId, createHash('sha256').update(sessionToken).digest('hex')],
       );
       await client.query('COMMIT');
-      return { userId, role, publicId, landingUrl: `${this.webUrl}/p/${publicId}`, sessionToken };
+      return {
+        userId,
+        role,
+        publicId,
+        landingUrl: `${this.webUrl}/p/${publicId}`,
+        shortLinkId,
+        slug,
+        shortUrl: `${this.shortUrl}/${slug}`,
+        oldSlug,
+        sessionToken,
+        links: seededLinks,
+      };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -82,6 +142,14 @@ export class SyntheticData {
       `%@${TEST_EMAIL_DOMAIN}`,
       STALE_INTERVAL,
     ]);
+  }
+
+  /**
+   * 방문 이벤트의 분당 제한 카운터를 비웁니다. Playwright는 시험마다 새 컨텍스트라 cl_vid가 매번 새것이지만 ego는 프로필의 cl_vid를 지우지 않아
+   * 짧은 반복 실행이 같은 방문자 예산(120건/분)을 나눠 쓰고 429로 실패합니다(0230 실측). 카운터는 사용자 데이터가 아니며 loadTargets가 루프백 DB만 허용합니다.
+   */
+  async resetVisitorRateLimits() {
+    await this.db.query('DELETE FROM landing_event_limits');
   }
 
   async dispose() {
