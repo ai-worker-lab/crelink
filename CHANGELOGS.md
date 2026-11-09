@@ -4,6 +4,10 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-11-09
+
+- `.sops.yaml`의 operator 수신자를 새 키로 교체했습니다(0208).
+
 ## 2026-11-07
 
 - PR149 main 기준 병합 준비 재검토: 선행 PR148의 squash merge 뒤 기존 feature branch에 최신 main을 정상 merge하고8개 파일의 ancestry 충돌을 밀도·0205·기존 회귀 보존으로 해결합니다. 목적이 끝난 stacked CI trigger를 제거해 main 대상 원래 검증 계약으로 되돌리고 사람 병합 전 최종 SHA/merge ref·독립 검토·CI 근거는 [0201](docs/work/crelink-pm/0201-list-density.md)과 PR149에 연결합니다. 실제 PR merge/deploy는 수행하지 않습니다.
