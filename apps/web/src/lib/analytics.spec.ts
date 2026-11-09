@@ -7,10 +7,20 @@ import {
   analyticsDuration,
   analyticsFilters,
   analyticsHref,
+  analyticsOwnerBadge,
   analyticsPercent,
   analyticsRawCount,
   analyticsRawPercent,
 } from './analytics.ts';
+
+describe('본인 방문 뱃지', () => {
+  it('값이 있으면 건수를, 표시가 없던 구간은 0 대신 뱃지 없음을 돌려준다', () => {
+    assert.equal(analyticsOwnerBadge(3), '본인 3');
+    assert.equal(analyticsOwnerBadge(1234), '본인 1,234');
+    assert.equal(analyticsOwnerBadge(0), '본인 0');
+    assert.equal(analyticsOwnerBadge(null), null);
+  });
+});
 
 describe('분석 화면 조회 범위', () => {
   it('내 통계는 URL을 조작해도 다른 계정·관리자 조건을 API에 넘기지 않는다', () => {

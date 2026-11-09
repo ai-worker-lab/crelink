@@ -54,6 +54,8 @@ export const analyticsRawCount = (value: number | null) =>
   value === null ? ANALYTICS_RAW_ONLY_UNAVAILABLE : formatNumber(value);
 export const analyticsRawPercent = (value: number | null) =>
   value === null ? ANALYTICS_RAW_ONLY_UNAVAILABLE : `${decimal.format(value * 100)}%`;
+/** 본인 방문 뱃지 문구(0233). 본인 표시가 없던 구간(null)은 0으로 적지 않고 뱃지를 내지 않습니다. */
+export const analyticsOwnerBadge = (value: number | null) => (value === null ? null : `본인 ${formatNumber(value)}`);
 export function analyticsDuration(value: number | null): string {
   if (value === null) return '계산 불가';
   if (value < 60_000) return `${decimal.format(value / 1000)}초`;

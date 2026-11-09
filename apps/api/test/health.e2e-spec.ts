@@ -129,6 +129,7 @@ describe('API 기동과 health', () => {
         { version: '0011_link_layout' },
         { version: '0012_list_density' },
         { version: '0013_signup_funnel' },
+        { version: '0014_landing_event_owner' },
       ]);
     } finally {
       await client.end();

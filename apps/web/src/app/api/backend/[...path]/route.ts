@@ -17,6 +17,7 @@ export const dynamic = 'force-dynamic';
  * 로그인 시작·콜백은 BFF가 아니라 전용 route handler(`/auth/google`, `/auth/google/callback`)가 부릅니다.
  * `upload`는 multipart 본문과 Content-Type(boundary 포함)을 그대로 넘기는 경로입니다.
  * `signupInAppKind`는 첫 링크 합계(0231)에 쓸 앱 내 브라우저 종류만 내부 헤더로 넘기는 경로입니다. User-Agent 원문은 넘기지 않습니다.
+ * `visitorEvent`는 익명 수집이라 쿠키를 넘기지 않습니다. `ownerSession`이 있는 랜딩 이벤트만 본인 방문 표시(0233)를 위해 `cl_session`을 API로 넘깁니다.
  */
 const ID = '[^/]+';
 const rules: ReadonlyArray<{
@@ -24,6 +25,7 @@ const rules: ReadonlyArray<{
   pattern: RegExp;
   upload?: true;
   visitorEvent?: true;
+  ownerSession?: true;
   signupInAppKind?: true;
 }> = [
   { methods: ['GET'], pattern: /^api\/health$/ },
@@ -50,7 +52,7 @@ const rules: ReadonlyArray<{
   { methods: ['POST'], pattern: /^api\/me\/files$/, upload: true },
   { methods: ['GET'], pattern: new RegExp(`^api/files/${ID}$`) },
   { methods: ['GET'], pattern: new RegExp(`^api/public/landings/${ID}$`) },
-  { methods: ['POST'], pattern: /^api\/landings\/[a-z0-9]{10}\/events$/, visitorEvent: true },
+  { methods: ['POST'], pattern: /^api\/landings\/[a-z0-9]{10}\/events$/, visitorEvent: true, ownerSession: true },
   { methods: ['POST'], pattern: /^api\/signup-funnel\/events$/, visitorEvent: true },
   { methods: ['GET'], pattern: /^api\/admin\/creators$/ },
   { methods: ['GET'], pattern: new RegExp(`^api/admin/creators/${ID}$`) },
@@ -97,7 +99,7 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
   request.nextUrl.searchParams.forEach((value, key) => target.searchParams.append(key, value));
   const headers = apiRequestHeaders({ Accept: request.headers.get('accept') ?? 'application/json' });
   const session = request.cookies.get(COOKIE_NAMES.session)?.value;
-  if (session && !rule.visitorEvent) headers.set('Cookie', `${COOKIE_NAMES.session}=${session}`);
+  if (session && (!rule.visitorEvent || rule.ownerSession)) headers.set('Cookie', `${COOKIE_NAMES.session}=${session}`);
   if (rule.signupInAppKind) {
     headers.set(
       SIGNUP_CONTEXT_HEADER,

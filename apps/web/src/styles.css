@@ -3557,6 +3557,12 @@ body:has(.sheet[open]) {
 .analytics-tiles dd {
   overflow-wrap: anywhere;
 }
+.analytics-owner-badge {
+  margin-left: var(--ds-space-6);
+  font-family: var(--ds-font-sans);
+  vertical-align: middle;
+  white-space: nowrap;
+}
 .analytics-trend {
   margin: 0;
 }

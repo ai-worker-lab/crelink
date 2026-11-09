@@ -1,10 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { Logger } from '@nestjs/common';
 import type {
   CreatorLandingState,
   LandingEventRequest,
   PublicLandingResponse,
   UploadFileResponse,
 } from '@crelink/shared';
+import { Database } from '../src/database';
 import { LandingPassService } from '../src/short-link/landing-pass.service';
 import { RetentionService } from '../src/retention/retention.service';
 import { PNG_STILL } from './image-samples';
@@ -145,6 +147,90 @@ describe('공개 랜딩 브라우저 계측', () => {
   });
   afterAll(async () => {
     await t?.close();
+  });
+
+  const ownerFlags = async (pageViewId: string) =>
+    (
+      await t.pool.query<{ kind: string; is_owner: boolean }>(
+        'SELECT kind,is_owner FROM landing_events WHERE page_view_id=$1 ORDER BY kind',
+        [pageViewId],
+      )
+    ).rows;
+
+  it('소유자 세션의 페이지뷰만 본인으로 표시하고 이후 이벤트는 페이지뷰 값을 따른다', async () => {
+    const page = binding().body;
+    expect((await send(page, owner, { cookie: owner.cookie })).status).toBe(204);
+    const click = event(page, { type: 'click', targetKind: 'link', targetId: owner.linkId });
+    expect((await send(click)).status).toBe(204);
+    expect(await ownerFlags(page.pageViewId)).toEqual([
+      { kind: 'click', is_owner: true },
+      { kind: 'page_view', is_owner: true },
+    ]);
+
+    const anonymous = binding().body;
+    await seed(anonymous);
+    const lateLogin = event(anonymous, { type: 'click', targetKind: 'link', targetId: owner.linkId });
+    expect((await send(lateLogin, owner, { cookie: owner.cookie })).status).toBe(204);
+    expect(await ownerFlags(anonymous.pageViewId)).toEqual([
+      { kind: 'click', is_owner: false },
+      { kind: 'page_view', is_owner: false },
+    ]);
+  });
+
+  it('비로그인과 다른 사용자 세션은 표시 없이 저장한다', async () => {
+    const guest = binding().body;
+    expect((await send(guest)).status).toBe(204);
+    expect(await ownerFlags(guest.pageViewId)).toEqual([{ kind: 'page_view', is_owner: false }]);
+
+    const stranger = binding().body;
+    expect((await send(stranger, owner, { cookie: other.cookie })).status).toBe(204);
+    expect(await ownerFlags(stranger.pageViewId)).toEqual([{ kind: 'page_view', is_owner: false }]);
+  });
+
+  it('잘못되거나 만료된 세션, 세션 확인 실패에도 이벤트를 표시 없이 저장하고 로그에 값을 남기지 않는다', async () => {
+    const garbage = binding().body;
+    expect((await send(garbage, owner, { cookie: 'cl_session=not-a-real-token' })).status).toBe(204);
+    expect(await ownerFlags(garbage.pageViewId)).toEqual([{ kind: 'page_view', is_owner: false }]);
+
+    const malformed = binding().body;
+    expect((await send(malformed, owner, { cookie: 'cl_session=%E0%A4%A' })).status).toBe(204);
+    expect(await ownerFlags(malformed.pageViewId)).toEqual([{ kind: 'page_view', is_owner: false }]);
+
+    const expiring = await newCreator();
+    await t.pool.query("UPDATE sessions SET expires_at=now()-interval '1 minute' WHERE user_id=$1", [expiring.userId]);
+    const expired = binding(expiring).body;
+    expect((await send(expired, expiring, { cookie: expiring.cookie })).status).toBe(204);
+    expect(await ownerFlags(expired.pageViewId)).toEqual([{ kind: 'page_view', is_owner: false }]);
+
+    const database = t.app.get(Database);
+    const query = database.query.bind(database);
+    const failing = jest
+      .spyOn(database, 'query')
+      .mockImplementation(((sql: string, values?: unknown[]) =>
+        sql.includes('FROM sessions s')
+          ? Promise.reject(new Error('session lookup failed'))
+          : query(sql, values)) as typeof database.query);
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    try {
+      const failed = binding().body;
+      expect((await send(failed, owner, { cookie: owner.cookie })).status).toBe(204);
+      expect(await ownerFlags(failed.pageViewId)).toEqual([{ kind: 'page_view', is_owner: false }]);
+      expect(warn).toHaveBeenCalledTimes(1);
+      const logged = JSON.stringify(warn.mock.calls);
+      expect(logged).not.toContain(owner.cookie.split('=')[1]);
+      expect(logged).not.toContain(owner.userId);
+    } finally {
+      failing.mockRestore();
+      warn.mockRestore();
+    }
+  });
+
+  it('입력으로 본인 표시를 넣을 수 없다', async () => {
+    const forged = { ...binding().body, isOwner: true };
+    expect((await send(forged)).status).toBe(400);
+    expect(
+      (await t.pool.query('SELECT 1 FROM landing_events WHERE page_view_id=$1', [forged.pageViewId])).rowCount,
+    ).toBe(0);
   });
 
   it('단축 UTM·익명 방문자 바인딩을 보존하며 공개 응답에 token·안정 키·대상 ID를 준다', async () => {

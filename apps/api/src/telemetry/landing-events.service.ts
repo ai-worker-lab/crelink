@@ -10,6 +10,7 @@ import {
 import type { Request } from 'express';
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
+import { AuthService } from '../auth/auth.service';
 import { AppConfig } from '../config.service';
 import { apiError, UUID_PATTERN } from '../common/http';
 import { bodyObject } from '../common/input';
@@ -70,6 +71,7 @@ interface EventRow {
   screen_width: number | null;
   screen_height: number | null;
   pixel_ratio: number | null;
+  is_owner: boolean;
 }
 
 @Injectable()
@@ -78,6 +80,7 @@ export class LandingEventsService {
     private readonly database: Database,
     private readonly config: AppConfig,
     private readonly passes: LandingPassService,
+    private readonly auth: AuthService,
   ) {}
 
   private input(body: unknown): LandingEventRequest {
@@ -235,6 +238,8 @@ export class LandingEventsService {
       )
     ).rows[0];
     await this.rate(binding.visitorId, shortSource?.ip ?? null);
+    // 본인 표시는 페이지뷰에서만 정하고 이후 이벤트는 앵커 값을 따릅니다. 트랜잭션 밖에서 확인해 실패가 저장을 막지 않습니다.
+    const viewerId = event.type === 'page_view' ? await this.auth.sessionUserId(request) : null;
     await this.database.transaction(async (client) => {
       const landing = await client.query<{ id: string; user_id: string; short_link_id: string }>(
         `SELECT l.id,l.user_id,sl.id AS short_link_id FROM landings l JOIN users u ON u.id=l.user_id JOIN short_links sl ON sl.landing_id=l.id
@@ -293,8 +298,8 @@ export class LandingEventsService {
       const inserted = await client.query(
         `INSERT INTO landing_events(event_id,page_view_id,session_id,short_link_id,visitor_id,kind,target_kind,target_id,
           source_visit_id,ip,country,city,referrer_host,user_agent,device_type,browser,os,utm,language,time_zone,
-          viewport_width,viewport_height,screen_width,screen_height,pixel_ratio,active_ms,scroll_percent)
-         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
+          viewport_width,viewport_height,screen_width,screen_height,pixel_ratio,active_ms,scroll_percent,is_owner)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
          ON CONFLICT DO NOTHING RETURNING event_id`,
         [
           event.eventId,
@@ -324,6 +329,7 @@ export class LandingEventsService {
           context.pixel_ratio,
           event.activeMs ?? 0,
           event.scrollPercent ?? 0,
+          anchor?.is_owner ?? viewerId === page.user_id,
         ],
       );
       if (!inserted.rowCount) {

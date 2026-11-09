@@ -32,11 +32,22 @@
 
 새 데이터를 수집하지 않고 저장된 값으로 세 가지를 더한다. 응답 원본은 `AnalyticsReport`의 `sources`, `visitorRecency`, `botExclusions`이고 근거와 적용 위치는 [0232](../work/orchestrator/0232-visitor-metrics.md)다.
 
-- 봇 제외: `isBotUserAgent`(`packages/shared/src/bot-user-agent.ts`, 패턴 목록)로 저장된 `user_agent`를 판별해 `landing_events`와 `visits`·`link_clicks`·`creator_banner_clicks`의 합계·분포·대상에서 뺀다. 제외 건수만 응답·화면에 나타나고 원문·봇 이름은 내리지 않는다. 값이 없으면 사람으로 둔다.
+- 봇 제외: `isBotUserAgent`(`packages/shared/src/bot-user-agent.ts`, 패턴 목록)로 저장된 `user_agent`를 판별해 `landing_events`와 `visits`·`link_clicks`·`creator_banner_clicks`의 합계·분포·대상에서 뺀다. 제외 건수만 응답·화면에 나타나고 원문·봇 이름은 내리지 않는다. 값이 없으면 사람으로 둔다. IP 기준은 [0233](#본인-방문-표시와-meta-링크-검사-제외0233)에서 더했다.
 - 유입별 클릭률: 유입 사이트·UTM 소스 값별 페이지뷰, 한 번 이상 클릭한 페이지뷰, 그 비율. 상위 20개 뒤는 기타로 합쳐 분모·분자를 보존한다.
 - 신규·재방문: 선택 기간 익명 방문자를 같은 소유 범위의 기간 시작 전 사람 `page_view` 유무로 나눈다. 비교는 남아 있는 원본(365일) 안에서만 하며 화면에 적는다.
 - 보존 합계가 선택 기간에 섞이면 세 지표는 `null`이고 화면에 `집계 불가`로 표시한다. 보존 합계에는 User-Agent가 없어 봇을 뺄 수 없고 그대로 남는다.
 - 값별 합계만 보여 주고 날짜×유입 교차, 개별 방문자 목록, 봇 종류는 만들지 않는다.
+
+## 본인 방문 표시와 Meta 링크 검사 제외(0233)
+
+근거와 시험은 [0233](../work/orchestrator/0233-owner-badge.md)이다.
+
+- 본인 표시: 공개 랜딩 페이지뷰를 저장할 때 유효한 로그인 세션의 사용자가 그 랜딩 소유자이면 `landing_events.is_owner`를 true로 둔다. 같은 페이지뷰의 이후 이벤트는 페이지뷰 값을 따른다. 세션 확인이 실패해도 표시 없이 저장한다. 계정 ID·세션은 저장하지 않고 `cl_vid`와 계정을 잇는 표나 새 쿠키를 만들지 않는다.
+- 계약: `AnalyticsReport.ownerVisits`와 `AnalyticsDaily.ownerPageViews`·`ownerUniqueVisitors`. 합계에서 빼지 않은 건수이고 화면은 페이지뷰·익명 순 방문자에 `본인 N`으로 붙인다.
+- 표시 없음: 조회 범위의 첫 본인 표시 전 구간과 보존 집계가 섞인 구간은 `null`이고 뱃지를 내지 않는다. 첫 표시 뒤에 본인 방문이 없는 날·기간만 0이다.
+- BFF: 수집 경로 중 랜딩 이벤트에만 `cl_session`을 API로 넘긴다. 가입 경로 합계는 계속 쿠키를 넘기지 않는다.
+- Meta 제외: 저장된 `ip`가 `2a03:2880::/32`이면 `isMetaCrawlerIp`(`apps/api/src/analytics/bot-ip.ts`)로 판별해 `isBotUserAgent`와 같은 위치에서 뺀다. 서버에서만 처리하고 IP는 응답에 넣지 않는다.
+- 한계: 배포 이후 방문부터 표시한다. 세션 없는 브라우저(앱 내 브라우저 등)와 단축 주소 리디렉트 기록은 본인을 구분하지 못한다.
 
 ## 지표 계산과 누락
 
