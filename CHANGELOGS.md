@@ -4,6 +4,10 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-11-10
+
+- Dependabot #139 나머지 갱신(0211): Nest 네 패키지와 `@playwright/test`를 뺀 17개 패키지를 #139의 대상 버전으로 올리고, 전이 의존성 `node-forge` 1.4.3·`undici` 6.29.1·`follow-redirects` 1.16.3·`body-parser` 2.4.0·`zod` 4.6.7을 잠금 파일에서 올렸습니다. `pnpm audit --prod`의 high는 9건에서 2건이 됐고, 남은 `zod`·`decode-uri-component`는 major 또는 Expo SDK 단위 갱신이 필요합니다. 근거는 [0211](docs/work/orchestrator/0211-deps-minor-patch.md)에 있습니다. main 병합·배포는 포함하지 않습니다.
+
 ## 2026-11-09
 
 - 분석 반응형 검사의 ego-lite 시범 전환(0206): `tests/e2e/analytics-responsive.spec.ts`의 chromium 검사 4개를 `ego-browser`로 실행하는 `tests/e2e/ego/`를 추가하고, 날짜 입력 경계 검사를 좌우 네 변 비교로 고쳤습니다. 기존 Playwright spec·config·CI·`apps/web`은 바꾸지 않습니다. 옮기지 못한 검사와 근거: `docs/work/crelink-qa/0206-ego-analytics-responsive.md`.

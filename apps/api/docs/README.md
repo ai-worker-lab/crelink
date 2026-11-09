@@ -160,7 +160,7 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 
 ## 오류 모니터링
 
-Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 추적, Nest 로그(Logs), 업무 지표(Metrics), 보존 작업 체크인(Cron)을 보냅니다. 결정과 대안·위험은 [ADR 0012](../../../docs/adr/0012-error-monitoring-sentry.md)와 무료 기능 확장 [ADR 0014](../../../docs/adr/0014-sentry-free-plan-features.md), 운영 설정 절차는 [런북](../../../infra/docs/prod-runbook.md), 개인정보 고지는 웹 `/privacy`입니다. SDK는 `@sentry/nestjs` 11.4입니다.
+Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 추적, Nest 로그(Logs), 업무 지표(Metrics), 보존 작업 체크인(Cron)을 보냅니다. 결정과 대안·위험은 [ADR 0012](../../../docs/adr/0012-error-monitoring-sentry.md)와 무료 기능 확장 [ADR 0014](../../../docs/adr/0014-sentry-free-plan-features.md), 운영 설정 절차는 [런북](../../../infra/docs/prod-runbook.md), 개인정보 고지는 웹 `/privacy`입니다. SDK는 `@sentry/nestjs` 11.11입니다.
 
 - 초기화: `src/instrument.ts`가 `main.ts`의 첫 import라 Nest·Express·pg보다 먼저 실행되고(자동 계측 조건), `apps/api/.env`를 읽은 뒤(`src/local-env.ts`) `sentryOptions`(`src/monitoring/sentry.ts`)로 `Sentry.init`합니다. `SENTRY_DSN`이 비면 초기화하지 않아 나머지 코드(`SentryModule.forRoot()`, 필터 데코레이터, `setUser`, `Sentry.close`)는 아무것도 보내지 않습니다. Jest 시험은 `main.ts`를 거치지 않으므로 Sentry가 꺼진 채 돕니다.
 - 보내는 오류: `ApiExceptionFilter`가 500 `internal_error`로 응답하는 오류만 `@SentryExceptionCaptured()`(500 처리 메서드에 붙임)로 보냅니다. Nest `HttpException`(4xx, 의도한 503 포함)과 본문 파서의 http-errors 4xx(400·413·415)는 보내지 않습니다. 이 데코레이터는 `HttpException`만 예상한 오류로 보므로 `catch`에 붙이면 http-errors 4xx도 보냅니다(실측: 데코레이터를 `catch`로 옮기면 아래 시험의 4xx 0건 검사가 실패).
