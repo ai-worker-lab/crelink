@@ -2,6 +2,10 @@
 
 내부 참고용으로 웹 클라이언트의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-11-10
+
+- 의존성 minor·patch 갱신(0211). 웹 패키지를 Dependabot #139 대상 버전으로 올렸습니다. 세부는 루트 변경 기록을 봅니다.
+
 ## 2026-11-07
 
 - 공개 랜딩 등록 응답 전 빠른 외부 이동에서 행동 클릭이 메모리 큐에 남아 유실되는 결함을 수정했습니다(0205, PR149 CI 후속). 미등록 클릭·종료 engagement를 원본 page_view와 한 요청으로 기존 BFF에 보내고 실제 등록204 뒤 후속 이벤트를 순차 전달합니다. 기존 API/shared/DB 계약·본문/출처/헤더/서명/권한/만료/rate 경계·eventId 멱등성을 유지하고 navigation 지연·영구 큐·재시도 확대는 추가하지 않았습니다. 실제 production Web/API/DB의 수정 전 page_view1/click0와 수정 후1/1, 기존 SIM01 불변 포함 personas5건, 신규 대기/중복/첫 실패 회귀와 실제 upstream 지연을 각각3엔진에서 확인했습니다. Beacon 큐 수락과 저장 완료·브라우저/서버 종료 및 오프라인 한계는 [방문 계측 문서](docs/visitor-telemetry.md)에 구분합니다.
