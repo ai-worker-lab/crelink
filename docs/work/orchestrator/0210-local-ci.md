@@ -22,12 +22,12 @@
 
 ## 범위
 
-- 포함: `scripts/ci-local.mjs`, `scripts/lib/ci-local.mjs`와 시험, 루트 `package.json`의 스크립트 한 줄, [검증 루프](../../development/verification.md#로컬-ci), 변경 기록.
+- 포함: `scripts/ci-local.mjs`, `scripts/lib/ci-local.mjs`와 시험, 루트 `package.json`의 `ci:local`·`test` 두 줄, [검증 루프](../../development/verification.md#로컬-ci), `AGENTS.md` 명령표와 문서 색인, 변경 기록.
 - 제외: `ci.yml`·ruleset 변경, 실제 commit status 기록, Playwright 설치와 실행, 이미지 push, 나머지 시험의 ego-lite 전환.
 
 ## 위험·복구
 
-운영·데이터에 영향이 없습니다. 스크립트는 이 worktree의 인스턴스 스택과 Docker 빌드 캐시만 건드리며 `make down`으로 되돌릴 수 있습니다. `--report`만 GitHub에 쓰며 이번 작업에서는 실제로 실행하지 않습니다. 문제가 있으면 revert합니다.
+운영·데이터에 영향이 없습니다. 스크립트는 이 worktree의 인스턴스 스택과 Docker 빌드 캐시만 건드리며 `make down`으로 되돌릴 수 있습니다. `--report`만 GitHub에 쓰며 이번 작업에서는 실제로 실행하지 않습니다. 로컬 이미지 빌드는 기기 고유 플랫폼이라 amd64에서만 나는 실패는 머지 뒤 Deploy에서 드러납니다(서버를 건드리기 전에 멈춤). 문제가 있으면 revert합니다.
 
 ## 연결
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // CI(.github/workflows/ci.yml)의 job을 이 기기에서 재현합니다(ADR 0016 결정 5). 사용법: pnpm ci:local [--report [--dry-run]]
 // origin/main 기준으로 문서만 바뀌었으면 문서 검사만, 아니면 work:scope → DB → verify → 스택 → ego 시험 → 이미지 빌드를 실행합니다.
+// 이미지는 Docker 서버의 고유 플랫폼으로 빌드해 Dockerfile·의존성 오류를 잡습니다. linux/amd64 빌드는 deploy.yml이 서버를 건드리기 전에 검증합니다.
 // 실패가 있어도 CI job처럼 남은 단계를 끝까지 돌리고 하나라도 실패하면 종료 코드 1로 끝납니다. 이 실행이 띄운 스택만 내립니다.
 // --report는 통과한 커밋에 commit status `CI 통과`를 기록합니다. gh의 현재 인증(GH_TOKEN 또는 gh auth)을 씁니다.
 // 전제: main ruleset의 필수 검사 `CI 통과`는 integration_id 15368(GitHub Actions)로 묶여 있고 strict입니다. 이 묶음을 바꾸기 전에는
@@ -42,7 +43,7 @@ const NOT_LOCAL = [
 const APP_SERVICES = ['api', 'web', 'app'];
 const READY_TIMEOUT_MS = 180_000;
 const IMAGE_HINT =
-  '출력의 첫 오류를 찾으세요. `QEMU internal SIGILL`이나 `qemu: uncaught target signal`이면 코드가 아니라 Apple Silicon의 amd64 에뮬레이션 크래시입니다(docs/development/verification.md#로컬-ci).';
+  '출력의 첫 오류를 찾으세요. 재현: docker buildx build -f apps/<api|web>/Dockerfile --output type=cacheonly .';
 const HINTS = {
   '이미지 api': IMAGE_HINT,
   '이미지 web': IMAGE_HINT,
@@ -125,6 +126,7 @@ const exec = async (command, args, env) => {
 const results = [];
 const warnings = [];
 const skip = (step, reason) => results.push({ step, status: '건너뜀', reason });
+let imagePlatform;
 
 /** action은 실패 이유 문자열을 돌려주고 성공이면 undefined입니다. 통과 여부를 돌려줍니다. */
 async function step(name, action, { always = false } = {}) {
@@ -143,6 +145,15 @@ async function step(name, action, { always = false } = {}) {
   const seconds = (Date.now() - started) / 1000;
   results.push({ step: name, status: reason ? '실패' : '통과', seconds, reason });
   return !reason;
+}
+
+/** Docker 서버의 고유 플랫폼입니다. Node가 Rosetta로 돌 수도 있어 process.arch가 아니라 서버에 묻습니다. */
+function dockerPlatform() {
+  const arch = execFileSync('docker', ['version', '--format', '{{.Server.Arch}}'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  return `linux/${arch.trim()}`;
 }
 
 function warn(message) {
@@ -273,19 +284,22 @@ async function codePath() {
 
   for (const area of ['api', 'web']) {
     // CI의 push: false와 같이 결과를 어디에도 내보내지 않습니다. 이미지 저장소에 태그 없는 이미지를 쌓지 않으려고 cacheonly를 씁니다.
-    await step(`이미지 ${area}`, () =>
-      exec('docker', [
+    // Apple Silicon의 QEMU에서는 linux/amd64 next build가 크래시해 고유 플랫폼으로 빌드합니다(docs/work/orchestrator/0210-local-ci.md).
+    await step(`이미지 ${area}`, () => {
+      imagePlatform ??= dockerPlatform();
+      console.log(`플랫폼: ${imagePlatform}`);
+      return exec('docker', [
         'buildx',
         'build',
         '--platform',
-        'linux/amd64',
+        imagePlatform,
         '--output',
         'type=cacheonly',
         '-f',
         `apps/${area}/Dockerfile`,
         '.',
-      ]),
-    );
+      ]);
+    });
   }
 }
 
@@ -337,6 +351,9 @@ function summarize(kind) {
   if (kind === '코드 변경') {
     console.log('\n로컬 CI 미포함 (CI에는 있고 여기서는 돌지 않는 검사)');
     for (const item of NOT_LOCAL) console.log(`  - ${item}`);
+    if (imagePlatform && imagePlatform !== 'linux/amd64') {
+      console.log(`  - 이미지 linux/amd64 (이 기기는 ${imagePlatform}로 빌드, amd64 빌드는 Deploy에서 검증)`);
+    }
   }
   if (warnings.length > 0) {
     console.log('\n경고');

@@ -71,14 +71,15 @@
 | 판정 | 순서 |
 | --- | --- |
 | 문서만 바뀜 | `pnpm verify --docs --keep-going` → `work:scope` |
-| 코드가 바뀜(비교할 수 없을 때 포함) | `work:scope` → `make infra-up` → `pnpm verify --keep-going` → `make up` → ego-lite 시험 모음 → `apps/api`·`apps/web` 이미지 빌드(`linux/amd64`, 내보내지 않음) |
+| 코드가 바뀜(비교할 수 없을 때 포함) | `work:scope` → `make infra-up` → `pnpm verify --keep-going` → `make up` → ego-lite 시험 모음 → `apps/api`·`apps/web` 이미지 빌드(기기 고유 플랫폼, 내보내지 않음) |
 
 - **판정 기준:** CI `changes` job과 같은 규칙으로 `git diff origin/main...HEAD`와 작업 트리 변경(추적하지 않는 파일 포함)을 봅니다. 작업 트리도 보는 것은 `pnpm verify`가 작업 트리를 검사하기 때문입니다. 이름 변경은 옛 경로와 새 경로를 모두 세므로(`--no-renames`) 코드를 `docs/`로 옮긴 변경은 코드입니다. CI보다 넓게 검사하는 쪽의 차이입니다.
 - **결과:** 단계별 결과·시간을 요약합니다. CI job처럼 한 단계가 실패해도 남은 단계를 돌리고, 하나라도 실패하면 종료 코드 1입니다. `Ctrl-C`·`SIGTERM`은 진행 중인 단계를 멈추고 스택을 정리한 뒤 130·143으로 끝납니다.
 - **스택 정리:** 시작할 때 DB 컨테이너와 API·웹·앱 포트를 확인해 이 실행이 띄운 것만 내립니다. 이미 떠 있던 서비스는 다시 시작하지도 내리지도 않고 그대로 씁니다. 스택은 ego 시험 뒤 바로 내리고 이미지 빌드는 그다음에 합니다.
 - **시험 모음:** ego-lite 시험은 스크립트의 `EGO_SUITES`, 아직 옮기지 않은 검사와 Node 26은 `NOT_LOCAL`이 원본입니다. 코드 경로의 실행 요약에 `로컬 CI 미포함`으로 나옵니다. `playwright install`을 하지 않습니다.
 - **Node:** `.nvmrc`(24) 기준입니다. 다른 버전으로 실행하면 경고합니다.
-- **알려진 제약:** Apple Silicon의 Docker Desktop(Rosetta 설정 `UseVirtualizationFrameworkRosetta` 꺼짐)에서 `이미지 web`이 실패합니다. [`apps/web/Dockerfile`](../../apps/web/Dockerfile)의 build 단계는 대상 플랫폼에서 돌아 QEMU로 `next build`를 실행하고, `QEMU internal SIGILL`이나 `qemu: uncaught target signal 11`로 죽습니다(2026-11-10 세 번 재현, 죽는 지점은 매번 다름). build 단계가 `$BUILDPLATFORM`인 `apps/api`는 통과합니다. Rosetta를 켠 환경은 확인하지 않았습니다. 이 실패는 건너뜀으로 바꾸지 않으므로 이 환경에서는 종료 코드 1이고 `--report`도 기록하지 않습니다. 해결 방법은 CI 전환 전에 정해야 합니다([0210](../work/orchestrator/0210-local-ci.md)).
+- **이미지 플랫폼:** 이미지 단계는 Docker 서버의 고유 플랫폼(Apple Silicon은 `linux/arm64`)으로 빌드해 Dockerfile·의존성 오류를 잡습니다. `linux/amd64`를 쓰지 않는 이유는 Apple Silicon의 QEMU에서 `apps/web`의 `next build`가 크래시하기 때문입니다(2026-11-10 네 번 재현, [0210](../work/orchestrator/0210-local-ci.md)). amd64 빌드는 Deploy에서 검증합니다. [`deploy.yml`](../../.github/workflows/deploy.yml)의 `배포` job은 `이미지` job이 성공(또는 건너뜀)해야 돌고 플랫폼은 [`infra/prod/targets.json`](../../infra/prod/targets.json)을 따르므로, 빌드가 실패하면 서버를 건드리지 않고 멈춥니다. 실행 요약의 `로컬 CI 미포함`에 `amd64 빌드는 Deploy에서 검증`으로 표시합니다.
+- **이미지 플랫폼의 한계:** amd64에서만 나는 빌드 실패는 머지 뒤 Deploy에서 드러납니다. 운영에는 나가지 않지만 그 사이 `main`에 고장 난 커밋이 남고, 되돌리거나 후속 PR로 고쳐야 합니다. 전환 전까지는 `ci.yml`의 `이미지 빌드` job이 PR에서 amd64도 검사합니다.
 
 ### commit status 기록
 

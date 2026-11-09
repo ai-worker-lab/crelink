@@ -1,4 +1,4 @@
-// 실행: node --test scripts/lib/ci-local.test.mjs
+// pnpm test(루트 package.json)에서 함께 실행합니다. 개별 실행: node --test scripts/lib/ci-local.test.mjs
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
