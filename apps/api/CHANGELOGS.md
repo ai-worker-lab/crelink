@@ -4,6 +4,7 @@
 
 ## 2026-11-09
 
+- 문서: 단축 도메인 설명에 Nest가 등록하는 404 전용 핸들러를 적었습니다(0209).
 - Nest 12.4.0 보안 갱신(0207): `@nestjs/common`·`@nestjs/core`·`@nestjs/platform-express`·`@nestjs/testing`을 12.1.2에서 12.4.0으로 올려 전이 의존성 `multer` 2.5.0, `express` 5.3.0을 반영했습니다. Nest 12.2부터 제외 경로마다 404 전용 핸들러가 붙어 글자 그대로 `:`가 든 네 주소만 응답이 바뀝니다(`GET`·`HEAD` 외 HTML 404가 JSON `not_found`로, `OPTIONS` 200이 404로). 실제 단축 주소와 `/api` 응답, 인증 결과는 같습니다. `test/health.e2e-spec.ts`의 라우트 비교에서 `\:` 항목만 뺐습니다. [0207](../../docs/work/orchestrator/0207-nest-security-update.md).
 
 ## 2026-11-07

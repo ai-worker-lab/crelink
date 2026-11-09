@@ -1,5 +1,7 @@
 # Crelink AI 운영팀 헌장
 
+> **정지(2026-11-09):** AI 운영자 자동화는 멈췄고 토큰은 폐기했습니다. 이 문서는 이력입니다. 현행 기준은 [ADR 0016](../adr/0016-devoffice-takeover.md)입니다.
+
 Crelink 프로젝트는 **`crelink-pm`이 감독하는 실제 실행팀**으로 운영합니다. 중앙 `orchestrator`는 회사·포트폴리오 우선순위, 위임 범위 내 승인과 프로젝트 간 충돌을 조정하고, PM은 크리링의 기존 단일 20분 스케줄과 한 `agent_run`을 소유합니다. PM은 필요한 전문 워커만 Orca로 호출하고 결과를 통합합니다. 운영 기록은 `agent_runs`·Orca Run/Task/Dispatch·work item·PR·Deploy 링크로 이어집니다.
 
 실행 계정은 `crelink-ai-operator-2`, 기존 자동화 ID는 유지하고 자동화 이름은 `crelink-pm`으로 전환합니다. `*/20 * * * *`(`Asia/Seoul`), `new_per_run`, `origin/main` 기준 실행을 유지하며 팀별 스케줄러나 상시 8워커 fleet을 만들지 않습니다. API의 전역 실행 lease(`agent_runs_one_running_idx`)는 진행 중 실행 하나만 허용합니다. 중앙 조정과 전문 워커는 별도 서버 실행을 열지 않습니다.

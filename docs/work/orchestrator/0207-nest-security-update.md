@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 검증
+- 상태: 완료
 - 종류: 유지보수
 - 우선순위: P1 (AI 제안)
 - 작성일: 2026-11-09
@@ -42,3 +42,4 @@ Nest 12.2부터 제외 경로마다 404 전용 핸들러가 붙어 글자 그대
 - 2026-11-09 결정: 개발실 조정자가 before/after를 다시 집계해 위 차이를 수용했습니다. `pnpm-lock.yaml`이 `api`의 `owns`에 없어 0149 선례대로 역할을 `orchestrator`로 두고, 라우트 비교에서는 `\:`가 든 항목만 빼며 기존 `GET` 단축 라우트 네 개 단언은 유지합니다. 버전은 12.4.0을 유지합니다.
 - 2026-11-09 검증: `pnpm verify` 8단계 통과, `pnpm --filter @crelink/api test` 스위트 32개·테스트 263개 통과, `pnpm work:scope 0207`과 `pnpm work:check` 통과. 잠금 파일의 `multer`는 2.5.0입니다. 업로드 경로는 `test/file-storage.e2e-spec.ts`·`test/upload-animated.e2e-spec.ts`가 2.5.0에서 통과했습니다. `pnpm smoke`는 로컬에서 돌리지 않았고 PR CI의 smoke로 확인합니다.
 - 2026-11-09 남은 일: `apps/api/docs/README.md`의 단축 도메인 설명("`/api` 밖 라우트가 정확히 이 네 정의뿐")은 이번 위임의 소유 경로 밖이라 고치지 않았습니다. `\:` 항목을 뺀다는 내용을 반영해야 합니다.
+- 2026-11-09 완료: 사용자 승인으로 #151을 머지(`57b41f6`)했고 Deploy 성공, API·웹 healthy를 확인했습니다.
