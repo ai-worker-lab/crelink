@@ -172,7 +172,7 @@ SOPS_AGE_KEY_CMD='security find-generic-password -s crelink-sops-age -a operator
 | 대상 | 절차 |
 | --- | --- |
 | 앱 비밀값(DB 비밀번호, Google 클라이언트 비밀번호) | 제공자에서 새 값 발급(Google은 새 비밀번호를 추가해 둘 다 유효하게) → 4-3으로 편집 → 병합·배포 → 확인 → 옛 값 폐기 |
-| 운영자 age 키 | 새 키를 4-2로 만들고 `.sops.yaml`에 수신자로 추가 → 모든 암호문 `updatekeys` → 옛 수신자 삭제 → 다시 `updatekeys` → 병합. Git 이력의 옛 암호문은 옛 키로 계속 풀리므로, 키가 샜다면 안의 비밀값도 회전합니다 |
+| 운영자 age 키 | 새 키를 4-2로 만들고 `.sops.yaml`에 수신자로 추가 → 모든 암호문 `updatekeys` → 옛 수신자 삭제 → 다시 `updatekeys` → 병합. Git 이력의 옛 암호문은 옛 키로 계속 풀리므로, 키가 샜다면 안의 비밀값도 회전합니다. 옛 운영자 키를 잃었으면 `.sops.yaml`과 암호문을 서버로 복사해 `SOPS_AGE_KEY_FILE=/etc/crelink/age.key sops updatekeys -y <파일>`로 수신자를 바꾸고 결과를 가져옵니다 |
 | 서버 age 키 | 서버에서 `sudo age-keygen -o /etc/crelink/age.key.new` → 공개키를 수신자에 **추가**하고 `updatekeys`·병합·배포 → 서버에서 새 파일을 `age.key`로 바꾸고 `chown root:deploy`·`chmod 640` → 옛 수신자 삭제·`updatekeys`·병합·배포. 바꾼 뒤에는 그 전 릴리스로 롤백하면 복호화가 실패합니다 |
 | `DEPLOY_SSH_KEY` | 1-1로 새 키 → 1-2로 bootstrap을 `DEPLOY_SSH_PUBKEY=<새 공개키>`로 다시 실행(줄 추가) → 2-4로 secret 교체 → `ssh -i <새 키> deploy@<host> status` 확인 → 서버 `/home/deploy/.ssh/authorized_keys`에서 옛 줄 삭제 |
 | Tailscale WIF 자격 증명 | Trust credentials에서 새로 만들고 2-3으로 variables 교체 → 옛 자격 증명 삭제 |

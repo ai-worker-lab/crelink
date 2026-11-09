@@ -7,6 +7,7 @@
 ## 2026-11-09
 
 - Nest 12.4.0 보안 갱신(0207): `multer`를 2.5.0으로 올리기 위해 Nest 네 패키지와 잠금 파일을 갱신했습니다. Dependabot #139를 나눠 처리하는 첫 단계이며 세부는 [백엔드 로그](apps/api/CHANGELOGS.md), 응답 비교와 검증은 [0207](docs/work/orchestrator/0207-nest-security-update.md)에 있습니다. main 병합·배포는 포함하지 않습니다.
+- `.sops.yaml`의 operator 수신자를 새 키로 교체했습니다(0208).
 
 ## 2026-11-07
 
