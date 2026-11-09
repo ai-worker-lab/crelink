@@ -48,4 +48,5 @@ Dependabot PR #139(22개 묶음, CI 실패)를 나눠 처리하는 2단계입니
 - 2026-11-10 남은 일:
   - `zod` #23: `zod` 3.25.76이 `@expo/cli` 57.0.28(`^3.25.76`)에 남습니다. 수정판은 4.6.6 이상뿐이라 override는 major 올림입니다. `@expo/cli` 57.0.33에는 `zod` 의존이 없지만 저장소 정책상 `@expo/*`는 Expo SDK 단위로만 올립니다.
   - `decode-uri-component` #30: 0.2.2가 `query-string` 7.1.3(`expo-router` 57.0.25의 `^7.1.3`)에 남습니다. 수정판 0.5.1은 0.2.x 호환 범위 밖이고 0.4부터 ESM 전용이어서, `require`하는 `query-string` 7에 override하면 동작이 달라질 수 있습니다. 현재 최신 `expo-router` 57.0.30도 같은 범위입니다.
-  - 이번 위임의 소유 경로 밖이라 고치지 않았습니다: `apps/api/docs/README.md`의 "`@sentry/nestjs` 11.4" 문구, `apps/api/CHANGELOGS.md`·`apps/web/CHANGELOGS.md` 영역 로그.
+- `apps/api/docs/README.md`의 `@sentry/nestjs` 버전 표기와 `apps/api`·`apps/web` 변경 기록은 이 PR에서 함께 고쳤습니다.
+- 2026-11-10 `qa` 합격: `make up` 실제 기동, API 263개 테스트, Google 공개 인증서 조회와 위조 토큰 거절을 확인했습니다. 실제 Google 로그인, Sentry 초기화, 실제 S3 전송은 로컬에서 확인하지 못해 배포 뒤 운영에서 확인합니다.
