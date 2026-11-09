@@ -56,7 +56,9 @@ describe('API 기동과 health', () => {
     const routes = (express.router.stack as RouterLayer[])
       .filter((layer) => layer.route)
       .flatMap(({ route }) => Object.keys(route!.methods).map((method) => `${method.toUpperCase()} ${route!.path}`));
-    expect(routes.filter((route) => !route.split(' ')[1].startsWith('/api/')).sort()).toEqual([
+    // Nest 12.2+가 제외 경로마다 모든 메서드로 등록하는 404 전용 핸들러(`\:` 정의라 글자 그대로의 `:` 주소만 받음)는 라우트 비교에서 뺍니다.
+    const outsideApi = routes.filter((route) => !route.split(' ')[1].startsWith('/api/') && !route.includes('\\:'));
+    expect(outsideApi.sort()).toEqual([
       'GET /:slug',
       'GET /a/:bannerPublicId/:landingPublicId',
       'GET /b/:bannerPublicId',
