@@ -105,6 +105,8 @@ describe('API 기동과 health', () => {
         'sessions',
         'short_links',
         'short_slugs',
+        'signup_funnel_daily',
+        'signup_funnel_oauth_contexts',
         'social_links',
         'user_identities',
         'users',
@@ -126,6 +128,7 @@ describe('API 기동과 health', () => {
         { version: '0010_analytics_rollups' },
         { version: '0011_link_layout' },
         { version: '0012_list_density' },
+        { version: '0013_signup_funnel' },
       ]);
     } finally {
       await client.end();

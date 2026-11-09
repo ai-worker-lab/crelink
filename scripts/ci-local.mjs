@@ -30,7 +30,12 @@ import { pm2Home } from './pm2-home.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = 'origin/main';
 // ego-lite로 옮긴 시험 모음입니다. 옮기면 여기에 더하고 아래 NOT_LOCAL에서 뺍니다.
-const EGO_SUITES = ['tests/e2e/ego/smoke.mjs', 'tests/e2e/ego/analytics-responsive.mjs', 'tests/e2e/ego/visitor.mjs'];
+const EGO_SUITES = [
+  'tests/e2e/ego/smoke.mjs',
+  'tests/e2e/ego/analytics-responsive.mjs',
+  'tests/e2e/ego/visitor.mjs',
+  'tests/e2e/ego/signup-funnel.mjs',
+];
 // CI의 코드 경로에는 있지만 로컬에서 돌지 않는 검사입니다. 실행 요약에 `로컬 CI 미포함`으로 표시합니다.
 const NOT_LOCAL = [
   '핵심 사용자 E2E: creator, operator, notices, guestbook, instabio-import',

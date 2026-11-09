@@ -2,12 +2,15 @@ import {
   COOKIE_NAMES,
   CRELINK_API_PATHS,
   LOGIN_RETURN_TO_PARAM,
+  serializeSignupContext,
+  SIGNUP_CONTEXT_HEADER,
   type ApiError,
   type GoogleAuthStartResponse,
 } from '@crelink/shared';
 import type { NextRequest } from 'next/server';
 import { noticeLocation, redirectWithCookies, returnToCookie, validReturnTo } from '../../../lib/api/auth-redirect';
 import { apiOrigin, apiRequestHeaders } from '../../../lib/api/server';
+import { signupContextFromRequest } from '../../../lib/signup-funnel';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,13 +18,23 @@ export const dynamic = 'force-dynamic';
  * 구글 로그인 시작: API가 발급한 state 쿠키를 붙여 구글 인증 화면으로 보냅니다.
  * `?returnTo=`가 허용 형식(`LOGIN_RETURN_TO_PATTERN`)이면 로그인 뒤 돌아갈 주소를 `cl_return_to` 쿠키로 붙이고(PRD R19),
  * 없거나 허용 형식 밖이면 버리며 이전 시도가 남긴 쿠키도 지웁니다(콜백이 `/me`로 보냄).
+ * 가입 경로 합계(0231)에 쓸 유입값은 내부 헤더로만 API에 넘깁니다.
  */
 export async function GET(request: NextRequest) {
   if (!apiOrigin) return redirectWithCookies(noticeLocation('auth_not_configured'));
   let response: Response;
   try {
     response = await fetch(`${apiOrigin}${CRELINK_API_PATHS.authGoogleStart}`, {
-      headers: apiRequestHeaders({ Accept: 'application/json' }),
+      headers: apiRequestHeaders({
+        Accept: 'application/json',
+        [SIGNUP_CONTEXT_HEADER]: serializeSignupContext(
+          signupContextFromRequest(
+            request.headers.get('referer'),
+            request.headers.get('x-forwarded-host') ?? request.headers.get('host'),
+            request.headers.get('user-agent'),
+          ),
+        ),
+      }),
       cache: 'no-store',
     });
   } catch {

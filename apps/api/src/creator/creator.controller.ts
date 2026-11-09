@@ -1,9 +1,24 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   CreatorLandingState,
   LinkView,
+  parseSignupContextHeader,
   PortfolioItemView,
   SessionUser,
+  SIGNUP_CONTEXT_HEADER,
   SlugAvailabilityResponse,
   SocialLinkView,
 } from '@crelink/shared';
@@ -64,8 +79,12 @@ export class LinksController {
   constructor(private readonly links: LinksService) {}
 
   @Post()
-  create(@CurrentUser() user: SessionUser, @Body() body: unknown): Promise<LinkView> {
-    return this.links.create(user.id, body);
+  create(
+    @CurrentUser() user: SessionUser,
+    @Body() body: unknown,
+    @Headers(SIGNUP_CONTEXT_HEADER) signupContext: unknown,
+  ): Promise<LinkView> {
+    return this.links.create(user.id, body, parseSignupContextHeader(signupContext).inAppKind);
   }
 
   @Put('order')

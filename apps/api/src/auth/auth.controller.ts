@@ -1,16 +1,19 @@
-import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
 import {
   COOKIE_NAMES,
   CRELINK_LIMITS,
   GoogleAuthCallbackResponse,
   GoogleAuthStartResponse,
   MeResponse,
+  parseSignupContextHeader,
   SessionUser,
+  SIGNUP_CONTEXT_HEADER,
 } from '@crelink/shared';
 import type { Request, Response } from 'express';
 import { AppConfig } from '../config.service';
 import { readCookie, serializeCookie } from '../common/http';
 import { countBusinessMetric } from '../monitoring/metrics';
+import { SignupFunnelService } from '../telemetry/signup-funnel.service';
 import { AuthService } from './auth.service';
 import { CurrentUser, SessionGuard } from './session.guard';
 
@@ -21,12 +24,17 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly config: AppConfig,
+    private readonly funnel: SignupFunnelService,
   ) {}
 
   /** 웹 `GET /auth/google`이 서버에서 호출하고 Set-Cookie를 브라우저에 그대로 전달합니다. */
   @Get('google/start')
-  start(@Res({ passthrough: true }) response: Response): GoogleAuthStartResponse {
+  start(
+    @Headers(SIGNUP_CONTEXT_HEADER) signupContext: unknown,
+    @Res({ passthrough: true }) response: Response,
+  ): GoogleAuthStartResponse {
     const { authorizationUrl, state } = this.auth.start();
+    this.funnel.oauthStarted(state, parseSignupContextHeader(signupContext));
     response.setHeader(
       'Set-Cookie',
       serializeCookie(COOKIE_NAMES.oauthState, state, OAUTH_STATE_SECONDS, this.config.webCookieSecure),

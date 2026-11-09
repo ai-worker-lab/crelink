@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { FilesModule } from '../files/files.module';
 import { LandingPassModule } from '../short-link/landing-pass.module';
 import { ShortLinkModule } from '../short-link/short-link.module';
+import { SignupFunnelModule } from '../telemetry/signup-funnel.module';
 import { BannersController } from './banners.controller';
 import { BannersService } from './banners.service';
 import { CreatorController, LinksController, PortfolioController } from './creator.controller';
@@ -16,7 +17,7 @@ import { PublicLandingController } from './public-landing.controller';
 import { SlugService } from './slug.service';
 
 @Module({
-  imports: [AuthModule, FilesModule, LandingPassModule, ShortLinkModule],
+  imports: [AuthModule, FilesModule, LandingPassModule, ShortLinkModule, SignupFunnelModule],
   controllers: [
     InstabioImportController,
     CreatorController,

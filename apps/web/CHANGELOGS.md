@@ -4,6 +4,7 @@
 
 ## 2026-11-10
 
+- 앱 내 브라우저 가입 안내(0231): Instagram·Facebook·카카오톡·네이버·라인 앱 안에서 가입·로그인 버튼을 누르면 Google로 보내지 않고 외부 브라우저 안내를 보여 줍니다(Android `intent://`, iOS 주소 복사와 Safari 안내, `그래도 계속`). 일반 브라우저 동선은 그대로이고 `dialog.showModal()`이 없는 웹뷰는 안내 없이 기본 링크로 이동합니다. 홈 방문·가입 버튼을 합계로 보고합니다. 근거 `docs/work/orchestrator/0231-inapp-signup-funnel.md`.
 - 의존성 minor·patch 갱신(0211). 웹 패키지를 Dependabot #139 대상 버전으로 올렸습니다. 세부는 루트 변경 기록을 봅니다.
 
 ## 2026-11-07

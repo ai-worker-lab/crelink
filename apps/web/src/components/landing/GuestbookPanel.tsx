@@ -15,6 +15,7 @@ import { formatDateTime } from '../../lib/format';
 import { ActionStatus } from '../ActionStatus';
 import { DefaultAvatar } from '../DefaultAvatar';
 import { RemoteImage } from '../RemoteImage';
+import { SignInLink } from '../SignInLink';
 
 type Viewer = GuestbookPage['viewer'];
 
@@ -276,10 +277,7 @@ export function GuestbookPanel({
       ) : (
         <div className="empty-state guestbook-signin">
           <p>방명록은 로그인한 회원만 남길 수 있어요. 읽기는 누구나 할 수 있어요.</p>
-          {/* route handler로 가는 전체 이동이라 next/link 대신 a를 씁니다. */}
-          <a className="primary" href={CRELINK_WEB_PATHS.googleLogin(CRELINK_WEB_PATHS.landingGuestbook(publicId))}>
-            로그인하고 남기기
-          </a>
+          <SignInLink returnTo={CRELINK_WEB_PATHS.landingGuestbook(publicId)}>로그인하고 남기기</SignInLink>
         </div>
       )}
       <ActionStatus error={status.error} notice={status.notice} />

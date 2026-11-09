@@ -5,6 +5,7 @@ import { AppConfig } from '../config.service';
 import { Database, isUniqueViolation } from '../database';
 import { apiError, readCookie } from '../common/http';
 import { setUserId } from '../monitoring/sentry';
+import { SignupFunnelService } from '../telemetry/signup-funnel.service';
 import type { AuthenticatedRequest, RequestActor } from './actor';
 import { GoogleClientConfig, GoogleOAuth, googleVerifyFailureReason, GoogleProfile } from './google-oauth';
 import { provisionAccount } from './provision';
@@ -20,6 +21,7 @@ export class AuthService {
     private readonly database: Database,
     private readonly config: AppConfig,
     private readonly google: GoogleOAuth,
+    private readonly funnel: SignupFunnelService,
   ) {}
 
   private googleConfig(): GoogleClientConfig {
@@ -60,6 +62,7 @@ export class AuthService {
         '로그인 요청이 만료되었거나 올바르지 않습니다. 처음부터 다시 로그인해 주세요.',
       );
     }
+    const signupContext = await this.funnel.oauthCallback(state);
     if (typeof code !== 'string' || !code) {
       throw apiError(HttpStatus.UNAUTHORIZED, 'oauth_failed', '구글 로그인에 실패했습니다. 다시 시도해 주세요.');
     }
@@ -71,16 +74,19 @@ export class AuthService {
       this.logger.warn(`구글 code 교환·ID 토큰 검증 실패: ${googleVerifyFailureReason(error)}`);
       throw apiError(HttpStatus.UNAUTHORIZED, 'oauth_failed', '구글 로그인에 실패했습니다. 다시 시도해 주세요.');
     }
+    let session: { user: SessionUser; token: string; isNew: boolean };
     try {
-      return await this.login(profile);
+      session = await this.login(profile);
     } catch (error) {
       // 같은 구글 계정의 첫 로그인이 동시에 들어오면 user_identities UNIQUE에 걸립니다. 한 번 더 시도하면 기존 사용자로 로그인합니다.
-      if (isUniqueViolation(error)) return this.login(profile);
-      throw error;
+      if (!isUniqueViolation(error)) throw error;
+      session = await this.login(profile);
     }
+    if (session.isNew) this.funnel.count('signup_complete', signupContext);
+    return { user: session.user, token: session.token };
   }
 
-  private login(profile: GoogleProfile): Promise<{ user: SessionUser; token: string }> {
+  private login(profile: GoogleProfile): Promise<{ user: SessionUser; token: string; isNew: boolean }> {
     // 운영자 권한은 구글이 검증한 이메일이 OPERATOR_EMAILS에 있을 때만 줍니다. 목록에서 빠지면 다음 로그인 때 creator로 돌아갑니다.
     const role: UserRole =
       profile.emailVerified && this.config.operatorEmails.has(profile.email) ? 'operator' : 'creator';
@@ -90,6 +96,7 @@ export class AuthService {
         [profile.subject],
       );
       let userId = identity.rows[0]?.user_id;
+      const isNew = !userId;
       if (userId) {
         await client.query(
           "UPDATE user_identities SET email = $2, last_login_at = now() WHERE provider = 'google' AND provider_subject = $1",
@@ -121,7 +128,7 @@ export class AuthService {
         `INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + make_interval(days => $3))`,
         [userId, hashToken(token), CRELINK_LIMITS.sessionDays],
       );
-      return { user: sessionUser, token };
+      return { user: sessionUser, token, isNew };
     });
   }
 

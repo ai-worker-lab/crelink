@@ -1001,6 +1001,7 @@ export const LANDING_PASS_PARAM = 'pass';
 
 export const CRELINK_API_PATHS = {
   landingEvents: (publicId: string) => `/api/landings/${encodeURIComponent(publicId)}/events`,
+  signupFunnelEvents: '/api/signup-funnel/events',
   authGoogleStart: '/api/auth/google/start',
   authGoogleCallback: '/api/auth/google/callback',
   authLogout: '/api/auth/logout',
