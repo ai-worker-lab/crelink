@@ -8,7 +8,12 @@ import {
   type MobilePlatform,
 } from '@crelink/shared';
 import { useRef, useState, type MouseEvent, type ReactNode } from 'react';
-import { chromeIntentUrl, sendSignupFunnelEvent, signupContextFromPage } from '../lib/signup-funnel';
+import {
+  canShowModalDialog,
+  chromeIntentUrl,
+  sendSignupFunnelEvent,
+  signupContextFromPage,
+} from '../lib/signup-funnel';
 import { CopyButton } from './CopyButton';
 import { EditSheet } from './manage/EditSheet';
 
@@ -33,7 +38,7 @@ interface Notice {
 
 /**
  * 구글 로그인으로 가는 링크(route handler로 가는 전체 이동이라 next/link 대신 a). 구글은 앱 내 브라우저의 OAuth를 막으므로(0231)
- * 앱 내 브라우저에서 누르면 이동을 멈추고 외부 브라우저 안내를 엽니다. JS가 돌기 전이나 일반 브라우저에서는 그대로 `/auth/google`로 갑니다.
+ * 앱 내 브라우저에서 누르면 이동을 멈추고 외부 브라우저 안내를 엽니다. JS가 돌기 전, 일반 브라우저, `dialog`를 지원하지 않는 웹뷰에서는 그대로 `/auth/google`로 갑니다.
  * 안내의 주소는 기존 `returnTo`만 싣고 유입값은 싣지 않습니다(`packages/shared/src/signup-funnel.ts`).
  */
 export function SignInLink({ returnTo, children }: { returnTo?: string; children: ReactNode }) {
@@ -48,7 +53,8 @@ export function SignInLink({ returnTo, children }: { returnTo?: string; children
       signupContextFromPage(location.search, document.referrer, location.hostname, userAgent),
     );
     const kind = detectInAppBrowser(userAgent);
-    if (!kind) return;
+    // 안내 시트를 열 수 없는 웹뷰에서 `showModal` 예외로 화면 전체가 오류가 되지 않도록 기본 링크 이동으로 돌립니다.
+    if (!kind || !canShowModalDialog()) return;
     event.preventDefault();
     setNotice({ kind, platform: detectMobilePlatform(userAgent), url: new URL(href, location.origin).href });
   }

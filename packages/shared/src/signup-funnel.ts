@@ -50,10 +50,14 @@ export const EMPTY_SIGNUP_FUNNEL_CONTEXT: SignupFunnelContext = {
 export const SIGNUP_FUNNEL_LIMITS = {
   bodyBytes: 1024,
   valueLength: 64,
-  /** 하루 합계 행 상한. 넘으면 유입값을 `other`로 모아 임의 값으로 행을 늘리지 못하게 합니다. */
+  /** 하루 합계 행 상한. 넘으면 새 조합만 `other`로 모아 임의 값으로 행을 늘리지 못하게 합니다. 이미 있는 행에는 계속 더합니다. */
   dailyRowsMax: 2000,
   /** 브라우저 보고의 분당 전체 상한. */
   eventsPerMinute: 600,
+  /** OAuth 왕복 동안 묶어 두는 유입값 행 상한. 넘으면 묶지 않고 콜백은 유입값 없이 셉니다. */
+  oauthContextsMax: 5000,
+  /** 동시에 진행하는 서버 단계 기록 수. DB 풀을 로그인·저장 요청 몫으로 남기려는 값이고 넘는 기록은 버립니다. */
+  pendingWritesMax: 5,
 } as const;
 
 /** 웹 서버가 API로 넘기는 계측 값 헤더(JSON). 브라우저가 직접 보낼 수 없는 내부 경로에서만 씁니다. */

@@ -1,7 +1,12 @@
 // 가입 경로 도우미. 실행: pnpm --filter @crelink/web test
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { chromeIntentUrl, signupContextFromPage, signupContextFromRequest } from './signup-funnel.ts';
+import {
+  canShowModalDialog,
+  chromeIntentUrl,
+  signupContextFromPage,
+  signupContextFromRequest,
+} from './signup-funnel.ts';
 
 const INSTAGRAM = 'Mozilla/5.0 (iPhone) Mobile/15E148 Instagram 339.0.2.12.87 (iPhone14,5; iOS 17_5)';
 const SAFARI = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) Version/17.5 Mobile/15E148 Safari/604.1';
@@ -45,6 +50,12 @@ test('로그인 시작은 같은 출처 Referer의 UTM만 읽고 외부 Referer�
     inAppKind: 'unknown',
   });
   assert.equal(signupContextFromRequest('not a url', 'links.shaul.kr', SAFARI).inAppKind, 'none');
+});
+
+test('dialog.showModal이 없으면 안내 시트를 쓸 수 없다고 판단한다', () => {
+  assert.equal(canShowModalDialog({}), false);
+  assert.equal(canShowModalDialog({ HTMLDialogElement: { prototype: {} } }), false);
+  assert.equal(canShowModalDialog({ HTMLDialogElement: { prototype: { showModal: () => {} } } }), true);
 });
 
 test('intent 주소는 returnTo를 그대로 싣고 Chrome을 지정한다', () => {

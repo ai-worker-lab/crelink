@@ -41,7 +41,8 @@
 
 ## 위험·복구
 
-- 데이터: 추가 migration 하나입니다. 되돌리려면 다음 migration에서 두 테이블을 지웁니다. 계측 실패는 로그인·링크 저장을 막지 않습니다(`SignupFunnelService.count`).
+- 데이터: 추가 migration 하나입니다. 되돌리려면 다음 migration에서 두 테이블을 지웁니다.
+- 인증 없는 쓰기: 서버 단계 기록은 응답과 분리하고 동시 5개까지만 진행합니다(넘으면 버림). OAuth 유입 기록은 살아 있는 행 5,000개까지입니다. 그래서 대량 요청이 오는 동안 `oauth_start` 수는 실제보다 적을 수 있고 유입값을 잃을 수 있습니다. 기록 실패는 로그인·링크 저장을 막지 않습니다.
 - 합계의 한계: 브라우저 보고는 위조할 수 있고 재로그인도 `oauth_start`·`oauth_callback`에 섞입니다. 첫 링크는 모든 링크를 지운 뒤 다시 만들면 다시 셉니다. 외부 브라우저로 나간 뒤의 단계는 유입값 없이 `none`으로 집계됩니다.
 - 안내 문구는 디자인 인계 없이 기존 시트와 버튼을 재사용했습니다.
 
@@ -55,3 +56,4 @@
 - 2026-11-10: 생성·구현. `pnpm verify` 8단계, `pnpm work:scope 0231`, `pnpm work:check`, API 통합 시험(`test/signup-funnel.e2e-spec.ts`, 실제 PostgreSQL·가짜 구글로 여섯 단계)을 통과했습니다.
 - 2026-11-10: `node tests/e2e/ego/signup-funnel.mjs` 통과(Instagram UA 안내, `returnTo` 유지, `그래도 계속`, 일반 UA는 `/auth/google`, 콘솔 오류 0, 390px 가로 넘침 0). `EGO_TEST_FAULT=always-notice`로 일반 UA에 안내가 뜨게 하면 종료 코드 1입니다. 로컬에는 구글 키가 없어 일반 UA 경로는 `/auth/google` 다음 `/notice?reason=auth_not_configured`로 끝나며 실제 Google에는 가지 않습니다.
 - 2026-11-10: 실제 웹 경로 확인. 로컬 API를 임시 더미 구글 값으로 띄워 Instagram UA·같은 출처 Referer로 `/auth/google`을 호출하면 302 Location과 state 쿠키에 유입값이 없고 `oauth_start` 행(`source=realstack`, `campaign=c0231`, `in_app_kind=instagram`)이 생겼습니다. 콜백 이후 단계는 실제 Google이 필요해 API 통합 시험으로만 봤습니다.
+- 2026-11-10: QA 합격 후 머지 전 수정. CEO가 처리방침은 고치지 않기로 정했습니다(개인을 알아볼 값이 없는 합계). 서버 단계 기록을 응답과 분리하고 동시 기록·OAuth 유입 행에 상한을 뒀습니다. 하루 행 상한이 차도 이미 있는 행에는 더합니다. `showModal`이 없는 웹뷰는 안내 대신 기본 링크로 이동합니다(`EditSheet`는 그대로).

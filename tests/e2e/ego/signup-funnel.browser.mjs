@@ -1,6 +1,6 @@
 // 앱 내 브라우저 가입 안내(0231) 시나리오. ego-browser 런타임에서만 실행됩니다.
 // 지우는 쿠키는 cl_session뿐입니다. 실제 Google 로그인은 하지 않으며 Google 주소는 차단합니다.
-/* global document, URL, navigator */
+/* global document, URL, navigator, location, HTMLDialogElement */
 import { join } from 'node:path';
 import pg from 'pg';
 import { blockHosts, clearSessionCookie, NAVIGATION_TIMEOUT, poll, setViewport } from './lib/browser.mjs';
@@ -17,6 +17,7 @@ const NOTICE = 'dialog.sheet[open]';
 const MIN_CHECKS = {
   'signup/instagram-ios-home': 16,
   'signup/instagram-android-return-to': 10,
+  'signup/no-dialog-support': 7,
   'signup/regular-browser': 7,
 };
 
@@ -151,6 +152,39 @@ async function androidReturnTo(context) {
   await checkConsole(context);
 }
 
+/** `showModal`이 없는 오래된 웹뷰: 안내를 열지 못하니 오류 화면 없이 기본 링크로 이동해야 합니다. */
+async function noDialogSupport(context) {
+  const { page, config, report, must, name, watch } = context;
+  await setUserAgent(page, IOS_INSTAGRAM);
+  await openHome(context, 'instagram');
+  const removed = await page.evaluate(() => {
+    delete HTMLDialogElement.prototype.showModal;
+    return typeof HTMLDialogElement.prototype.showModal;
+  });
+  must(removed === 'undefined', `showModal 제거 ${removed}`);
+  await watch.clearDocumentChains();
+  const clicksBefore = await stepCount(config, 'signup_click', 'instagram');
+  await page.click(HERO_BUTTON);
+  const chain = await poll(
+    () => documentUrls(watch),
+    (urls) => authRequests(urls).length > 0,
+  );
+  must(chain.ok, `/auth/google 문서 요청 ${chain.value?.join(' ')}`);
+  report.record(
+    name,
+    new URL(authRequests(chain.value)[0]).search === '',
+    `기본 링크 이동 ${authRequests(chain.value)[0]}`,
+  );
+  const landed = await poll(
+    () => page.evaluate(() => location.pathname),
+    (path) => path !== '/',
+  );
+  report.record(name, landed.ok, `홈에서 벗어남 ${landed.value}`);
+  const clicks = await waitForCount(config, 'signup_click', 'instagram', clicksBefore + 1);
+  report.record(name, clicks.ok, `signup_click(instagram) ${clicks.value} = ${clicksBefore + 1}`);
+  await checkConsole(context);
+}
+
 async function regularBrowser(context) {
   const { page, config, report, must, name, watch, desktop } = context;
   await setUserAgent(page, desktop.userAgent);
@@ -197,6 +231,7 @@ export const run = ({ taskSpace, config }) =>
       await clearSessionCookie(context.page, context.config);
       if (context.name === 'signup/instagram-ios-home') return iosHome(context);
       if (context.name === 'signup/instagram-android-return-to') return androidReturnTo(context);
+      if (context.name === 'signup/no-dialog-support') return noDialogSupport(context);
       return regularBrowser(context);
     },
   });

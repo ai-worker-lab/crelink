@@ -64,7 +64,7 @@ export class LinksService {
       );
       return { view: created, first: links.rows[0].total === 1 };
     });
-    if (first) await this.funnel.firstLink(userId, inAppKind);
+    if (first) this.funnel.firstLink(userId, inAppKind);
     return view;
   }
 

@@ -170,7 +170,7 @@ export class InstabioImportService {
       firstLink = latest.size === 0 && added.length > 0;
       return { links: added, skipped: selected.length - added.length, profile };
     });
-    if (firstLink) await this.funnel.firstLink(userId, inAppKind);
+    if (firstLink) this.funnel.firstLink(userId, inAppKind);
     return result;
   }
 

@@ -82,7 +82,7 @@ export class AuthService {
       if (!isUniqueViolation(error)) throw error;
       session = await this.login(profile);
     }
-    if (session.isNew) await this.funnel.count('signup_complete', signupContext);
+    if (session.isNew) this.funnel.count('signup_complete', signupContext);
     return { user: session.user, token: session.token };
   }
 

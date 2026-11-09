@@ -54,6 +54,13 @@ export function chromeIntentUrl(absoluteUrl: string): string {
   return `intent://${url.host}${url.pathname}${url.search}#Intent;scheme=${url.protocol.replace(':', '')};package=com.android.chrome;end`;
 }
 
+/** 안내 시트(`EditSheet`)에 필요한 `dialog.showModal()` 지원 여부. 없는 오래된 웹뷰는 안내 없이 기본 링크 이동으로 돌립니다. */
+export function canShowModalDialog(
+  scope: { HTMLDialogElement?: { prototype: { showModal?: unknown } } } = globalThis,
+): boolean {
+  return typeof scope.HTMLDialogElement?.prototype.showModal === 'function';
+}
+
 /** 브라우저 보고 전송. 실패해도 화면 동작에 영향을 주지 않습니다. */
 export function sendSignupFunnelEvent(step: SignupFunnelClientStep, context: SignupFunnelContext): void {
   const endpoint = `/api/backend${CRELINK_API_PATHS.signupFunnelEvents}`;

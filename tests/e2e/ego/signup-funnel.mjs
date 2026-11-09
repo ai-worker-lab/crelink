@@ -19,7 +19,12 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../../..');
-const SCENARIOS = ['signup/instagram-ios-home', 'signup/instagram-android-return-to', 'signup/regular-browser'];
+const SCENARIOS = [
+  'signup/instagram-ios-home',
+  'signup/instagram-android-return-to',
+  'signup/no-dialog-support',
+  'signup/regular-browser',
+];
 const trimSlash = (value) => value.replace(/\/$/, '');
 const interrupt = interruptController();
 

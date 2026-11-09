@@ -29,12 +29,12 @@ export class AuthController {
 
   /** 웹 `GET /auth/google`이 서버에서 호출하고 Set-Cookie를 브라우저에 그대로 전달합니다. */
   @Get('google/start')
-  async start(
+  start(
     @Headers(SIGNUP_CONTEXT_HEADER) signupContext: unknown,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<GoogleAuthStartResponse> {
+  ): GoogleAuthStartResponse {
     const { authorizationUrl, state } = this.auth.start();
-    await this.funnel.oauthStarted(state, parseSignupContextHeader(signupContext));
+    this.funnel.oauthStarted(state, parseSignupContextHeader(signupContext));
     response.setHeader(
       'Set-Cookie',
       serializeCookie(COOKIE_NAMES.oauthState, state, OAUTH_STATE_SECONDS, this.config.webCookieSecure),
