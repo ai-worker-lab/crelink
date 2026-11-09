@@ -2,7 +2,7 @@
 
 - 단계: 티켓
 - 역할: orchestrator
-- 상태: 진행
+- 상태: 검증
 - 종류: 유지보수
 - 우선순위: P2 (AI 제안)
 - 작성일: 2026-11-10
@@ -65,3 +65,5 @@
 - 2026-11-10: 반복 실행 3회 중 1회가 `page.waitForLoadState(networkidle) timed out after 30000ms (1 requests still in flight: Ping …/events)`로 실패하고 같은 탭의 다음 시나리오까지 실패했습니다. 문서 전환 때 나간 beacon으로 추정합니다. 타임아웃 완화 대신 `waitForNetworkQuiet()`로 바꿨습니다.
 - 2026-11-10: 그 뒤 6회 중 5·6회가 방문자 버킷 초과(`used` 143 > 120)로 `/events` 429 콘솔 오류, 직접 진입 시나리오는 같은 상태에서 `/events` 요청 1건이 30초 안에 끝나지 않아 실패했습니다. 이 상태에서만 관찰했고 원인은 확정하지 못했습니다. 실행 시작에 `landing_event_limits`를 비우도록 고친 뒤 8회 연속 종료 코드 0(통과 64, 실패 0, 각 약 4초)입니다.
 - 2026-11-10: 변이: `body{min-width:2000px}`는 `문서 폭 2000px <= 화면 폭` 2건, `body{display:none}`는 처음에 종료 코드 0으로 빠져나가 `innerText`의 비렌더링 동작을 찾아 `checkVisibility`를 넣었습니다. `.profile-main{min-width:900px}`는 390px 넘침 1건, `EGO_TEST_FAULT=empty-body`·`missing-link`·`missing-open-link`·`outside-scenario`와 잘못된 `EGO_TEST_ONLY`는 모두 종료 코드 1입니다. `SIGTERM` 종료 코드 143, 합성 사용자 0건, 시험 TaskSpace 없음을 확인했습니다.
+- 2026-11-10: `2da4b4e`, 깨끗한 트리에서 `pnpm ci:local` 종료 코드 0(통과 10, 실패 0, 건너뜀 1, 59.6초). `ego smoke` 1.6초, `ego analytics-responsive` 19.9초, `ego visitor` 4.2초입니다. 최종 코드 기준 `node tests/e2e/ego/smoke.mjs`·`visitor.mjs` 각 3회 종료 코드 0(통과 22·64, 실패 0), `pnpm verify`·`pnpm work:scope 0230`·`pnpm work:check` 통과. 스택은 이 작업이 띄운 것을 내렸습니다.
+- 2026-11-10: 모든 수용 기준을 충족해 `검증`으로 올립니다. PR CI 결과는 PR에서 확인합니다.
