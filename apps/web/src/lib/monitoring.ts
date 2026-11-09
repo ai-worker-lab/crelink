@@ -18,7 +18,14 @@ export const TRACES_SAMPLE_RATE = 0.1;
 export const CONSOLE_LOG_LEVELS: ('warn' | 'error')[] = ['warn', 'error'];
 
 /** 이벤트·span에서 지우는 요청·응답 헤더(소문자). 세션 쿠키 `cl_session`, 인증 정보, API로 보내는 내부 토큰입니다. */
-const SCRUBBED_HEADERS = ['cookie', 'set-cookie', 'authorization', 'proxy-authorization', 'x-crelink-internal'];
+const SCRUBBED_HEADERS = [
+  'cookie',
+  'set-cookie',
+  'authorization',
+  'proxy-authorization',
+  'x-crelink-internal',
+  'x-crelink-signup-context',
+];
 
 const SCRUBBED_SPAN_ATTRIBUTE = new RegExp(`^http\\.(request|response)\\.header\\.(${SCRUBBED_HEADERS.join('|')})$`);
 

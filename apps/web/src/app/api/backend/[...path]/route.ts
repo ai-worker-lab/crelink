@@ -1,4 +1,10 @@
-import { COOKIE_NAMES } from '@crelink/shared';
+import {
+  COOKIE_NAMES,
+  EMPTY_SIGNUP_FUNNEL_CONTEXT,
+  inAppKindOfUserAgent,
+  serializeSignupContext,
+  SIGNUP_CONTEXT_HEADER,
+} from '@crelink/shared';
 import type { NextRequest } from 'next/server';
 import { forwardToApi, proxyErrorResponse } from '../../../../lib/api/proxy';
 import { apiOrigin, apiRequestHeaders } from '../../../../lib/api/server';
@@ -10,9 +16,16 @@ export const dynamic = 'force-dynamic';
  * 브라우저가 부를 수 있는 API 경로. 계약 원본: packages/shared/src/crelink.ts `CRELINK_API_PATHS`.
  * 로그인 시작·콜백은 BFF가 아니라 전용 route handler(`/auth/google`, `/auth/google/callback`)가 부릅니다.
  * `upload`는 multipart 본문과 Content-Type(boundary 포함)을 그대로 넘기는 경로입니다.
+ * `signupInAppKind`는 첫 링크 합계(0231)에 쓸 앱 내 브라우저 종류만 내부 헤더로 넘기는 경로입니다. User-Agent 원문은 넘기지 않습니다.
  */
 const ID = '[^/]+';
-const rules: ReadonlyArray<{ methods: readonly string[]; pattern: RegExp; upload?: true; visitorEvent?: true }> = [
+const rules: ReadonlyArray<{
+  methods: readonly string[];
+  pattern: RegExp;
+  upload?: true;
+  visitorEvent?: true;
+  signupInAppKind?: true;
+}> = [
   { methods: ['GET'], pattern: /^api\/health$/ },
   { methods: ['POST'], pattern: /^api\/auth\/logout$/ },
   { methods: ['GET'], pattern: /^api\/me$/ },
@@ -20,8 +33,8 @@ const rules: ReadonlyArray<{ methods: readonly string[]; pattern: RegExp; upload
   { methods: ['GET', 'PATCH'], pattern: /^api\/me\/landing$/ },
   { methods: ['GET'], pattern: /^api\/me\/short-link\/availability$/ },
   { methods: ['PUT'], pattern: /^api\/me\/short-link\/slug$/ },
-  { methods: ['POST'], pattern: /^api\/me\/imports\/instabio(\/preview)?$/ },
-  { methods: ['POST'], pattern: /^api\/me\/links$/ },
+  { methods: ['POST'], pattern: /^api\/me\/imports\/instabio(\/preview)?$/, signupInAppKind: true },
+  { methods: ['POST'], pattern: /^api\/me\/links$/, signupInAppKind: true },
   { methods: ['PUT'], pattern: /^api\/me\/links\/order$/ },
   // 광고 블록 켜고 끄기(R20 ⑩): 크리에이터 스위치와 운영자 플랫폼 스위치. 플랫폼 스위치 `GET`은 서버 렌더만 부르므로 넣지 않습니다.
   { methods: ['PUT'], pattern: /^api\/me\/ad-block$/ },
@@ -38,6 +51,7 @@ const rules: ReadonlyArray<{ methods: readonly string[]; pattern: RegExp; upload
   { methods: ['GET'], pattern: new RegExp(`^api/files/${ID}$`) },
   { methods: ['GET'], pattern: new RegExp(`^api/public/landings/${ID}$`) },
   { methods: ['POST'], pattern: /^api\/landings\/[a-z0-9]{10}\/events$/, visitorEvent: true },
+  { methods: ['POST'], pattern: /^api\/signup-funnel\/events$/, visitorEvent: true },
   { methods: ['GET'], pattern: /^api\/admin\/creators$/ },
   { methods: ['GET'], pattern: new RegExp(`^api/admin/creators/${ID}$`) },
   { methods: ['GET'], pattern: new RegExp(`^api/admin/creators/${ID}/stats$`) },
@@ -84,6 +98,15 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
   const headers = apiRequestHeaders({ Accept: request.headers.get('accept') ?? 'application/json' });
   const session = request.cookies.get(COOKIE_NAMES.session)?.value;
   if (session && !rule.visitorEvent) headers.set('Cookie', `${COOKIE_NAMES.session}=${session}`);
+  if (rule.signupInAppKind) {
+    headers.set(
+      SIGNUP_CONTEXT_HEADER,
+      serializeSignupContext({
+        ...EMPTY_SIGNUP_FUNNEL_CONTEXT,
+        inAppKind: inAppKindOfUserAgent(request.headers.get('user-agent')),
+      }),
+    );
+  }
   let body: ArrayBuffer | string | undefined;
   if (mutating) {
     const contentType = request.headers.get('content-type');

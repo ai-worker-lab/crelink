@@ -151,6 +151,12 @@ export class RetentionService implements OnApplicationBootstrap, OnModuleDestroy
       );
       await client.query('DELETE FROM landing_events WHERE occurred_at < $1', [boundary.rows[0].boundary]);
       await client.query("DELETE FROM landing_event_limits WHERE window_start < now() - interval '15 minutes'");
+      // 가입 경로 합계(0231)는 원본과 같은 기간만 둡니다. 묶어 둔 OAuth 유입값은 콜백이 오지 않은 것만 남습니다.
+      await client.query('DELETE FROM signup_funnel_daily WHERE day < ($1::timestamptz AT TIME ZONE $2)::date', [
+        boundary.rows[0].boundary,
+        STATS_TIME_ZONE,
+      ]);
+      await client.query("DELETE FROM signup_funnel_oauth_contexts WHERE created_at < now() - interval '15 minutes'");
       const visits = await client.query('DELETE FROM visits WHERE occurred_at < $1', [boundary.rows[0].boundary]);
       const clicks = await client.query('DELETE FROM link_clicks WHERE occurred_at < $1', [boundary.rows[0].boundary]);
       const bannerClicks = await client.query('DELETE FROM creator_banner_clicks WHERE occurred_at < $1', [

@@ -1,9 +1,15 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CRELINK_LIMITS, type InstabioImportPreview, type InstabioImportResult } from '@crelink/shared';
+import {
+  CRELINK_LIMITS,
+  type InstabioImportPreview,
+  type InstabioImportResult,
+  type SignupInAppKind,
+} from '@crelink/shared';
 import { Database } from '../database';
 import { apiError } from '../common/http';
 import { bodyObject, optionalBoolean, optionalText, requiredText } from '../common/input';
 import { FilesService } from '../files/files.service';
+import { SignupFunnelService } from '../telemetry/signup-funnel.service';
 import { CreatorService } from './creator.service';
 import { InstabioSource, unavailable } from './instabio-source';
 import { LinksService } from './links.service';
@@ -18,6 +24,7 @@ export class InstabioImportService {
     private readonly creator: CreatorService,
     private readonly links: LinksService,
     private readonly files: FilesService,
+    private readonly funnel: SignupFunnelService,
   ) {}
 
   /** 워커 하나에서 계정당1개·전체4개까지 외부 가져오기를 허용합니다. DB 정합성은 별도 행 잠금으로 보장합니다. */
@@ -41,11 +48,15 @@ export class InstabioImportService {
     return this.bounded(userId, () => this.source.preview(bodyObject(body).url));
   }
 
-  apply(userId: string, body: unknown): Promise<InstabioImportResult> {
-    return this.bounded(userId, () => this.save(userId, bodyObject(body)));
+  apply(userId: string, body: unknown, inAppKind: SignupInAppKind = 'unknown'): Promise<InstabioImportResult> {
+    return this.bounded(userId, () => this.save(userId, bodyObject(body), inAppKind));
   }
 
-  private async save(userId: string, input: Record<string, unknown>): Promise<InstabioImportResult> {
+  private async save(
+    userId: string,
+    input: Record<string, unknown>,
+    inAppKind: SignupInAppKind,
+  ): Promise<InstabioImportResult> {
     if (!Array.isArray(input.links) || input.links.length > CRELINK_LIMITS.totalLinks) {
       throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', '가져올 링크를 선택해 주세요.');
     }
@@ -109,7 +120,8 @@ export class InstabioImportService {
       images.set(url, (await this.files.uploadBytes(userId, buffer)).fileId);
     }
     // 링크·프로필은 한번에 커밋합니다. 준비된 업로드는 일반 ImageField 업로드와 동일하게 독립 파일입니다.
-    return this.database.transaction(async (client) => {
+    let firstLink = false;
+    const result = await this.database.transaction(async (client) => {
       await client.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [userId]);
       if (expected) {
         const landing = await client.query<{
@@ -155,8 +167,11 @@ export class InstabioImportService {
         );
         profile = { displayName, bio, avatar: this.files.imageRef(avatarFileId) };
       }
+      firstLink = latest.size === 0 && added.length > 0;
       return { links: added, skipped: selected.length - added.length, profile };
     });
+    if (firstLink) await this.funnel.firstLink(userId, inAppKind);
+    return result;
   }
 
   private limitError(): never {

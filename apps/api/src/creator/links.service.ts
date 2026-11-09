@@ -1,7 +1,8 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CRELINK_LIMITS, LinkView } from '@crelink/shared';
+import { CRELINK_LIMITS, LinkView, type SignupInAppKind } from '@crelink/shared';
 import type { PoolClient } from 'pg';
 import { Database } from '../database';
+import { SignupFunnelService } from '../telemetry/signup-funnel.service';
 import { apiError, insertWithRandomId, UUID_PATTERN } from '../common/http';
 import {
   bodyObject,
@@ -36,6 +37,7 @@ export class LinksService {
     private readonly database: Database,
     private readonly creator: CreatorService,
     private readonly files: FilesService,
+    private readonly funnel: SignupFunnelService,
   ) {}
 
   /** 같은 사용자의 링크 변경을 줄 세워 한도 검사가 동시 요청에 뚫리지 않게 합니다. */
@@ -53,8 +55,17 @@ export class LinksService {
     }
   }
 
-  async create(userId: string, body: unknown): Promise<LinkView> {
-    return this.database.transaction((client) => this.createInTransaction(client, userId, body));
+  async create(userId: string, body: unknown, inAppKind: SignupInAppKind = 'unknown'): Promise<LinkView> {
+    const { view, first } = await this.database.transaction(async (client) => {
+      const created = await this.createInTransaction(client, userId, body);
+      const links = await client.query<{ total: number }>(
+        'SELECT count(*)::int AS total FROM links WHERE user_id = $1',
+        [userId],
+      );
+      return { view: created, first: links.rows[0].total === 1 };
+    });
+    if (first) await this.funnel.firstLink(userId, inAppKind);
+    return view;
   }
 
   /** 가져오기 배치와 단일 추가가 같은 소유권·한도·차단·순서 검사를 씁니다. */

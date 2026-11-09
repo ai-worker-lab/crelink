@@ -592,6 +592,15 @@ textarea.input {
   font-size: var(--ds-font-size-16);
   color: var(--ds-color-text-primary);
 }
+/* 앱 내 브라우저 안내(시트 안 내용, 0231). */
+.signin-notice {
+  display: grid;
+  gap: var(--ds-space-12);
+  padding-bottom: calc(var(--ds-space-20) + env(safe-area-inset-bottom));
+}
+.signin-notice p {
+  margin: 0;
+}
 .copy-control {
   display: inline-flex;
   align-items: center;

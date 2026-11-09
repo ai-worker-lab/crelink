@@ -4,6 +4,8 @@ import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { HomeExampleLanding } from '../../components/HomeExampleLanding';
 import { LogoutButton } from '../../components/LogoutButton';
+import { SignInLink } from '../../components/SignInLink';
+import { SignupFunnelHomeView } from '../../components/SignupFunnelHomeView';
 import { serverApi, ServerApiError } from '../../lib/api/server';
 import { crelinkOpenGraph, SITE_DESCRIPTION, SITE_JSON_LD } from '../../lib/site';
 
@@ -38,13 +40,9 @@ const HOME_TITLE = '인스타그램 프로필 링크 하나로 나를 소개하�
 const HOME_LEAD =
   '크리링은 SNS 채널·포트폴리오·외부 링크를 한 페이지에 모아 짧은 주소로 전하는 크리에이터 랜딩페이지예요.';
 
-/** route handler로 가는 전체 이동이라 next/link 대신 a를 씁니다. 유입 경로 쿼리는 0087 결정 전이라 붙이지 않습니다. */
+/** 유입값은 주소에 쿼리로 붙이지 않고 합계로만 남깁니다(0231, `lib/signup-funnel.ts`). */
 function GoogleStart() {
-  return (
-    <a className="primary" href="/auth/google">
-      구글로 시작하기
-    </a>
-  );
+  return <SignInLink>구글로 시작하기</SignInLink>;
 }
 
 /** 로그인한 홈: 관리 화면으로 가는 입구(design/home-intro/handoff.md `로그인한 홈`, 바꾸지 않음). */
@@ -78,6 +76,7 @@ function HomeIntro({ errorMessage }: { errorMessage: string | null }) {
   const { totalLinks, slugChangeIntervalDays, retiredSlugGraceDays } = CRELINK_LIMITS;
   return (
     <div className="home-intro">
+      <SignupFunnelHomeView />
       <section className="home-hero" aria-labelledby="home-title">
         <div className="home-hero-text">
           <p className="brand-mark">크리링</p>

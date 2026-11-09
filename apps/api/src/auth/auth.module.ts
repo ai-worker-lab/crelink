@@ -4,9 +4,11 @@ import { AuthController, MeController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { GoogleAuthLibraryOAuth, GoogleOAuth } from './google-oauth';
 import { OperatorGuard, OptionalSessionGuard, SessionGuard } from './session.guard';
+import { SignupFunnelModule } from '../telemetry/signup-funnel.module';
 
 // 가드는 쓰는 모듈의 주입기에서 만들어지므로 가드가 받는 provider(AuthService·ActorPolicy)도 함께 내보냅니다.
 @Module({
+  imports: [SignupFunnelModule],
   controllers: [AuthController, MeController],
   providers: [
     AuthService,

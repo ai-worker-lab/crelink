@@ -4,6 +4,7 @@
 
 ## 2026-11-10
 
+- 가입 경로 일별 합계(0231): migration `0013_signup_funnel`, `POST /api/signup-funnel/events`, OAuth 시작·콜백·신규 가입·첫 링크 집계, 보존 작업 대상 추가. 식별자 없이 합계만 저장하고 계측 실패는 로그인·링크 저장을 막지 않습니다. 근거 `docs/work/orchestrator/0231-inapp-signup-funnel.md`.
 - 의존성 minor·patch 갱신(0211). API 패키지를 Dependabot #139 대상 버전으로 올렸습니다. 세부는 루트 변경 기록을 봅니다.
 
 ## 2026-11-09

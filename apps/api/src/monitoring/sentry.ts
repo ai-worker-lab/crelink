@@ -10,7 +10,14 @@ import type { ErrorEvent, Log, Metric, NodeOptions } from '@sentry/nestjs';
 export const DEFAULT_TRACES_SAMPLE_RATE = 0.1;
 
 /** 이벤트·span에서 지우는 요청·응답 헤더(소문자). 세션 쿠키 `cl_session`, 인증 정보, 웹이 붙이는 내부 토큰입니다. */
-export const SCRUBBED_HEADERS = ['cookie', 'set-cookie', 'authorization', 'proxy-authorization', 'x-crelink-internal'];
+export const SCRUBBED_HEADERS = [
+  'cookie',
+  'set-cookie',
+  'authorization',
+  'proxy-authorization',
+  'x-crelink-internal',
+  'x-crelink-signup-context',
+];
 
 /** URL 쿼리에서 값을 `[Filtered]`로 바꾸는 이름: 구글 로그인 `code`·`state`, 랜딩 통과 표시 `pass`. */
 const SCRUBBED_QUERY_PARAMS = ['code', 'state', 'pass'];

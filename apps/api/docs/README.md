@@ -264,6 +264,27 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 - 링크별 클릭의 `linkId`는 링크 공개 ID(`{SHORT}/c/{linkPublicId}`의 값)입니다. 지운 링크도 기록이 남아 있으면 `title: null`로 나옵니다.
 - 배너별 클릭(`bannerClicks`, R21 ④·미정 4 A)은 `creator_banner_clicks` 원본과 `creator_banner_click_rollups`를 합친 기간 합계입니다. `bannerId`는 배너 공개 ID(`{SHORT}/b/{bannerPublicId}`의 값)이고, 지운 배너는 `alt: null`입니다. `totals.linkClicks`·`daily`에는 넣지 않습니다.
 
+
+## 가입 경로 계측
+
+앱 내 브라우저에서 가입이 막히는지와 유입별 가입을 보려는 일별 합계입니다(0231, [work item](../../../docs/work/orchestrator/0231-inapp-signup-funnel.md)). 계약 원본은 `packages/shared/src/signup-funnel.ts`, 구현은 `src/telemetry/signup-funnel.service.ts`입니다.
+
+- 단계: `home_view`·`signup_click`(브라우저 보고, `POST /api/signup-funnel/events`, 같은 출처 BFF만, 전체 분당 상한), `oauth_start`·`oauth_callback`·`signup_complete`·`first_link`(서버가 셈). `oauth_callback`은 state가 쿠키와 일치한 뒤에만 셉니다.
+- 저장: `signup_funnel_daily`에 일(서울 기준)·단계·`source`·`medium`·`campaign`·`referrer_host`·`in_app_kind`·수만 둡니다. 이메일·이름·IP·전체 주소·전체 User-Agent·방문자 식별자 열이 없고, 유입값은 정규화해 허용 문자 밖이면 `other`입니다. 하루 행이 상한을 넘으면 유입값을 `other`로 모읍니다.
+- OAuth 왕복: 웹이 `/auth/google` 요청의 같은 출처 Referer에서 UTM을, User-Agent에서 앱 종류를 읽어 내부 헤더 `x-crelink-signup-context`로 넘깁니다. API는 이를 state 해시에 묶어(`signup_funnel_oauth_contexts`) 콜백에서 꺼내 지웁니다. state 값과 주소에는 유입값을 싣지 않습니다.
+- 한계: 계정과 잇지 않으므로 `first_link`에는 유입값이 없고 앱 종류만 남습니다. 재로그인도 `oauth_start`·`oauth_callback`에 포함되며 `signup_complete`만 신규 계정입니다. 지표 제외 계정과 AI 계정의 첫 링크는 세지 않습니다.
+- 보존: 합계는 원본과 같은 365일, 콜백이 오지 않은 OAuth 기록은 15분 뒤 지웁니다(보존 작업).
+
+단계별 수 조회(최근 7일):
+
+```sql
+SELECT step, in_app_kind, source, sum(events) AS events
+FROM signup_funnel_daily
+WHERE day >= (now() AT TIME ZONE 'Asia/Seoul')::date - 6
+GROUP BY step, in_app_kind, source
+ORDER BY array_position(ARRAY['home_view','signup_click','oauth_start','oauth_callback','signup_complete','first_link'], step), events DESC;
+```
+
 ## AI 운영자
 
 `src/ai-operator/`(R23). 계약은 `packages/shared/src/crelink.ts`의 `AI 운영자 (R23)` 절, 설계는 [AI 운영자 기술 설계](../../../docs/specs/crelink-ai-operator.md)입니다. 데이터는 migration `0004_ai_operator`(`users.kind`·`metrics_excluded_at`, `api_tokens`, `agent_runs`, `operator_actions`, `ai_operator_settings`)입니다.
