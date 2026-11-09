@@ -4,6 +4,10 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-11-10
+
+- Dependabot #139 나머지 갱신(0211): Nest 네 패키지와 `@playwright/test`를 뺀 17개 패키지를 #139의 대상 버전으로 올리고, 전이 의존성 `node-forge` 1.4.3·`undici` 6.29.1·`follow-redirects` 1.16.3·`body-parser` 2.4.0·`zod` 4.6.7을 잠금 파일에서 올렸습니다. `pnpm audit --prod`의 high는 9건에서 2건이 됐고, 남은 `zod`·`decode-uri-component`는 major 또는 Expo SDK 단위 갱신이 필요합니다. 근거는 [0211](docs/work/orchestrator/0211-deps-minor-patch.md)에 있습니다. main 병합·배포는 포함하지 않습니다.
+
 ## 2026-11-09
 
 - 개발실 인수 결정을 문서에 반영했습니다(ADR 0016, 0209). AI 운영자 자율 실행을 정지로 표시하고 0207·0208을 완료로 옮겼습니다.
