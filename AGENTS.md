@@ -9,10 +9,10 @@ pnpm 모노레포 스켈레톤입니다: NestJS API(`apps/api`), Next.js 웹(`ap
 - 코드·설정을 바꾸면 영향받는 문서·링크·변경 기록(`CHANGELOGS.md`, 영역 로그)을 같은 변경에서 고칩니다.
 - 작업 영역의 `AGENTS.md`를 함께 읽습니다: [api](apps/api/AGENTS.md), [web](apps/web/AGENTS.md), [app](apps/app/AGENTS.md), [infra](infra/AGENTS.md).
 - 티켓의 `역할` 소유 경로(`.omp/agents/*.md`의 `owns`) 밖을 바꾸지 않습니다. `pnpm work:scope`로 확인합니다.
-- 실행하지 않은 검증을 통과했다고 보고하지 않습니다. 배포·데이터 파괴·외부 공개는 명시적 요청 없이 하지 않습니다.
-- main 머지는 곧 운영 배포입니다(CD). 머지 전에 사용자 승인을 받고, 머지 뒤에는 Deploy job 결과(운영 주소 검사 포함)로 확인합니다. 운영(prod)에서 직접 확인·시험은 운영에서만 드러나는 위험이라는 명분이 있을 때만, 이유·범위를 사용자에게 먼저 알리고 진행합니다([검증 루프](docs/development/verification.md#운영-확인)).
+- 실행하지 않은 검증을 통과했다고 보고하지 않습니다. 데이터 파괴·외부 공개는 명시적 요청 없이 하지 않습니다. 배포는 ADR 0016을 따릅니다.
+- main 머지는 곧 운영 배포입니다(CD). 머지는 개발실이 CI와 검증을 통과한 뒤 실행하고, 머지 뒤에는 Deploy job 결과(운영 주소 검사 포함)로 확인합니다. 운영(prod)에서 직접 확인·시험은 운영에서만 드러나는 위험이라는 명분이 있을 때만, 이유·범위를 사용자에게 먼저 알리고 진행합니다([검증 루프](docs/development/verification.md#운영-확인)).
 - 제품 방향·우선순위·요구 확정은 사용자가 결정합니다.
-- AI 운영자 자율 실행(ADR 0015)은 정지했습니다. 예외는 운영 장애 시 직전 릴리스로의 롤백뿐이며 실행 뒤 바로 보고합니다([ADR 0016](docs/adr/0016-devoffice-takeover.md)).
+- AI 운영자 자율 실행(ADR 0015)은 정지했습니다. 현재 권한과 사용자 승인이 필요한 일은 [ADR 0016](docs/adr/0016-devoffice-takeover.md)을 따릅니다.
 
 전체 정책 원문: [저장소 공통 정책](docs/development/repository-policy.md).
 
