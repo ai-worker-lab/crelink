@@ -307,7 +307,7 @@ export class ReservationsService {
   }
 
   async removeForLink(userId: string, linkId: string): Promise<void> {
-    if ((await this.linkFilter(userId, linkId)) === null) throw linkNotFound();
+    await this.linkFilter(userId, linkId);
     await this.database.query(
       'DELETE FROM link_reservations r USING links l WHERE r.link_id = $1 AND l.id = r.link_id AND l.user_id = $2',
       [linkId, userId],
