@@ -64,6 +64,27 @@
 
 시각 기준선은 고정 Linux CI의 Chromium·viewport·합성 콘텐츠·폰트 준비 조건에서 생성하고 PNG 원본을 직접 검토한 뒤에만 등록합니다. macOS 캡처를 Linux baseline으로 바꾸거나 실패 이미지를 자동 승인하지 않습니다. 최초 기준선 부재로 실패한 실행은 중간 실패이며, 같은 실행의 artifact와 필수 gate 실패를 확인한 뒤 기준선을 명시적으로 추가하고 정상 최종 SHA에서 전체 gate 성공을 확인해야 합니다. 검증 기록은 [출시 QA 설계](../specs/release-qa.md), 결과는 [0200](../work/orchestrator/0200-release-qa.md)에 연결합니다.
 
+## 로컬 CI
+
+[`scripts/ci-local.mjs`](../../scripts/ci-local.mjs)의 `pnpm ci:local`이 위 CI job을 이 기기에서 재현합니다([ADR 0016](../adr/0016-devoffice-takeover.md) 결정 5). 전환 전이라 `ci.yml`과 ruleset은 그대로이고, 이 명령은 그 옆에서 같은 판정을 미리 돌려 봅니다.
+
+| 판정 | 순서 |
+| --- | --- |
+| 문서만 바뀜 | `pnpm verify --docs --keep-going` → `work:scope` |
+| 코드가 바뀜(비교할 수 없을 때 포함) | `work:scope` → `make infra-up` → `pnpm verify --keep-going` → `make up` → ego-lite 시험 모음 → `apps/api`·`apps/web` 이미지 빌드(`linux/amd64`, 내보내지 않음) |
+
+- **판정 기준:** CI `changes` job과 같은 규칙으로 `git diff origin/main...HEAD`와 작업 트리 변경(추적하지 않는 파일 포함)을 봅니다. 작업 트리도 보는 것은 `pnpm verify`가 작업 트리를 검사하기 때문입니다. 이름 변경은 옛 경로와 새 경로를 모두 세므로(`--no-renames`) 코드를 `docs/`로 옮긴 변경은 코드입니다. CI보다 넓게 검사하는 쪽의 차이입니다.
+- **결과:** 단계별 결과·시간을 요약합니다. CI job처럼 한 단계가 실패해도 남은 단계를 돌리고, 하나라도 실패하면 종료 코드 1입니다. `Ctrl-C`·`SIGTERM`은 진행 중인 단계를 멈추고 스택을 정리한 뒤 130·143으로 끝납니다.
+- **스택 정리:** 시작할 때 DB 컨테이너와 API·웹·앱 포트를 확인해 이 실행이 띄운 것만 내립니다. 이미 떠 있던 서비스는 다시 시작하지도 내리지도 않고 그대로 씁니다. 스택은 ego 시험 뒤 바로 내리고 이미지 빌드는 그다음에 합니다.
+- **시험 모음:** ego-lite 시험은 스크립트의 `EGO_SUITES`, 아직 옮기지 않은 검사와 Node 26은 `NOT_LOCAL`이 원본입니다. 코드 경로의 실행 요약에 `로컬 CI 미포함`으로 나옵니다. `playwright install`을 하지 않습니다.
+- **Node:** `.nvmrc`(24) 기준입니다. 다른 버전으로 실행하면 경고합니다.
+- **알려진 제약:** Apple Silicon의 Docker Desktop(Rosetta 설정 `UseVirtualizationFrameworkRosetta` 꺼짐)에서 `이미지 web`이 실패합니다. [`apps/web/Dockerfile`](../../apps/web/Dockerfile)의 build 단계는 대상 플랫폼에서 돌아 QEMU로 `next build`를 실행하고, `QEMU internal SIGILL`이나 `qemu: uncaught target signal 11`로 죽습니다(2026-11-10 세 번 재현, 죽는 지점은 매번 다름). build 단계가 `$BUILDPLATFORM`인 `apps/api`는 통과합니다. Rosetta를 켠 환경은 확인하지 않았습니다. 이 실패는 건너뜀으로 바꾸지 않으므로 이 환경에서는 종료 코드 1이고 `--report`도 기록하지 않습니다. 해결 방법은 CI 전환 전에 정해야 합니다([0210](../work/orchestrator/0210-local-ci.md)).
+
+### commit status 기록
+
+`pnpm ci:local --report`는 모든 단계가 통과하고, 시작과 끝에 작업 트리가 깨끗하고, 실행 중 HEAD가 그대로이고, HEAD가 같은 이름의 원격 브랜치 tip일 때만 그 커밋에 commit status(`context` `CI 통과`, `state` `success`)를 `gh api`로 기록합니다. 인증은 `gh`의 현재 인증(`GH_TOKEN` 또는 `gh auth`)을 씁니다. 조건을 못 맞추거나 호출이 실패하면 종료 코드 1입니다. `--report --dry-run`은 같은 판정까지 하고 대상 SHA·`context`·호출 내용만 출력합니다. 옵션 없이 실행하면 기록하지 않습니다.
+
+전제: ruleset `main 보호`의 필수 검사 `CI 통과`는 `integration_id: 15368`(GitHub Actions)로 묶여 있고 `strict` 정책이 켜져 있습니다. 지금은 이 명령이 기록한 status가 필수 검사로 인정되지 않으므로, CI를 옮기는 전환 단계에서 ruleset을 바꿔야 합니다. `strict` 때문에 `main`보다 뒤처진 커밋은 머지할 수 없으니 브랜치를 갱신한 뒤 다시 실행합니다. HEAD가 `origin/main`을 포함하지 않으면 경고합니다. 쓰기 권한자는 검증 없이도 status를 기록할 수 있다는 한계는 ADR 0016에 적었습니다.
 
 ## CD(운영 배포)
 

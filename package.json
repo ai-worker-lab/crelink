@@ -22,6 +22,7 @@
     "geoip:download": "node scripts/geoip.mjs",
     "search:indexnow": "node scripts/indexnow.mjs",
     "verify": "node scripts/verify.mjs",
+    "ci:local": "node scripts/ci-local.mjs",
     "smoke": "node scripts/smoke.mjs",
     "e2e": "node scripts/e2e.mjs",
     "docs:check": "node scripts/docs-check.mjs",
