@@ -106,6 +106,74 @@ describe('Sentry 설정', () => {
     });
   });
 
+  describe('Meta 토큰·웹훅 서명', () => {
+    const metaToken = `EAA${'Bw0ZCabc123'.repeat(4)}`;
+
+    it('쿼리 access_token·client_secret·hub.verify_token을 지우고 x-hub-signature-256 헤더도 지운다', () => {
+      const options = sentryOptions({ SENTRY_DSN: 'https://public@o1.ingest.us.sentry.io/1' })!;
+      expect(options.dataCollection?.urlQueryParams).toEqual({
+        deny: expect.arrayContaining(['access_token', 'client_secret', 'hub.verify_token']),
+      });
+      expect(options.dataCollection?.httpHeaders).toEqual({
+        request: { deny: expect.arrayContaining(['x-hub-signature-256']) },
+        response: { deny: expect.arrayContaining(['x-hub-signature-256']) },
+      });
+      const event = scrubEvent({
+        type: undefined,
+        request: { headers: { 'X-Hub-Signature-256': 'sha256=abc', accept: '*/*' } },
+      } as ErrorEvent);
+      expect(event.request?.headers).toEqual({ accept: '*/*' });
+      const span = scrubSpan({
+        trace_id: 't',
+        span_id: 's',
+        name: 'POST /api/webhooks/instagram',
+        start_timestamp: 0,
+        status: 'ok',
+        is_segment: true,
+        attributes: { 'http.request.header.x-hub-signature-256': ['sha256=abc'], 'http.method': 'POST' },
+      });
+      expect(span.attributes).toEqual({ 'http.method': 'POST' });
+    });
+
+    it('오류 이벤트의 문구와 URL에서 Meta 토큰 형식을 가린다', () => {
+      const event = scrubEvent({
+        type: undefined,
+        message: `graph failed ${metaToken}`,
+        exception: { values: [{ type: 'Error', value: `bad token ${metaToken}` }] },
+        request: { url: `https://x.test/cb?t=${metaToken}`, query_string: `t=${metaToken}` },
+      } as ErrorEvent);
+      expect(JSON.stringify(event)).not.toContain(metaToken);
+      expect(event.exception?.values?.[0]?.value).toBe('bad token [token]');
+      expect(event.message).toBe('graph failed [token]');
+    });
+
+    it('span 문자열 속성과 로그 본문·속성에서 Meta 토큰을 가리고, 서명 속성은 지운다', () => {
+      const span = scrubSpan({
+        trace_id: 't',
+        span_id: 's',
+        name: 'GET',
+        start_timestamp: 0,
+        status: 'ok',
+        is_segment: true,
+        attributes: { 'url.full': `https://graph.facebook.com/x?t=${metaToken}` },
+      });
+      expect(span.attributes).toEqual({ 'url.full': 'https://graph.facebook.com/x?t=[token]' });
+
+      const log = scrubLog({
+        level: 'warn',
+        message: `Graph 실패: ${metaToken}`,
+        attributes: { 'nest.stack': `Error ${metaToken}`, 'x-hub-signature-256': 'sha256=abc' },
+      });
+      expect(log.message).toBe('Graph 실패: [token]');
+      expect(log.attributes).toEqual({ 'nest.stack': 'Error [token]' });
+    });
+
+    it('EAA로 시작해도 토큰 길이가 아니거나 단어 안에 있으면 그대로 둔다', () => {
+      const log = scrubLog({ level: 'info', message: 'EAA short, ABCEAA' + 'x'.repeat(30), attributes: {} });
+      expect(log.message).toBe('EAA short, ABCEAA' + 'x'.repeat(30));
+    });
+  });
+
   it('지표 속성에서 사용자 ID·이메일·이름·IP를 지우고 열거값은 남긴다', () => {
     const metric = scrubMetric({
       name: 'crelink.auth.login',

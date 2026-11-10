@@ -2,6 +2,10 @@
 
 내부 참고용으로 백엔드 API의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-11-11
+
+- Instagram 댓글 자동 DM 기반(0254): migration `0016_instagram_dm`(연결·규칙·발송·수신 거부·삭제 요청 표, `platform_settings.instagram_dm_audience` 기본 `off`), `src/instagram/`의 암호화(`crypto.ts`: AES-256-GCM·행 ID AAD·키 회전·작성자 해시·수신 거부 토큰), Graph 경계(`graph.ts`: `v27.0`, 허용된 코드·서브코드만 남기고 원문을 버림), 뒤 티켓용 빈 controller·service와 모듈 등록을 추가했습니다. 설정 8개 키는 전부 있거나 전부 없어야 하고(`AppConfig.instagram`, 없으면 null) `PRODUCTION_REQUIRED_KEYS`에 넣지 않았습니다. Sentry에 `x-hub-signature-256`, 쿼리 `access_token`·`client_secret`·`hub.verify_token`, Meta 토큰 형식(`EAA…`) 스크럽을 더했습니다. 공개 경로는 아직 없습니다. 실제 Meta 호출은 하지 않았고 `[M?]` 호출 형식은 미실측입니다. [설계](../../docs/specs/instagram-comment-dm.md), [티켓](../../docs/work/api/0254-instagram-dm-foundation.md).
+
 ## 2026-11-10
 
 - 공유관리 페이지 API(0243): `0014_shared_pages.sql`, 초대·멤버·페이지 목록 계약과 경로를 추가했습니다. `SessionGuard` 다음 `PageAccessGuard`가 헤더 대상 권한을 매 요청 조회하고 인증 사용자·행위자를 유지한 채 서비스에 대상 소유자 id를 전달합니다. 파일 소유자·통계·방명록 공동 관리와 초대 보존을 적용했습니다. 초대는 SHA-256만 저장하고 소유자 행 잠금·조건부 소비로 동시 수락을 제한합니다. 웹/BFF 전달은 후속 0244 범위입니다. 검증 제한과 실행 결과는 [0243](../../docs/work/api/0243-shared-pages-api.md)에 기록합니다.
