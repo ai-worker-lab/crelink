@@ -6,7 +6,8 @@ export const metadata: Metadata = { title: '이용약관' };
 
 /**
  * 서비스 이용 조건의 공개 초안입니다. 근거: docs/product/crelink.md R13·R14·R20·R23,
- * docs/specs/crelink-link-limit-ad-toggle.md(광고 블록 켜고 끄기, 외부 링크 한도), docs/work/web/0140-terms-of-service-page.md.
+ * docs/specs/crelink-link-limit-ad-toggle.md(광고 블록 켜고 끄기, 외부 링크 한도), docs/work/web/0140-terms-of-service-page.md,
+ * docs/specs/instagram-comment-dm.md `권한·보안·개인정보`(인스타그램 댓글 자동 DM, work item 0267).
  * 법률 검토 전 문구입니다.
  */
 export default function TermsPage() {
@@ -48,6 +49,10 @@ export default function TermsPage() {
           <ul>
             <li>피싱·악성코드·사기 등 방문자에게 위험을 줄 수 있는 링크나 콘텐츠를 올리는 행위</li>
             <li>스팸, 자동화된 대량 요청, 다른 사람을 사칭하거나 권리를 침해하는 행위</li>
+            <li>
+              인스타그램 댓글 자동 DM에서 팔로우나 구독을 DM을 받는 조건으로 붙이는 행위, 수신 거부를 우회하거나 수신
+              거부 안내를 가리거나 없애는 행위(7조)
+            </li>
             <li>크리링의 보안·접근 제한을 우회하거나 서비스 운영을 방해하는 행위</li>
             <li>법령, 제3자 서비스 약관 또는 다른 사람의 지식재산권·개인정보를 침해하는 행위</li>
           </ul>
@@ -84,8 +89,40 @@ export default function TermsPage() {
           </p>
         </section>
 
+        <section aria-labelledby="terms-instagram-dm">
+          <h2 id="terms-instagram-dm">7. 인스타그램 댓글 자동 DM</h2>
+          <p>
+            크리에이터가 인스타그램 계정을 연결하고 규칙을 켜면, 정한 키워드가 든 댓글을 단 사람에게 크리에이터가 쓴
+            문구와 링크를 DM으로 보낼 수 있어요. 이 기능은 크리링이 기능을 열어 둔 때에만 쓸 수 있고, 크리링은 서비스
+            보안, 플랫폼 정책, 수신자 보호를 위해 기능 전체나 특정 계정의 자동 DM을 멈출 수 있어요. 멈춘 계정은
+            크리에이터가 직접 풀 수 없어요.
+          </p>
+          <ul>
+            <li>
+              메시지 내용의 책임: DM의 문구, 링크가 가리키는 곳, 보낼 대상과 키워드는 크리에이터가 정하고 그 내용은
+              크리에이터가 책임져요. 크리링은 내용을 미리 검토하지 않아요. 법령과 인스타그램(Meta)의 약관·정책을
+              어기거나, 속이거나 위험한 내용을 담은 DM은 보낼 수 없어요.
+            </li>
+            <li>
+              팔로우 조건 금지: 팔로우, 구독, 좋아요, 공유 같은 행동을 해야 링크를 받을 수 있다고 안내하거나 그런 조건을
+              내세워 댓글을 유도할 수 없어요.
+            </li>
+            <li>
+              수신 거부 존중: 자동 DM에는 크리링이 &lsquo;자동 발송 메시지&rsquo; 표시와 수신 거부 링크를 붙이고,
+              크리에이터는 이 줄을 뺄 수 없어요. 수신 거부한 사람에게 다른 수단으로 같은 자동 DM을 보내려 하거나 수신
+              거부를 우회·방해하는 행위는 금지돼요.
+            </li>
+          </ul>
+          <p>
+            3조의 &lsquo;자동화된 대량 요청&rsquo; 금지는 크리링을 통하지 않고 크리링 서비스나 다른 사람의 계정에 자동
+            요청을 보내는 행위에 그대로 적용돼요. 이 조의 자동 DM은 크리링이 제공하는 기능을 이 조의 조건에 따라 쓰는
+            경우에 한해 허용되며, 이 조건을 어기면 2조에 따라 자동 DM이나 계정의 이용을 제한하거나 정지할 수 있어요.
+            자동 DM에서 모은 정보의 처리는 개인정보 처리방침의 &lsquo;인스타그램 댓글 자동 DM&rsquo;을 따라요.
+          </p>
+        </section>
+
         <section aria-labelledby="terms-change">
-          <h2 id="terms-change">7. 약관 변경</h2>
+          <h2 id="terms-change">8. 약관 변경</h2>
           <p>
             서비스 내용이나 법령이 바뀌면 이 페이지를 고칠 수 있어요. 중요한 변경은 변경된 내용을 이 페이지에 게시하고,
             변경일과 적용일을 함께 알려요. 변경 후에도 서비스를 계속 이용하면 변경된 조건에 동의한 것으로 볼 수 있어요.
@@ -93,14 +130,15 @@ export default function TermsPage() {
         </section>
 
         <section aria-labelledby="terms-contact">
-          <h2 id="terms-contact">8. 문의</h2>
+          <h2 id="terms-contact">9. 문의</h2>
           <p>
             이용 중 문제가 있거나 정지·링크 차단에 관해 문의하려면 로그인 후 관리 화면의 <strong>의견 보내기</strong>를
             이용해 주세요. 문의를 처리하려면 개인정보 처리방침에 적힌 범위의 정보가 사용될 수 있어요.
           </p>
         </section>
 
-        <p>시행일: 2026년 10월 12일</p>
+        <p>변경일: 2026년 11월 11일 (인스타그램 댓글 자동 DM 조항 추가)</p>
+        <p>시행일: 2026년 11월 11일 (이전 시행일: 2026년 10월 12일)</p>
       </article>
     </main>
   );
