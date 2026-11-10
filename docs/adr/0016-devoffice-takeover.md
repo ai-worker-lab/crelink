@@ -18,7 +18,7 @@
 2. **장애 예외:** 운영 장애가 확인되면 직전 릴리스로의 롤백은 사전 승인된 것으로 보고 실행한 뒤 바로 보고합니다. DB 마이그레이션은 되돌리지 않습니다.
 3. **범위:** 유지·개발과 운영입니다. 성장(마케팅·이벤트)은 안정화 후 다시 정합니다.
 4. **작업 체계:** work item, `.omp/agents/*.md`의 이름과 `owns`, `pnpm work:*`, `pnpm verify`를 그대로 씁니다. `pnpm work:run`과 20분 자동화는 쓰지 않습니다.
-5. **CI:** 로컬 기기에서 실행한 뒤 PR을 머지하고 GitHub Actions에는 CD만 남기기로 했습니다. 전환 전까지 `ci.yml`은 유지합니다.
+5. **CI:** 로컬 기기에서 `pnpm ci:local --report`를 실행한 뒤 PR을 머지하고 GitHub Actions에서 자동으로 도는 것은 CD만 남깁니다(2026-11-10 전환, 0237). `ci.yml`은 로컬에 없는 E2E와 WebKit·Firefox·amd64가 필요할 때 손으로 실행합니다.
 6. **브라우저 검증:** Playwright에서 ego-lite로 옮깁니다. 첫 시범은 [0206](https://github.com/ai-worker-lab/crelink/tree/work/0206-ego-analytics-responsive)입니다.
 7. **운영 감시:** Sentry와 Discord를 씁니다. Jira와 Confluence는 보류합니다.
 

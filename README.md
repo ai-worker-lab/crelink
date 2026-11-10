@@ -24,7 +24,7 @@
 
 ## 요구사항
 
-- Node.js: 24 LTS 이상(24.9+, NestJS 12 요구)을 지원하며 CI가 24·26을 검사합니다. 기준 런타임과 로컬 개발 기본 버전은 [`.nvmrc`](.nvmrc)(24)입니다(`nvm use` 또는 `fnm use`).
+- Node.js: 24 LTS 이상(24.9+, NestJS 12 요구)을 지원하며 수동 CI가 24·26을 검사합니다. 기준 런타임과 로컬 개발 기본 버전은 [`.nvmrc`](.nvmrc)(24)입니다(`nvm use` 또는 `fnm use`).
 - pnpm: 루트 `package.json`의 `packageManager` 값(`corepack enable` 후 자동 사용)
 - Docker Engine/Desktop과 Compose v2 (로컬 PostgreSQL·Valkey용)
 - make, PM2(`pnpm install` 시 함께 설치)
@@ -57,7 +57,7 @@ pnpm instance      # 이 checkout의 포트·주소·Compose project 출력(work
 pnpm logs api      # 서비스 최근 로그 (api|web|app|infra, --lines N, --follow)
 pnpm verify        # CI와 같은 전체 검증: 토큰·work item·문서·lint·타입·빌드·테스트
 pnpm verify --fast # 빌드·테스트를 뺀 빠른 검증
-pnpm ci:local      # ci.yml의 판정과 job을 이 기기에서 재현
+pnpm ci:local      # 머지 전 검사를 이 기기에서 실행(--report로 CI 통과 기록)
 pnpm smoke         # 실행 중인 API·웹에 Playwright smoke 테스트
 pnpm docs:check    # 문서 링크·형식 검사
 pnpm design:sync   # design/system 디자인 시스템을 로컬 OpenDesign에 설치
