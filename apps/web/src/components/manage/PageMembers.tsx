@@ -10,6 +10,7 @@ import { ActionStatus } from '../ActionStatus';
 import { CopyButton } from '../CopyButton';
 import { EditSheet } from './EditSheet';
 import { useManager } from './ManagerContext';
+import { managerMenuLabel } from './menu';
 
 export function PageMembers() {
   const { state } = useManager();
@@ -67,7 +68,7 @@ export function PageMembers() {
   }
   return (
     <section className="form-stack">
-      <h1 className="page-title">설정</h1>
+      <h1 className="page-title">{managerMenuLabel('members')}</h1>
       <h2>공동 관리자</h2>
       {owner ? (
         <>

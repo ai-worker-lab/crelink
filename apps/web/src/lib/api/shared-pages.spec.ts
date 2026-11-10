@@ -108,7 +108,7 @@ describe('브라우저 관리 대상', () => {
     try {
       for (const pathname of [
         '/me/landings/abc123def4',
-        '/me/landings/xyz123def4/settings',
+        '/me/landings/xyz123def4/members',
         '/invite',
         '/me',
         '/admin',

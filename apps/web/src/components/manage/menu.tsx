@@ -28,16 +28,6 @@ const iconProps = {
  */
 export const MANAGER_MENU = [
   {
-    segment: 'settings',
-    label: '설정',
-    icon: (
-      <svg {...iconProps}>
-        <circle cx="12" cy="12" r="8" />
-        <circle cx="12" cy="12" r="3" />
-      </svg>
-    ),
-  },
-  {
     segment: '',
     label: '페이지 편집',
     icon: (
@@ -83,6 +73,16 @@ export const MANAGER_MENU = [
       <svg {...iconProps}>
         <rect x="4" y="4" width="16" height="16" rx="2" />
         <path d="M4 10h16M10 10v10M4 15h16" />
+      </svg>
+    ),
+  },
+  {
+    segment: 'members',
+    label: '공동 관리자',
+    icon: (
+      <svg {...iconProps}>
+        <circle cx="12" cy="12" r="8" />
+        <circle cx="12" cy="12" r="3" />
       </svg>
     ),
   },
