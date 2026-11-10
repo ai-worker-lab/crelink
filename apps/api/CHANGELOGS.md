@@ -4,6 +4,8 @@
 
 ## 2026-11-11
 
+- Instagram 댓글 자동 DM(0256~0261, 0269): OAuth 연결과 일일 토큰 점검, 웹훅 수신·데이터 삭제 콜백, 발송 worker(`crelink.instagram.dm` 지표), 규칙·게시물·발송 내역 API, 긴급 정지와 90일 보존을 더했습니다. 통합 보정(0269): 운영자 정지 중인 연결의 `DELETE /api/me/instagram`은 행을 지우지 않고 재인증 전이(토큰 파기·대기 취소)와 규칙 보관만 해 재연결로 `operator_paused_at`이 사라지지 않습니다. 호출 중 정지·비활성이 생기면 재시도·레이트 대기로 `pending`에 되돌리지 않고 `cancelled`(`stopped_before_send`)로 끝내며 레이트 제한의 시도 횟수 미차감은 유지합니다. `crelink.instagram.webhook`·`crelink.instagram.dm`을 `BusinessMetric`에 더했습니다. 실제 Meta 연동은 미검증입니다. [설계](../../docs/specs/instagram-comment-dm.md), [티켓](../../docs/work/orchestrator/0269-instagram-dm-integration.md).
+
 - Instagram 댓글 자동 DM 기반(0254): migration `0016_instagram_dm`(연결·규칙·발송·수신 거부·삭제 요청 표, `platform_settings.instagram_dm_audience` 기본 `off`), `src/instagram/`의 암호화(`crypto.ts`: AES-256-GCM·행 ID AAD·키 회전·작성자 해시·수신 거부 토큰), Graph 경계(`graph.ts`: `v27.0`, 허용된 코드·서브코드만 남기고 원문을 버림), 뒤 티켓용 빈 controller·service와 모듈 등록을 추가했습니다. 설정 8개 키는 전부 있거나 전부 없어야 하고(`AppConfig.instagram`, 없으면 null) `PRODUCTION_REQUIRED_KEYS`에 넣지 않았습니다. Sentry에 `x-hub-signature-256`, 쿼리 `access_token`·`client_secret`·`hub.verify_token`, Meta 토큰 형식(`EAA…`) 스크럽을 더했습니다. 공개 경로는 아직 없습니다. 실제 Meta 호출은 하지 않았고 `[M?]` 호출 형식은 미실측입니다. [설계](../../docs/specs/instagram-comment-dm.md), [티켓](../../docs/work/api/0254-instagram-dm-foundation.md).
 
 ## 2026-11-10

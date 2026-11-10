@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@ne
 import * as Sentry from '@sentry/nestjs';
 import { AppConfig, type InstagramSettings } from '../config.service';
 import { Database } from '../database';
+import { countBusinessMetric } from '../monitoring/metrics';
 import { InstagramConnectionService } from './connection.service';
 import { decryptToken } from './crypto';
 import { InstagramGraph } from './graph';
@@ -27,6 +28,25 @@ const SENDABLE_SQL = `s.instagram_dm_audience <> 'off'
     AND r.archived_at IS NULL`;
 
 const WINDOW_EXPIRED_SQL = `c.rate_window_started_at <= now() - interval '1 hour'`;
+
+/**
+ * `sending`을 `pending`으로 되돌리기 전에 지금도 보낼 수 있는지 봅니다. `$1`은 발송 행 ID입니다.
+ * 정지·비활성화 트랜잭션은 `sending`을 취소하지 않으므로, 연결·규칙·설정 행을 잠가 그 트랜잭션과 줄을 세웁니다.
+ * 잠금 순서는 규칙 변경과 같은 연결 → 규칙이고, 같은 트랜잭션에서 연결을 갱신할 수 있어 연결은 처음부터 쓰기 잠금입니다.
+ */
+const RETRY_GATE_CTE = `gate AS (
+         SELECT d.id, (${SENDABLE_SQL}) AS sendable
+         FROM instagram_dm_deliveries d
+         JOIN instagram_connections c ON c.id = d.connection_id
+         JOIN users u ON u.id = c.user_id
+         JOIN instagram_dm_rules r ON r.id = d.rule_id
+         JOIN platform_settings s ON s.id
+         WHERE d.id = $1 AND d.status = 'sending'
+         FOR NO KEY UPDATE OF c
+         FOR SHARE OF r, s
+       )`;
+
+const STOPPED_FAILURE_CODE = 'stopped_before_send';
 
 interface Claim {
   id: string;
@@ -57,6 +77,10 @@ const EMPTY_TICK: InstagramWorkerTick = { claimed: 0, leaseExpired: 0, expired: 
 /** 예외 내용에는 Graph 원문이나 토큰이 섞일 수 있어 이름만 남깁니다. */
 function errorName(error: unknown): string {
   return error instanceof Error ? error.name : 'unknown';
+}
+
+function countDm(result: string, value = 1): void {
+  if (value > 0) countBusinessMetric('crelink.instagram.dm', { result }, value);
 }
 
 /**
@@ -143,6 +167,8 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
        )
        SELECT (SELECT count(*)::int FROM lease) AS lease_expired, (SELECT count(*)::int FROM stale) AS expired`,
     );
+    countDm('lease_expired', rows[0].lease_expired);
+    countDm('expired', rows[0].expired);
     return { leaseExpired: rows[0].lease_expired, expired: rows[0].expired };
   }
 
@@ -208,7 +234,8 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
     // lease를 잃은 행은 더 이상 이 프로세스의 것이 아니므로 아무것도 쓰지 않습니다(만료 처리가 `unknown`으로 끝냅니다).
     if (!state?.lease_held) return;
     if (!state.sendable) {
-      await this.finish(claim.id, 'cancelled', 'stopped_before_send');
+      await this.finish(claim.id, 'cancelled', STOPPED_FAILURE_CODE);
+      countDm('cancelled');
       return;
     }
     let accessToken: string;
@@ -222,6 +249,7 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
     } catch (error) {
       this.logger.error(`연결 ${state.connection_id}의 토큰을 읽지 못했습니다: ${errorName(error)}`);
       await this.finish(claim.id, 'failed', 'token_unreadable');
+      countDm('token_unreadable');
       return;
     }
     try {
@@ -231,6 +259,7 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
       return;
     }
     await this.finish(claim.id, 'sent', null);
+    countDm('sent');
   }
 
   /** 호출 직전 재확인. 토큰·본문도 이 시점의 값을 읽어 정지·토큰 교체를 최대한 늦게 반영합니다. */
@@ -263,6 +292,7 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
 
   private async recordFailure(id: string, state: SendState, error: unknown): Promise<void> {
     const failure = classifySendFailure(error, this.errorCodes);
+    countDm(failure.kind);
     switch (failure.kind) {
       case 'retry':
         await this.scheduleRetry(id);
@@ -289,35 +319,50 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
     }
   }
 
-  /** 연결 전 실패만 재시도합니다. 횟수를 다 쓰면 `failed`입니다. */
+  /** 연결 전 실패만 재시도합니다. 횟수를 다 쓰면 `failed`이고, 그 사이 정지됐으면 `pending`으로 되돌리지 않고 `cancelled`입니다. */
   private async scheduleRetry(id: string): Promise<void> {
     await this.database.query(
-      `UPDATE instagram_dm_deliveries
-       SET status = CASE WHEN attempts >= cardinality($2::int[]) THEN 'failed' ELSE 'pending' END,
-           failure_code = 'connect_failed',
-           next_attempt_at = CASE WHEN attempts >= cardinality($2::int[]) THEN next_attempt_at
-                                  ELSE now() + (($2::int[])[attempts + 1] * interval '1 second') END,
-           attempts = attempts + 1,
+      `WITH ${RETRY_GATE_CTE}
+       UPDATE instagram_dm_deliveries d
+       SET status = CASE WHEN NOT gate.sendable THEN 'cancelled'
+                         WHEN d.attempts >= cardinality($2::int[]) THEN 'failed'
+                         ELSE 'pending' END,
+           failure_code = CASE WHEN gate.sendable THEN 'connect_failed' ELSE $3 END,
+           next_attempt_at = CASE WHEN d.attempts >= cardinality($2::int[]) THEN d.next_attempt_at
+                                  ELSE now() + (($2::int[])[d.attempts + 1] * interval '1 second') END,
+           attempts = d.attempts + 1,
            lease_until = NULL
-       WHERE id = $1 AND status = 'sending'`,
-      [id, RETRY_DELAYS_SECONDS],
+       FROM gate
+       WHERE d.id = gate.id AND d.status = 'sending'`,
+      [id, RETRY_DELAYS_SECONDS, STOPPED_FAILURE_CODE],
     );
   }
 
-  /** 연결 전체를 쉬게 하고 이 건은 시도 횟수를 쓰지 않고 되돌립니다. */
+  /**
+   * 연결 전체를 쉬게 하고 이 건은 시도 횟수를 쓰지 않고 되돌립니다. 그 사이 정지됐으면 되돌리지 않고 `cancelled`입니다.
+   * 한 문장으로 합치면 연결 갱신이 먼저 실행돼 gate 잠금이 그 행을 건너뛰므로 두 문장으로 나눕니다.
+   */
   private async waitForRateLimit(id: string, connectionId: string, waitSeconds: number): Promise<void> {
-    await this.database.query(
-      `WITH released AS (
-         UPDATE instagram_dm_deliveries
-         SET status = 'pending', lease_until = NULL, next_attempt_at = now() + ($3::double precision * interval '1 second')
-         WHERE id = $1 AND status = 'sending'
-       )
-       UPDATE instagram_connections
-       SET rate_limited_until = GREATEST(rate_limited_until, now() + ($3::double precision * interval '1 second')),
-           updated_at = now()
-       WHERE id = $2`,
-      [id, connectionId, waitSeconds],
-    );
+    await this.database.transaction(async (client) => {
+      await client.query(
+        `WITH ${RETRY_GATE_CTE}
+         UPDATE instagram_dm_deliveries d
+         SET status = CASE WHEN gate.sendable THEN 'pending' ELSE 'cancelled' END,
+             failure_code = CASE WHEN gate.sendable THEN d.failure_code ELSE $3 END,
+             lease_until = NULL,
+             next_attempt_at = now() + ($2::double precision * interval '1 second')
+         FROM gate
+         WHERE d.id = gate.id AND d.status = 'sending'`,
+        [id, waitSeconds, STOPPED_FAILURE_CODE],
+      );
+      await client.query(
+        `UPDATE instagram_connections
+         SET rate_limited_until = GREATEST(rate_limited_until, now() + ($2::double precision * interval '1 second')),
+             updated_at = now()
+         WHERE id = $1`,
+        [connectionId, waitSeconds],
+      );
+    });
     this.logger.warn(`연결 ${connectionId}이 Graph 레이트 제한에 걸려 ${waitSeconds}초 쉽니다.`);
   }
 

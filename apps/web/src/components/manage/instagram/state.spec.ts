@@ -53,13 +53,13 @@ test('메뉴는 소유자에게 instagramDmAvailable=true일 때만 보인다', 
   assert.equal(instagramMenuVisible({ instagramDmAvailable: true }), true);
   assert.equal(instagramMenuVisible({ instagramDmAvailable: true, pageAccess: { role: 'owner' } as never }), true);
   assert.equal(instagramMenuVisible({ instagramDmAvailable: false }), false);
-  assert.equal(instagramMenuVisible({}), false);
   assert.equal(instagramMenuVisible({ instagramDmAvailable: true, pageAccess: { role: 'editor' } as never }), false);
 });
 
 test('연결 실패 코드는 알려진 값만 읽는다', () => {
   assert.equal(readConnectFailure('instagram_account_in_use'), 'instagram_account_in_use');
   assert.equal(readConnectFailure('oauth_state_invalid'), 'oauth_state_invalid');
+  assert.equal(readConnectFailure('instagram_access_denied'), 'instagram_access_denied');
   assert.equal(readConnectFailure('other'), null);
   assert.equal(readConnectFailure(['instagram_account_in_use']), null);
   assert.equal(readConnectFailure(undefined), null);

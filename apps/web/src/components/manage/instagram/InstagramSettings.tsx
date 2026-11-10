@@ -8,7 +8,7 @@ import { connectionScreen, type ConnectFailureCode } from './state';
 
 /**
  * `인스타그램 DM` 메뉴(설계 docs/specs/instagram-comment-dm.md): 위에 연결 카드, 연결돼 있으면 아래에 규칙 카드입니다.
- * 서버가 읽은 연결 정보로 시작하고, 이후 변경은 각 요청의 응답으로 맞춥니다. 발송 내역 화면은 별도 티켓(0265)입니다.
+ * 서버가 읽은 연결 정보로 시작하고, 이후 변경은 각 요청의 응답으로 맞춥니다. 발송 내역은 규칙 카드의 링크로 갑니다.
  */
 export function InstagramSettings({
   initial,

@@ -12,7 +12,7 @@ import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import { apiError } from '../common/http';
 import { booleanField } from '../common/input';
 import { AppConfig, InstagramSettings } from '../config.service';
-import { Database, isUniqueViolation } from '../database';
+import { Database, isUniqueViolation, type Queryable } from '../database';
 import { decryptToken, encryptToken } from './crypto';
 import {
   GraphAccessToken,
@@ -378,7 +378,10 @@ export class InstagramConnectionService {
     return toConnectionView(result.rows[0]);
   }
 
-  /** `DELETE /api/me/instagram`. 구독 해제는 시도만 하고(실패 무시) 연결 행을 지웁니다. 규칙·내역은 CASCADE로 함께 지워집니다. */
+  /**
+   * `DELETE /api/me/instagram`. 구독 해제는 시도만 하고(실패 무시) 연결 행을 지웁니다. 규칙·내역은 CASCADE로 함께 지워집니다.
+   * 운영자 정지 중이면 재연결로 정지가 풀리지 않도록 행은 남기고 토큰 파기·대기 취소·규칙 보관만 합니다.
+   */
   async disconnect(userId: string): Promise<void> {
     const settings = this.settings();
     const result = await this.database.query<{
@@ -400,7 +403,29 @@ export class InstagramConnectionService {
         this.logger.warn(`Instagram 구독 해제 실패(무시): ${row.id}`);
       }
     }
-    await this.database.query('DELETE FROM instagram_connections WHERE id = $1', [row.id]);
+    await this.removeConnection(row.id);
+  }
+
+  /** 구독 해제 호출 뒤에 행을 잠그고 다시 읽으므로 호출 중에 걸린 운영자 정지도 놓치지 않습니다. */
+  private async removeConnection(connectionId: string): Promise<void> {
+    await this.database.transaction(async (client) => {
+      const current = await client.query<{ token_revision: number; operator_paused_at: Date | null }>(
+        'SELECT token_revision, operator_paused_at FROM instagram_connections WHERE id = $1 FOR UPDATE',
+        [connectionId],
+      );
+      const row = current.rows[0];
+      if (!row) return;
+      if (!row.operator_paused_at) {
+        await client.query('DELETE FROM instagram_connections WHERE id = $1', [connectionId]);
+        return;
+      }
+      await this.applyReauthRequired(client, connectionId, row.token_revision);
+      await client.query(
+        `UPDATE instagram_dm_rules SET archived_at = now(), version = version + 1, updated_at = now()
+         WHERE connection_id = $1 AND archived_at IS NULL`,
+        [connectionId],
+      );
+    });
   }
 
   /** `PUT /api/me/instagram/pause`. 정지하면 같은 트랜잭션에서 대기 건을 취소하고, 운영자 정지 중에는 바꿀 수 없습니다. */
@@ -438,22 +463,30 @@ export class InstagramConnectionService {
    * `token_revision`이 읽은 값과 다르면 아무것도 하지 않고 false를 돌려줍니다.
    */
   async markReauthRequired(connectionId: string, expectedRevision: number): Promise<boolean> {
-    const changed = await this.database.transaction(async (client) => {
-      const updated = await client.query(
-        `UPDATE instagram_connections
-         SET status = 'reauth_required', token_ciphertext = NULL, token_key_version = NULL,
-             token_revision = token_revision + 1, updated_at = now()
-         WHERE id = $1 AND token_revision = $2 AND status <> 'reauth_required'`,
-        [connectionId, expectedRevision],
-      );
-      if (updated.rowCount !== 1) return false;
-      await client.query(
-        "UPDATE instagram_dm_deliveries SET status = 'cancelled' WHERE connection_id = $1 AND status = 'pending'",
-        [connectionId],
-      );
-      return true;
-    });
+    const changed = await this.database.transaction((client) =>
+      this.applyReauthRequired(client, connectionId, expectedRevision),
+    );
     if (changed) this.logger.warn(`Instagram 연결을 재인증 필요로 바꿨습니다: ${connectionId}`);
     return changed;
+  }
+
+  private async applyReauthRequired(
+    client: Queryable,
+    connectionId: string,
+    expectedRevision: number,
+  ): Promise<boolean> {
+    const updated = await client.query(
+      `UPDATE instagram_connections
+       SET status = 'reauth_required', token_ciphertext = NULL, token_key_version = NULL,
+           token_revision = token_revision + 1, updated_at = now()
+       WHERE id = $1 AND token_revision = $2 AND status <> 'reauth_required'`,
+      [connectionId, expectedRevision],
+    );
+    if (updated.rowCount !== 1) return false;
+    await client.query(
+      "UPDATE instagram_dm_deliveries SET status = 'cancelled' WHERE connection_id = $1 AND status = 'pending'",
+      [connectionId],
+    );
+    return true;
   }
 }

@@ -195,7 +195,7 @@ CREATE TABLE instagram_deletion_requests (
 | 대상 | 기간·시점 | 수단 |
 | --- | --- | --- |
 | `instagram_dm_deliveries` 전체(해시, 댓글 ID, 최종 본문 포함) | 생성 후 90일 | 보존 작업 DELETE(E7) |
-| 연결 해제 | 즉시 | 연결 행 삭제, CASCADE |
+| 연결 해제 | 즉시 | 연결 행 삭제, CASCADE. 운영자 정지 중이면 행을 남기고 토큰 파기·대기 취소·규칙 보관(아래 `해제`). 이때 발송 내역은 90일 보존 작업으로 지운다 |
 | 토큰 무효 | 즉시 | 토큰 파기, `reauth_required`, 대기 건 취소 |
 | 데이터 삭제 콜백 | 즉시 | 연결 행 삭제, 확인 코드만 남김 |
 | 확인 코드 | 90일 | 보존 작업 DELETE |
@@ -280,8 +280,8 @@ CREATE TABLE instagram_deletion_requests (
 | 결과 | 처리 |
 | --- | --- |
 | 200 | `sent` |
-| 연결 전 네트워크 실패 | 재시도(30초·2분·10분·1시간, 최대 4회) |
-| 613·서브코드 2534040, BUC 80002, 429 `[문서]` | `X-Business-Use-Case-Usage`의 대기 시간으로 `rate_limited_until` 설정(값이 없으면 1시간). 시도 횟수 미차감 |
+| 연결 전 네트워크 실패 | 재시도(30초·2분·10분·1시간, 최대 4회). 정지·비활성이면 아래 `긴급 정지`대로 취소 |
+| 613·서브코드 2534040, BUC 80002, 429 `[문서]` | `X-Business-Use-Case-Usage`의 대기 시간으로 `rate_limited_until` 설정(값이 없으면 1시간). 시도 횟수 미차감. 정지·비활성이면 아래 `긴급 정지`대로 취소 |
 | 타임아웃, 5xx, 응답 전 끊김 | **`unknown`, 재시도 안 함** |
 | 토큰 무효 `[문서]`(190 계열 `[M?]`) | **재시도 금지.** 읽었던 `token_revision`이 그대로일 때만 재인증 전이 함수 호출(아래) |
 | 메시지 접근 꺼짐(코드는 S8) | `messages_access_required`, `pending`을 `cancelled`로. 토큰 유지 |
@@ -302,7 +302,7 @@ S4에서 같은 `comment_id` 재호출이 구분되는 오류로 거부된다고
 | 계정 | `dm_paused_at`(크리에이터), `operator_paused_at`(운영자) | 같은 동작을 해당 계정에만 적용 |
 | 기능 전체 | 설정 키 없음 | API 503 `instagram_not_configured`, worker 미시작 |
 
-진행 중이던 호출은 프로세스당 최대 5건이며 회수할 수 없습니다. 재개해도 취소된 건은 보내지 않습니다.
+진행 중이던 호출은 프로세스당 최대 5건이며 회수할 수 없습니다. 재개해도 취소된 건은 보내지 않습니다. 호출이 연결 전 실패나 레이트 제한으로 끝났을 때 이미 정지·비활성이면(`SENDABLE_SQL`이 거짓) `pending`으로 되돌리지 않고 `cancelled`(`stopped_before_send`)로 끝냅니다. 이 판정은 연결·규칙·설정 행을 잠가 진행 중인 정지 트랜잭션을 기다립니다.
 
 `audience`는 출시 제어도 겸합니다. `off`(기본), `operators`(회사 계정 시범, 운영자 역할만), `everyone`(사업자 확보와 검수 통과 뒤, 이번 에픽 범위 밖)입니다. 그래서 main에 머지되어도 켜기 전까지 동작하지 않습니다(E19).
 
@@ -314,7 +314,8 @@ S4에서 같은 `comment_id` 재호출이 구분되는 오류로 거부된다고
 2. 동의는 브라우저에서 열리고 비밀번호가 필요합니다 `[문서]`. 시작과 콜백이 같은 브라우저여야 쿠키가 맞습니다. 인앱 브라우저이면(기존 `inAppKindOfUserAgent`, `apps/web/src/app/api/backend/[...path]/route.ts:6`, `:56`) 시작 전에 기본 브라우저 안내 화면을 보입니다.
 3. 콜백 페이지(web 전용 route)는 세션 쿠키와 state 쿠키를 API에 전달합니다(E9). `code`·`state`는 Sentry에서 이미 지웁니다(E12).
 4. `POST /api/me/instagram/callback`은 쿠키 일치, 서명, 만료, `uid=세션 사용자`를 검증합니다. 다음으로 code 교환, IG 계정 조회, 프로페셔널 계정 확인, **충돌 검사**, `subscribed_apps` 구독, 암호화 저장 순서로 진행하고 저장은 한 트랜잭션에 합니다.
-5. 동의 결과 IG 계정이 정확히 1개가 아니면 409 `instagram_account_selection_required`입니다. 선택 화면은 만들지 않고 하나만 골라 다시 연결하도록 안내합니다.
+5. 동의 화면에서 거부하면 콜백 route가 Meta의 `error` 값을 옮기지 않고 `instagram_access_denied`로 화면에 돌려보냅니다.
+6. 동의 결과 IG 계정이 정확히 1개가 아니면 409 `instagram_account_selection_required`입니다. 선택 화면은 만들지 않고 하나만 골라 다시 연결하도록 안내합니다.
 
 **토큰 암호화와 키.**
 
@@ -340,9 +341,9 @@ S7에서 토큰이 만료되고 갱신 수단이 있다고 확인되면 후속 m
 
 **토큰 세대.** `token_revision`은 새 토큰을 저장할 때와 재인증 전이로 토큰을 파기할 때 올립니다. 같은 토큰을 다시 암호화할 때는 올리지 않습니다. 외부 호출 결과(일일 점검, 충돌 점검, worker의 토큰 무효)는 읽었던 `token_revision`이 그대로일 때만 적용하고 다르면 버립니다. 외부 호출 중에는 DB 잠금을 잡지 않습니다.
 
-**해제.** `DELETE /api/me/instagram`은 구독 해제를 시도하고(실패 무시) 연결 행을 삭제합니다. 규칙과 내역도 함께 지워지며 화면에 그렇게 안내합니다.
+**해제.** `DELETE /api/me/instagram`은 구독 해제를 시도하고(실패 무시) 연결 행을 삭제합니다. 규칙과 내역도 함께 지워지며 화면에 그렇게 안내합니다. 운영자 정지(`operator_paused_at`)가 있으면 행을 지우지 않습니다. 재인증 전이(토큰 파기·`pending` 취소)를 하고 규칙을 보관한 뒤 행을 남기며, 구독 해제 뒤에 행을 잠그고 다시 읽어 호출 중에 걸린 정지도 놓치지 않습니다. 재연결(같은 `user_id`)은 그 행을 갱신하므로 정지가 유지됩니다. 응답은 똑같이 204이고, 데이터 삭제 콜백은 운영자 정지와 관계없이 행을 지웁니다.
 
-**데이터 삭제 콜백.** HTTPS, `signed_request` 검증, `{url, confirmation_code}` 응답입니다 `[문서]`. `meta_user_id`로 연결을 찾아 삭제하고, 해당 `ig_user_id`의 수신 거부 기록도 같은 트랜잭션에서 파기합니다. 못 찾아도 같은 응답을 줍니다. `user_id` 대응이 안 되면(S9) 콜백 대신 안내 URL과 제품 내 해제로 바꿉니다. 확인 페이지는 코드 존재 여부만 표시합니다. 댓글 작성자는 앱을 승인한 적이 없어 콜백이 오지 않습니다 `[M?]`. 90일 자동 파기와 처리방침의 문의 경로로 대응합니다.
+**데이터 삭제 콜백.** HTTPS, `signed_request` 검증, `{url, confirmation_code}` 응답입니다 `[문서]`. `meta_user_id`로 연결을 찾아 삭제하고, 해당 `ig_user_id`의 수신 거부 기록도 같은 트랜잭션에서 파기합니다. 못 찾아도 같은 응답을 줍니다. 응답 `url`은 `{WEB}/privacy/instagram-deletion/{code}`입니다. `user_id` 대응이 안 되면(S9) 콜백 대신 안내 URL과 제품 내 해제로 바꿉니다. 확인 페이지는 코드 존재 여부만 표시합니다. 댓글 작성자는 앱을 승인한 적이 없어 콜백이 오지 않습니다 `[M?]`. 90일 자동 파기와 처리방침의 문의 경로로 대응합니다.
 
 ## DM 링크와 측정
 
@@ -367,7 +368,7 @@ S7에서 토큰이 만료되고 갱신 수단이 있다고 확인되면 후속 m
 | `POST /api/me/instagram/connect` | 소유자·사람 | 없음 | `{ authorizationUrl }`, state 쿠키 | 403 `instagram_unavailable` |
 | `POST /api/me/instagram/callback` | 로그인·사람 | `{ code, state }` | `InstagramConnectionView` | 400 `oauth_state_invalid`, 409 `instagram_account_in_use`, 409 `instagram_account_selection_required`, 422 `instagram_account_not_professional`, 502 `instagram_upstream_failed` |
 | `POST /api/me/instagram/recheck` | 소유자 | 없음 | 연결 뷰. `messages_access_required`를 `active`로 되돌림. 다음 발송 결과가 실제 확인이다 | 공통 |
-| `DELETE /api/me/instagram` | 소유자 | 없음 | 204 | 공통 |
+| `DELETE /api/me/instagram` | 소유자 | 없음 | 204(운영자 정지 중이면 행 유지, `해제` 참고) | 공통 |
 | `PUT /api/me/instagram/pause` | 소유자 | `{ paused }` | 연결 뷰 | 409 `instagram_operator_paused` |
 | `GET /api/me/instagram/media` | 소유자 | `?after=` | `{ items: [{ id, caption, permalink, thumbnailUrl, timestamp }], nextCursor }` 25건 | 409 `instagram_reauth_required`, 502 |
 | `GET /api/me/instagram/rules` | 소유자 | 없음 | `{ rules: [InstagramDmRuleView] }` 상한 10 | 공통 |
@@ -402,7 +403,7 @@ S7에서 토큰이 만료되고 갱신 수단이 있다고 확인되면 후속 m
 | 메시지 접근 꺼짐 | `messages_access_required` | 켜는 방법과 `다시 확인` 버튼 |
 | 재연결 필요 | `reauth_required` | "연결이 끊겼어요. 다시 연결해 주세요", 자동 재시도 없음 안내, 규칙 읽기 전용 |
 | 만료 임박 | `tokenExpiresAt` 14일 이내 | 재연결 안내(값이 없으면 표시 없음) |
-| 연결 실패 | 409 `in_use`, 422, 502, 400 state | 코드별 문구, `ActionStatus` |
+| 연결 실패 | 409 `in_use`, 422, 502, 400 state, 동의 거부 `instagram_access_denied`(콜백 route가 `?instagram_error=`로 전달) | 코드별 문구, `ActionStatus` |
 | 계정 선택 오류 | 409 selection | 하나만 골라 다시 연결 안내 |
 | 운영자 정지 | `operatorPaused=true` | 스위치 비활성, 안내 |
 | 규칙 없음 | `rules=[]` | 안내와 `규칙 추가` |
@@ -586,6 +587,7 @@ R 등급의 정의 문서는 `docs/development`, `docs/alm`, `WORKFLOW.md`, `doc
 ## 변경 기록
 
 - 승인 전 없음
+- 2026-11-11 0269 통합 보정: 운영자 정지 중 해제 동작, 정지 중 재시도 복귀 취소, `instagram_access_denied`, 삭제 확인 주소 `/privacy/instagram-deletion/{code}` 반영
 
 ## 나중으로 미룬 항목
 

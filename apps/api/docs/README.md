@@ -195,6 +195,8 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 | `crelink.ad_banner.impression` | `TrackingService.recordAdStat('impression')`: 공개 랜딩 API가 `passAccepted`이고 광고 블록이 보일 때 첫 장 1건(기록 시작) | 없음 |
 | `crelink.ad_banner.click` | `TrackingService.recordAdStat('click')`: 광고 클릭 경로(기록 시작) | 없음 |
 | `crelink.creator_banner.click` | `ShortLinkController.creatorBannerClick`(`GET /b/{bannerPublicId}`)이 외부 URL로 302 할 때(클릭 기록 시작) | 없음 |
+| `crelink.instagram.webhook` | `InstagramWebhookService`. 값은 항목 수이고 본문 크기는 분포 `crelink.instagram.webhook.body_bytes` | `result`: `stored`, `not_stored`, `unmatched`, `malformed`, `forbidden`, `db_error`, 항목을 건너뛴 이유(`webhook-payload.ts`), 삭제 콜백 `deletion_processed`·`deletion_forbidden` |
+| `crelink.instagram.dm` | `InstagramWorkerService`. Graph 호출 결과 1건과 tick의 종료 처리 건수 | `result`: `sent`, `retry`, `unknown`, `rate_limited`, `token_invalid`, `messages_access`, `policy_restricted`, `rejected`, `token_unreadable`, `cancelled`(호출 직전 재확인에서 정지), `lease_expired`, `expired` |
 
 ### 소스맵
 
@@ -353,7 +355,7 @@ pnpm --filter @crelink/api --silent ai-operator list-tokens   # 또는 node apps
 
 ## Instagram 댓글 자동 DM
 
-`src/instagram/`. 설계는 [Instagram 댓글 자동 DM](../../../docs/specs/instagram-comment-dm.md)이고, 지금은 스키마·설정·암호화·Graph 경계와 빈 모듈 뼈대만 있어 공개 경로가 없습니다(0254). 플랫폼 스위치 `platform_settings.instagram_dm_audience`의 기본값은 `off`입니다.
+`src/instagram/`. 설계는 [Instagram 댓글 자동 DM](../../../docs/specs/instagram-comment-dm.md)입니다. 공개 경로는 웹훅 2개(`/api/webhooks/instagram`, `/api/webhooks/instagram/data-deletion`)뿐이고 Caddy가 웹 호스트에서 API로 바로 보냅니다. 플랫폼 스위치 `platform_settings.instagram_dm_audience`의 기본값은 `off`입니다.
 
 - 설정: [환경변수](#환경변수)의 8개 키는 전부 있거나 전부 없어야 합니다. 일부만 있으면 기동을 거부하고 오류에는 키 이름만 넣습니다. 전부 없으면 `AppConfig.instagram`이 null이고 기능이 꺼집니다. 시크릿 등록 전 배포가 막히지 않도록 `PRODUCTION_REQUIRED_KEYS`에는 넣지 않습니다.
 - 토큰: AES-256-GCM(`iv || tag || ct`)이고 행 ID를 AAD로 묶어 다른 행으로 복사하면 복호화되지 않습니다. 저장할 행의 ID가 필요하므로 새 연결은 ID를 먼저 정합니다. 키는 `INSTAGRAM_TOKEN_KEYS`의 버전으로 회전하고, 옛 버전은 저장된 토큰을 모두 다시 암호화할 때까지 남겨 둡니다.
@@ -361,3 +363,7 @@ pnpm --filter @crelink/api --silent ai-operator list-tokens   # 또는 node apps
 - 수신 거부 토큰: 저장하지 않는 서명 토큰(만료 없음)입니다. base64url(`len(1) || ig_user_id || commenter_hash || MAC 앞 16바이트`)이고 키는 `INSTAGRAM_OPT_OUT_KEY`입니다.
 - Graph 경계: `InstagramGraph`(`src/instagram/graph.ts`)가 `GoogleOAuth`와 같은 교체 지점입니다. API 버전 상수는 `GRAPH_API_VERSION`(`v27.0`)이고, 호출 형식이 미실측인 곳은 코드 주석에 `[M?]`로 표시했습니다(S3·S5·S7·S8). 오류는 `InstagramGraphError` 하나이며 종류·HTTP 상태와 허용 목록(`GRAPH_ALLOWED_ERROR_CODES`·`GRAPH_ALLOWED_ERROR_SUBCODES`) 안의 코드만 남기고 응답 원문은 버립니다. 실측으로 코드가 정해지면 이 목록에 더합니다.
 - 로그 차단: Sentry는 `x-hub-signature-256` 헤더, 쿼리 `access_token`·`client_secret`·`hub.verify_token`, 문자열 속의 Meta 토큰 형식(`EAA…`)을 지웁니다.
+- 발송 worker(`worker.service.ts`): 설정이 있을 때만 앱 기동과 함께 2초 tick으로 돕니다. 프로세스당 동시 5건(두 색 합쳐 10건)이고 빈 슬롯 수만큼만 `sending`으로 선점합니다. lease는 2분이며 끝나면 `unknown`으로 마감합니다. 결과를 모르는 호출(타임아웃·5xx·응답 전 끊김)은 다시 보내지 않습니다. 연결 전 실패만 30초·2분·10분·1시간 간격으로 4회 재시도하고, 레이트 제한은 연결 전체를 쉬게 하되 시도 횟수를 쓰지 않습니다. 댓글 시각에서 24시간이 지난 `pending`은 `expired`입니다. 시간당 한도는 `INSTAGRAM_DM_HOURLY_LIMIT`입니다. 종료 때 선점을 멈추고 진행 중인 호출을 기다립니다.
+- 긴급 정지: 운영자 스위치 `audience=off`(`PUT /api/admin/instagram-dm`)와 계정 정지(`PUT /api/admin/instagram-dm/connections/:userId/pause`)는 대기 건을 같은 트랜잭션에서 취소합니다. 호출 중이던 건이 재시도·레이트 대기로 돌아올 때 스위치 off, 계정·사용자 정지, 규칙 비활성·보관이면 `pending`이 아니라 `cancelled`(`failure_code=stopped_before_send`)로 끝납니다. 이 판정은 연결·규칙·설정 행을 잠가 진행 중인 정지 트랜잭션을 기다립니다. 재개해도 취소된 건은 보내지 않습니다.
+- 연결 해제: `DELETE /api/me/instagram`은 행을 지우고 규칙·내역은 CASCADE로 함께 지웁니다. 다만 `operator_paused_at`이 있으면 행을 남기고 재인증 전이(토큰 파기·대기 취소)와 규칙 보관만 해서 재연결(같은 `user_id`, 행 갱신)로 운영자 정지가 풀리지 않습니다. 응답은 똑같이 204입니다. Meta 데이터 삭제 콜백은 운영자 정지와 관계없이 행을 지웁니다.
+- 지표는 [로그·지표·Cron](#로그지표cron)의 `crelink.instagram.webhook`·`crelink.instagram.dm`입니다. 정책 제재와 재인증 전이는 경고 로그를 남기고, 정책 제재는 Sentry 경고도 보냅니다.

@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/nestjs';
 import { apiError, insertWithRandomId } from '../common/http';
 import { AppConfig, InstagramSettings } from '../config.service';
 import { Database } from '../database';
+import { countBusinessMetric } from '../monitoring/metrics';
 import { commenterHash, signOptOutToken } from './crypto';
 import { matchesKeyword } from './keyword';
 import { constantTimeEquals, parseSignedRequest, verifyWebhookSignature } from './signed-request';
@@ -74,7 +75,7 @@ function findRule(rules: RuleRow[], comment: WebhookComment): RuleRow | undefine
 }
 
 function countResult(result: string, value = 1): void {
-  if (value > 0) Sentry.metrics.count(WEBHOOK_METRIC, value, { attributes: { result } });
+  if (value > 0) countBusinessMetric(WEBHOOK_METRIC, { result }, value);
 }
 
 /** 웹훅 필터링과 발송 행 저장, 데이터 삭제 콜백. comment_id·작성자 ID·댓글 본문은 로그와 지표에 남기지 않습니다. */

@@ -117,6 +117,9 @@ export function RulesPanel({
             {limits.activeRules}개, 보관한 규칙까지 {limits.totalRules}개까지 둘 수 있어요.
           </p>
         </div>
+        <Link className="secondary" href={`${managerHref(state.landing.publicId, 'instagram')}/deliveries`}>
+          발송 내역
+        </Link>
       </div>
 
       {!editable ? (

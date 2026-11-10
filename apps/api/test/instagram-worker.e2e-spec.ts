@@ -522,6 +522,114 @@ describe('Instagram DM 발송 worker', () => {
       expect(send).toHaveBeenCalledTimes(5);
     });
 
+    describe('정지 중 재시도 복귀', () => {
+      const STOPS: [string, string][] = [
+        ['전체 스위치 off', `UPDATE platform_settings SET instagram_dm_audience = 'off'`],
+        ['크리에이터 정지', `UPDATE instagram_connections SET dm_paused_at = now()`],
+        ['운영자 정지', `UPDATE instagram_connections SET operator_paused_at = now()`],
+        ['규칙 비활성', `UPDATE instagram_dm_rules SET enabled = false`],
+        ['규칙 보관', `UPDATE instagram_dm_rules SET archived_at = now()`],
+      ];
+
+      it.each(STOPS)('연결 전 실패 중 %s이면 pending으로 되돌리지 않고 취소한다', async (_name, sql) => {
+        const account = await seedAccount();
+        const delivery = await seedDelivery(account);
+        send.mockImplementation(async () => {
+          await t.pool.query(sql);
+          throw graphError('connect_failed', null);
+        });
+
+        await tick(worker());
+
+        expect(await row(delivery.id)).toMatchObject({
+          status: 'cancelled',
+          failure_code: 'stopped_before_send',
+          lease_until: null,
+          attempts: 1,
+        });
+      });
+
+      it.each(STOPS)('레이트 제한 중 %s이면 취소하고 시도 횟수는 쓰지 않는다', async (_name, sql) => {
+        const account = await seedAccount();
+        const delivery = await seedDelivery(account);
+        send.mockImplementation(async () => {
+          await t.pool.query(sql);
+          throw graphError('rejected', 429, null, null, 60);
+        });
+
+        await tick(worker());
+
+        expect(await row(delivery.id)).toMatchObject({
+          status: 'cancelled',
+          failure_code: 'stopped_before_send',
+          lease_until: null,
+          attempts: 0,
+        });
+        expect((await connection(account.connectionId)).rate_limited_in).toBeGreaterThan(50);
+      });
+
+      it.each<[string, Error]>([
+        ['연결 전 실패', graphError('connect_failed', null)],
+        ['레이트 제한', graphError('rejected', 429, null, null, 60)],
+      ])('%s 기록은 진행 중인 정지 트랜잭션을 기다렸다가 취소로 끝난다', async (_name, error) => {
+        const account = await seedAccount();
+        const delivery = await seedDelivery(account);
+        const client = await t.pool.connect();
+        try {
+          send.mockImplementation(async () => {
+            await client.query('BEGIN');
+            await client.query('UPDATE instagram_connections SET operator_paused_at = now() WHERE id = $1', [
+              account.connectionId,
+            ]);
+            throw error;
+          });
+          const target = worker();
+          await target.runOnce();
+          await waitForBlockedQuery();
+          await client.query('COMMIT');
+          await target.drain();
+        } finally {
+          // 시험이 중간에 실패해도 잠금을 남겨 다음 시험을 막지 않게 합니다(커밋 뒤에는 효과 없음).
+          await client.query('ROLLBACK');
+          client.release();
+        }
+
+        expect((await row(delivery.id)).status).toBe('cancelled');
+      });
+
+      async function waitForBlockedQuery(): Promise<void> {
+        for (let attempt = 0; attempt < 200; attempt += 1) {
+          const { rows } = await t.pool.query<{ blocked: boolean }>(
+            `SELECT EXISTS (
+               SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'
+             ) AS blocked`,
+          );
+          if (rows[0].blocked) return;
+          await sleep(10);
+        }
+        throw new Error('결과 기록이 연결 행 잠금을 기다리지 않았습니다.');
+      }
+    });
+
+    it('호출 결과와 만료를 crelink.instagram.dm 지표로 남긴다', async () => {
+      const count = jest.spyOn(Sentry.metrics, 'count');
+      const account = await seedAccount();
+      await seedDelivery(account);
+      await tick(worker());
+      expect(count).toHaveBeenCalledWith('crelink.instagram.dm', 1, { attributes: { result: 'sent' } });
+
+      count.mockClear();
+      await seedDelivery(account);
+      send.mockRejectedValueOnce(graphError('connect_failed', null));
+      await tick(worker());
+      expect(count).toHaveBeenCalledWith('crelink.instagram.dm', 1, { attributes: { result: 'retry' } });
+
+      count.mockClear();
+      await seedDelivery(account, { commentedAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() });
+      await tick(worker());
+      expect(count).toHaveBeenCalledWith('crelink.instagram.dm', 1, { attributes: { result: 'expired' } });
+    });
+
     it('재시도 뒤 성공하면 실패 표시를 지운다', async () => {
       const account = await seedAccount();
       const delivery = await seedDelivery(account);

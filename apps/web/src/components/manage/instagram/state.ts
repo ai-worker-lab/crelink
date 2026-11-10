@@ -43,14 +43,9 @@ export function rulesEditable(connection: InstagramConnectionView | null): boole
   return connection !== null && connection.status !== 'reauth_required';
 }
 
-/**
- * 메뉴 `인스타그램 DM` 표시. 편집자이거나 `instagramDmAvailable`이 true가 아니면 숨깁니다.
- * `CreatorLandingState.instagramDmAvailable`(설계 `API 계약 초안`)이 공유 계약에 들어오기 전에도 컴파일되도록 선택 필드로 읽습니다.
- */
-export function instagramMenuVisible(
-  state: Pick<CreatorLandingState, 'pageAccess'> & { instagramDmAvailable?: boolean },
-): boolean {
-  return state.pageAccess?.role !== 'editor' && state.instagramDmAvailable === true;
+/** 메뉴 `인스타그램 DM` 표시. 편집자이거나 `instagramDmAvailable`이 true가 아니면 숨깁니다. */
+export function instagramMenuVisible(state: Pick<CreatorLandingState, 'pageAccess' | 'instagramDmAvailable'>): boolean {
+  return state.pageAccess?.role !== 'editor' && state.instagramDmAvailable;
 }
 
 /** 콜백 route(0263)가 화면으로 돌려보낼 때 붙이는 오류 코드 중 이 화면이 안내하는 것. 그 밖의 값은 무시합니다. */
@@ -60,6 +55,7 @@ export const CONNECT_FAILURE_CODES = [
   'instagram_account_not_professional',
   'instagram_upstream_failed',
   'oauth_state_invalid',
+  'instagram_access_denied',
 ] as const;
 
 export type ConnectFailureCode = (typeof CONNECT_FAILURE_CODES)[number];
@@ -80,6 +76,7 @@ export const CONNECT_FAILURE_MESSAGES: Record<ConnectFailureCode, string> = {
   instagram_upstream_failed: '인스타그램에서 응답을 받지 못했어요. 잠시 뒤 다시 연결해 주세요.',
   oauth_state_invalid:
     '연결 시간이 지났거나 다른 브라우저에서 이어졌어요. 이 브라우저에서 처음부터 다시 연결해 주세요.',
+  instagram_access_denied: '인스타그램 동의를 마치지 않아 연결하지 못했어요. 다시 연결하고 권한을 허용해 주세요.',
 };
 
 /** 규칙 입력 검사. 문구 내용은 제한하지 않고 길이만 봅니다(설계: 서버 문구 검사 없음). */

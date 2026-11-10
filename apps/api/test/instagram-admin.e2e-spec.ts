@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { InstagramConnectionView, InstagramDmSettingsView } from '@crelink/shared';
 import { AppConfig } from '../src/config.service';
@@ -184,6 +184,29 @@ describe('Instagram DM 긴급 정지·보존', () => {
       [action],
     );
     return rows[0];
+  }
+
+  async function connectThroughApi(igUserId: string): Promise<void> {
+    const graph = t.app.get(InstagramGraph);
+    jest.spyOn(graph, 'exchangeCode').mockResolvedValueOnce({ accessToken: 'plain-new-token', expiresAt: null });
+    jest.spyOn(graph, 'fetchAccounts').mockResolvedValueOnce({
+      metaUserId: `meta-${igUserId}`,
+      accounts: [{ igUserId, username: `user_${igUserId}`, isProfessional: true }],
+    });
+    const started = await api<{ authorizationUrl: string }>(t.baseUrl, 'POST', '/api/me/instagram/connect', {
+      cookie: creatorCookie,
+    });
+    expect(started.status).toBe(200);
+    const stateCookie = started.headers
+      .getSetCookie()
+      .find((cookie) => cookie.startsWith(`${INSTAGRAM_OAUTH_STATE_COOKIE}=`))!
+      .split(';')[0];
+    const state = decodeURIComponent(stateCookie.slice(stateCookie.indexOf('=') + 1));
+    const saved = await api<InstagramConnectionView>(t.baseUrl, 'POST', '/api/me/instagram/callback', {
+      cookie: `${creatorCookie}; ${stateCookie}`,
+      body: { code: 'code-1', state },
+    });
+    expect(saved.status).toBe(200);
   }
 
   describe('권한', () => {
@@ -446,6 +469,131 @@ describe('Instagram DM 긴급 정지·보존', () => {
     });
   });
 
+  describe('운영자 정지 중 해제·재연결', () => {
+    const disconnect = () => api(t.baseUrl, 'DELETE', '/api/me/instagram', { cookie: creatorCookie });
+
+    async function connectionRow(userId: string) {
+      const { rows } = await t.pool.query<{
+        id: string;
+        status: string;
+        token_ciphertext: Buffer | null;
+        token_key_version: number | null;
+        operator_paused_at: Date | null;
+      }>(
+        `SELECT id, status, token_ciphertext, token_key_version, operator_paused_at
+         FROM instagram_connections WHERE user_id = $1`,
+        [userId],
+      );
+      return rows[0];
+    }
+
+    async function pausedAccount(): Promise<Account> {
+      const account = await seedAccount(creatorId);
+      expect((await operatorPause(creatorId, true)).status).toBe(204);
+      return account;
+    }
+
+    it('해제해도 행을 남기고 토큰 파기·대기 취소·규칙 보관을 한 뒤 204다', async () => {
+      const account = await pausedAccount();
+      const pausedAt = (await connectionRow(creatorId)).operator_paused_at;
+      // 정지 뒤에 남은 대기 건도 취소돼야 합니다.
+      const pending = await seedDelivery(account);
+      const sent = await seedDelivery(account, { status: 'sent' });
+
+      expect((await disconnect()).status).toBe(204);
+
+      expect(await connectionRow(creatorId)).toEqual({
+        id: account.connectionId,
+        status: 'reauth_required',
+        token_ciphertext: null,
+        token_key_version: null,
+        operator_paused_at: pausedAt,
+      });
+      expect(t.app.get(InstagramGraph).unsubscribeApp).toHaveBeenCalledTimes(1);
+      expect(await status(pending)).toBe('cancelled');
+      expect(await status(sent)).toBe('sent');
+      const rules = await t.pool.query<{ archived: boolean; version: number }>(
+        'SELECT archived_at IS NOT NULL AS archived, version FROM instagram_dm_rules WHERE connection_id = $1',
+        [account.connectionId],
+      );
+      expect(rules.rows).toEqual([{ archived: true, version: 2 }]);
+
+      expect((await disconnect()).status).toBe(204);
+      expect((await connectionRow(creatorId)).id).toBe(account.connectionId);
+    });
+
+    it('재연결은 같은 행을 갱신해 운영자 정지를 유지하고 크리에이터가 풀 수 없다', async () => {
+      const account = await pausedAccount();
+      const pausedAt = (await connectionRow(creatorId)).operator_paused_at;
+      expect((await disconnect()).status).toBe(204);
+
+      await connectThroughApi(account.igUserId);
+
+      const row = await connectionRow(creatorId);
+      expect(row).toMatchObject({ id: account.connectionId, status: 'active', operator_paused_at: pausedAt });
+      const view = await api<{ connection: InstagramConnectionView }>(t.baseUrl, 'GET', '/api/me/instagram', {
+        cookie: creatorCookie,
+      });
+      expect(view.body.connection).toMatchObject({ status: 'active', operatorPaused: true });
+
+      const resumed = await api(t.baseUrl, 'PUT', '/api/me/instagram/pause', {
+        cookie: creatorCookie,
+        body: { paused: false },
+      });
+      expect(resumed.status).toBe(409);
+      expect(resumed.body.code).toBe('instagram_operator_paused');
+
+      const ruleId = await seedRule(account.connectionId);
+      const pending = await seedDelivery({ connectionId: account.connectionId, ruleId });
+      expect((await tick()).claimed).toBe(0);
+      expect(send).not.toHaveBeenCalled();
+      expect(await status(pending)).toBe('pending');
+    });
+
+    it('구독 해제 호출 중에 운영자가 정지하면 행을 남긴다', async () => {
+      const account = await seedAccount(creatorId);
+      jest.spyOn(t.app.get(InstagramGraph), 'unsubscribeApp').mockImplementation(async () => {
+        expect((await operatorPause(creatorId, true)).status).toBe(204);
+      });
+
+      expect((await disconnect()).status).toBe(204);
+
+      expect(await connectionRow(creatorId)).toMatchObject({ id: account.connectionId, status: 'reauth_required' });
+      expect((await connectionRow(creatorId)).operator_paused_at).not.toBeNull();
+    });
+
+    it('운영자가 정지를 푼 뒤의 해제는 행을 지운다', async () => {
+      await pausedAccount();
+      expect((await operatorPause(creatorId, false)).status).toBe(204);
+
+      expect((await disconnect()).status).toBe(204);
+
+      expect(await connectionRow(creatorId)).toBeUndefined();
+    });
+
+    it('Meta 데이터 삭제 콜백은 운영자 정지 연결도 지운다', async () => {
+      const account = await pausedAccount();
+      const metaUserId = `meta-${account.igUserId}`;
+      await t.pool.query('UPDATE instagram_connections SET meta_user_id = $1 WHERE id = $2', [
+        metaUserId,
+        account.connectionId,
+      ]);
+      const encoded = Buffer.from(JSON.stringify({ algorithm: 'HMAC-SHA256', user_id: metaUserId })).toString(
+        'base64url',
+      );
+      const signature = createHmac('sha256', 'test-secret').update(encoded).digest('base64url');
+
+      const response = await fetch(`${t.baseUrl}/api/webhooks/instagram/data-deletion`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ signed_request: `${signature}.${encoded}` }).toString(),
+      });
+
+      expect(response.status).toBe(200);
+      expect(await connectionRow(creatorId)).toBeUndefined();
+    });
+  });
+
   describe('보존 작업', () => {
     const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
     const retention = () => t.app.get(RetentionService).runOnce();
@@ -492,29 +640,6 @@ describe('Instagram DM 긴급 정지·보존', () => {
   });
 
   describe('수신 거부 기록 유지', () => {
-    async function connectThroughApi(igUserId: string): Promise<void> {
-      const graph = t.app.get(InstagramGraph);
-      jest.spyOn(graph, 'exchangeCode').mockResolvedValueOnce({ accessToken: 'plain-new-token', expiresAt: null });
-      jest.spyOn(graph, 'fetchAccounts').mockResolvedValueOnce({
-        metaUserId: `meta-${igUserId}`,
-        accounts: [{ igUserId, username: `user_${igUserId}`, isProfessional: true }],
-      });
-      const started = await api<{ authorizationUrl: string }>(t.baseUrl, 'POST', '/api/me/instagram/connect', {
-        cookie: creatorCookie,
-      });
-      expect(started.status).toBe(200);
-      const stateCookie = started.headers
-        .getSetCookie()
-        .find((cookie) => cookie.startsWith(`${INSTAGRAM_OAUTH_STATE_COOKIE}=`))!
-        .split(';')[0];
-      const state = decodeURIComponent(stateCookie.slice(stateCookie.indexOf('=') + 1));
-      const saved = await api<InstagramConnectionView>(t.baseUrl, 'POST', '/api/me/instagram/callback', {
-        cookie: `${creatorCookie}; ${stateCookie}`,
-        body: { code: 'code-1', state },
-      });
-      expect(saved.status).toBe(200);
-    }
-
     const optOutCount = async () => (await t.pool.query('SELECT 1 FROM instagram_dm_opt_outs')).rowCount;
 
     it('일반 해제·재인증·재연결 뒤에도 남아 같은 사람에게 보내지 않는다', async () => {
