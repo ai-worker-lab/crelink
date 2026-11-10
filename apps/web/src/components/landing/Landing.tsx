@@ -208,8 +208,8 @@ export function Landing({
           className="profile-avatar"
           src={landing.avatarUrl}
           alt={landing.displayName ? `${landing.displayName} 프로필 사진` : '프로필 사진'}
-          width={96}
-          height={96}
+          width={72}
+          height={72}
         />
       ) : (
         <DefaultAvatar className="profile-avatar" />

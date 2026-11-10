@@ -1304,8 +1304,8 @@ textarea.input {
   text-align: center;
 }
 .profile-avatar {
-  width: 96px;
-  height: 96px;
+  width: 72px;
+  height: 72px;
   object-fit: cover;
   border: 1px solid var(--ds-color-border-default);
   border-radius: 50%;
@@ -1957,7 +1957,7 @@ a.portfolio-card:hover {
 .profile-trigger:hover {
   border-color: var(--ds-color-text-primary);
 }
-.profile-avatar {
+.profile-trigger .profile-avatar {
   display: block;
   width: 36px;
   height: 36px;
