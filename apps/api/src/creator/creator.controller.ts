@@ -25,8 +25,9 @@ import {
   SIGNUP_CONTEXT_HEADER,
   SlugAvailabilityResponse,
   SocialLinkView,
+  SessionUser,
 } from '@crelink/shared';
-import { SessionGuard } from '../auth/session.guard';
+import { CurrentUser, SessionGuard } from '../auth/session.guard';
 import { ChannelLinksService } from './channel-links.service';
 import { CreatorService } from './creator.service';
 import { LinksService } from './links.service';
@@ -44,18 +45,22 @@ export class CreatorController {
   ) {}
 
   @Get('landing')
-  async landing(@CurrentPage() page: PageContext): Promise<CreatorLandingState> {
+  async landing(@CurrentPage() page: PageContext, @CurrentUser() user: SessionUser): Promise<CreatorLandingState> {
     return {
-      ...(await this.creator.landingState(page.ownerUserId)),
+      ...(await this.creator.landingState(page.ownerUserId, user.role === 'operator')),
       pageAccess: { role: page.role, shared: page.shared },
     };
   }
 
   @Patch('landing')
-  async updateLanding(@CurrentPage() page: PageContext, @Body() body: unknown): Promise<CreatorLandingState> {
+  async updateLanding(
+    @CurrentPage() page: PageContext,
+    @CurrentUser() user: SessionUser,
+    @Body() body: unknown,
+  ): Promise<CreatorLandingState> {
     await this.profile.updateLanding(page.ownerUserId, body);
     return {
-      ...(await this.creator.landingState(page.ownerUserId)),
+      ...(await this.creator.landingState(page.ownerUserId, user.role === 'operator')),
       pageAccess: { role: page.role, shared: page.shared },
     };
   }
@@ -63,10 +68,14 @@ export class CreatorController {
   /** 광고 블록 켜고 끄기(R20 ⑩). 400 `validation_failed`, 플랫폼 스위치가 꺼져 있으면 409 `ad_block_unavailable`. */
   @Put('ad-block')
   @PageOwnerOnly()
-  async setAdBlock(@CurrentPage() page: PageContext, @Body() body: unknown): Promise<CreatorLandingState> {
+  async setAdBlock(
+    @CurrentPage() page: PageContext,
+    @CurrentUser() user: SessionUser,
+    @Body() body: unknown,
+  ): Promise<CreatorLandingState> {
     await this.profile.setAdBlock(page.ownerUserId, body);
     return {
-      ...(await this.creator.landingState(page.ownerUserId)),
+      ...(await this.creator.landingState(page.ownerUserId, user.role === 'operator')),
       pageAccess: { role: page.role, shared: page.shared },
     };
   }
@@ -79,10 +88,14 @@ export class CreatorController {
 
   @Put('short-link/slug')
   @PageOwnerOnly()
-  async changeSlug(@CurrentPage() page: PageContext, @Body() body: unknown): Promise<CreatorLandingState> {
+  async changeSlug(
+    @CurrentPage() page: PageContext,
+    @CurrentUser() user: SessionUser,
+    @Body() body: unknown,
+  ): Promise<CreatorLandingState> {
     await this.slugs.change(page.ownerUserId, bodyObject(body).slug);
     return {
-      ...(await this.creator.landingState(page.ownerUserId)),
+      ...(await this.creator.landingState(page.ownerUserId, user.role === 'operator')),
       pageAccess: { role: page.role, shared: page.shared },
     };
   }
