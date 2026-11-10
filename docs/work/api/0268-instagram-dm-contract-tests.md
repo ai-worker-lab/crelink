@@ -4,7 +4,7 @@
 - 역할: api
 - 상위: 0251
 - 선행: 0257, 0258, 0260
-- 상태: 준비
+- 상태: 검증
 - 종류: 기능
 - 우선순위: P2 (AI 제안)
 - 작성일: 2026-11-11
@@ -35,3 +35,5 @@
 ## 진행 기록
 
 - 2026-11-11: 생성.
+- 2026-11-11: DTO 경계 e2e와 shared 계약 시험을 추가했다. `pnpm --filter @crelink/shared test`, shared/API typecheck는 통과했다. e2e 명령은 시험 DB URL이 없어 `createTestDatabase` 단계에서 실패했으며, DB가 준비된 메인 세션에서 재실행해야 한다. R3의 서명·중복·토큰 비노출 기준은 기존 시험에 맡겼다.
+- 2026-11-11: Claude가 로컬 DB에서 재검증(`instagram-contract` 4건, `@crelink/shared` 134건 통과).
