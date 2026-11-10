@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { resolve } from 'node:path';
+import { decodeSecretKey, parseTokenKeyring, type TokenKeyring } from './instagram/crypto';
 
 /** `NODE_ENV=production`에서 비어 있으면 기동을 거부하는 공통 키. 저장소 키(`UPLOAD_DIR` 또는 `S3_REQUIRED_KEYS`)는 `FILE_STORAGE`에 따라 더합니다. 근거: docs/specs/crelink-prod-deploy.md#비밀값과-환경변수 */
 export const PRODUCTION_REQUIRED_KEYS = [
@@ -60,6 +61,77 @@ export function parseFileStorageConfig(env: NodeJS.ProcessEnv): FileStorageConfi
     bucket: env.S3_BUCKET!.trim(),
     accessKeyId: env.S3_ACCESS_KEY_ID!.trim(),
     secretAccessKey: env.S3_SECRET_ACCESS_KEY!.trim(),
+  };
+}
+
+/** Instagram DM에 필요한 키. 전부 있거나 전부 없어야 하고, 시크릿 등록 전 배포가 막히지 않도록 `PRODUCTION_REQUIRED_KEYS`에 넣지 않습니다. */
+export const INSTAGRAM_REQUIRED_KEYS = [
+  'META_APP_ID',
+  'META_APP_SECRET',
+  'META_LOGIN_CONFIG_ID',
+  'META_WEBHOOK_VERIFY_TOKEN',
+  'INSTAGRAM_TOKEN_KEYS',
+  'INSTAGRAM_TOKEN_KEY_CURRENT',
+  'INSTAGRAM_COMMENTER_HASH_KEY',
+  'INSTAGRAM_OPT_OUT_KEY',
+] as const;
+
+/** `INSTAGRAM_DM_HOURLY_LIMIT`가 비었을 때 연결당 시간 한도(플랫폼 한도 750에서 여유분을 뺀 값). */
+export const DEFAULT_INSTAGRAM_DM_HOURLY_LIMIT = 700;
+
+export interface InstagramSettings {
+  appId: string;
+  appSecret: string;
+  loginConfigId: string;
+  webhookVerifyToken: string;
+  tokenKeyring: TokenKeyring;
+  commenterHashKey: Buffer;
+  optOutKey: Buffer;
+  dmHourlyLimit: number;
+}
+
+/** `INSTAGRAM_DM_HOURLY_LIMIT`: 비면 700, 1 이상의 정수가 아니면 오류(기동 거부). 오류에는 키 이름만 넣습니다. */
+export function parseInstagramDmHourlyLimit(value: string | undefined): number {
+  const text = value?.trim();
+  if (!text) return DEFAULT_INSTAGRAM_DM_HOURLY_LIMIT;
+  const limit = Number(text);
+  if (!/^\d+$/.test(text) || !Number.isSafeInteger(limit) || limit < 1) {
+    throw new Error(`INSTAGRAM_DM_HOURLY_LIMIT는 1 이상의 정수여야 합니다(기본 ${DEFAULT_INSTAGRAM_DM_HOURLY_LIMIT}).`);
+  }
+  return limit;
+}
+
+/**
+ * Instagram DM 설정. 키가 하나도 없으면 null(기능 꺼짐)이고, 일부만 있거나 값 형식이 틀리면 오류입니다.
+ * 토큰 키·작성자 해시 키·수신 거부 키는 서로 달라야 합니다. 비밀값이 섞이지 않도록 오류에는 키 이름만 넣습니다.
+ */
+export function parseInstagramSettings(env: NodeJS.ProcessEnv): InstagramSettings | null {
+  const missing = INSTAGRAM_REQUIRED_KEYS.filter((key) => !env[key]?.trim());
+  if (missing.length === INSTAGRAM_REQUIRED_KEYS.length) return null;
+  if (missing.length) {
+    throw new Error(`Instagram DM 설정은 전부 있거나 전부 없어야 합니다. 비어 있음: ${missing.join(', ')}`);
+  }
+  const tokenKeyring = parseTokenKeyring(env.INSTAGRAM_TOKEN_KEYS!.trim(), env.INSTAGRAM_TOKEN_KEY_CURRENT!);
+  const commenterHashKey = decodeSecretKey(env.INSTAGRAM_COMMENTER_HASH_KEY!.trim(), 'INSTAGRAM_COMMENTER_HASH_KEY');
+  const optOutKey = decodeSecretKey(env.INSTAGRAM_OPT_OUT_KEY!.trim(), 'INSTAGRAM_OPT_OUT_KEY');
+  const tokenKeys = [...tokenKeyring.keys.values()];
+  if (
+    commenterHashKey.equals(optOutKey) ||
+    tokenKeys.some((key) => key.equals(commenterHashKey) || key.equals(optOutKey))
+  ) {
+    throw new Error(
+      'INSTAGRAM_TOKEN_KEYS·INSTAGRAM_COMMENTER_HASH_KEY·INSTAGRAM_OPT_OUT_KEY는 서로 다른 키여야 합니다.',
+    );
+  }
+  return {
+    appId: env.META_APP_ID!.trim(),
+    appSecret: env.META_APP_SECRET!.trim(),
+    loginConfigId: env.META_LOGIN_CONFIG_ID!.trim(),
+    webhookVerifyToken: env.META_WEBHOOK_VERIFY_TOKEN!.trim(),
+    tokenKeyring,
+    commenterHashKey,
+    optOutKey,
+    dmHourlyLimit: parseInstagramDmHourlyLimit(env.INSTAGRAM_DM_HOURLY_LIMIT),
   };
 }
 
@@ -190,6 +262,7 @@ export class AppConfig implements OnModuleInit {
     parseTrustedProxyHops(process.env.TRUSTED_PROXY_HOPS);
     parseFileStorageConfig(process.env);
     parseBannerSlotLimits(process.env);
+    parseInstagramSettings(process.env);
   }
 
   /** 크리에이터 배너 한도(`BANNER_SLOT_MAX`·`BANNER_SLOT_TOTAL_MAX`). 웹은 응답의 `bannerLimits`로만 봅니다. */
@@ -227,6 +300,12 @@ export class AppConfig implements OnModuleInit {
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
     if (!clientId || !clientSecret) return null;
     return { clientId, clientSecret, redirectUri: `${this.webUrl}/auth/google/callback` };
+  }
+
+  /** Instagram DM 설정. 키가 하나도 없으면 null이며 API는 503 `instagram_not_configured`, worker는 시작하지 않습니다. */
+  get instagram(): (InstagramSettings & { redirectUri: string }) | null {
+    const settings = parseInstagramSettings(process.env);
+    return settings && { ...settings, redirectUri: `${this.webUrl}/me/integrations/instagram/callback` };
   }
 
   /** 운영자 구글 이메일(쉼표 구분, 대소문자 무시). */
