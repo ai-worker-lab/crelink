@@ -4,6 +4,7 @@
 
 ## 2026-11-10
 
+- 테스트 워커 제한(0235): `jest.maxWorkers`를 2로 정해 12코어 기기에서 기본 11개가 뜨던 것을 막았습니다. 캐시 없는 실행 기준 워커 메모리 최댓값은 6.75 GiB에서 2.53 GiB로 줄었고 소요 시간은 17초로 같습니다. 측정은 [0235](../../docs/work/api/0235-api-jest-workers.md)에 있습니다.
 - 방문자 지표 보강(0232): `AnalyticsReport`에 유입별 클릭 성과 `sources`, 신규·재방문 `visitorRecency`, 봇 제외 건수 `botExclusions`를 추가했습니다. 저장된 `user_agent`로 크롤러·자동화 요청을 판별해 `landing_events`·`visits`·`link_clicks`·`creator_banner_clicks`의 합계에서 뺍니다. 보존 합계가 섞인 구간은 세 값이 `null`입니다. migration·수집 변경은 없습니다. 근거 `docs/work/orchestrator/0232-visitor-metrics.md`.
 - 가입 경로 일별 합계(0231): migration `0013_signup_funnel`, `POST /api/signup-funnel/events`, OAuth 시작·콜백·신규 가입·첫 링크 집계, 보존 작업 대상 추가. 식별자 없이 합계만 저장하고 서버 단계 기록은 응답과 분리해 로그인·링크 저장을 지연시키거나 막지 않습니다. OAuth 유입 기록과 동시 기록에 상한을 두고, 하루 행 상한이 차면 새 조합만 `other`로 모읍니다. 근거 `docs/work/orchestrator/0231-inapp-signup-funnel.md`.
 - 의존성 minor·patch 갱신(0211). API 패키지를 Dependabot #139 대상 버전으로 올렸습니다. 세부는 루트 변경 기록을 봅니다.
