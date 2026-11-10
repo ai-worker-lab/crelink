@@ -1,11 +1,11 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { SentryExceptionCaptured } from '@sentry/nestjs';
-import { ApiError, CrelinkErrorCode } from '@crelink/shared';
+import { ApiError, CrelinkApiErrorCode } from '@crelink/shared';
 import type { Request, Response } from 'express';
 import { randomInt } from 'node:crypto';
 
 /** `{ code, message }` 형식의 오류. message는 사용자에게 보여 줄 한국어 문구입니다. */
-export function apiError(status: HttpStatus, code: CrelinkErrorCode, message: string): HttpException {
+export function apiError(status: HttpStatus, code: CrelinkApiErrorCode, message: string): HttpException {
   const body: ApiError = { code, message };
   return new HttpException(body, status);
 }

@@ -1,3 +1,4 @@
+import { PageAccessGuard } from '../pages/page-access.guard';
 import { Module } from '@nestjs/common';
 import { ActorPolicy } from './actor-policy';
 import { AuthController, MeController } from './auth.controller';
@@ -14,10 +15,11 @@ import { SignupFunnelModule } from '../telemetry/signup-funnel.module';
     AuthService,
     ActorPolicy,
     SessionGuard,
+    PageAccessGuard,
     OptionalSessionGuard,
     OperatorGuard,
     { provide: GoogleOAuth, useClass: GoogleAuthLibraryOAuth },
   ],
-  exports: [AuthService, ActorPolicy, SessionGuard, OptionalSessionGuard, OperatorGuard],
+  exports: [PageAccessGuard, AuthService, ActorPolicy, SessionGuard, OptionalSessionGuard, OperatorGuard],
 })
 export class AuthModule {}

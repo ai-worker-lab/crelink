@@ -1,3 +1,4 @@
+import { PagesModule } from './pages/pages.module';
 import { Module } from '@nestjs/common';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { HealthModule } from './health.module';
@@ -22,6 +23,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     AuthModule,
     FilesModule,
     CreatorModule,
+    PagesModule,
     GuestbookModule,
     AdminModule,
     AiOperatorModule,
