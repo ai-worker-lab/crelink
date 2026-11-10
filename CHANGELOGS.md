@@ -6,6 +6,7 @@
 
 ## 2026-11-10
 
+- 채널별 짧은 주소(0246, 0247, 0248): `{SHORT}/s/{code}`(7자 난수)가 저장된 채널·노출 위치를 UTM으로 기록하고 주소창에는 UTM 대신 `via={code}`만 남깁니다. 설계 `docs/specs/channel-links.md`를 추가했고 `packages/shared`에 `channel-links.ts`(프리셋 8채널·한도·`ChannelLinkView`·UTM 변환·API 경로·오류 코드 3개)와 공개 랜딩 응답의 선택 필드 `utm`을 더했습니다. 세부는 [백엔드 로그](apps/api/CHANGELOGS.md), [웹 로그](apps/web/CHANGELOGS.md), [인프라 로그](infra/CHANGELOGS.md)에 있습니다.
 - 공유관리 페이지 출시(0241~0245): 설계 문서의 공동 관리자 화면 경로를 실제(`/members`)로 맞췄습니다.
 - 공유관리 페이지 설계와 제품 요구 추가(0241, 0242): `docs/specs/shared-pages.md`, PRD R29, R19 공동 관리자 반영. 구현은 0243, 0244입니다.
 - 웹 컴포넌트 카탈로그 1차(0240): `design/docs/component-catalog.md`를 추가했습니다. 공통 부품 현황과 관리 화면 패턴의 상태·접근성 비교, 개선 후보 10건을 담은 문서이며 제품 코드는 바꾸지 않습니다.

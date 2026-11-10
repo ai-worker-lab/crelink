@@ -40,5 +40,9 @@ for path in /b/zzzzzzzzzz /a/zzzzzzzzzz/zzzzzzzzzz; do
 	check "배너 클릭 $path → notice" "$web/notice?reason=link_unavailable" \
 		"$(curl -s -o /dev/null --max-time 20 -w '%{redirect_url}' "$short$path")"
 done
+# 채널별 짧은 주소(docs/specs/channel-links.md): 없는 code는 읽기만 하고 link_not_found 안내로 302. 쓰기 요청은 보내지 않는다.
+check "채널 주소 /s/zzzzzzz 302" 302 "$(code "$short/s/zzzzzzz")"
+check "채널 주소 /s/zzzzzzz → notice" "$web/notice?reason=link_not_found" \
+	"$(curl -s -o /dev/null --max-time 20 -w '%{redirect_url}' "$short/s/zzzzzzz")"
 check "API 직접 접근 차단" 404 "$(code "$short/api/health")"
 exit "$fail"

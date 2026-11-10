@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
+import { isPageOwner } from '../../lib/api/page-context';
 import { firstRunGuidePlacement } from '../../lib/first-run-guide';
 import { useWideLayout } from '../../lib/use-wide-layout';
 import { BannerSlotNotice } from './BannerSlotSection';
@@ -73,11 +74,14 @@ function useMenuSegment(): ManagerMenuSegment {
 /** 관리 메뉴. 메뉴는 주소가 바뀌는 이동이라 탭 위젯이 아니라 링크 목록이고, 지금 메뉴에 `aria-current="page"`를 둡니다. */
 function ManagerMenu() {
   const pathname = usePathname();
-  const { publicId } = useManager().state.landing;
+  const { state } = useManager();
+  const { publicId } = state.landing;
+  // `채널 주소`는 소유자 전용입니다(API가 편집자에게 403). 편집자에게는 메뉴를 보이지 않습니다.
+  const owner = isPageOwner(state.pageAccess);
   return (
     <nav className="manager-menu" aria-label="관리 메뉴">
       <ul>
-        {MANAGER_MENU.map((item) => {
+        {MANAGER_MENU.filter((item) => item.segment !== 'channels' || owner).map((item) => {
           const href = managerHref(publicId, item.segment);
           return (
             <li key={item.segment}>

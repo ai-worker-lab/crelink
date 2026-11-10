@@ -44,14 +44,16 @@ http://{$CRELINK_SHORT_HOST:go.shaul.kr} {
 		path_regexp ^/[A-Za-z0-9][A-Za-z0-9-]{1,28}[A-Za-z0-9]$
 	}
 
-	# 클릭 기록. 세 경로를 정규식 하나로 묶어 reverse_proxy 블록을 늘리지 않습니다. id는 모두 [a-z0-9] 10자입니다.
+	# 클릭 기록·채널별 짧은 주소. 네 경로를 정규식 하나로 묶어 reverse_proxy 블록을 늘리지 않습니다. id는 모두 [a-z0-9]입니다(/s/는 7~10자).
 	# - 링크 /c/{링크}: links.public_id(apps/api/src/creator/links.service.ts LINK_PUBLIC_ID_LENGTH, common/http.ts ID_ALPHABET).
 	# - 광고 /a/{크리링 배너}/{랜딩}: ad_banners.public_id·landings.public_id(DB CHECK ^[a-z0-9]{10}$).
 	# - 크리에이터 배너 /b/{배너}: creator_banners.public_id(DB CHECK 같음).
+	# - 채널별 짧은 주소 /s/{code}: channel_link_codes.code(DB CHECK ^[a-z0-9]{7,10}$, 지금 발급은 7자. 길이만 늘릴 수 있게 7~10자를 받음).
+	#   슬러그는 3자 이상이라 `/s/`와 겹치지 않고, 위 @shortlink 정규식은 `/`가 든 경로에 맞지 않습니다. 기준: docs/specs/channel-links.md
 	# 기준: docs/specs/crelink-ad-banner.md "노출·클릭 기록과 R7 ⑥". 1~2자 /a·/b는 단축 주소(3자 이상)에도 맞지 않아 404입니다.
 	@click {
 		method GET
-		path_regexp ^/(c/[a-z0-9]{10}|a/[a-z0-9]{10}/[a-z0-9]{10}|b/[a-z0-9]{10})$
+		path_regexp ^/(c/[a-z0-9]{10}|a/[a-z0-9]{10}/[a-z0-9]{10}|b/[a-z0-9]{10}|s/[a-z0-9]{7,10})$
 	}
 
 	handle @click {

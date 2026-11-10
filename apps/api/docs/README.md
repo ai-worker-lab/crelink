@@ -128,13 +128,14 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 
 ## 단축 도메인
 
-- 같은 프로세스가 `/api` 접두사 밖의 `GET /{slug}`, `GET /c/{linkPublicId}`, `GET /a/{bannerPublicId}/{landingPublicId}`, `GET /b/{bannerPublicId}`를 처리합니다(`src/short-link/`). `app.setup.ts`의 `setGlobalPrefix` exclude(`SHORT_DOMAIN_ROUTES`)는 요청 URL이 아니라 라우트 정의 경로에 맞춰 보기 때문에, `:`를 이스케이프한 `\:slug`·`c/\:linkPublicId`·`a/\:bannerPublicId/\:landingPublicId`·`b/\:bannerPublicId`로 네 정의만 제외합니다. 그냥 `:slug`를 쓰면 `/api/me`·`/api/health` 같은 한 단계 경로가 접두사를 잃습니다. 이 매칭은 Nest 11.2와 12.1이 같습니다: `test/health.e2e-spec.ts`가 등록된 Express 라우트 표에서 `/api` 밖 라우트가 정확히 이 네 정의뿐이고 `/api/health/ready` 같은 두 단계 경로가 접두사를 유지하는지 확인합니다. 운영 edge(Caddy 단축 호스트)는 단축 주소와 `^/(c/[a-z0-9]{10}|a/[a-z0-9]{10}/[a-z0-9]{10}|b/[a-z0-9]{10})$`만 API로 넘기고, API도 배너·랜딩 공개 ID가 `[a-z0-9]{10}`이 아니면 DB를 보지 않고 안내로 보냅니다. Nest 12.2 이상은 제외 경로마다 모든 메서드의 404 전용 핸들러도 등록합니다(`\:` 정의라 글자 그대로 `:`가 든 주소만 받습니다).
+- 같은 프로세스가 `/api` 접두사 밖의 `GET /{slug}`, `GET /c/{linkPublicId}`, `GET /a/{bannerPublicId}/{landingPublicId}`, `GET /b/{bannerPublicId}`, `GET /s/{code}`를 처리합니다(`src/short-link/`). `app.setup.ts`의 `setGlobalPrefix` exclude(`SHORT_DOMAIN_ROUTES`)는 요청 URL이 아니라 라우트 정의 경로에 맞춰 보기 때문에, `:`를 이스케이프한 `\:slug`·`c/\:linkPublicId`·`a/\:bannerPublicId/\:landingPublicId`·`b/\:bannerPublicId`·`s/\:code`로 다섯 정의만 제외합니다. 그냥 `:slug`를 쓰면 `/api/me`·`/api/health` 같은 한 단계 경로가 접두사를 잃습니다. 이 매칭은 Nest 11.2와 12.1이 같습니다: `test/health.e2e-spec.ts`가 등록된 Express 라우트 표에서 `/api` 밖 라우트가 정확히 이 다섯 정의뿐이고 `/api/health/ready` 같은 두 단계 경로가 접두사를 유지하는지 확인합니다. 운영 edge(Caddy 단축 호스트)는 단축 주소와 `^/(c/[a-z0-9]{10}|a/[a-z0-9]{10}/[a-z0-9]{10}|b/[a-z0-9]{10}|s/[a-z0-9]{7,10})$`만 API로 넘기고, API도 배너·랜딩 공개 ID가 `[a-z0-9]{10}`이 아니면 DB를 보지 않고 안내로 보냅니다. Nest 12.2 이상은 제외 경로마다 모든 메서드의 404 전용 핸들러도 등록합니다(`\:` 정의라 글자 그대로 `:`가 든 주소만 받습니다).
 - 그래서 접두사 없는 `/health`, `/me`, `/api` 같은 요청은 단축 주소로 해석되고, 예약어라 없는 주소 안내로 302 합니다. 예약어 목록은 `RESERVED_SLUGS`(공유 계약).
 - `GET /{slug}`: 대소문자를 무시하고 현재 주소 또는 `retired_at + 90일` 안의 옛 주소를 찾습니다. 찾으면 방문을 기록(응답을 기다리지 않음)하고 302 `{WEB_URL}/p/{publicId}?pass={통과 표시}`. 없으면 302 `…/notice?reason=link_not_found`, 정지 크리에이터면 `…reason=creator_suspended`.
 - `GET /c/{linkPublicId}`: 클릭을 기록하고 DB에 저장된 URL(저장 시 http·https만 허용)로 302. 숨김·차단·삭제·정지면 302 `…/notice?reason=link_unavailable`. 열린 리디렉트를 막기 위해 요청 값으로 대상 URL을 만들지 않습니다.
 - `GET /a/{bannerPublicId}/{landingPublicId}`(크리링 배너 클릭, R20 ⑧): 배너가 지금 게시 중(`starts_at <= now() < ends_at`)이고 랜딩이 있고 크리에이터가 정지가 아니면 `TrackingService.recordAdStat('click')`로 날짜(Asia/Seoul)·배너·랜딩 카운터(`ad_banner_daily_stats.clicks`)를 올리고(응답을 기다리지 않음) 저장된 URL로 302. 끝남·예약·없음·정지면 302 `…/notice?reason=link_unavailable`. 개인 식별 정보를 남기지 않으므로 방문자 쿠키를 읽거나 발급하지 않습니다. 공개 랜딩 API가 `passAccepted`일 때만 이 주소를 주므로 서비스 화면에서 연 랜딩의 클릭은 세지 않습니다. 누구나 주소를 만들어 수를 늘릴 수 있다는 점은 `/c/`와 같은 수준으로 받아들였습니다([기술 설계](../../../docs/specs/crelink-ad-banner.md) `노출·클릭 기록` 절).
 - `GET /b/{bannerPublicId}`(크리에이터 배너 클릭, R21 ④): 연결 URL이 있고 숨김·차단이 아니고 계정이 배너 슬롯 부여됨·정지 아님이면 `creator_banner_clicks`에 링크 클릭과 같은 항목(방문자 쿠키·IP·국가·도시·유입 호스트·UA·기기·브라우저·OS)을 남기고 저장된 URL로 302. 단축 URL은 `short_links.landing_id = creator_banners.landing_id`로 찾습니다. URL 없음·숨김·차단·회수·정지·삭제면 `link_unavailable`. 배너를 지워도 기록은 `banner_public_id` 사본으로 남습니다.
-- 리디렉트는 모두 `Cache-Control: no-store`이고, 방문자 쿠키 `cl_vid`(UUID, HttpOnly, SameSite=Lax, 1년)는 `/{slug}`·`/c/`·`/b/`에서 없거나 형식이 틀릴 때만 새로 발급합니다. `/a/`는 쿠키를 다루지 않습니다.
+- `GET /s/{code}`(채널별 짧은 주소, [설계](../../../docs/specs/channel-links.md)): code는 `[a-z0-9]` 7~10자(발급은 7자)이며 아니면 DB를 보지 않고 `link_not_found` 안내입니다. `channel_links`에서 찾아 페이지가 지워졌거나 없으면 `link_not_found`, 정지 크리에이터면 `creator_suspended` 안내입니다. 찾으면 방문을 기록하고(`visits.slug`는 현재 슬러그, `visits.utm`은 **저장된 프리셋** `source`·`medium`·`campaign`·`content`·`id`=code이며 요청 쿼리의 `utm_*`는 무시) 302 `{WEB_URL}/p/{publicId}?pass={통과 표시}&via={code}`입니다. Location에 `utm_`이 없습니다. 보관한 주소도 계속 동작합니다(보관은 관리 목록에서만 숨김).
+- 리디렉트는 모두 `Cache-Control: no-store`이고, 방문자 쿠키 `cl_vid`(UUID, HttpOnly, SameSite=Lax, 1년)는 `/{slug}`·`/c/`·`/b/`·`/s/`에서 없거나 형식이 틀릴 때만 새로 발급합니다. `/a/`는 쿠키를 다루지 않습니다.
 
 ### 랜딩 통과 표시
 
@@ -142,7 +143,7 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 
 - 형식 `<만료 epoch 초>.<base64url HMAC-SHA256 앞 16바이트>`, 서명 대상 `publicId + '.' + 만료`, 유효 60초. 비교는 `timingSafeEqual`.
 - 키: API 프로세스가 시작할 때 `crypto.randomBytes(32)`로 만듭니다. 환경변수·비밀값이 없습니다. 위조·재사용돼도 결과는 "그 요청이 방문으로 안 세어짐"뿐이고, Blue/Green 전환 순간 다른 색 API가 검증해 실패해도 웹이 단축 주소로 한 번 더 보내 새 표시를 받으므로 스스로 복구됩니다. 한 색에서 API 프로세스를 여러 개(cluster·복제) 띄우면 발급과 검증이 다른 프로세스로 갈 수 있어 공유 키가 필요합니다.
-- 검증: `GET /api/public/landings/{publicId}?pass=`가 `passAccepted`(이 publicId에 대해 발급했고 만료 전이면 true)와 `shortUrl`(현재 단축 주소, `CreatorService.shortLink`)을 줍니다. 발급(`ShortLinkModule`)과 검증(`CreatorModule`)이 같은 키를 쓰도록 `LandingPassModule` 하나가 서비스를 제공합니다.
+- 검증: `GET /api/public/landings/{publicId}?pass=&via=`가 `passAccepted`(이 publicId에 대해 발급했고 만료 전이면 true)와 `shortUrl`(현재 단축 주소, `CreatorService.shortLink`)을 줍니다. `via`가 이 랜딩의 채널 주소 code(보관 여부와 무관)이면 `shortUrl`이 `{SHORT}/s/{code}`이고 저장 프리셋 `utm`이 함께 옵니다. 다른 랜딩의 code·형식이 틀린 값은 조용히 무시하며 `via`가 없으면 질의하지 않습니다. 발급(`ShortLinkModule`)과 검증(`CreatorModule`)이 같은 키를 쓰도록 `LandingPassModule` 하나가 서비스를 제공합니다.
 
 ### 방문자 IP
 
@@ -335,3 +336,13 @@ pnpm --filter @crelink/api --silent ai-operator list-tokens   # 또는 node apps
 - `GET /api/me/pages`는 본인 페이지부터 반환하며 정지된 대상은 제외합니다. `POST`/`DELETE /api/me/page-invites`, `GET /api/me/page-members`, `DELETE /api/me/page-members/:userId`가 소유자 관리 경로입니다. 편집자는 `DELETE /api/me/page-members/me`로 나갑니다.
 - 로그인 후 `POST /api/page-invites/preview`·`accept`에 `{ token }`을 보냅니다. 수락은 사람만 가능합니다. 토큰은 발급 응답에서만 반환하며 32바이트 난수의 SHA-256 hex만 DB에 저장합니다. 유효기간 72시간·1회 사용·멤버 5명 제한입니다. 재발급은 미사용 초대를 교체하고 보존 작업은 만료/사용 후 7일 지난 초대를 지웁니다.
 - 웹의 헤더 전달과 BFF 허용 경로 추가는 후속 작업입니다. API 시험은 `test/page-members.e2e-spec.ts`에서 실제 PostgreSQL과 HTTP 요청으로 확인합니다.
+## 채널별 짧은 주소
+
+기준은 [채널별 짧은 주소 설계](../../../docs/specs/channel-links.md), 계약은 `packages/shared/src/channel-links.ts`, 구현은 `src/creator/channel-links.service.ts`(관리 API)와 `src/short-link/short-link.controller.ts`의 `GET /s/{code}`([단축 도메인](#단축-도메인))입니다.
+
+- 표: migration `0015_channel_links`가 `channel_link_codes`(code의 영구 기록, FK 없음, 지우지 않음)와 `channel_links`(code의 현재 의미, `landings` 삭제 시 CASCADE)를 만듭니다. 페이지가 지워지면 의미는 사라지고 code만 남아 다시 발급되지 않습니다. `RetentionService` 대상이 아닙니다. 적용 뒤 파일명을 바꾸면 기동이 막히므로 바꾸지 않습니다.
+- 관리 API `/api/me/channel-links`(`SessionGuard` 다음 `PageAccessGuard`와 `@PageOwnerOnly()`: 대상 페이지는 `X-Crelink-Page`(없으면 본인 페이지)로 정해지고 멤버(편집자)는 403 `page_owner_only`, AI는 다른 `/api/me` 쓰기와 같이 실행 헤더·멈춤 검사): `GET` 보관하지 않은 주소 최신순(최대 50), `POST {channel, placement, campaign?}`는 같은 조합의 보관되지 않은 주소가 있으면 200으로 그것을, 없으면 201로 새로 만들며 프리셋 밖 조합·정규화 뒤 빈 캠페인은 400 `validation_failed`, `POST /api/me/channel-links/{code}/archive`는 204(이미 보관이어도 204, 남의 code·없는 code는 404 `channel_link_not_found`). 운영자 대행 경로는 없습니다.
+- 한도: 보관 제외 50개(409 `channel_link_limit_reached`), 보관 포함 200개(409 `channel_link_total_limit_reached`). 같은 조합이 이미 있으면 한도와 관계없이 그 주소를 돌려줍니다.
+- 동시성: 트랜잭션 첫 줄에서 사용자 행을 `FOR UPDATE`로 잠가(링크 추가와 같은 방식) 같은 조합의 동시 요청과 한도 검사를 줄 세웁니다. `insertWithRandomId`는 `channel_link_codes`에만 쓰고(겹침만 재시도) 그다음 `channel_links`를 넣습니다. 부분 UNIQUE 인덱스 `channel_links_active`가 마지막 방어선입니다.
+- 공유관리([0243](#공유관리-페이지)): 이 경로는 소유자 전용이라 서비스에는 `PageContext.ownerUserId`를 넘깁니다. `GET /s/{code}`와 공개 랜딩 `via`는 공개 경로라 가드가 없습니다. 웹의 헤더 전달(0244)이 병합되면 편집자에게는 `채널 주소` 메뉴를 숨겨야 합니다(API는 이미 403).
+- 시험: `test/channel-links.e2e-spec.ts`(실제 일회용 PostgreSQL, 수용 기준 1~7·9와 멤버 403), `test/health.e2e-spec.ts`(`/api` 밖 경로·표·migration 목록).

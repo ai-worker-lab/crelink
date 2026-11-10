@@ -77,6 +77,16 @@ export const MANAGER_MENU = [
     ),
   },
   {
+    segment: 'channels',
+    label: '채널 주소',
+    icon: (
+      <svg {...iconProps}>
+        <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+        <path d="M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1" />
+      </svg>
+    ),
+  },
+  {
     segment: 'members',
     label: '공동 관리자',
     icon: (

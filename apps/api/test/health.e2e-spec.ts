@@ -49,7 +49,7 @@ describe('API 기동과 health', () => {
     expect(await response.json()).toEqual({ code: 'not_found', message: '요청한 경로를 찾을 수 없습니다.' });
   });
 
-  it('등록된 라우트는 단축 도메인 네 정의만 /api 밖이고 나머지는 모두 /api 아래다', () => {
+  it('등록된 라우트는 단축 도메인 다섯 정의만 /api 밖이고 나머지는 모두 /api 아래다', () => {
     // setGlobalPrefix exclude(`SHORT_DOMAIN_ROUTES`)의 매칭 규칙이 프레임워크 업그레이드로 바뀌거나 새 exclude가
     // `/api/*` 두 단계 경로의 접두사를 빼면 여기서 드러납니다.
     const express = app.getHttpAdapter().getInstance() as Express;
@@ -63,6 +63,7 @@ describe('API 기동과 health', () => {
       'GET /a/:bannerPublicId/:landingPublicId',
       'GET /b/:bannerPublicId',
       'GET /c/:linkPublicId',
+      'GET /s/:code',
     ]);
     expect(routes).toEqual(
       expect.arrayContaining(['GET /api/health', 'GET /api/health/ready', 'GET /api/me', 'POST /api/me/files']),
@@ -84,6 +85,8 @@ describe('API 기동과 health', () => {
         'ai_operator_settings',
         'api_tokens',
         'blocked_domains',
+        'channel_link_codes',
+        'channel_links',
         'creator_banner_click_rollups',
         'creator_banner_clicks',
         'creator_banners',
@@ -132,6 +135,7 @@ describe('API 기동과 health', () => {
         { version: '0012_list_density' },
         { version: '0013_signup_funnel' },
         { version: '0014_shared_pages' },
+        { version: '0015_channel_links' },
       ]);
     } finally {
       await client.end();

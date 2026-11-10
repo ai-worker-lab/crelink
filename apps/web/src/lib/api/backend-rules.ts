@@ -26,6 +26,9 @@ export const backendRules: ReadonlyArray<{
   { methods: ['POST'], pattern: /^api\/me\/imports\/instabio(\/preview)?$/, signupInAppKind: true },
   { methods: ['POST'], pattern: /^api\/me\/links$/, signupInAppKind: true },
   { methods: ['PUT'], pattern: /^api\/me\/links\/order$/ },
+  // 채널별 짧은 주소(docs/specs/channel-links.md): 목록·생성·보관(보관은 POST, 삭제 경로 없음). API가 소유자 전용으로 막습니다.
+  { methods: ['GET', 'POST'], pattern: /^api\/me\/channel-links$/ },
+  { methods: ['POST'], pattern: new RegExp(`^api/me/channel-links/${ID}/archive$`) },
   // 광고 블록 켜고 끄기(R20 ⑩): 크리에이터 스위치와 운영자 플랫폼 스위치. 플랫폼 스위치 `GET`은 서버 렌더만 부르므로 넣지 않습니다.
   { methods: ['PUT'], pattern: /^api\/me\/ad-block$/ },
   { methods: ['PUT'], pattern: /^api\/admin\/ad-block$/ },
