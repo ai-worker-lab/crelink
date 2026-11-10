@@ -64,4 +64,13 @@ export const backendRules: ReadonlyArray<{
   // AI 운영자(설계 docs/specs/crelink-ai-operator.md `화면 상태와 API 대응`). 조회 GET은 서버 렌더만 부르므로 넣지 않습니다.
   { methods: ['PUT'], pattern: /^api\/admin\/ai-operator\/pause$/ },
   { methods: ['PUT'], pattern: new RegExp(`^api/admin/ai-operator/tokens/${ID}/revoke$`) },
+  // Instagram 댓글 자동 DM(설계 docs/specs/instagram-comment-dm.md `API 계약 초안`): 소유자 경로와 공개 수신 거부.
+  // 콜백은 state 쿠키가 필요해 전용 route(`/me/integrations/instagram/callback`)만 부르고, 웹훅은 Meta가 API로 직접 부르므로 넣지 않습니다.
+  { methods: ['GET', 'DELETE'], pattern: /^api\/me\/instagram$/ },
+  { methods: ['POST'], pattern: /^api\/me\/instagram\/(connect|recheck)$/ },
+  { methods: ['PUT'], pattern: /^api\/me\/instagram\/pause$/ },
+  { methods: ['GET'], pattern: /^api\/me\/instagram\/(media|deliveries)$/ },
+  { methods: ['GET', 'POST'], pattern: /^api\/me\/instagram\/rules$/ },
+  { methods: ['PATCH', 'DELETE'], pattern: /^api\/me\/instagram\/rules\/[a-z0-9]{10}$/ },
+  { methods: ['POST'], pattern: /^api\/public\/instagram-dm-opt-outs$/ },
 ];
