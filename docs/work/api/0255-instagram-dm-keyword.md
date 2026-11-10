@@ -3,7 +3,7 @@
 - 단계: 티켓
 - 역할: api
 - 상위: 0251
-- 상태: 준비
+- 상태: 검증
 - 종류: 기능
 - 우선순위: P2 (AI 제안)
 - 작성일: 2026-11-11
@@ -34,3 +34,4 @@
 ## 진행 기록
 
 - 2026-11-11: 생성.
+- 2026-11-11: Codex Sol medium 구현, Claude가 재검증(`jest --runTestsByPath src/instagram/keyword.spec.ts` 13건 통과). 일치 방식은 포함.
