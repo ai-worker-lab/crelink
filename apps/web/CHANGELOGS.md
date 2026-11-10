@@ -4,6 +4,8 @@
 
 ## 2026-11-11
 
+- 인스타그램 DM 수신 거부 화면(0272): 공개 `/dm-opt-out`이 URL 프래그먼트 `#t=`의 토큰을 클라이언트에서만 읽고, `수신 거부` 버튼을 눌러야 `POST /api/public/instagram-dm-opt-outs`(본문 `{ token }`, 기존 BFF)를 보냅니다. 진입만으로는 거부되지 않습니다. 확인·처리 중·완료·유효하지 않음(토큰 없음 포함, 400 `opt_out_invalid`)·오류와 `다시 시도` 상태를 그리고, 완료나 유효하지 않음이 되면 `history.replaceState`로 프래그먼트를 지웁니다. 토큰은 쿼리·로그·분석 이벤트·저장소에 넣지 않고 `referrer: no-referrer`로 둡니다. `ROBOTS_DISALLOW`에 `/dm-opt-out`을 더했습니다. 근거: [설계](../../docs/specs/instagram-comment-dm.md), [티켓](../../docs/work/web/0272-instagram-dm-opt-out-ui.md).
+
 - 인스타그램 DM 연결·규칙 화면(0264): 관리 메뉴 `인스타그램 DM`(`/me/landings/[publicId]/instagram`)에서 계정 연결·해제(확인 시트, 첫 초점 취소)·자동 DM 정지 스위치와 규칙 목록·게시물 고르기·키워드·메시지(250자 글자 수)·켜기·삭제를 합니다. 미연결·연결 전 안내·메시지 접근 꺼짐(`다시 확인`)·재연결 필요(규칙 읽기 전용)·만료 14일 전 안내·운영자 정지·인앱 브라우저 안내·연결 실패 코드별 문구를 상태표대로 그립니다. 메뉴는 소유자이고 `instagramDmAvailable`이 true일 때만 보이며, 이 값이 공유 계약에 들어오기 전에는 선택 필드로 읽습니다. 규칙 기본 문구에 독점 콘텐츠 표현과 팔로우 조건이 없습니다. BFF 허용 목록과 OAuth 콜백 route는 0263 소관이라 이 변경에 없습니다. 근거: [설계](../../docs/specs/instagram-comment-dm.md), [티켓](../../docs/work/web/0264-instagram-dm-settings-ui.md).
 
 ## 2026-11-10
