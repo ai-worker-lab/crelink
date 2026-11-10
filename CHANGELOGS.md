@@ -4,6 +4,10 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-11-11
+
+- Instagram 댓글 자동 DM 제품 요구와 에픽 추가(0251): PRD R30을 추가하고, R12의 제외 범위가 프로필 SNS 주소 인증만 가리키도록 문구를 고쳤습니다. 일반 크리에이터 공개는 범위에서 뺐습니다.
+
 ## 2026-11-10
 
 - 채널별 짧은 주소(0246, 0247, 0248): `{SHORT}/s/{code}`(7자 난수)가 저장된 채널·노출 위치를 UTM으로 기록하고 주소창에는 UTM 대신 `via={code}`만 남깁니다. 설계 `docs/specs/channel-links.md`를 추가했고 `packages/shared`에 `channel-links.ts`(프리셋 8채널·한도·`ChannelLinkView`·UTM 변환·API 경로·오류 코드 3개)와 공개 랜딩 응답의 선택 필드 `utm`을 더했습니다. 세부는 [백엔드 로그](apps/api/CHANGELOGS.md), [웹 로그](apps/web/CHANGELOGS.md), [인프라 로그](infra/CHANGELOGS.md)에 있습니다.
