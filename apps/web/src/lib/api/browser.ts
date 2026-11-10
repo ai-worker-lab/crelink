@@ -2,6 +2,7 @@
 
 import type { ApiError } from '@crelink/shared';
 import { errorMessage } from './errors';
+import { pageIdFromPath } from './page-context';
 
 export class BrowserApiError extends Error {
   constructor(
@@ -20,6 +21,9 @@ export class BrowserApiError extends Error {
  */
 export async function browserApi<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
+  headers.delete('X-Crelink-Page');
+  const publicId = typeof window === 'undefined' ? null : pageIdFromPath(window.location.pathname);
+  if (publicId && path.split('?')[0] !== '/api/me') headers.set('X-Crelink-Page', publicId);
   headers.set('Accept', 'application/json');
   if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   let response: Response;

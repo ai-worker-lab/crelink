@@ -1,5 +1,6 @@
 'use client';
 
+import { isPageOwner } from '../../lib/api/page-context';
 import { useManager } from './ManagerContext';
 
 /**
@@ -9,6 +10,7 @@ import { useManager } from './ManagerContext';
  */
 export function AdBlockSwitch() {
   const { state, adBlockAction, toggleAdBlock } = useManager();
+  if (!isPageOwner(state.pageAccess)) return null;
   const enabled = state.adBlock.enabled;
   return (
     <button

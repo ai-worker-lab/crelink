@@ -76,6 +76,16 @@ export const MANAGER_MENU = [
       </svg>
     ),
   },
+  {
+    segment: 'members',
+    label: '공동 관리자',
+    icon: (
+      <svg {...iconProps}>
+        <circle cx="12" cy="12" r="8" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    ),
+  },
 ] as const satisfies ReadonlyArray<ManagerMenuItem>;
 
 export type ManagerMenuSegment = (typeof MANAGER_MENU)[number]['segment'];

@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { CRELINK_API_PATHS, type ManagedPagesResponse } from '@crelink/shared';
+import { browserApi, describeError } from '../../lib/api/browser';
 import { usePathname } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type FocusEvent } from 'react';
 import { useLogout } from '../../lib/use-logout';
@@ -22,6 +24,9 @@ export function ProfileMenu({
   isOperator: boolean;
   avatarUrl: string | null;
 }) {
+  const [pages, setPages] = useState<ManagedPagesResponse | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
   const panelId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -34,6 +39,25 @@ export function ProfileMenu({
     setSeenPathname(pathname);
     setOpen(false);
   }
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    browserApi<ManagedPagesResponse>(CRELINK_API_PATHS.pages).then(
+      (data) => {
+        if (active) {
+          setPages(data);
+          setPageError(null);
+        }
+      },
+      (error: unknown) => {
+        if (active) setPageError(describeError(error));
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [open, pathname, revision]);
 
   useEffect(() => {
     if (!open || pending) return;
@@ -77,6 +101,39 @@ export function ProfileMenu({
       </button>
       <div id={panelId} className="profile-panel" hidden={!open}>
         {email ? <p className="profile-email">{email}</p> : null}
+        {pageError ? (
+          <>
+            <p role="alert">{pageError}</p>
+            <button className="profile-item" onClick={() => setRevision((value) => value + 1)}>
+              페이지 목록 다시 시도
+            </button>
+          </>
+        ) : open && !pages ? (
+          <p role="status">페이지 불러오는 중…</p>
+        ) : null}
+        {pages?.pages.some((page) => page.access === 'shared') ? (
+          <nav aria-label="페이지 전환">
+            <p className="profile-email">내 페이지</p>
+            {pages.pages
+              .filter((page) => page.access === 'personal')
+              .map((page) => (
+                <Link key={page.publicId} className="profile-item" href={'/me/landings/' + page.publicId}>
+                  {page.displayName ?? '내 페이지'}
+                  {page.hasMembers ? ' · 공유 중' : ''}
+                </Link>
+              ))}
+            <p className="profile-email">공유 페이지</p>
+            {pages.pages
+              .filter((page) => page.access === 'shared')
+              .map((page) => (
+                <Link key={page.publicId} className="profile-item" href={'/me/landings/' + page.publicId}>
+                  {page.displayName ?? '이름 없는 페이지'}
+                </Link>
+              ))}
+          </nav>
+        ) : pages?.pages.some((page) => page.access === 'personal' && page.hasMembers) ? (
+          <p className="profile-email">내 페이지 · 공유 중</p>
+        ) : null}
         {isOperator ? (
           <Link className="profile-item" href="/admin">
             운영자 화면
