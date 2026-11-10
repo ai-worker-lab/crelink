@@ -12,7 +12,7 @@ name: crelink-edge
 
 services:
   caddy:
-    image: caddy:2.11.7-alpine
+    image: caddy:2.11.9-alpine
     restart: unless-stopped
     ports:
       - 127.0.0.1:${CRELINK_HTTP_PORT:-18080}:80
