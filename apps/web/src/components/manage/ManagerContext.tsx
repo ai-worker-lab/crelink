@@ -76,8 +76,6 @@ export interface ManagerContextValue {
   setState: Dispatch<SetStateAction<CreatorLandingState>>;
   /** 편집 상태를 다시 읽어 바꾸고 그 값을 돌려줍니다(저장 뒤 한도·순서를 서버 값과 맞출 때). */
   reload: () => Promise<CreatorLandingState>;
-  /** 계정 이메일(`GET /api/me`). 못 읽었으면 null. */
-  email: string | null;
   /** 메뉴를 옮겨도 남는 저장하지 않은 입력(초안). 미리보기가 저장 상태 위에 덮어 그립니다. */
   profile: ProfileDraft;
   setProfile: Dispatch<SetStateAction<ProfileDraft>>;
@@ -132,11 +130,6 @@ export interface ManagerContextValue {
   /** 방명록 관리 목록에서 글을 숨기거나 풀면 늘어, 미리보기 방명록이 다시 불러옵니다. */
   guestbookVersion: number;
   guestbookChanged: () => void;
-  /** 주소 막대 `주소 변경`이 `주소 설정` 메뉴의 새 주소 입력에 초점을 요청합니다. */
-  slugFocusRequest: number;
-  requestSlugFocus: () => void;
-  /** 초점 요청이 남아 있으면 true를 돌려주고 지웁니다(메뉴를 다시 열 때 또 옮기지 않도록). */
-  takeSlugFocus: () => boolean;
   firstRunGuide: FirstRunGuide;
 }
 
@@ -152,15 +145,7 @@ export function useManager(): ManagerContextValue {
  * 랜딩 관리 화면(`/me/landings/{publicId}/…`) 전체가 함께 쓰는 브라우저 상태. 레이아웃에 두므로 메뉴를 옮겨도 저장 상태와
  * 저장하지 않은 입력이 남습니다(페이지를 떠날 때 경고는 두지 않음).
  */
-export function ManagerProvider({
-  initial,
-  email,
-  children,
-}: {
-  initial: CreatorLandingState;
-  email: string | null;
-  children: ReactNode;
-}) {
+export function ManagerProvider({ initial, children }: { initial: CreatorLandingState; children: ReactNode }) {
   const [state, setState] = useState(initial);
   const [profile, setProfile] = useState(() => profileDraftOf(initial.landing));
   const [socials, setSocials] = useState(() => socialRowsOf(initial.socials));
@@ -181,8 +166,6 @@ export function ManagerProvider({
   const [formPending, setFormPending] = useState(false);
   const entryTrigger = useRef<HTMLElement | null>(null);
   const [guestbookVersion, setGuestbookVersion] = useState(0);
-  const [slugFocusRequest, setSlugFocusRequest] = useState(0);
-  const slugFocusPending = useRef(false);
   const guestbookAction = useAction();
   const adBlockAction = useAction();
   // 시작 안내 카드: ①은 저장 상태의 보이는 항목 수, ②·③·닫기는 기기 로컬 진행. 첫 항목을 저장해 ①을 막 마치면(② 전) 상태 줄로 알리고,
@@ -387,21 +370,11 @@ export function ManagerProvider({
     return trigger;
   }, []);
   const guestbookChanged = useCallback(() => setGuestbookVersion((version) => version + 1), []);
-  const requestSlugFocus = useCallback(() => {
-    slugFocusPending.current = true;
-    setSlugFocusRequest((count) => count + 1);
-  }, []);
-  const takeSlugFocus = useCallback(() => {
-    const pending = slugFocusPending.current;
-    slugFocusPending.current = false;
-    return pending;
-  }, []);
 
   const value: ManagerContextValue = {
     state,
     setState,
     reload,
-    email,
     profile,
     setProfile,
     socials,
@@ -437,9 +410,6 @@ export function ManagerProvider({
     toggleGuestbook,
     guestbookVersion,
     guestbookChanged,
-    slugFocusRequest,
-    requestSlugFocus,
-    takeSlugFocus,
     adBlockAction,
     toggleAdBlock,
     firstRunGuide: {

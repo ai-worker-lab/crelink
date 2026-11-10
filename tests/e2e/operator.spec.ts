@@ -97,11 +97,11 @@ test('운영자: 크리에이터 통계·분포, 보이는 링크 6번째 추가
   await expect(links.getByText('링크 6/50')).toBeVisible();
   await expect(previewTitles).toHaveText([shop.title, blog.title, '유튜브', '카페', '공지', '여섯 번째']);
 
-  // 운영자 자신의 관리 화면 머리글에는 운영자 화면 링크
+  // 운영자 자신의 관리 화면 머리글 프로필 메뉴에는 운영자 화면 링크
   await page.goto('/me');
-  await expect(
-    page.getByRole('navigation', { name: '주요 메뉴' }).getByRole('link', { name: '운영자 화면' }),
-  ).toHaveAttribute('href', '/admin');
+  const operatorHeader = page.getByRole('navigation', { name: '주요 메뉴' });
+  await operatorHeader.getByRole('button', { name: '계정 메뉴' }).click();
+  await expect(operatorHeader.getByRole('link', { name: '운영자 화면' })).toHaveAttribute('href', '/admin');
 
   // 도메인 차단 → 기존 링크 차단
   await page.goto('/admin/blocked-domains');

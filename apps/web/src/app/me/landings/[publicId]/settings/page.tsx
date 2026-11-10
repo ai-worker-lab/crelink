@@ -1,10 +1,10 @@
-import type { Metadata } from 'next';
-import { AddressSettings } from '../../../../../components/manage/AddressSettings';
-import { managerMenuLabel } from '../../../../../components/manage/menu';
+import { redirect } from 'next/navigation';
+import { managerHref } from '../../../../../components/manage/menu';
 
-export const metadata: Metadata = { title: managerMenuLabel('settings'), robots: { index: false } };
+type Props = { params: Promise<{ publicId: string }> };
 
-/** `주소 설정` 메뉴(PRD R8): 내 크리링 링크·주소 바꾸기·계정. */
-export default function SettingsPage() {
-  return <AddressSettings />;
+/** 옛 `주소 설정` 주소. 주소 복사·변경은 `페이지 편집`의 주소 막대로 옮겼으므로 그 화면으로 보냅니다(0234). */
+export default async function SettingsPage({ params }: Props) {
+  const { publicId } = await params;
+  redirect(managerHref(publicId, ''));
 }

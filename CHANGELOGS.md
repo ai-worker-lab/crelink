@@ -6,6 +6,7 @@
 
 ## 2026-11-10
 
+- 관리 화면 주소 막대 입력형·프로필 메뉴·`주소 설정` 메뉴 제거(0234): 인계 `design/manager-address-bar/handoff.md`를 추가해 실측값으로 갱신하고, PRD R18 ⑦·`docs/specs/crelink-mvp.md`·`design/first-run-guide/handoff.md`·`docs/product/growth/profile-self-check.txt`·`tests/e2e/`를 새 화면에 맞췄습니다. 세부는 [웹 로그](apps/web/CHANGELOGS.md), 근거는 [0234](docs/work/orchestrator/0234-address-bar-inline.md)에 있습니다.
 - 방문자 지표 보강(0232): `packages/shared`에 봇 판별 `isBotUserAgent`와 계약 `sources`·`visitorRecency`·`botExclusions`를 추가했습니다. 새 수집·컬럼·migration은 없습니다. `tests/e2e/fixtures.ts` 세션의 크로미움 기본 UA를 사람 브라우저 값으로 고정했습니다. 세부는 [백엔드 로그](apps/api/CHANGELOGS.md)와 [웹 로그](apps/web/CHANGELOGS.md), 근거는 [0232](docs/work/orchestrator/0232-visitor-metrics.md)에 있습니다.
 - 앱 내 브라우저 가입 안내와 가입 경로 계측(0231): 공유 계약 `packages/shared/src/signup-funnel.ts`를 추가하고 `tests/e2e/ego/signup-funnel.mjs`를 `pnpm ci:local`의 ego 시험 모음에 넣었습니다. 세부는 [백엔드 로그](apps/api/CHANGELOGS.md)와 [웹 로그](apps/web/CHANGELOGS.md), 판단과 범위는 [0231](docs/work/orchestrator/0231-inapp-signup-funnel.md)에 있습니다.
 - `tests/smoke/smoke.spec.ts`와 `tests/e2e/visitor.spec.ts`를 ego-lite로 옮겼습니다(0230). `tests/e2e/ego/smoke.mjs`·`visitor.mjs`를 `pnpm ci:local`의 ego 시험 모음에 추가했습니다. 기존 Playwright spec·`ci.yml`은 바꾸지 않습니다. 옮기지 못한 검사와 `Fetch` 시험 결과는 [0230](docs/work/orchestrator/0230-ego-smoke-core.md)에 있습니다.

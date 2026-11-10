@@ -38,9 +38,9 @@ export default function GuidePage() {
           </li>
           <li>
             관리 화면에는 <strong>페이지 편집</strong>·<strong>프로필</strong>·<strong>방명록</strong>·
-            <strong>지표</strong>·<strong>통계</strong>·<strong>주소 설정</strong> 메뉴가 있어요. 편집 메뉴의 넓은
-            화면에서는 가운데에 방문자에게 보이는 모습이 미리보기로 보이고, 오른쪽 패널에서 고쳐요. 휴대폰에서는 위쪽의{' '}
-            <strong>편집</strong>·<strong>미리보기</strong>로 바꿔 봐요. 저장하기 전 입력도 미리보기에 바로 보여요(
+            <strong>지표</strong>·<strong>통계</strong> 메뉴가 있어요. 편집 메뉴의 넓은 화면에서는 가운데에 방문자에게
+            보이는 모습이 미리보기로 보이고, 오른쪽 패널에서 고쳐요. 휴대폰에서는 위쪽의 <strong>편집</strong>·
+            <strong>미리보기</strong>로 바꿔 봐요. 저장하기 전 입력도 미리보기에 바로 보여요(
             <strong>저장하지 않은 변경 포함</strong>). 미리보기 안 링크는 눌러도 열리지 않으니, 실제 페이지는 미리보기
             위 주소 막대의 <strong>공개 페이지 열기</strong>로 확인해요.
           </li>
@@ -124,8 +124,7 @@ export default function GuidePage() {
         <h2 id="guide-share">4. 크리링 링크 공유하기</h2>
         <ol>
           <li>
-            관리 화면 미리보기 위 주소 막대나 <strong>주소 설정</strong>의 <strong>내 크리링 링크</strong>에서{' '}
-            <strong>복사</strong>를 눌러요.
+            관리 화면 미리보기 위 주소 막대(휴대폰은 메뉴 아래 줄)에서 주소 옆 <strong>복사</strong> 아이콘을 눌러요.
           </li>
           <li>인스타그램 앱에서 프로필 편집 &gt; 링크에 복사한 주소를 붙여 넣어요.</li>
         </ol>
@@ -135,9 +134,9 @@ export default function GuidePage() {
         <h3>주소 바꾸기</h3>
         <ul>
           <li>
-            <strong>주소 설정</strong>(또는 주소 막대의 <strong>주소 변경</strong>)의 <strong>새 주소</strong>에 원하는
-            주소를 넣으면 쓸 수 있는지 바로 알려 줘요. 영소문자·숫자·하이픈(-) {CRELINK_LIMITS.slugMinLength}~
-            {CRELINK_LIMITS.slugMaxLength}자이고, 처음과 끝은 영소문자나 숫자여야 해요.
+            주소 막대의 입력란(휴대폰은 메뉴 아래 줄의 <strong>주소 변경</strong> 아이콘)에 원하는 주소를 넣으면 쓸 수
+            있는지 바로 알려 줘요. <strong>변경</strong>을 누르고 한 번 더 확인하면 바뀌어요. 영소문자·숫자·하이픈(-){' '}
+            {CRELINK_LIMITS.slugMinLength}~{CRELINK_LIMITS.slugMaxLength}자이고, 처음과 끝은 영소문자나 숫자여야 해요.
           </li>
           <li>
             자동 발급 주소는 바로 바꿀 수 있고, 그 뒤로는 {CRELINK_LIMITS.slugChangeIntervalDays}일에 한 번 바꿀 수
