@@ -73,4 +73,7 @@ export const backendRules: ReadonlyArray<{
   { methods: ['GET', 'POST'], pattern: /^api\/me\/instagram\/rules$/ },
   { methods: ['PATCH', 'DELETE'], pattern: /^api\/me\/instagram\/rules\/[a-z0-9]{10}$/ },
   { methods: ['POST'], pattern: /^api\/public\/instagram-dm-opt-outs$/ },
+  // 운영자 스위치와 계정별 정지. 설정 `GET`은 서버 렌더만 부르므로 넣지 않습니다.
+  { methods: ['PUT'], pattern: /^api\/admin\/instagram-dm$/ },
+  { methods: ['PUT'], pattern: new RegExp(`^api/admin/instagram-dm/connections/${ID}/pause$`) },
 ];
