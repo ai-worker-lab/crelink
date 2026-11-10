@@ -11,6 +11,8 @@ pnpm 모노레포 스켈레톤입니다: NestJS API(`apps/api`), Next.js 웹(`ap
 - 티켓의 `역할` 소유 경로(`.omp/agents/*.md`의 `owns`) 밖을 바꾸지 않습니다. `pnpm work:scope`로 확인합니다.
 - 실행하지 않은 검증을 통과했다고 보고하지 않습니다. 데이터 파괴·외부 공개는 명시적 요청 없이 하지 않습니다. 배포는 ADR 0016을 따릅니다.
 - main 머지는 곧 운영 배포입니다(CD). 머지는 개발실이 CI와 검증을 통과한 뒤 실행하고, 머지 뒤에는 Deploy job 결과(운영 주소 검사 포함)로 확인합니다. 운영(prod)에서 직접 확인·시험은 운영에서만 드러나는 위험이라는 명분이 있을 때만, 이유·범위를 사용자에게 먼저 알리고 진행합니다([검증 루프](docs/development/verification.md#운영-확인)).
+- `git push`와 PR 머지 전에 이 기기에서 로컬 CI를 돌립니다. push 전에는 `pnpm ci:local`, 머지 전에는 PR 브랜치에서 `pnpm ci:local --report`(필수 검사 `CI 통과`를 기록)를 실행하고, 실패하면 push·머지하지 않습니다. 기준은 [로컬 CI](docs/development/verification.md#로컬-ci)입니다.
+- `main`은 PR로만 바꿉니다. ruleset `main 보호`가 직접 push·force push·삭제를 막습니다.
 - 제품 방향·우선순위·요구 확정은 사용자가 결정합니다.
 - AI 운영자 자율 실행(ADR 0015)은 정지했습니다. 현재 권한과 사용자 승인이 필요한 일은 [ADR 0016](docs/adr/0016-devoffice-takeover.md)을 따릅니다.
 

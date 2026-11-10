@@ -65,7 +65,7 @@ PR마다 GitHub Actions에서 도는 CI는 없습니다(0237, [ADR 0016](../adr/
 
 ## 로컬 CI
 
-[`scripts/ci-local.mjs`](../../scripts/ci-local.mjs)의 `pnpm ci:local`이 머지 전 검사를 이 기기에서 실행합니다([ADR 0016](../adr/0016-devoffice-takeover.md) 결정 5). 머지 전에 PR 브랜치에서 `pnpm ci:local --report`를 실행합니다. Dependabot PR도 브랜치를 받아 같은 명령을 씁니다.
+[`scripts/ci-local.mjs`](../../scripts/ci-local.mjs)의 `pnpm ci:local`이 머지 전 검사를 이 기기에서 실행합니다([ADR 0016](../adr/0016-devoffice-takeover.md) 결정 5). push 전에 `pnpm ci:local`을, 머지 전에 PR 브랜치에서 `pnpm ci:local --report`를 실행합니다(`--report`는 push된 커밋에만 기록하므로 push 뒤에 다시 돕니다). Dependabot PR도 브랜치를 받아 같은 명령을 씁니다.
 
 | 판정 | 순서 |
 | --- | --- |
