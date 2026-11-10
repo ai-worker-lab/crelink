@@ -75,12 +75,12 @@ export default function InstagramProfileLinksPage() {
             저장해요. 포트폴리오는 <strong>+ 포트폴리오 추가</strong>로 넣어요.
           </li>
           <li>
-            미리보기 위 주소 막대에서 <strong>복사</strong>를 눌러 내 크리링 링크를 복사해요.
+            미리보기 위 주소 막대에서 주소 옆 <strong>복사</strong> 아이콘을 눌러 내 크리링 링크를 복사해요.
           </li>
           <li>인스타그램 앱의 프로필 편집 &gt; 링크에 복사한 주소를 붙여 넣어요.</li>
         </ol>
         <p>
-          크리링 링크는 <strong>주소 설정</strong>에서 내 이름에 맞게 바꿀 수 있어요. 바꿔도 옛 주소는{' '}
+          크리링 링크는 관리 화면 주소 막대에서 내 이름에 맞게 바꿀 수 있어요. 바꿔도 옛 주소는{' '}
           {CRELINK_LIMITS.retiredSlugGraceDays}일 동안 새 주소로 연결돼요. 메뉴마다 자세한 설명은{' '}
           <Link href={CRELINK_WEB_PATHS.docsGuide}>사용 안내</Link>에 있어요.
         </p>

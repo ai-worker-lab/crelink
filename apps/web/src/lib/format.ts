@@ -9,10 +9,16 @@ const dateTimeFormat = new Intl.DateTimeFormat('ko-KR', {
   timeStyle: 'short',
 });
 const isoDayFormat = new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE });
+const monthDayFormat = new Intl.DateTimeFormat('ko-KR', { timeZone: TIME_ZONE, month: 'long', day: 'numeric' });
 const numberFormat = new Intl.NumberFormat('ko-KR');
 
 export function formatDate(iso: string): string {
   return dateFormat.format(new Date(iso));
+}
+
+/** 연도 없는 `M월 D일`. 가까운 날짜를 짧게 쓸 때(주소 막대의 다음 변경 가능일)만 씁니다. */
+export function formatMonthDay(iso: string): string {
+  return monthDayFormat.format(new Date(iso));
 }
 
 export function formatDateTime(iso: string): string {

@@ -54,7 +54,7 @@ async function navigationsDuring(page: Page, action: () => Promise<void>): Promi
   return navigations;
 }
 
-test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SNS), 미리보기 고르기 → 패널 편집(포트폴리오·외부 링크: 초안 유지·한도·숨기기·드래그·삭제), 주소 설정(복사·30일 제한), 390px 편집|미리보기·하단 시트', async ({
+test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SNS), 미리보기 고르기 → 패널 편집(포트폴리오·외부 링크: 초안 유지·한도·숨기기·드래그·삭제), 주소 막대 입력(복사·변경 확인·30일 제한), 390px 편집|미리보기·하단 시트', async ({
   data,
 }) => {
   const creator = await data.user();
@@ -82,15 +82,29 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
   await expect(page.getByRole('heading', { name: '페이지 편집', level: 1 })).toBeVisible();
   await expect(menu.getByRole('link', { name: '페이지 편집' })).toHaveAttribute('aria-current', 'page');
   await expect(menu.getByRole('link', { name: '프로필' })).toHaveAttribute('href', `${managePath}/profile`);
-  // 머리글은 로그아웃만(크리에이터에게 `운영자 화면` 없음). 공개 페이지 열기는 무대 주소 막대로 옮겨 머리글에 없음
+  // 머리글은 프로필 메뉴(열면 이메일·로그아웃, 크리에이터에게 `운영자 화면` 없음). 공개 페이지 열기는 무대 주소 막대로 옮겨 머리글에 없음
   const header = page.getByRole('navigation', { name: '주요 메뉴' });
+  const accountMenu = header.getByRole('button', { name: '계정 메뉴' });
+  await expect(accountMenu).toHaveAttribute('aria-expanded', 'false');
+  await expect(header.getByRole('button', { name: '로그아웃' })).toHaveCount(0);
+  await accountMenu.click();
+  await expect(accountMenu).toHaveAttribute('aria-expanded', 'true');
+  await expect(header.getByText(creator.email)).toBeVisible();
   await expect(header.getByRole('button', { name: '로그아웃' })).toBeVisible();
   await expect(header.getByRole('link', { name: '운영자 화면' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(accountMenu).toHaveAttribute('aria-expanded', 'false');
+  await expect(accountMenu).toBeFocused();
+  await expect(header.getByRole('button', { name: '로그아웃' })).toHaveCount(0);
   await expect(header.getByRole('link', { name: '공개 페이지 열기' })).toHaveCount(0);
   await expect(main.getByRole('region', { name: '내 페이지' })).toHaveCount(0);
-  // 주소 막대: 단축 주소(`http(s)://` 없이)·복사·주소 변경·공개 페이지 열기(새 창)
-  await expect(stage.locator('code.url-text')).toHaveText(`${shortHost}/${creator.slug}`);
-  await expect(stage.getByRole('button', { name: '내 크리링 링크 복사' })).toBeVisible();
+  // 주소 막대: 도메인 글자(`http(s)://` 없이) + 저장된 주소가 채워진 입력란·복사 아이콘·공개 페이지 열기(새 창)
+  const addressInput = stage.getByLabel('내 크리링 주소');
+  const copyIcon = stage.getByRole('button', { name: '내 크리링 링크 복사' });
+  await expect(addressInput).toHaveValue(creator.slug);
+  await expect(stage.locator('.address-domain')).toHaveText(`${shortHost}/`);
+  await expect(copyIcon).toBeVisible();
+  await expect(stage.getByRole('link', { name: '주소 변경' })).toHaveCount(0);
   const openPublic = stage.getByRole('link', { name: '공개 페이지 열기 (새 창)', exact: true });
   await expect(openPublic).toHaveAttribute('href', creator.landingUrl);
   await expect(openPublic).toHaveAttribute('target', '_blank');
@@ -191,41 +205,72 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
   await back.click();
   await expect(main.getByRole('button', { name: /포트폴리오.*1\/20/ })).toBeVisible();
 
-  // 주소 막대 `주소 변경` → `주소 설정` 메뉴, 새 주소 입력에 초점. 계정 이메일
-  await stage.getByRole('link', { name: '주소 변경' }).click();
-  await expect(page).toHaveURL(`${WEB_URL}${managePath}/settings`);
-  await expect(menu.getByRole('link', { name: '주소 설정' })).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByRole('heading', { name: '주소 설정', level: 1 })).toBeVisible();
-  const slugCard = main.getByRole('region', { name: '주소 바꾸기' });
-  await expect(slugCard.getByLabel('새 주소')).toBeFocused();
-  await expect(main.getByRole('region', { name: '계정' }).getByText(creator.email)).toBeVisible();
-
-  // 단축 URL 표시·복사
-  const short = main.getByRole('region', { name: '내 크리링 링크' });
-  await expect(short.locator('code.url-text')).toHaveText(creator.shortUrl);
-  await short.getByRole('button', { name: '내 크리링 링크 복사' }).click();
-  await expect(short.getByText('복사했어요.')).toBeVisible();
+  // 주소 막대 복사: 저장된 단축 URL이 복사되고 결과 문장은 막대 아래(인스타그램 붙여넣기 안내 포함)
+  const copiedNotice = stage.getByText('복사했어요. 인스타그램 프로필 편집 > 링크에 붙여 넣으세요.');
+  await copyIcon.click();
+  await expect(copiedNotice).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(creator.shortUrl);
 
-  // 주소 변경: 자동 주소는 바로 바꿀 수 있음. 바꾸면 주소 막대 주소도 바뀜
+  // 입력하면 복사·열기 대신 취소·변경. 막대의 Esc·취소는 저장값으로 되돌리고 초점은 입력란에 남음
+  const changeButton = stage.getByRole('button', { name: '주소 변경', exact: true });
+  const cancelButton = stage.getByRole('button', { name: '취소', exact: true });
   const newSlug = data.unique('e2e-me');
-  await expect(slugCard.getByText('자동 발급 주소는 지금 바로 바꿀 수 있어요.', { exact: false })).toBeVisible();
-  await slugCard.getByLabel('새 주소').fill(newSlug);
-  await expect(slugCard.getByText('사용할 수 있는 주소예요.')).toBeVisible();
-  await slugCard.getByRole('button', { name: '주소 바꾸기' }).click();
-  await expect(slugCard.getByText('주소를 바꿨어요.', { exact: false })).toBeVisible();
-  await expect(short.locator('code.url-text')).toHaveText(`${SHORT_URL}/${newSlug}`);
-  await expect(stage.locator('code.url-text')).toHaveText(`${shortHost}/${newSlug}`);
-  // 주소 막대의 복사도 바뀐 주소
-  await stage.getByRole('button', { name: '내 크리링 링크 복사' }).click();
-  await expect(stage.getByText('복사했어요.')).toBeVisible();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`${SHORT_URL}/${newSlug}`);
+  await addressInput.fill('ab');
+  await expect(copyIcon).toHaveCount(0);
+  await expect(openPublic).toHaveCount(0);
+  await expect(addressInput).toHaveAttribute('aria-invalid', 'true');
+  await expect(changeButton).toBeDisabled();
+  await addressInput.press('Escape');
+  await expect(addressInput).toHaveValue(creator.slug);
+  await expect(addressInput).toBeFocused();
+  await expect(copyIcon).toBeVisible();
+  await addressInput.fill(newSlug);
+  await cancelButton.click();
+  await expect(addressInput).toHaveValue(creator.slug);
+  await expect(addressInput).toBeFocused();
 
-  // 다시 바꾸려 하면 30일 제한 안내(화면은 입력을 막고, API도 429)
-  await expect(
-    slugCard.getByText('주소는 30일에 한 번 바꿀 수 있어요. 다음 변경 가능일:', { exact: false }),
-  ).toBeVisible();
-  await expect(slugCard.getByLabel('새 주소')).toBeDisabled();
+  // 자동 주소는 바로 바꿀 수 있음. Enter 두 번으로는 저장되지 않음(대화상자의 첫 초점이 `취소`). 닫아도 입력값은 남고 초점은 `변경`으로
+  const slugPuts: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'PUT' && request.url().endsWith('/api/me/short-link/slug')) slugPuts.push(request.url());
+  });
+  await addressInput.fill(newSlug);
+  await expect(stage.getByText('사용할 수 있는 주소예요.')).toBeVisible();
+  await expect(stage.getByText('자동 발급 주소는 지금 바로 바꿀 수 있어요.', { exact: false })).toBeVisible();
+  await expect(changeButton).toBeEnabled();
+  await addressInput.press('Enter');
+  const slugDialog = page.getByRole('dialog', { name: '주소를 바꿀까요?', exact: true });
+  await expect(slugDialog.getByRole('button', { name: '취소', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(slugDialog).toHaveCount(0);
+  await expect(changeButton).toBeFocused();
+  await expect(addressInput).toHaveValue(newSlug);
+  expect(slugPuts, 'Enter 두 번으로 저장되지 않음').toEqual([]);
+
+  // `변경` → 확인 대화상자 → 저장. 입력란 대신 새 주소 글자와 성공 안내, 초점은 `새 주소 복사`
+  await changeButton.click();
+  await expect(slugDialog.getByText(`${shortHost}/${creator.slug}`)).toBeVisible();
+  await expect(slugDialog.getByText(`${shortHost}/${newSlug}`)).toBeVisible();
+  await slugDialog.getByRole('button', { name: '이 주소로 바꾸기' }).click();
+  await expect(slugDialog).toHaveCount(0);
+  const changedNotice = stage.getByText('주소를 바꿨어요.', { exact: false });
+  await expect(changedNotice).toBeVisible();
+  await expect(stage.getByRole('button', { name: '새 주소 복사' })).toBeFocused();
+  await expect(stage.locator('.address-bar > code.url-text')).toHaveText(`${shortHost}/${newSlug}`);
+  expect(slugPuts).toHaveLength(1);
+  // 주소 막대의 복사도 바뀐 주소
+  await copyIcon.click();
+  await expect(copiedNotice).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`${SHORT_URL}/${newSlug}`);
+  // 무대가 그대로여도 메뉴를 옮기면 성공 안내가 닫힘
+  await menu.getByRole('link', { name: '프로필' }).click();
+  await expect(page).toHaveURL(`${WEB_URL}${managePath}/profile`);
+  await expect(changedNotice).toHaveCount(0);
+
+  // 다시 바꾸려 하면 30일 제한: 입력란 없이 주소 글자와 다음 변경 가능일(API도 429)
+  const lockedNote = stage.locator('.address-lock');
+  await expect(addressInput).toHaveCount(0);
+  await expect(lockedNote).toContainText('부터');
   const again = await page.request.put(`${WEB_URL}/api/backend/api/me/short-link/slug`, {
     headers: { Origin: WEB_URL },
     data: { slug: data.unique('e2e-again') },
@@ -233,10 +278,14 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
   expect(again.status()).toBe(429);
   expect((await again.json()).code).toBe('slug_change_too_soon');
   await page.reload();
-  await expect(
-    slugCard.getByText('주소는 30일에 한 번 바꿀 수 있어요. 다음 변경 가능일:', { exact: false }),
-  ).toBeVisible();
-  await expectMobileFits(page, '주소 설정');
+  await expect(addressInput).toHaveCount(0);
+  await expect(lockedNote).toContainText('부터');
+
+  // 옛 `주소 설정` 주소는 `페이지 편집`으로. 메뉴에도 없음
+  await page.goto(`${managePath}/settings`);
+  await expect(page).toHaveURL(`${WEB_URL}${managePath}`);
+  await expect(menu.getByRole('link', { name: '주소 설정' })).toHaveCount(0);
+  await expectMobileFits(page, '페이지 편집(주소 잠금)');
 
   // `페이지 편집`으로 돌아와 미리보기의 외부 링크 구역을 고르면 외부 링크 패널(초점은 패널 제목)
   await menu.getByRole('link', { name: '페이지 편집' }).click();
@@ -446,15 +495,16 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
   await expect(page).toHaveURL(`${WEB_URL}${managePath}`);
   expect(editClicks, '미리보기 링크 카드를 눌러도 이동·새 창 없음').toEqual([]);
 
-  // 다른 메뉴(주소 설정)의 미리보기는 방문자 모습: 링크는 클릭 기록 없는 저장된 주소이고 눌러도 이동하지 않음
-  await menu.getByRole('link', { name: '주소 설정' }).click();
-  await expect(page).toHaveURL(`${WEB_URL}${managePath}/settings`);
+  // 다른 메뉴(방명록)의 미리보기는 방문자 모습: 링크는 클릭 기록 없는 저장된 주소이고 눌러도 이동하지 않음. 방명록 메뉴는 미리보기를 방명록 탭으로 열므로 링크 탭을 먼저 누름
+  await menu.getByRole('link', { name: '방명록' }).click();
+  await expect(page).toHaveURL(`${WEB_URL}${managePath}/guestbook`);
+  await stage.getByRole('tab', { name: '링크', exact: true }).click();
   await expect(previewTitles).toHaveText(expected);
   const firstPreviewLink = stage.locator('.preview-screen a.link-card').first();
   await expect(firstPreviewLink).toHaveAttribute('href', /^https:\/\/site-.*\.e2e\.test\/l6$/);
   const plainClicks = await navigationsDuring(page, async () => {
     await firstPreviewLink.click();
-    await expect(page).toHaveURL(`${WEB_URL}${managePath}/settings`);
+    await expect(page).toHaveURL(`${WEB_URL}${managePath}/guestbook`);
     await expect(previewTitles).toHaveText(expected);
   });
   expect(plainClicks, '미리보기 링크를 눌러도 이동·새 창 없음').toEqual([]);
@@ -468,7 +518,7 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
   await expectNoHorizontalOverflow(page, '페이지 편집 1280px');
   await expectMobileFits(page, '페이지 편집');
 
-  // 390px: 무대 대신 탭 아래 sticky 줄(단축 주소·복사·공개 페이지 열기·`편집 | 미리보기`). 떠 있는 미리보기 버튼·대화상자 없음
+  // 390px: 무대 대신 탭 아래 sticky 줄(단축 주소·복사·자물쇠(앞에서 주소를 바꿔 잠김)·공개 페이지 열기·`편집 | 미리보기`). 떠 있는 미리보기 버튼·대화상자 없음
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(stage).toHaveCount(0);
   await expect(main.locator('code.url-text')).toHaveText(`${shortHost}/${newSlug}`);
@@ -477,6 +527,17 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
     'href',
     creator.landingUrl,
   );
+  // 잠겨 있으면 자물쇠 → 다음 변경 가능일 시트(입력 비활성), 닫으면 연 버튼으로 초점 복귀
+  const lockButton = main.getByRole('button', { name: '주소 변경 잠김, 다음 변경 가능일 보기', exact: true });
+  await lockButton.click();
+  const lockSheet = page.getByRole('dialog', { name: '주소 변경', exact: true });
+  await expect(
+    lockSheet.getByText('주소는 30일에 한 번 바꿀 수 있어요. 다음 변경 가능일:', { exact: false }),
+  ).toBeVisible();
+  await expect(lockSheet.getByLabel('새 주소')).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(lockSheet).toHaveCount(0);
+  await expect(lockButton).toBeFocused();
   const viewModes = main.getByRole('group', { name: '미리보기 모드' });
   const editView = viewModes.getByRole('button', { name: '편집', exact: true });
   const previewView = viewModes.getByRole('button', { name: '미리보기', exact: true });
@@ -594,6 +655,64 @@ test('크리에이터: /me 이동, 주소 막대, 프로필 메뉴(프로필·SN
   await expect(page.getByText('모바일 설명')).toBeVisible();
   await expect(page.getByRole('region', { name: '포트폴리오' }).getByText('E2E 협업')).toBeVisible();
   await expectMobileFits(page, '/p/{publicId}');
+});
+
+test('크리에이터: 390px 주소 변경 시트(연필 → 확인 단계 → 저장, 두 번 입력으로 저장되지 않음)', async ({ data }) => {
+  const creator = await data.user();
+  const { page } = await data.session(creator, {
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  });
+  await page.goto(`/me/landings/${creator.publicId}`);
+  const main = page.getByRole('main');
+  const newSlug = data.unique('e2e-sheet');
+  const puts: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'PUT' && request.url().endsWith('/api/me/short-link/slug')) puts.push(request.url());
+  });
+
+  // 연필 → 시트(입력 첫 초점). 시트는 빈 입력에서 시작하므로 지금 주소를 넣으면 `같아요` 안내
+  await main.getByRole('button', { name: '주소 변경', exact: true }).click();
+  const sheet = page.getByRole('dialog', { name: '주소 변경', exact: true });
+  const newAddress = sheet.getByLabel('새 주소');
+  await expect(newAddress).toBeFocused();
+  await expect(sheet.getByText('인스타그램 프로필 편집 > 링크에 이 주소를 붙여 넣으세요.')).toBeVisible();
+  await newAddress.fill(creator.slug);
+  await expect(sheet.getByText('지금 쓰는 주소와 같아요.')).toBeVisible();
+  await newAddress.fill(newSlug);
+  await expect(sheet.getByText('사용할 수 있는 주소예요.')).toBeVisible();
+
+  // Enter 두 번: 확인 단계의 첫 초점이 `뒤로`라 입력 단계로 돌아오고 저장되지 않음
+  const back = sheet.getByRole('button', { name: '뒤로', exact: true });
+  await newAddress.press('Enter');
+  await expect(back).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(newAddress).toBeFocused();
+  expect(puts, 'Enter 두 번으로 저장되지 않음').toEqual([]);
+
+  // 두 번 탭: 둘째 탭은 같은 높이의 `뒤로`에 떨어져 저장되지 않음
+  const submit = sheet.getByRole('button', { name: '주소 바꾸기', exact: true });
+  const box = await submit.boundingBox();
+  if (!box) throw new Error('주소 바꾸기 버튼 위치를 찾지 못했어요.');
+  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(newAddress).toBeVisible();
+  await expect(newAddress).toHaveValue(newSlug);
+  expect(puts, '두 번 탭으로 저장되지 않음').toEqual([]);
+
+  // 확인 단계에서 저장하면 성공 내용과 `새 주소 복사`(초점), 닫으면 연필이 자물쇠로 바뀐 같은 버튼으로 초점 복귀
+  await submit.tap();
+  await expect(back).toBeFocused();
+  await sheet.getByRole('button', { name: '이 주소로 바꾸기' }).tap();
+  await expect(sheet.locator('.form-success')).toContainText('주소를 바꿨어요.');
+  await expect(sheet.getByRole('button', { name: '새 주소 복사' })).toBeFocused();
+  expect(puts).toHaveLength(1);
+  await sheet.locator('.edit-form-actions').getByRole('button', { name: '닫기' }).tap();
+  await expect(sheet).toHaveCount(0);
+  await expect(main.getByRole('button', { name: '주소 변경 잠김, 다음 변경 가능일 보기', exact: true })).toBeFocused();
+  await expect(main.locator('code.url-text')).toHaveText(`${new URL(SHORT_URL).host}/${newSlug}`);
+  await expectNoHorizontalOverflow(page, '주소 변경 시트 뒤 390px');
 });
 
 test('크리에이터: 모바일 터치로 링크를 끌어 순서 변경(390px 외부 링크 시트)', async ({ data }) => {

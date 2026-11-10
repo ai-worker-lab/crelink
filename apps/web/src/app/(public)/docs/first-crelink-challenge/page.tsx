@@ -118,8 +118,8 @@ export default function FirstCrelinkChallengePage() {
             차단된 링크는 방문자에게 보이지 않아요.
           </li>
           <li>
-            관리 화면 주소 막대 또는 <strong>주소 설정</strong>의 <strong>내 크리링 링크</strong>에서{' '}
-            <strong>복사</strong>를 눌러요. 공유할 주소는 내 크리링 단축 주소예요.
+            관리 화면 주소 막대에서 주소 옆 <strong>복사</strong> 아이콘을 눌러요. 공유할 주소는 내 크리링 단축
+            주소예요.
           </li>
           <li>
             이 주소를 내 프로필에 넣을지 직접 결정해요. 인스타그램에 넣고 싶다면 앱의 프로필 편집 &gt; 링크에서 붙여
