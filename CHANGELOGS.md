@@ -6,6 +6,7 @@
 
 ## 2026-11-10
 
+- 웹 컴포넌트 카탈로그 1차(0240): `design/docs/component-catalog.md`를 추가했습니다. 공통 부품 현황과 관리 화면 패턴의 상태·접근성 비교, 개선 후보 10건을 담은 문서이며 제품 코드는 바꾸지 않습니다.
 - ego 콘솔 검사의 파비콘 예외를 지웠습니다(0238). 사이트 아이콘이 생겨 브라우저가 `/favicon.ico`를 요청하지 않습니다.
 - CI를 로컬로 전환(0237): `ci.yml`을 수동 실행 전용으로 바꾸고 ruleset의 필수 검사 `CI 통과`를 GitHub Actions에 묶지 않아 `pnpm ci:local --report`의 commit status로 충족합니다. 자동으로 도는 Actions는 CD만 남습니다.
 - 관리 화면 주소 막대 입력형·프로필 메뉴·`주소 설정` 메뉴 제거(0234): 인계 `design/manager-address-bar/handoff.md`를 추가해 실측값으로 갱신하고, PRD R18 ⑦·`docs/specs/crelink-mvp.md`·`design/first-run-guide/handoff.md`·`docs/product/growth/profile-self-check.txt`·`tests/e2e/`를 새 화면에 맞췄습니다. 세부는 [웹 로그](apps/web/CHANGELOGS.md), 근거는 [0234](docs/work/orchestrator/0234-address-bar-inline.md)에 있습니다.
