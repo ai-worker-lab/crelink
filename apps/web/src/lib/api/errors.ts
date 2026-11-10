@@ -1,10 +1,19 @@
-import { CRELINK_LIMITS, type CrelinkErrorCode, type NoticeReason } from '@crelink/shared';
+import { CRELINK_LIMITS, type CrelinkApiErrorCode, type NoticeReason } from '@crelink/shared';
 
 /** 업로드 이미지 크기 한도 표시(예: `4MB`). 숫자는 계약 `CRELINK_LIMITS.imageMaxBytes`에서만 옵니다. */
 export const IMAGE_MAX_LABEL = `${Math.floor(CRELINK_LIMITS.imageMaxBytes / (1024 * 1024))}MB`;
 
 /** API 오류 코드별 사용자 안내. 계약(`CrelinkErrorCode`)의 모든 코드를 다룹니다. */
-const API_ERROR_MESSAGES: Record<CrelinkErrorCode, string> = {
+const API_ERROR_MESSAGES: Record<CrelinkApiErrorCode, string> = {
+  page_not_found: '페이지를 찾을 수 없어요. 권한이 해제되었을 수 있어요. 내 페이지로 돌아가 주세요.',
+  page_suspended: '운영이 정지된 페이지예요.',
+  page_owner_only: '페이지 소유자만 할 수 있는 작업이에요.',
+  page_member_limit: '공동 관리자는 최대 5명이에요. 소유자에게 문의해 주세요.',
+  member_not_found: '이미 해제되었거나 찾을 수 없는 공동 관리자예요.',
+  invite_invalid: '초대가 만료되었거나 이미 사용된 링크예요. 새 초대 링크를 요청해 주세요.',
+  invite_own_page: '내 페이지의 초대는 수락할 수 없어요.',
+  already_member: '이미 함께 관리하는 페이지예요.',
+
   import_unavailable:
     '원본을 가져오지 못했어요. 공개된 Instabio 주소와 페이지 상태를 확인한 뒤 다시 미리보기해 주세요.',
   import_source_changed: '원본 내용이 바뀌었어요. 다시 미리보기한 뒤 가져와 주세요.',

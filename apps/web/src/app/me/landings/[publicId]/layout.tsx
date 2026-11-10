@@ -29,7 +29,7 @@ export default async function ManageLandingLayout({
 }) {
   const { publicId } = await params;
   const [result, me] = await Promise.all([
-    loadSignedIn<CreatorLandingState>(CRELINK_API_PATHS.meLanding),
+    loadSignedIn<CreatorLandingState>(CRELINK_API_PATHS.meLanding, publicId),
     loadSignedIn<MeResponse>(CRELINK_API_PATHS.me),
   ]);
   // 로그인 사용자의 내부 ID만 이 요청(서버)과 브라우저의 Sentry 이벤트에 붙입니다. 이메일은 넣지 않습니다.
@@ -45,7 +45,7 @@ export default async function ManageLandingLayout({
   return (
     <div className="app-page manager-page">
       {me.ok ? <MonitoringUser id={me.data.id} /> : null}
-      {!result.ok ? (
+      {!result.ok && result.error.status !== 404 ? (
         <>
           {errorHeader}
           <main className="app-main">
@@ -69,10 +69,13 @@ export default async function ManageLandingLayout({
           </main>
         </>
       ) : (
-        <ManagerProvider initial={own}>
+        <ManagerProvider key={publicId} initial={own}>
           <SiteHeader>
             <ManagerProfileMenu email={email} isOperator={isOperator} />
           </SiteHeader>
+          {own.pageAccess?.role === 'editor' ? (
+            <p className="notice-box">공유 페이지 · {own.landing.displayName ?? '이름 없는 페이지'}</p>
+          ) : null}
           <ManagerShell>{children}</ManagerShell>
         </ManagerProvider>
       )}

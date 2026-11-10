@@ -1,5 +1,6 @@
 'use client';
 
+import { isPageOwner } from '../../lib/api/page-context';
 import { CRELINK_LIMITS } from '@crelink/shared';
 import { usePathname } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type FocusEvent, type FormEvent, type KeyboardEvent } from 'react';
@@ -31,6 +32,20 @@ type FocusTarget = 'input' | 'copy' | 'change' | 'confirm' | 'new-copy';
  * 30일 제한 중에는 입력란 대신 주소 글자와 다음 변경 가능일을 보여 줍니다. 막대 높이(60px)를 지키려고 상태 문장은 막대 아래에 겹쳐 띄웁니다.
  */
 export function AddressBar() {
+  const { state } = useManager();
+  return isPageOwner(state.pageAccess) ? (
+    <OwnerAddressBar />
+  ) : (
+    <div className="address-bar">
+      <code className="url-text">{state.shortLink.url}</code>
+      <CopyButton text={state.shortLink.url} />
+      <a className="secondary" href={state.landing.url} target="_blank" rel="noopener">
+        공개 페이지 열기
+      </a>
+    </div>
+  );
+}
+function OwnerAddressBar() {
   const { state, firstRunGuide } = useManager();
   const { landing, shortLink } = state;
   const change = useSlugChange({ startsFromSaved: true });

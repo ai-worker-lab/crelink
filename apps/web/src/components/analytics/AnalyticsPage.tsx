@@ -35,7 +35,10 @@ export async function CreatorAnalyticsPage({
   mode: AnalyticsMode;
 }) {
   const filters = analyticsFilters(await searchParams);
-  const result = await loadSignedIn<AnalyticsReport>(`${CRELINK_API_PATHS.meAnalytics}?${analyticsApiQuery(filters)}`);
+  const result = await loadSignedIn<AnalyticsReport>(
+    `${CRELINK_API_PATHS.meAnalytics}?${analyticsApiQuery(filters)}`,
+    publicId,
+  );
   const base = `/me/landings/${encodeURIComponent(publicId)}/${mode}`;
   if (!result.ok)
     return (

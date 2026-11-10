@@ -1,3 +1,5 @@
+import { backendRules } from '../../../../lib/api/backend-rules';
+import { forwardPageHeader } from '../../../../lib/api/page-context';
 import {
   COOKIE_NAMES,
   EMPTY_SIGNUP_FUNNEL_CONTEXT,
@@ -18,61 +20,6 @@ export const dynamic = 'force-dynamic';
  * `upload`는 multipart 본문과 Content-Type(boundary 포함)을 그대로 넘기는 경로입니다.
  * `signupInAppKind`는 첫 링크 합계(0231)에 쓸 앱 내 브라우저 종류만 내부 헤더로 넘기는 경로입니다. User-Agent 원문은 넘기지 않습니다.
  */
-const ID = '[^/]+';
-const rules: ReadonlyArray<{
-  methods: readonly string[];
-  pattern: RegExp;
-  upload?: true;
-  visitorEvent?: true;
-  signupInAppKind?: true;
-}> = [
-  { methods: ['GET'], pattern: /^api\/health$/ },
-  { methods: ['POST'], pattern: /^api\/auth\/logout$/ },
-  { methods: ['GET'], pattern: /^api\/me$/ },
-  { methods: ['GET'], pattern: /^api\/(me|admin)\/analytics$/ },
-  { methods: ['GET', 'PATCH'], pattern: /^api\/me\/landing$/ },
-  { methods: ['GET'], pattern: /^api\/me\/short-link\/availability$/ },
-  { methods: ['PUT'], pattern: /^api\/me\/short-link\/slug$/ },
-  { methods: ['POST'], pattern: /^api\/me\/imports\/instabio(\/preview)?$/, signupInAppKind: true },
-  { methods: ['POST'], pattern: /^api\/me\/links$/, signupInAppKind: true },
-  { methods: ['PUT'], pattern: /^api\/me\/links\/order$/ },
-  // 광고 블록 켜고 끄기(R20 ⑩): 크리에이터 스위치와 운영자 플랫폼 스위치. 플랫폼 스위치 `GET`은 서버 렌더만 부르므로 넣지 않습니다.
-  { methods: ['PUT'], pattern: /^api\/me\/ad-block$/ },
-  { methods: ['PUT'], pattern: /^api\/admin\/ad-block$/ },
-  { methods: ['PATCH', 'DELETE'], pattern: new RegExp(`^api/me/links/${ID}$`) },
-  { methods: ['PUT'], pattern: /^api\/me\/socials$/ },
-  { methods: ['POST'], pattern: /^api\/me\/portfolio$/ },
-  { methods: ['PUT'], pattern: /^api\/me\/portfolio\/order$/ },
-  { methods: ['PATCH', 'DELETE'], pattern: new RegExp(`^api/me/portfolio/${ID}$`) },
-  { methods: ['POST'], pattern: /^api\/me\/banners$/ },
-  { methods: ['PUT'], pattern: /^api\/me\/banners\/order$/ },
-  { methods: ['PATCH', 'DELETE'], pattern: new RegExp(`^api/me/banners/${ID}$`) },
-  { methods: ['POST'], pattern: /^api\/me\/files$/, upload: true },
-  { methods: ['GET'], pattern: new RegExp(`^api/files/${ID}$`) },
-  { methods: ['GET'], pattern: new RegExp(`^api/public/landings/${ID}$`) },
-  { methods: ['POST'], pattern: /^api\/landings\/[a-z0-9]{10}\/events$/, visitorEvent: true },
-  { methods: ['POST'], pattern: /^api\/signup-funnel\/events$/, visitorEvent: true },
-  { methods: ['GET'], pattern: /^api\/admin\/creators$/ },
-  { methods: ['GET'], pattern: new RegExp(`^api/admin/creators/${ID}$`) },
-  { methods: ['GET'], pattern: new RegExp(`^api/admin/creators/${ID}/stats$`) },
-  { methods: ['PUT'], pattern: new RegExp(`^api/admin/creators/${ID}/(suspension|banner-slot|metrics-exclusion)$`) },
-  { methods: ['PUT'], pattern: new RegExp(`^api/admin/links/${ID}/block$`) },
-  { methods: ['PUT'], pattern: new RegExp(`^api/admin/banners/${ID}/block$`) },
-  { methods: ['GET', 'POST'], pattern: /^api\/admin\/blocked-domains$/ },
-  { methods: ['DELETE'], pattern: new RegExp(`^api/admin/blocked-domains/${ID}$`) },
-  // 광고 배너 목록 `GET`은 서버 렌더만 부르므로 넣지 않습니다(설계 docs/specs/crelink-ad-banner.md `권한·보안`).
-  { methods: ['POST'], pattern: /^api\/admin\/ad-banners$/ },
-  { methods: ['PUT'], pattern: /^api\/admin\/ad-banners\/order$/ },
-  { methods: ['PATCH'], pattern: new RegExp(`^api/admin/ad-banners/${ID}$`) },
-  { methods: ['PUT'], pattern: new RegExp(`^api/admin/ad-banners/${ID}/end$`) },
-  { methods: ['GET', 'POST'], pattern: new RegExp(`^api/landings/${ID}/guestbook$`) },
-  { methods: ['DELETE'], pattern: new RegExp(`^api/guestbook/${ID}$`) },
-  { methods: ['PUT'], pattern: new RegExp(`^api/guestbook/${ID}/hidden$`) },
-  // AI 운영자(설계 docs/specs/crelink-ai-operator.md `화면 상태와 API 대응`). 조회 GET은 서버 렌더만 부르므로 넣지 않습니다.
-  { methods: ['PUT'], pattern: /^api\/admin\/ai-operator\/pause$/ },
-  { methods: ['PUT'], pattern: new RegExp(`^api/admin/ai-operator/tokens/${ID}/revoke$`) },
-];
-
 /** 상태 변경 요청은 같은 출처에서 온 것만 받습니다. Origin이 없거나 요청 호스트와 다르면 거부합니다. */
 function isSameOrigin(request: NextRequest): boolean {
   const origin = request.headers.get('origin');
@@ -87,7 +34,9 @@ function isSameOrigin(request: NextRequest): boolean {
 
 async function forward(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const path = (await context.params).path.map(encodeURIComponent).join('/');
-  const rule = rules.find((candidate) => candidate.methods.includes(request.method) && candidate.pattern.test(path));
+  const rule = backendRules.find(
+    (candidate) => candidate.methods.includes(request.method) && candidate.pattern.test(path),
+  );
   if (!rule) return proxyErrorResponse('route_not_allowed');
   const mutating = request.method !== 'GET' && request.method !== 'HEAD';
   if (mutating && !isSameOrigin(request)) return proxyErrorResponse('forbidden');
@@ -96,6 +45,7 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
   const target = new URL(`${apiOrigin}/${path}`);
   request.nextUrl.searchParams.forEach((value, key) => target.searchParams.append(key, value));
   const headers = apiRequestHeaders({ Accept: request.headers.get('accept') ?? 'application/json' });
+  forwardPageHeader(request.headers, headers);
   const session = request.cookies.get(COOKIE_NAMES.session)?.value;
   if (session && !rule.visitorEvent) headers.set('Cookie', `${COOKIE_NAMES.session}=${session}`);
   if (rule.signupInAppKind) {

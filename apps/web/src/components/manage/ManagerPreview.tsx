@@ -10,6 +10,7 @@ import { CopyButton } from '../CopyButton';
 import { Landing } from '../landing/Landing';
 import type { LandingEditControl } from '../landing/LandingEdit';
 import type { LandingTab } from '../landing/LandingTabs';
+import { isPageOwner } from '../../lib/api/page-context';
 import { AddressBar } from './AddressBar';
 import { CopyResultLine, lockIcon, openIcon, pencilIcon } from './AddressParts';
 import { useManager } from './ManagerContext';
@@ -98,15 +99,17 @@ export function NarrowBar({
         buttonRef={copyRef}
       />
       {/* 연필과 자물쇠는 같은 버튼이어야 저장 뒤 시트를 닫을 때 초점이 돌아갈 곳이 남습니다. */}
-      <button
-        ref={sheetButtonRef}
-        type="button"
-        className="secondary icon-only"
-        aria-label={locked ? '주소 변경 잠김, 다음 변경 가능일 보기' : '주소 변경'}
-        onClick={() => setSheetOpen(true)}
-      >
-        {locked ? lockIcon : pencilIcon}
-      </button>
+      {isPageOwner(state.pageAccess) ? (
+        <button
+          ref={sheetButtonRef}
+          type="button"
+          className="secondary icon-only"
+          aria-label={locked ? '주소 변경 잠김, 다음 변경 가능일 보기' : '주소 변경'}
+          onClick={() => setSheetOpen(true)}
+        >
+          {locked ? lockIcon : pencilIcon}
+        </button>
+      ) : null}
       <a
         className="secondary icon-only"
         href={landing.url}
@@ -141,7 +144,7 @@ export function NarrowBar({
           </div>
         ) : null}
       </div>
-      {sheetOpen ? (
+      {sheetOpen && isPageOwner(state.pageAccess) ? (
         <SlugSheet
           onClose={() => {
             setSheetOpen(false);

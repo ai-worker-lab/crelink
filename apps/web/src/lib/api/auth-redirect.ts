@@ -34,7 +34,7 @@ export const AUTH_RETURN_CONTINUE_PATH = '/auth/return/go';
 
 /** `LOGIN_RETURN_TO_PATTERN`(`/p/{publicId}`와 선택 `#guestbook`)에 맞는 값만 돌려줍니다(열린 리디렉트 방지). */
 export function validReturnTo(value: string | null | undefined): string | null {
-  return value && LOGIN_RETURN_TO_PATTERN.test(value) ? value : null;
+  return value && (value === '/invite' || LOGIN_RETURN_TO_PATTERN.test(value)) ? value : null;
 }
 
 /**
