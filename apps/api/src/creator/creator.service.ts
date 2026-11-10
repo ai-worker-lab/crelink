@@ -191,15 +191,17 @@ export class CreatorService {
     return { totalMax: CRELINK_LIMITS.totalLinks, totalUsed: result.rows[0].total };
   }
 
-  /** 광고 블록 스위치 두 개(R20 ⑩): 플랫폼(`platform_settings`, 1행)과 이 계정(`users.ad_block_enabled`). */
-  async adBlock(db: Queryable, userId: string): Promise<CreatorAdBlockState> {
-    const result = await db.query<CreatorAdBlockState>(
-      `SELECT coalesce((SELECT ad_block_enabled FROM platform_settings), false) AS "platformEnabled",
-              ad_block_enabled AS enabled
-       FROM users WHERE id = $1`,
-      [userId],
+  /** 광고 블록과 DM 가용 여부는 기존 플랫폼 설정 조회 한 번으로 읽습니다. */
+  private async landingSettings(db: Queryable, userId: string, viewerIsOperator: boolean) {
+    const result = await db.query<CreatorAdBlockState & { instagramDmAvailable: boolean }>(
+      `SELECT coalesce(s.ad_block_enabled, false) AS "platformEnabled", u.ad_block_enabled AS enabled,
+              coalesce(s.instagram_dm_audience = 'everyone' OR
+                (s.instagram_dm_audience = 'operators' AND $2::boolean), false) AS "instagramDmAvailable"
+       FROM users u LEFT JOIN platform_settings s ON true WHERE u.id = $1`,
+      [userId, viewerIsOperator],
     );
-    return result.rows[0];
+    const { instagramDmAvailable, ...adBlock } = result.rows[0];
+    return { adBlock, instagramDmAvailable: this.config.instagram !== null && instagramDmAvailable };
   }
 
   /** 링크 호스트가 차단 도메인이거나 그 하위 도메인이면 차단 도메인을, 아니면 null. */
@@ -346,7 +348,7 @@ export class CreatorService {
   }
 
   /** `GET /api/me/landing` 응답. */
-  async landingState(userId: string): Promise<CreatorLandingState> {
+  async landingState(userId: string, viewerIsOperator = false): Promise<CreatorLandingState> {
     const db = this.database.pool;
     const landing = await db.query<{
       id: string;
@@ -362,7 +364,7 @@ export class CreatorService {
       [userId],
     );
     const row = landing.rows[0];
-    const [shortLink, links, socials, portfolio, limits, slot, adBanners, banners, bannerLimits, adBlock] =
+    const [shortLink, links, socials, portfolio, limits, slot, adBanners, banners, bannerLimits, settings] =
       await Promise.all([
         this.shortLink(db, userId),
         this.links(db, userId),
@@ -373,7 +375,7 @@ export class CreatorService {
         this.liveAdBanners(db),
         this.creatorBanners(db, row.id),
         this.bannerLimits(db, row.id),
-        this.adBlock(db, userId),
+        this.landingSettings(db, userId, viewerIsOperator),
       ]);
     return {
       landing: {
@@ -396,7 +398,7 @@ export class CreatorService {
       adBanners: adBanners.map((banner) => this.publicBannerView(banner, banner.url)),
       banners,
       bannerLimits,
-      adBlock,
+      ...settings,
     };
   }
 }

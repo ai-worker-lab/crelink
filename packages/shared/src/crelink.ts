@@ -305,6 +305,7 @@ export type ListDensity = 8 | 10 | 12;
 
 /** `GET /api/me/landing` 응답. 편집 화면 전체 상태입니다. */
 export interface CreatorLandingState {
+  instagramDmAvailable: boolean;
   pageAccess?: PageAccess;
   landing: {
     publicId: string;
