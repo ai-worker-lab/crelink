@@ -16,9 +16,9 @@ BFF 헤더 전달과 페이지 전환, 초대 수락, 공동 관리자 화면을
 ## 수용 기준
 
 - [x] 관리 화면의 모든 API 호출이 대상 페이지 헤더를 보내고 BFF가 형식 검증 후 전달합니다.
-- [ ] 공유 화면의 저장이 개인 페이지를 바꾸지 않음을 BFF를 통과하는 시험으로 확인합니다.
-- [ ] 페이지 전환, 초대 수락, 공동 관리자 메뉴, 편집자 숨김, 처리방침이 설계와 같습니다.
-- [ ] `pnpm verify`가 통과합니다.
+- [x] 공유 화면의 저장이 개인 페이지를 바꾸지 않음을 BFF를 통과하는 시험으로 확인합니다.
+- [x] 페이지 전환, 초대 수락, 공동 관리자 메뉴, 편집자 숨김, 처리방침이 설계와 같습니다.
+- [x] `pnpm verify`가 통과합니다.
 
 ## 범위
 
@@ -45,3 +45,4 @@ BFF 헤더 전달과 페이지 전환, 초대 수락, 공동 관리자 화면을
 - 2026-11-10: 추가 시험은 pnpm --filter @crelink/web exec node --test src/lib/api/shared-pages.spec.ts 종료 0(11/11 통과). 실제 BFF route를 fetch 대역과 실행해 일반·multipart 헤더/본문, 허용 메서드, browserApi 경로/업로드, 서버 헤더와 계정 조회 제외, 토큰 제거/복귀/수락 POST/오류, 광고 스위치 렌더를 확인했습니다. 전체 웹 시험의 localhost 필요 기존 2개는 샌드박스의 listen EPERM으로 실패하며 기존 시험은 변경하지 않았습니다.
 - 2026-11-10: 실제 두 계정에서 BFF 경유 저장이 개인 페이지를 바꾸지 않는지, 초대·멤버 해제·비밀글·통계의 실제 API 연결, 1280px/390px 브라우저·초점·콘솔은 미확인입니다. localhost 제약에 따라 DB API 시험·pnpm smoke·실제 서버 접속은 미실행입니다. pnpm verify 전체와 next build도 미실행입니다. 수용 기준 중 통합 동작과 전체 verify는 확인하지 않아 체크하지 않았습니다.
 - 2026-11-10: 최종 pnpm --filter @crelink/web test 종료 1(121개 중 119 통과, 기존 localhost 시험 2개 EPERM 실패). pnpm verify --fast 재실행 종료 0(6/6 단계 통과), pnpm work:scope 0244 --base work/0243-shared-pages-api 종료 0(변경 파일 24개 소유 범위 통과), git diff --check 종료 0입니다.
+- 2026-11-10: CEO 재검증과 독립 QA. 샌드박스 밖에서 `pnpm verify` 8단계 통과. 독립 QA가 BFF를 통과한 요청 107건과 ego-browser 화면으로 저장 격리, 권한, 초대, 처리 흐름을 확인했고 재현 가능한 결함은 없었습니다. `pnpm smoke`는 이 맥에 Playwright Chromium이 없어 실행하지 못해 GitHub CI 수동 실행으로 대신합니다.
