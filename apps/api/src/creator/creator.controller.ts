@@ -1,3 +1,5 @@
+import { CurrentPage, PageAccessGuard, PageOwnerOnly } from '../pages/page-access.guard';
+import { PageContext } from '@crelink/shared';
 import {
   Body,
   Controller,
@@ -17,12 +19,11 @@ import {
   LinkView,
   parseSignupContextHeader,
   PortfolioItemView,
-  SessionUser,
   SIGNUP_CONTEXT_HEADER,
   SlugAvailabilityResponse,
   SocialLinkView,
 } from '@crelink/shared';
-import { CurrentUser, SessionGuard } from '../auth/session.guard';
+import { SessionGuard } from '../auth/session.guard';
 import { CreatorService } from './creator.service';
 import { LinksService } from './links.service';
 import { ProfileService } from './profile.service';
@@ -30,7 +31,7 @@ import { SlugService } from './slug.service';
 import { bodyObject } from '../common/input';
 
 @Controller('me')
-@UseGuards(SessionGuard)
+@UseGuards(SessionGuard, PageAccessGuard)
 export class CreatorController {
   constructor(
     private readonly creator: CreatorService,
@@ -39,94 +40,109 @@ export class CreatorController {
   ) {}
 
   @Get('landing')
-  landing(@CurrentUser() user: SessionUser): Promise<CreatorLandingState> {
-    return this.creator.landingState(user.id);
+  async landing(@CurrentPage() page: PageContext): Promise<CreatorLandingState> {
+    return {
+      ...(await this.creator.landingState(page.ownerUserId)),
+      pageAccess: { role: page.role, shared: page.shared },
+    };
   }
 
   @Patch('landing')
-  async updateLanding(@CurrentUser() user: SessionUser, @Body() body: unknown): Promise<CreatorLandingState> {
-    await this.profile.updateLanding(user.id, body);
-    return this.creator.landingState(user.id);
+  async updateLanding(@CurrentPage() page: PageContext, @Body() body: unknown): Promise<CreatorLandingState> {
+    await this.profile.updateLanding(page.ownerUserId, body);
+    return {
+      ...(await this.creator.landingState(page.ownerUserId)),
+      pageAccess: { role: page.role, shared: page.shared },
+    };
   }
 
   /** 광고 블록 켜고 끄기(R20 ⑩). 400 `validation_failed`, 플랫폼 스위치가 꺼져 있으면 409 `ad_block_unavailable`. */
   @Put('ad-block')
-  async setAdBlock(@CurrentUser() user: SessionUser, @Body() body: unknown): Promise<CreatorLandingState> {
-    await this.profile.setAdBlock(user.id, body);
-    return this.creator.landingState(user.id);
+  @PageOwnerOnly()
+  async setAdBlock(@CurrentPage() page: PageContext, @Body() body: unknown): Promise<CreatorLandingState> {
+    await this.profile.setAdBlock(page.ownerUserId, body);
+    return {
+      ...(await this.creator.landingState(page.ownerUserId)),
+      pageAccess: { role: page.role, shared: page.shared },
+    };
   }
 
   @Get('short-link/availability')
-  availability(@CurrentUser() user: SessionUser, @Query('slug') slug: unknown): Promise<SlugAvailabilityResponse> {
-    return this.slugs.availability(user.id, slug);
+  @PageOwnerOnly()
+  availability(@CurrentPage() page: PageContext, @Query('slug') slug: unknown): Promise<SlugAvailabilityResponse> {
+    return this.slugs.availability(page.ownerUserId, slug);
   }
 
   @Put('short-link/slug')
-  async changeSlug(@CurrentUser() user: SessionUser, @Body() body: unknown): Promise<CreatorLandingState> {
-    await this.slugs.change(user.id, bodyObject(body).slug);
-    return this.creator.landingState(user.id);
+  @PageOwnerOnly()
+  async changeSlug(@CurrentPage() page: PageContext, @Body() body: unknown): Promise<CreatorLandingState> {
+    await this.slugs.change(page.ownerUserId, bodyObject(body).slug);
+    return {
+      ...(await this.creator.landingState(page.ownerUserId)),
+      pageAccess: { role: page.role, shared: page.shared },
+    };
   }
 
   @Put('socials')
-  replaceSocials(@CurrentUser() user: SessionUser, @Body() body: unknown): Promise<SocialLinkView[]> {
-    return this.profile.replaceSocials(user.id, body);
+  replaceSocials(@CurrentPage() page: PageContext, @Body() body: unknown): Promise<SocialLinkView[]> {
+    return this.profile.replaceSocials(page.ownerUserId, body);
   }
 }
 
 @Controller('me/links')
-@UseGuards(SessionGuard)
+@UseGuards(SessionGuard, PageAccessGuard)
 export class LinksController {
   constructor(private readonly links: LinksService) {}
 
   @Post()
   create(
-    @CurrentUser() user: SessionUser,
+    @CurrentPage() page: PageContext,
     @Body() body: unknown,
     @Headers(SIGNUP_CONTEXT_HEADER) signupContext: unknown,
   ): Promise<LinkView> {
-    return this.links.create(user.id, body, parseSignupContextHeader(signupContext).inAppKind);
+    return this.links.create(page.ownerUserId, body, parseSignupContextHeader(signupContext).inAppKind);
   }
 
   @Put('order')
-  reorder(@CurrentUser() user: SessionUser, @Body() body: unknown): Promise<LinkView[]> {
-    return this.links.reorder(user.id, body);
+  reorder(@CurrentPage() page: PageContext, @Body() body: unknown): Promise<LinkView[]> {
+    return this.links.reorder(page.ownerUserId, body);
   }
 
   @Patch(':id')
-  update(@CurrentUser() user: SessionUser, @Param('id') id: string, @Body() body: unknown): Promise<LinkView> {
-    return this.links.update(user.id, id, body);
+  update(@CurrentPage() page: PageContext, @Param('id') id: string, @Body() body: unknown): Promise<LinkView> {
+    return this.links.update(page.ownerUserId, id, body);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@CurrentUser() user: SessionUser, @Param('id') id: string): Promise<void> {
-    return this.links.remove(user.id, id);
+  remove(@CurrentPage() page: PageContext, @Param('id') id: string): Promise<void> {
+    return this.links.remove(page.ownerUserId, id);
   }
 }
 
 @Controller('me/portfolio')
-@UseGuards(SessionGuard)
+@UseGuards(SessionGuard, PageAccessGuard)
 export class PortfolioController {
   constructor(private readonly profile: ProfileService) {}
 
   @Post()
-  create(@CurrentUser() user: SessionUser, @Body() body: unknown): Promise<PortfolioItemView> {
-    return this.profile.createPortfolioItem(user.id, body);
+  create(@CurrentPage() page: PageContext, @Body() body: unknown): Promise<PortfolioItemView> {
+    return this.profile.createPortfolioItem(page.ownerUserId, body);
   }
 
   @Put('order')
-  reorder(@CurrentUser() user: SessionUser, @Body() body: unknown): Promise<PortfolioItemView[]> {
-    return this.profile.reorderPortfolio(user.id, body);
+  reorder(@CurrentPage() page: PageContext, @Body() body: unknown): Promise<PortfolioItemView[]> {
+    return this.profile.reorderPortfolio(page.ownerUserId, body);
   }
 
   @Patch(':id')
-  update(@CurrentUser() user: SessionUser, @Param('id') id: string, @Body() body: unknown): Promise<PortfolioItemView> {
-    return this.profile.updatePortfolioItem(user.id, id, body);
+  update(@CurrentPage() page: PageContext, @Param('id') id: string, @Body() body: unknown): Promise<PortfolioItemView> {
+    return this.profile.updatePortfolioItem(page.ownerUserId, id, body);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@CurrentUser() user: SessionUser, @Param('id') id: string): Promise<void> {
-    return this.profile.deletePortfolioItem(user.id, id);
+  remove(@CurrentPage() page: PageContext, @Param('id') id: string): Promise<void> {
+    return this.profile.deletePortfolioItem(page.ownerUserId, id);
   }
 }

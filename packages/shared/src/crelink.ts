@@ -1,6 +1,6 @@
 /**
  * 크리링 MVP API 계약. 근거: docs/specs/crelink-mvp.md (API 계약 초안, 데이터 모델).
- * 오류 응답은 모두 `ApiError { code, message }`이며 code는 `CrelinkErrorCode` 중 하나입니다.
+ * 오류 응답은 모두 `ApiError { code, message }`이며 code는 `CrelinkApiErrorCode` 중 하나입니다.
  * 날짜·시각은 ISO 8601 문자열, 날짜만 쓰는 값은 `YYYY-MM-DD`입니다.
  */
 
@@ -84,6 +84,20 @@ export const SOCIAL_PLATFORMS: readonly SocialPlatform[] = [
 ];
 
 export type UserRole = 'creator' | 'operator';
+
+/** 공유 페이지 오류. 기존 소비자의 완전 매핑을 유지하며 후속 웹 작업에서 별도로 처리합니다. */
+export type PageErrorCode =
+  | 'page_not_found'
+  | 'page_suspended'
+  | 'page_owner_only'
+  | 'page_member_limit'
+  | 'member_not_found'
+  | 'invite_invalid'
+  | 'invite_own_page'
+  | 'already_member';
+
+/** API에서 반환하는 전체 업무 오류 코드입니다. */
+export type CrelinkApiErrorCode = CrelinkErrorCode | PageErrorCode;
 
 export type CrelinkErrorCode =
   | 'validation_failed'
@@ -273,6 +287,7 @@ export type ListDensity = 8 | 10 | 12;
 
 /** `GET /api/me/landing` 응답. 편집 화면 전체 상태입니다. */
 export interface CreatorLandingState {
+  pageAccess?: PageAccess;
   landing: {
     publicId: string;
     /** 본 도메인 랜딩 주소. 예: `http://127.0.0.1:5193/p/k3j9x0a1b2`. */
@@ -999,7 +1014,56 @@ export interface SetMetricsExclusionRequest {
 /** 단축 주소 리디렉트가 랜딩 주소에 붙이는 통과 표시 쿼리 이름. 웹은 이 표시가 유효할 때만 외부에서 온 요청을 그대로 그립니다(PRD R7). */
 export const LANDING_PASS_PARAM = 'pass';
 
+export const PAGE_HEADER = 'X-Crelink-Page';
+export interface PageAccess {
+  role: 'owner' | 'editor';
+  shared: boolean;
+}
+export interface PageContext extends PageAccess {
+  ownerUserId: string;
+  publicId: string | null;
+}
+export interface ManagedPage {
+  publicId: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  access: 'personal' | 'shared';
+  role: 'owner' | 'editor';
+  hasMembers: boolean;
+}
+export interface ManagedPagesResponse {
+  pages: ManagedPage[];
+}
+export interface PageInviteResponse {
+  token: string;
+  expiresAt: string;
+}
+export interface PageInviteRequest {
+  token: string;
+}
+export interface PageInvitePreview {
+  publicId: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  expiresAt: string;
+}
+export interface PageInviteAccepted {
+  publicId: string;
+}
+export interface PageMembersResponse {
+  members: { userId: string; email: string; createdAt: string }[];
+  invite: { expiresAt: string } | null;
+  limit: 5;
+}
+
 export const CRELINK_API_PATHS = {
+  pages: '/api/me/pages',
+  pageInvites: '/api/me/page-invites',
+  pageMembers: '/api/me/page-members',
+  pageMember: (userId: string) => `/api/me/page-members/${encodeURIComponent(userId)}`,
+  leavePage: '/api/me/page-members/me',
+  pageInvitePreview: '/api/page-invites/preview',
+  pageInviteAccept: '/api/page-invites/accept',
   landingEvents: (publicId: string) => `/api/landings/${encodeURIComponent(publicId)}/events`,
   signupFunnelEvents: '/api/signup-funnel/events',
   authGoogleStart: '/api/auth/google/start',

@@ -27,6 +27,41 @@ describe('runMigrations', () => {
     rmSync(directory, { recursive: true, force: true });
   });
 
+  it('0014는 멤버 중복·자기 멤버·토큰 해시 형식과 사용자 삭제 연쇄를 지킨다', async () => {
+    const source = join(__dirname, '../migrations');
+    for (const name of readdirSync(source)
+      .filter((name) => name.endsWith('.sql'))
+      .sort()) {
+      copyFileSync(join(source, name), join(directory, name));
+    }
+    await runMigrations(pool, directory);
+    await runMigrations(pool, directory);
+    expect(await versions()).toContain('0014_shared_pages');
+    const users = await pool.query(
+      "INSERT INTO users(email) VALUES('owner@example.com'),('member@example.com') RETURNING id",
+    );
+    const [owner, member] = users.rows.map((row) => row.id);
+    await pool.query('INSERT INTO page_members(page_user_id,member_user_id) VALUES($1,$2)', [owner, member]);
+    await expect(
+      pool.query('INSERT INTO page_members(page_user_id,member_user_id) VALUES($1,$2)', [owner, member]),
+    ).rejects.toThrow(/page_members_pkey/);
+    await expect(
+      pool.query('INSERT INTO page_members(page_user_id,member_user_id) VALUES($1,$1)', [owner]),
+    ).rejects.toThrow(/page_members_check/);
+    await expect(
+      pool.query("INSERT INTO page_invites(page_user_id,token_hash,expires_at) VALUES($1,'raw-token',now())", [owner]),
+    ).rejects.toThrow(/token_hash_check/);
+    await pool.query(
+      "INSERT INTO page_invites(page_user_id,token_hash,expires_at,used_by_user_id) VALUES($1,repeat('a',64),now(),$2)",
+      [owner, member],
+    );
+    await pool.query('DELETE FROM users WHERE id=$1', [member]);
+    expect((await pool.query('SELECT 1 FROM page_members')).rowCount).toBe(0);
+    expect((await pool.query('SELECT used_by_user_id FROM page_invites')).rows[0].used_by_user_id).toBeNull();
+    await pool.query('DELETE FROM users WHERE id=$1', [owner]);
+    expect((await pool.query('SELECT 1 FROM page_invites')).rowCount).toBe(0);
+  });
+
   it('디렉터리가 없으면 기록 테이블만 만들고 아무것도 적용하지 않는다', async () => {
     await runMigrations(pool, join(directory, 'missing'));
     expect(await versions()).toEqual([]);

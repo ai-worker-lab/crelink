@@ -157,6 +157,7 @@ export class RetentionService implements OnApplicationBootstrap, OnModuleDestroy
         STATS_TIME_ZONE,
       ]);
       await client.query("DELETE FROM signup_funnel_oauth_contexts WHERE created_at < now() - interval '15 minutes'");
+      await client.query("DELETE FROM page_invites WHERE coalesce(used_at, expires_at) < now() - interval '7 days'");
       const visits = await client.query('DELETE FROM visits WHERE occurred_at < $1', [boundary.rows[0].boundary]);
       const clicks = await client.query('DELETE FROM link_clicks WHERE occurred_at < $1', [boundary.rows[0].boundary]);
       const bannerClicks = await client.query('DELETE FROM creator_banner_clicks WHERE occurred_at < $1', [

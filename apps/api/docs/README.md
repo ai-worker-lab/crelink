@@ -324,3 +324,14 @@ pnpm --filter @crelink/api --silent ai-operator list-tokens   # 또는 node apps
 기존 본인 랜딩 `PATCH /api/me/landing`의 `linkLayout`은 `list`/`grid`만 허용합니다. migration0011이 기존 랜딩을 기본 list로 유지하며 편집·공개 조회에도 반환합니다. 이전 응답에 필드가 없으면 list로 표시하고 저장 응답이 요청과 일치할 때만 성공 안내합니다. rollback 때 컬럼과 값을 삭제하지 않습니다. [0198](../../../docs/specs/link-grid-layout.md).
 
 같은 PATCH의 `listDensity`는 JSON 숫자8·10·12만 허용하며, 생략하면 현재 값을 보존합니다. null·문자열·불리언·배열·객체·다른 숫자는400 `validation_failed`입니다. migration `0012_list_density.sql`은 `smallint NOT NULL DEFAULT 8`과 CHECK로 기존 데이터를8개형으로 확장합니다. 편집 상태와 공개 조회는 항상 숫자를 반환하며 이전 API 응답에 필드가 없으면 소비자는8로 표시합니다. list/grid 전환·프로필·링크·Instabio 가져오기는 밀도를 바꾸지 않습니다. 이전 서버로 rollback할 때도 추가 컬럼과 저장값을 남깁니다. 구현 원본은 `src/creator/profile.service.ts`·`creator.service.ts`·`public-landing.controller.ts`, 계약은 `packages/shared/src/crelink.ts`입니다. [리스트 밀도 설계](../../../docs/specs/list-density.md).
+
+
+## 공유관리 페이지
+
+기준 설계는 [공유관리 페이지](../../../docs/specs/shared-pages.md)이며 실행 원본은 `src/pages/`, `migrations/0014_shared_pages.sql`, `packages/shared/src/crelink.ts`입니다.
+
+- `X-Crelink-Page`는 대상 랜딩의 10자리 `publicId`입니다. 편집 API의 `SessionGuard` 다음 `PageAccessGuard`가 매 요청 멤버십·대상 정지를 확인합니다. 헤더가 없으면 DB 조회 없이 기존 본인 대상을 유지합니다. 인증 사용자와 행위자는 바꾸지 않습니다.
+- 편집 API(랜딩·SNS·링크·포트폴리오·배너·Instabio 가져오기·파일·통계)는 멤버에게 허용합니다. 주소·광고 블록·초대 생성/취소·멤버 목록/해제는 소유자 전용입니다. 인증·본인 계정 조회·관리자·AI 운영자·공개 API에는 페이지 가드를 적용하지 않습니다. 방명록은 서비스가 별도로 소유자/멤버를 판정하고 작성자는 로그인한 사람으로 저장합니다.
+- `GET /api/me/pages`는 본인 페이지부터 반환하며 정지된 대상은 제외합니다. `POST`/`DELETE /api/me/page-invites`, `GET /api/me/page-members`, `DELETE /api/me/page-members/:userId`가 소유자 관리 경로입니다. 편집자는 `DELETE /api/me/page-members/me`로 나갑니다.
+- 로그인 후 `POST /api/page-invites/preview`·`accept`에 `{ token }`을 보냅니다. 수락은 사람만 가능합니다. 토큰은 발급 응답에서만 반환하며 32바이트 난수의 SHA-256 hex만 DB에 저장합니다. 유효기간 72시간·1회 사용·멤버 5명 제한입니다. 재발급은 미사용 초대를 교체하고 보존 작업은 만료/사용 후 7일 지난 초대를 지웁니다.
+- 웹의 헤더 전달과 BFF 허용 경로 추가는 후속 작업입니다. API 시험은 `test/page-members.e2e-spec.ts`에서 실제 PostgreSQL과 HTTP 요청으로 확인합니다.

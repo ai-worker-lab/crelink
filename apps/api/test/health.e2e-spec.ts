@@ -99,6 +99,8 @@ describe('API 기동과 health', () => {
         'link_clicks',
         'links',
         'operator_actions',
+        'page_invites',
+        'page_members',
         'platform_settings',
         'portfolio_items',
         'schema_migrations',
@@ -129,6 +131,7 @@ describe('API 기동과 health', () => {
         { version: '0011_link_layout' },
         { version: '0012_list_density' },
         { version: '0013_signup_funnel' },
+        { version: '0014_shared_pages' },
       ]);
     } finally {
       await client.end();
