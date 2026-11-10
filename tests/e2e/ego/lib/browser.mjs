@@ -315,6 +315,8 @@ export class ConsoleWatch {
       } else if (event.method === 'Log.entryAdded' && params.entry?.level === 'error') {
         const { text, url } = params.entry;
         if (text.startsWith('Failed to load resource') && url && !this.isLocal(url)) continue;
+        // 실제 브라우저가 스스로 요청하는 파비콘입니다(Playwright는 요청하지 않음). 앱 코드의 요청이 아니고 사이트에 파비콘이 아직 없습니다.
+        if (text.startsWith('Failed to load resource') && url && new URL(url).pathname === '/favicon.ico') continue;
         problems.push(`${text} ${url ?? ''}`.trim());
       }
     }

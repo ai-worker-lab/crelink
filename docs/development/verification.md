@@ -44,17 +44,16 @@
 
 ## CI
 
-[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)이 `main` 대상 PR에서만 실행합니다. main push(PR 머지)에서는 다시 돌리지 않습니다(0060). 대신 GitHub ruleset `main 보호`(0061)가 머지를 막습니다: main 직접 push·force push·삭제 금지, PR 필수(squash만, 승인 0), 필수 검사 `CI 통과`, PR 브랜치가 최신 `main`을 포함해야 함(뒤처지면 PR의 `Update branch`). 그래서 PR이 검사한 내용과 머지 결과가 같습니다. 우회는 저장소 admin의 PR 머지만 가능하고 Actions가 돌지 않을 때만 씁니다(아래 CD 절). 설정 값은 `gh api repos/ai-worker-lab/crelink/rulesets`로 봅니다. 먼저 `changes` job이 바뀐 파일(병합 커밋의 첫 부모와 비교)이 문서뿐인지 판정합니다. 문서는 `docs/`·`design/` 아래 파일과 `*.md`이고, `RELEASES.md`는 웹 `/docs/releases`가 빌드 때 읽으므로 코드로 봅니다. 문서뿐이면 `docs` job만, 아니면(비교할 수 없을 때 포함) `check`·`smoke`·이미지 빌드를 실행합니다.
+PR마다 GitHub Actions에서 도는 CI는 없습니다(0237, [ADR 0016](../adr/0016-devoffice-takeover.md) 결정 5). 머지 전 검사는 [로컬 CI](#로컬-ci)의 `pnpm ci:local --report`가 맡습니다. GitHub ruleset `main 보호`(0061)가 머지를 막습니다: main 직접 push·force push·삭제 금지, PR 필수(squash만, 승인 0), 필수 검사 `CI 통과`, PR 브랜치가 최신 `main`을 포함해야 함. `CI 통과`는 `--report`가 기록하는 commit status로 충족합니다. 어느 앱에서 온 status인지는 묶지 않으므로 쓰기 권한자는 검증 없이도 기록할 수 있습니다(ADR 0016의 한계).
+
+[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)은 수동 실행 전용입니다(`gh workflow run CI --ref <브랜치>`). 아래 변경은 머지 전에 한 번 실행합니다. 로컬 CI에 없는 E2E가 이 흐름을 지키기 때문입니다: 로그인·가입, 권한·개인정보, 관리 화면·공개 랜딩의 작성 흐름, 의존성 major 갱신, WebKit·Firefox나 amd64에서만 나는 문제가 의심되는 변경. 성공하면 같은 이름의 `CI 통과`가 남습니다.
 
 | job | 내용 |
 | --- | --- |
-| `변경 종류`(`changes`) | 전체 이력을 받아 위 기준으로 `code` 출력(`true`·`false`)을 정합니다. 판정 근거 파일 목록을 로그에 남깁니다. |
-| `docs` | 문서만 바뀌었을 때 `.nvmrc` Node로 `pnpm install --frozen-lockfile` 후 `pnpm verify --docs --keep-going`. |
-| `check` | 코드가 바뀌었을 때 지원 Node.js(`matrix.node`: 기준 LTS 24와 다음 LTS 후보 26)마다 `pnpm install --frozen-lockfile` 후 `pnpm verify --keep-going`. PostgreSQL 17 서비스 컨테이너에 `TEST_DATABASE_URL`로 연결합니다. 한 버전이 실패해도 나머지 버전 결과를 끝까지 봅니다. |
-| `smoke` | 고정 `ubuntu-24.04`·`.nvmrc` Node·lockfile Playwright에서 공용 패키지/API/웹을 빌드하고 localhost PostgreSQL 서비스와 API/웹을 시작합니다. 인스턴스 주소를 job 환경에 넣은 뒤 smoke → 핵심 사용자 Chromium → personas → analytics-responsive 3엔진 → link-layout 3엔진을 같은 DB에서 순서대로 실행합니다. 실패는 job과 필수 `CI 통과`를 실패시키며 `always()` artifact에 suite별 HTML/JSON·PNG·trace와 API/웹 로그를14일 보관합니다. |
-| `이미지 빌드 api`·`이미지 빌드 web` | 운영 이미지(`apps/api/Dockerfile`, `apps/web/Dockerfile`)가 `linux/amd64`로 빌드되는지 확인합니다(buildx, gha 캐시). 푸시하지 않습니다. 배포 대상 플랫폼 빌드는 `deploy.yml`이 합니다. |
-| `work scope` | `work/NNNN-*` 브랜치의 PR에서만 전체 이력을 받아 `pnpm work:scope --base origin/<기준 브랜치>`로 변경 파일이 티켓 역할의 소유 경로 안에 있는지 검사합니다. |
-| `CI 통과` | 위 job이 모두 끝난 뒤 항상 돌아, 하나라도 실패·취소면 실패합니다(건너뜀은 통과). ruleset의 필수 검사는 이 job 하나입니다. 개별 job을 필수로 걸면 문서만 바뀐 PR에서 건너뛴 matrix job이 치환되지 않은 이름(`check (Node ${{ matrix.node }})`)으로 보고되어 필수 이름이 오지 않기 때문입니다. job을 추가하면 이 job의 `needs`에도 넣습니다. |
+| `check` | 지원 Node.js(`matrix.node`: 24, 26)마다 `pnpm verify --keep-going`. PostgreSQL 17 서비스 컨테이너를 씁니다. |
+| `smoke` | 고정 `ubuntu-24.04`·lockfile Playwright에서 smoke → 핵심 사용자 Chromium → personas → analytics-responsive 3엔진 → link-layout 3엔진을 순서대로 실행합니다. 실패 시 artifact에 suite별 HTML/JSON·PNG·trace와 API/웹 로그를 남깁니다. |
+| `이미지 빌드 api`·`이미지 빌드 web` | 운영 이미지가 `linux/amd64`로 빌드되는지 확인합니다(푸시 안 함). |
+| `CI 통과` | 위 job 중 하나라도 실패·취소면 실패합니다. |
 
 지원 Node.js 버전을 바꾸면 workflow의 `matrix.node`, `.nvmrc`, 운영 이미지 베이스(`apps/*/Dockerfile`), `apps/web/package.json`의 `engines`, README 요구사항을 함께 고칩니다. 버전 선택 기준은 [저장소 공통 정책](repository-policy.md#의존성-버전)입니다.
 
@@ -66,26 +65,26 @@
 
 ## 로컬 CI
 
-[`scripts/ci-local.mjs`](../../scripts/ci-local.mjs)의 `pnpm ci:local`이 위 CI job을 이 기기에서 재현합니다([ADR 0016](../adr/0016-devoffice-takeover.md) 결정 5). 전환 전이라 `ci.yml`과 ruleset은 그대로이고, 이 명령은 그 옆에서 같은 판정을 미리 돌려 봅니다.
+[`scripts/ci-local.mjs`](../../scripts/ci-local.mjs)의 `pnpm ci:local`이 머지 전 검사를 이 기기에서 실행합니다([ADR 0016](../adr/0016-devoffice-takeover.md) 결정 5). 머지 전에 PR 브랜치에서 `pnpm ci:local --report`를 실행합니다. Dependabot PR도 브랜치를 받아 같은 명령을 씁니다.
 
 | 판정 | 순서 |
 | --- | --- |
 | 문서만 바뀜 | `pnpm verify --docs --keep-going` → `work:scope` |
 | 코드가 바뀜(비교할 수 없을 때 포함) | `work:scope` → `make infra-up` → `pnpm verify --keep-going` → `make up` → ego-lite 시험 모음 → `apps/api`·`apps/web` 이미지 빌드(기기 고유 플랫폼, 내보내지 않음) |
 
-- **판정 기준:** CI `changes` job과 같은 규칙으로 `git diff origin/main...HEAD`와 작업 트리 변경(추적하지 않는 파일 포함)을 봅니다. 작업 트리도 보는 것은 `pnpm verify`가 작업 트리를 검사하기 때문입니다. 이름 변경은 옛 경로와 새 경로를 모두 세므로(`--no-renames`) 코드를 `docs/`로 옮긴 변경은 코드입니다. CI보다 넓게 검사하는 쪽의 차이입니다.
+- **판정 기준:** 문서만 바뀌었는지는 `git diff origin/main...HEAD`와 작업 트리 변경(추적하지 않는 파일 포함)을 봅니다. 작업 트리도 보는 것은 `pnpm verify`가 작업 트리를 검사하기 때문입니다. 이름 변경은 옛 경로와 새 경로를 모두 세므로(`--no-renames`) 코드를 `docs/`로 옮긴 변경은 코드입니다.
 - **결과:** 단계별 결과·시간을 요약합니다. CI job처럼 한 단계가 실패해도 남은 단계를 돌리고, 하나라도 실패하면 종료 코드 1입니다. `Ctrl-C`·`SIGTERM`은 진행 중인 단계를 멈추고 스택을 정리한 뒤 130·143으로 끝납니다.
 - **스택 정리:** 시작할 때 DB 컨테이너와 API·웹·앱 포트를 확인해 이 실행이 띄운 것만 내립니다. 이미 떠 있던 서비스는 다시 시작하지도 내리지도 않고 그대로 씁니다. 스택은 ego 시험 뒤 바로 내리고 이미지 빌드는 그다음에 합니다.
 - **시험 모음:** ego-lite 시험은 스크립트의 `EGO_SUITES`, 아직 옮기지 않은 검사와 Node 26은 `NOT_LOCAL`이 원본입니다. 코드 경로의 실행 요약에 `로컬 CI 미포함`으로 나옵니다. `playwright install`을 하지 않습니다.
 - **Node:** `.nvmrc`(24) 기준입니다. 다른 버전으로 실행하면 경고합니다.
 - **이미지 플랫폼:** 이미지 단계는 Docker 서버의 고유 플랫폼(Apple Silicon은 `linux/arm64`)으로 빌드해 Dockerfile·의존성 오류를 잡습니다. `linux/amd64`를 쓰지 않는 이유는 Apple Silicon의 QEMU에서 `apps/web`의 `next build`가 크래시하기 때문입니다(2026-11-10 네 번 재현, [0210](../work/orchestrator/0210-local-ci.md)). amd64 빌드는 Deploy에서 검증합니다. [`deploy.yml`](../../.github/workflows/deploy.yml)의 `배포` job은 `이미지` job이 성공(또는 건너뜀)해야 돌고 플랫폼은 [`infra/prod/targets.json`](../../infra/prod/targets.json)을 따르므로, 빌드가 실패하면 서버를 건드리지 않고 멈춥니다. 실행 요약의 `로컬 CI 미포함`에 `amd64 빌드는 Deploy에서 검증`으로 표시합니다.
-- **이미지 플랫폼의 한계:** amd64에서만 나는 빌드 실패는 머지 뒤 Deploy에서 드러납니다. 운영에는 나가지 않지만 그 사이 `main`에 고장 난 커밋이 남고, 되돌리거나 후속 PR로 고쳐야 합니다. 전환 전까지는 `ci.yml`의 `이미지 빌드` job이 PR에서 amd64도 검사합니다.
+- **이미지 플랫폼의 한계:** amd64에서만 나는 빌드 실패는 머지 뒤 Deploy에서 드러납니다. 운영에는 나가지 않지만 그 사이 `main`에 고장 난 커밋이 남고, 되돌리거나 후속 PR로 고쳐야 합니다. amd64가 걱정되는 변경은 머지 전에 `ci.yml`을 수동 실행합니다.
 
 ### commit status 기록
 
 `pnpm ci:local --report`는 모든 단계가 통과하고, 시작과 끝에 작업 트리가 깨끗하고, 실행 중 HEAD가 그대로이고, HEAD가 같은 이름의 원격 브랜치 tip일 때만 그 커밋에 commit status(`context` `CI 통과`, `state` `success`)를 `gh api`로 기록합니다. 인증은 `gh`의 현재 인증(`GH_TOKEN` 또는 `gh auth`)을 씁니다. 조건을 못 맞추거나 호출이 실패하면 종료 코드 1입니다. `--report --dry-run`은 같은 판정까지 하고 대상 SHA·`context`·호출 내용만 출력합니다. 옵션 없이 실행하면 기록하지 않습니다.
 
-전제: ruleset `main 보호`의 필수 검사 `CI 통과`는 `integration_id: 15368`(GitHub Actions)로 묶여 있고 `strict` 정책이 켜져 있습니다. 지금은 이 명령이 기록한 status가 필수 검사로 인정되지 않으므로, CI를 옮기는 전환 단계에서 ruleset을 바꿔야 합니다. `strict` 때문에 `main`보다 뒤처진 커밋은 머지할 수 없으니 브랜치를 갱신한 뒤 다시 실행합니다. HEAD가 `origin/main`을 포함하지 않으면 경고합니다. 쓰기 권한자는 검증 없이도 status를 기록할 수 있다는 한계는 ADR 0016에 적었습니다.
+ruleset `main 보호`의 필수 검사 `CI 통과`는 이 status로 충족합니다. `strict` 때문에 `main`보다 뒤처진 커밋은 머지할 수 없으니 브랜치를 갱신한 뒤 다시 실행합니다. HEAD가 `origin/main`을 포함하지 않으면 경고합니다. 쓰기 권한자는 검증 없이도 status를 기록할 수 있다는 한계는 ADR 0016에 적었습니다.
 
 ## CD(운영 배포)
 
