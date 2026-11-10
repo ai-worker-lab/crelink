@@ -14,14 +14,7 @@ export const INSTAGRAM_DM_LIMITS = {
 } as const;
 
 export type InstagramConnectionStatus = 'active' | 'messages_access_required' | 'reauth_required';
-export type InstagramDmDeliveryStatus =
-  | 'pending'
-  | 'sending'
-  | 'sent'
-  | 'failed'
-  | 'unknown'
-  | 'expired'
-  | 'cancelled';
+export type InstagramDmDeliveryStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'unknown' | 'expired' | 'cancelled';
 export type InstagramDmAudience = 'off' | 'operators' | 'everyone';
 
 /** 연결 정보. 만료 시각이 없으면 `tokenExpiresAt`은 null입니다. */
