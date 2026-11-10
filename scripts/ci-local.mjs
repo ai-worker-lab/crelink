@@ -4,8 +4,7 @@
 // 이미지는 Docker 서버의 고유 플랫폼으로 빌드해 Dockerfile·의존성 오류를 잡습니다. linux/amd64 빌드는 deploy.yml이 서버를 건드리기 전에 검증합니다.
 // 실패가 있어도 CI job처럼 남은 단계를 끝까지 돌리고 하나라도 실패하면 종료 코드 1로 끝납니다. 이 실행이 띄운 스택만 내립니다.
 // --report는 통과한 커밋에 commit status `CI 통과`를 기록합니다. gh의 현재 인증(GH_TOKEN 또는 gh auth)을 씁니다.
-// 전제: main ruleset의 필수 검사 `CI 통과`는 integration_id 15368(GitHub Actions)로 묶여 있고 strict입니다. 이 묶음을 바꾸기 전에는
-// 여기서 기록한 status가 필수 검사로 인정되지 않습니다. strict 때문에 main보다 뒤처진 커밋의 status도 머지에 쓰이지 않습니다.
+// main ruleset의 필수 검사 `CI 통과`는 이 status로 충족합니다(0237). strict라 main보다 뒤처진 커밋은 브랜치를 갱신해 다시 실행합니다.
 // 기준 문서: docs/development/verification.md#로컬-ci
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
