@@ -3,7 +3,7 @@
 - 단계: 티켓
 - 역할: api
 - 상위: 0251
-- 상태: 준비
+- 상태: 검증
 - 종류: 기능
 - 우선순위: P2 (AI 제안)
 - 작성일: 2026-11-11
@@ -34,3 +34,4 @@
 ## 진행 기록
 
 - 2026-11-11: 생성.
+- 2026-11-11: Codex Luna high 구현, Claude가 재검증(`@crelink/shared` 시험 132건 통과, 패키지 typecheck 통과). 웹 전체 typecheck는 `OperatorActions.tsx`·`api/errors.ts`의 새 값 매핑이 필요해 웹 티켓에서 해결합니다.
