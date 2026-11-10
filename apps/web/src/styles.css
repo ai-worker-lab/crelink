@@ -2810,6 +2810,10 @@ body:has(.sheet[open]) {
 .sheet-body {
   padding: var(--ds-space-20) var(--ds-space-20) 0;
 }
+/* 저장 줄이 없는 시트(요약·안내)만 마지막 내용 아래 여백을 둔다. 저장 줄은 시트 아래에 붙어 있어야 해서 여백을 주지 않는다. */
+.sheet-body:not(:has(.edit-form-actions)) {
+  padding-bottom: calc(var(--ds-space-20) + env(safe-area-inset-bottom));
+}
 .sheet-title {
   margin: 0;
   font-size: var(--ds-font-size-22);
@@ -2866,6 +2870,9 @@ body:has(.sheet[open]) {
   }
   .sheet-body {
     padding: var(--ds-space-16) var(--ds-space-16) 0;
+  }
+  .sheet-body:not(:has(.edit-form-actions)) {
+    padding-bottom: calc(var(--ds-space-16) + env(safe-area-inset-bottom));
   }
   .sheet .edit-form-actions {
     margin: 0 calc(var(--ds-space-16) * -1);

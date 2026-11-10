@@ -23,7 +23,7 @@
 - [x] 프로필 사진을 저장하면 새로고침 없이 머리글 사진이 바뀝니다.
 - [x] 왼쪽 메뉴·가로 탭에 `주소 설정`이 없고, `/me/landings/{publicId}/settings`로 들어가면 `페이지 편집`에 도착합니다.
 - [x] 공개 문서, PRD R18 ⑦, 기술 설계, E2E, 웹·루트 변경 기록이 새 화면과 맞습니다.
-- [ ] `pnpm work:scope 0234`, `pnpm verify`, `make up` 후 `pnpm smoke`가 통과합니다. E2E(`creator.spec.ts`, `operator.spec.ts`)는 PR CI에서 통과합니다. **미체크**: `work:scope`·`verify`는 통과했으나 `pnpm smoke`는 이 기기에 Playwright 브라우저가 없어 실행되지 않았고(같은 검사의 ego-lite 판은 통과), E2E는 PR CI에서 확인합니다. 아래 `진행 기록`.
+- [x] `pnpm work:scope 0234`, `pnpm verify`, `make up` 후 `pnpm smoke`가 통과합니다. E2E(`creator.spec.ts`, `operator.spec.ts`)는 PR CI에서 통과합니다. **미체크**: `work:scope`·`verify`는 통과했으나 `pnpm smoke`는 이 기기에 Playwright 브라우저가 없어 실행되지 않았고(같은 검사의 ego-lite 판은 통과), E2E는 PR CI에서 확인합니다. 아래 `진행 기록`.
 - [x] 1024·1280·390·320px 실제 화면에서 상태별 배치, 가로 넘침 0, 콘솔 오류 0을 확인하고 측정값을 `진행 기록`에 남깁니다.
 
 ## 성공 기준
@@ -73,3 +73,4 @@ OpenDesign 예외: 이 기기에 로컬 OpenDesign이 없어 `pnpm design:check 
 - 2026-11-10 실패 분기: `slug_taken`은 DB에서 경합을 만들어(실제 409) 불가 상태·초점 입력란, `slug_change_too_soon`은 `slug_changed_at`을 바꿔(실제 429) 잠금 전환·전체 문장 4초·초점 복사 아이콘을 넓은 화면·시트 모두 확인했습니다. 재시도 가능한 실패는 응답을 가짜로 바꿔 대화상자 안 오류·초점 `이 주소로 바꾸기`·재시도 성공을 확인했습니다.
 - 2026-11-10 프로필 메뉴: 트리거 44×44, `aria-haspopup` 없음, Enter·Space로 열고 초점 유지, 다음 Tab이 패널 첫 항목, Esc는 닫고 트리거로, 바깥 누름은 닫기만, Tab으로 벗어나면 닫힘. 로그아웃 실패는 패널 유지·오류 표시·진행 중 클릭 무시(요청 1회)이고, 로그아웃하면 홈으로 가고 세션이 끊겨 관리 화면은 홈으로, `GET /api/me`는 401입니다. 프로필 저장 직후 새로고침 없이 머리글 사진이 바뀝니다. 공개 랜딩 HTML에 이메일이 없고 `/admin`·홈 머리글은 그대로입니다. 옛 `/settings`의 최종 주소는 `페이지 편집`입니다.
 - 2026-11-10 미확인(이 기기·도구로 확인 불가): 실제 스크린리더 낭독, WebKit·Firefox, 실기기 모바일 키보드, iPad 14px 입력 초점 확대. 인계 `검증`에 남겼습니다.
+- 2026-11-10: PR #162 CI 통과로 마지막 수용 기준을 체크했습니다. `pnpm smoke`와 E2E(`creator.spec.ts`, `operator.spec.ts` 포함)는 CI에서 통과했고, 로컬 `pnpm smoke`는 Playwright 브라우저가 없어 실행하지 못했습니다. 머지 `39f2964`, Deploy 성공.
