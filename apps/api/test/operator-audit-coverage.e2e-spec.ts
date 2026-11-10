@@ -164,6 +164,22 @@ const AUDITED: Record<string, { action: OperatorActionType; call: (t: TestApp, f
     call: async (t, f) =>
       (await api(t.baseUrl, 'PUT', '/api/admin/ad-block', { cookie: f.operator, body: { enabled: true } })).status,
   },
+  'PUT /api/admin/instagram-dm': {
+    action: 'instagram_dm.audience',
+    call: async (t, f) =>
+      (await api(t.baseUrl, 'PUT', '/api/admin/instagram-dm', { cookie: f.operator, body: { audience: 'off' } }))
+        .status,
+  },
+  'PUT /api/admin/instagram-dm/connections/:userId/pause': {
+    action: 'instagram_dm.connection_pause',
+    call: async (t, f) =>
+      (
+        await api(t.baseUrl, 'PUT', `/api/admin/instagram-dm/connections/${f.creatorId}/pause`, {
+          cookie: f.operator,
+          body: { paused: true },
+        })
+      ).status,
+  },
 };
 
 const paths = (value: unknown): string[] => (Array.isArray(value) ? value : [value ?? '']).map(String);
@@ -241,6 +257,11 @@ describe('운영자 쓰기 행동 기록 범위 (R23 ③)', () => {
     await t.pool.query('UPDATE users SET banner_slot_granted_at = NULL WHERE id = $1', [fixtures.creatorId]);
     fixtures.imageId = await upload(fixtures.operator);
     fixtures.tokenId = (await createAiOperator(t.pool)).tokenId;
+    await t.pool.query(
+      `INSERT INTO instagram_connections (user_id, ig_user_id, ig_username, status, token_ciphertext, token_key_version)
+       VALUES ($1, 'coverage-ig', 'coverage', 'active', '\\x00', 1)`,
+      [fixtures.creatorId],
+    );
   });
 
   afterAll(async () => {
