@@ -226,7 +226,7 @@ export function ConnectionPanel({
           <div className="ig-pause-row">
             <div>
               <strong id="ig-pause-label">자동 DM 보내기</strong>
-              <p className="field-help">끄면 새 댓글에도 DM을 보내지 않고, 보내지 않은 대기 DM은 그대로 있어요.</p>
+              <p className="field-help">끄면 새 댓글에 DM을 보내지 않고, 아직 보내지 않은 대기 DM은 취소돼요.</p>
             </div>
             <button
               type="button"
@@ -304,8 +304,9 @@ export function ConnectionPanel({
           }
         >
           <p>
-            연결을 해제하면 자동 DM이 멈추고, 이 계정의 <strong>규칙과 발송 내역이 함께 지워져요.</strong> 보내지 않은
-            대기 DM도 취소돼요. 다시 연결해도 지운 규칙은 돌아오지 않아요.
+            연결을 해제하면 자동 DM이 멈추고, 이 계정의 <strong>규칙과 발송 내역이 함께 지워져요.</strong> 운영자가 멈춘
+            계정은 토큰만 지워지고 발송 내역은 생성 후 90일까지 남아요. 보내지 않은 대기 DM도 취소돼요. 다시 연결해도
+            지운 규칙은 돌아오지 않아요.
           </p>
         </ConfirmSheet>
       ) : null}
