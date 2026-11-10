@@ -136,6 +136,8 @@ async function shortUrlScenario(context) {
     (value) => JSON.stringify(value) === JSON.stringify([first.title, second.title]),
   );
   must(titles.ok, `보이는 링크 ${JSON.stringify(titles.value)}`);
+  const icons = await page.evaluate(() => document.querySelectorAll('.link-title svg, .link-title img').length);
+  must(icons === 0, `목록형 링크명 옆 아이콘 ${icons}개 = 0`);
   must((await textOccurrences(page, first.title)) >= 1, '양성 대조: 글자 찾기가 첫 링크를 찾음');
   must((await textOccurrences(page, hidden.title)) === 0, '숨긴 링크 글자 없음');
   const hrefs = await linkHrefs(page, first.title);
@@ -231,8 +233,14 @@ async function shortUrlScenario(context) {
   );
   report.record(`${name}/390x844`, overflow <= 0, `/p/{publicId} 390px 가로 넘침 ${overflow}`);
   await setViewport(page, desktop, 1280, 800);
-  // 파비콘(랜딩마다 1건 이상)과 클릭 도착지가 차단되어야 합니다. 0이면 차단이 동작하지 않은 것입니다.
-  await checkNoProblems({ watch, report, name, minBlocked: 2 });
+  // 목록형 링크 카드는 파비콘을 더 이상 그리지 않으므로(0250), 합성 도메인 요청을 직접 한 번 보내 차단을 확인합니다.
+  // 0이면 차단이 동작하지 않은 것입니다.
+  await page.evaluate(
+    (host) => fetch(`https://probe.${host}/차단-대조`, { mode: 'no-cors' }).catch(() => undefined),
+    TEST_HOST_SUFFIX,
+  );
+  await settle(context);
+  await checkNoProblems({ watch, report, name, minBlocked: 1 });
 }
 
 async function directEntryScenario(context) {
