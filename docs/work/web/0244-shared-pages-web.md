@@ -4,7 +4,7 @@
 - 역할: web
 - 상위: 0241
 - 선행: 0243
-- 상태: 검증
+- 상태: 완료
 - 종류: 기능
 - 우선순위: P1
 - 작성일: 2026-11-10
@@ -49,3 +49,4 @@ BFF 헤더 전달과 페이지 전환, 초대 수락, 공동 관리자 화면을
 
 - 2026-11-10: CI E2E 회귀 수정. origin/main의 /settings 리디렉트 구현을 그대로 복구하고 공동 관리자 화면을 /members로 옮겼습니다. 메뉴 segment는 members, 라벨은 공동 관리자이며 맨 끝에 배치했습니다. h1과 문서 제목은 managerMenuLabel을 사용합니다. tests/e2e는 수정하지 않았습니다.
 - 2026-11-10: 회귀 수정 검증(Node 24). pnpm --filter @crelink/shared build 종료 0, pnpm --filter @crelink/web typecheck 종료 0, pnpm verify --fast 종료 0(6/6 단계), pnpm work:scope 0244 --base work/0243-shared-pages-api 종료 0(25개 파일). pnpm --filter @crelink/web test 종료 1(121개 중 119 통과, 기존 localhost listen EPERM 2건만 실패). git show origin/main과 복구한 settings/page.tsx의 바이트 일치를 확인했습니다. rg로 apps/web/src 전체를 검색해 settings를 가리키는 공동 관리자 링크가 없음을 확인했습니다. E2E·실제 브라우저·서버 접속 시험은 localhost 제한으로 미실행입니다.
+- 2026-11-10: 출시. PR #173, `pnpm ci:local --report` 12단계 통과, Deploy 42775757165 성공. 운영에서 `/invite` 200, 처리방침 개정, `robots.txt`의 `/invite`를 확인했습니다.
