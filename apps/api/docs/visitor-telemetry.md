@@ -29,6 +29,8 @@
 
 `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`, `utm_id` 여섯 값만 각각200자까지 보존합니다. 단축·웹 리디렉트는 공유 helper로 이 값만 다음 고정 URL에 덧붙입니다. 중복 값과 제어 문자는 버리고 이메일 등 나머지 쿼리는 저장하지 않습니다. UTM 내용은 사용자가 URL에 붙인 문자열이므로 민감한 값을 넣지 않아야 합니다. 원 단축 방문의 UTM은 `visits.utm`에, 브라우저 보고는 `landing_events.utm`에 저장됩니다.
 
+채널별 짧은 주소 `GET {SHORT}/s/{code}`는 예외로 요청 쿼리의 `utm_*`를 무시하고 **저장된 프리셋**(`source`·`medium`·`campaign`·`content`, `id`=code)을 `visits.utm`에 넣습니다. 리디렉트 주소에는 UTM 대신 `via={code}`만 붙고, 공개 랜딩 API가 `via`로 같은 프리셋 `utm`을 내려 주면 웹이 그 값을 `VisitorTracker`로 보고해 `landing_events.utm`도 같아집니다. 근거 [채널별 짧은 주소 설계](../../../docs/specs/channel-links.md).
+
 기존 `RetentionService`의 같은 트랜잭션·365일/Asia/Seoul 기준으로 `landing_events`를 일별·단축 주소·종류·대상 집계로 옮긴 뒤 원본을 삭제합니다. 집계에는 이벤트 수·일별 순 방문자 수·일별 순 세션 수·활성 시간 합·최대 스크롤이 남고, 이후 [0010](../migrations/0010_analytics_rollups.sql)에서 클릭한 표시·스크롤·노출 후 클릭 카운터와 언어·UTM 등을 값별 분포로 남기도록 확장했습니다. 방문자·세션·페이지뷰·이벤트 UUID와 IP·원문 UA는 집계에 남기지 않습니다. 단축 주소·콘텐츠 대상 식별자는 집계 구분에 사용합니다. 활성 시간은 page_view 앵커 값만 합하며 engagement 원본의 누적값을 더하지 않습니다. 일별 순 방문자·세션 합은 기간 전체 고유 수와 다릅니다. 원 방문 source FK는 원본 삭제 시 null이 되며 별도 복사된 이벤트 문맥은 이벤트의 보존 기한을 따릅니다.
 
 새 집계는 기존 302 통계에 합산하지 않습니다. 수집 1차 다음 작업에서 [본인·관리자 조회](analytics.md)를 구현했고, 기존 StatsService도 같은 읽기 스냅샷으로 바꿔 보존 전환 경쟁을 막습니다.

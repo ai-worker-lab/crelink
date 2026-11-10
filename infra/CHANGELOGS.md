@@ -2,6 +2,10 @@
 
 내부 참고용으로 인프라의 모든 변경을 적용 여부와 관계없이 기록합니다. 환경별 적용 시각·결과·복구 정보는 운영 work item이나 배포 플랫폼에 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-11-10
+
+- 채널별 짧은 주소 경로(0248): `prod/Caddyfile` 단축 호스트 `@click` 정규식에 `s/[a-z0-9]{7,10}`(GET만)를 더했습니다. `prod/tests/caddy-routing.sh`에 `/s/` 허용·거부와 웹 호스트·색 전환 뒤 확인 14건을 더해 Docker로 94건 통과를 확인했고, `prod/verify.sh`는 `/s/zzzzzzz` 302와 `notice?reason=link_not_found`로 검사 13개가 됩니다. 실제 서버 적용은 병합 뒤 Deploy job으로만 확인합니다. 롤백하면 이미 공유한 `/s/` 주소가 재배포 전까지 404입니다. [티켓](../docs/work/infra/0248-channel-links-edge.md).
+
 ## 2026-11-09
 
 - 런북에 AI 운영자 토큰 폐기와 일일 백업 존재를 적고 Sentry 조직 표기를 고쳤습니다(0209).

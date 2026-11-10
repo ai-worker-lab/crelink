@@ -4029,3 +4029,37 @@ body:has(.sheet[open]) {
 .link-grid .banner-slot-item {
   grid-column: 1 / -1;
 }
+
+/* 채널 주소 메뉴(docs/specs/channel-links.md): 선택 두 개는 좁은 폭에서 한 열, 목록 줄은 이름·주소와 버튼이 줄바꿈으로 나뉜다. */
+.channel-form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--ds-space-12);
+}
+.channel-list-title {
+  margin: var(--ds-space-24) 0 var(--ds-space-12);
+  font-size: var(--ds-font-size-18);
+}
+.channel-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-8) var(--ds-space-12);
+}
+.channel-item-text {
+  display: flex;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+  min-width: 0;
+}
+.channel-item-url {
+  overflow-wrap: anywhere;
+}
+.channel-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-8);
+}

@@ -12,9 +12,12 @@ import {
   Post,
   Put,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
+  ChannelLinkView,
   CreatorLandingState,
   LinkView,
   parseSignupContextHeader,
@@ -24,6 +27,7 @@ import {
   SocialLinkView,
 } from '@crelink/shared';
 import { SessionGuard } from '../auth/session.guard';
+import { ChannelLinksService } from './channel-links.service';
 import { CreatorService } from './creator.service';
 import { LinksService } from './links.service';
 import { ProfileService } from './profile.service';
@@ -144,5 +148,39 @@ export class PortfolioController {
   @HttpCode(204)
   remove(@CurrentPage() page: PageContext, @Param('id') id: string): Promise<void> {
     return this.profile.deletePortfolioItem(page.ownerUserId, id);
+  }
+}
+
+/**
+ * 채널별 짧은 주소(docs/specs/channel-links.md). 소유자 전용입니다(`@PageOwnerOnly()`): 대상 페이지는 `X-Crelink-Page`(없으면 본인 페이지)로
+ * 정해지고 멤버(편집자)는 목록·생성·보관이 모두 403입니다. 운영자 대행 경로는 없습니다.
+ */
+@Controller('me/channel-links')
+@UseGuards(SessionGuard, PageAccessGuard)
+@PageOwnerOnly()
+export class ChannelLinksController {
+  constructor(private readonly channelLinks: ChannelLinksService) {}
+
+  @Get()
+  list(@CurrentPage() page: PageContext): Promise<ChannelLinkView[]> {
+    return this.channelLinks.list(page.ownerUserId);
+  }
+
+  /** 같은 조합의 보관되지 않은 주소가 이미 있으면 200으로 그것을, 새로 만들면 201. */
+  @Post()
+  async create(
+    @CurrentPage() page: PageContext,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<ChannelLinkView> {
+    const { view, created } = await this.channelLinks.create(page.ownerUserId, body);
+    response.status(created ? 201 : 200);
+    return view;
+  }
+
+  @Post(':code/archive')
+  @HttpCode(204)
+  archive(@CurrentPage() page: PageContext, @Param('code') code: string): Promise<void> {
+    return this.channelLinks.archive(page.ownerUserId, code);
   }
 }

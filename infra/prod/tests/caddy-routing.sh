@@ -142,7 +142,7 @@ require("http").get({ host: process.argv[1], port: 2019, path: "/config/", timeo
 result '전환 전 업스트림 blue(api·web)' 'blue blue' \
 	"$("${CURL[@]}" -o /dev/null -w '%header{x-echo-color}' "$go/abc") $("${CURL[@]}" -o /dev/null -w '%header{x-echo-color}' "$links/")"
 
-echo "== 단축 호스트($short): GET 단축·클릭 기록(/c/·/a/·/b/)만 api"
+echo "== 단축 호스트($short): GET 단축·클릭 기록(/c/·/a/·/b/)·채널 주소(/s/)만 api"
 check 'GET /abc (3자)' '200 api GET /abc' "$go/abc"
 check 'GET /myslug' '200 api GET /myslug' "$go/myslug"
 check 'GET /My-Slug-2 (대문자 허용)' '200 api GET /My-Slug-2' "$go/My-Slug-2"
@@ -191,6 +191,19 @@ check 'POST /b/abcde12345' 404 -X POST -d x "$go/b/abcde12345"
 check 'HEAD /a/abcde12345/fghij67890' 404 -I "$go/a/abcde12345/fghij67890"
 check 'HEAD /b/abcde12345' 404 -I "$go/b/abcde12345"
 check 'GET /b/../api/health (path-as-is)' 404 --path-as-is "$go/b/../api/health"
+# 채널별 짧은 주소 /s/{7~10자}(docs/specs/channel-links.md)
+check 'GET /s/abcde12 (채널 주소 7자)' '200 api GET /s/abcde12' "$go/s/abcde12"
+check 'GET /s/abcde12345 (채널 주소 10자)' '200 api GET /s/abcde12345' "$go/s/abcde12345"
+check 'GET /s/abcde12?x=1 (쿼리 유지)' '200 api GET /s/abcde12?x=1' "$go/s/abcde12?x=1"
+check 'GET /s/abcde1 (6자)' 404 "$go/s/abcde1"
+check 'GET /s/abcde123456 (11자)' 404 "$go/s/abcde123456"
+check 'GET /s/ABCDE12 (대문자)' 404 "$go/s/ABCDE12"
+check 'GET /s/abcde12/ (끝 슬래시)' 404 "$go/s/abcde12/"
+check 'GET /s/abcde12/extra (세그먼트 둘)' 404 "$go/s/abcde12/extra"
+check 'GET /s/ (코드 없음)' 404 "$go/s/"
+check 'POST /s/abcde12' 404 -X POST -d x "$go/s/abcde12"
+check 'HEAD /s/abcde12' 404 -I "$go/s/abcde12"
+check 'GET /s/../api/health (path-as-is)' 404 --path-as-is "$go/s/../api/health"
 check 'GET /a/abcde12345/../../api/health (path-as-is)' 404 --path-as-is "$go/a/abcde12345/../../api/health"
 
 echo "== 웹 호스트($web): 전체 web"
@@ -200,6 +213,7 @@ check 'POST /api/backend/me/links' '200 web POST /api/backend/me/links' -X POST 
 check 'GET /c/abcde12345 (웹 호스트도 web)' '200 web GET /c/abcde12345' "$links/c/abcde12345"
 check 'GET /a/abcde12345/fghij67890 (웹 호스트도 web)' '200 web GET /a/abcde12345/fghij67890' "$links/a/abcde12345/fghij67890"
 check 'GET /b/abcde12345 (웹 호스트도 web)' '200 web GET /b/abcde12345' "$links/b/abcde12345"
+check 'GET /s/abcde12 (웹 호스트도 web)' '200 web GET /s/abcde12' "$links/s/abcde12"
 # AI 운영자 토큰 경로(docs/specs/crelink-ai-operator.md `웹 토큰 경로`): Caddy는 경로를 가리지 않고 web에 넘기며 인증·실행 헤더를 바꾸지 않아야 합니다.
 # 시험 값은 실제 토큰 형식(crl_ai_ + 43자)이 아닙니다.
 agent_auth='Bearer crl_ai_caddy-routing-test'
@@ -257,6 +271,7 @@ result '전환 뒤 업스트림 green(api·web)' 'green green' \
 check '전환 뒤 공개 정책 유지: GET /api/health' 404 "$go/api/health"
 check '전환 뒤 공개 정책 유지: GET /c/abcde12345' '200 api GET /c/abcde12345' "$go/c/abcde12345"
 check '전환 뒤 공개 정책 유지: GET /b/abcde12345' '200 api GET /b/abcde12345' "$go/b/abcde12345"
+check '전환 뒤 공개 정책 유지: GET /s/abcde12' '200 api GET /s/abcde12' "$go/s/abcde12"
 result '전환 뒤 /b/ 업스트림 green' green "$("${CURL[@]}" -o /dev/null -w '%header{x-echo-color}' "$go/b/abcde12345")"
 result 'reload는 컨테이너를 다시 만들거나 재시작하지 않음' "$caddy_started" "$(docker inspect -f '{{.State.StartedAt}}' "$caddy")"
 

@@ -1,5 +1,8 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import {
+  CHANNEL_LINK_CODE_PATTERN,
+  CHANNEL_LINK_VIA_PARAM,
+  channelLinkUtm,
   LANDING_PASS_PARAM,
   PublicBannerSlotView,
   PublicLandingResponse,
@@ -35,6 +38,7 @@ export class PublicLandingController {
   async landing(
     @Param('publicId') publicId: string,
     @Query(LANDING_PASS_PARAM) pass: unknown,
+    @Query(CHANNEL_LINK_VIA_PARAM) via: unknown,
   ): Promise<PublicLandingResponse> {
     const db = this.database.pool;
     const landing = await this.creator.publicLanding(db, publicId);
@@ -72,6 +76,7 @@ export class PublicLandingController {
           : Promise.resolve([]),
     ]);
     const passAccepted = this.landingPass.verify(publicId, pass);
+    const channel = await this.channelLink(landing.id, via);
     const slotBlockId = blocks.rows.find((block) => block.type === 'list')?.id;
     return {
       publicId,
@@ -123,8 +128,25 @@ export class PublicLandingController {
       }),
       guestbookEnabled: landing.guestbook_enabled,
       passAccepted,
-      shortUrl: shortLink.url,
+      shortUrl: channel ? `${this.config.shortLinkBaseUrl}/s/${channel.code}` : shortLink.url,
+      ...(channel ? { utm: channelLinkUtm(channel) } : {}),
     };
+  }
+
+  /**
+   * `via`가 이 랜딩의 채널 주소 code이면(보관 여부와 무관) 그 저장값을, 아니면 null입니다. 다른 랜딩의 code나 형식이 틀린 값은
+   * 조용히 무시합니다. `via`가 없으면 질의하지 않습니다.
+   */
+  private async channelLink(
+    landingId: string,
+    via: unknown,
+  ): Promise<{ code: string; channel: string; placement: string; campaign: string } | null> {
+    if (typeof via !== 'string' || !CHANNEL_LINK_CODE_PATTERN.test(via)) return null;
+    const found = await this.database.query<{ code: string; channel: string; placement: string; campaign: string }>(
+      'SELECT code, channel, placement, campaign FROM channel_links WHERE code = $1 AND landing_id = $2',
+      [via, landingId],
+    );
+    return found.rows[0] ?? null;
   }
 
   /**

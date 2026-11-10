@@ -1,4 +1,4 @@
-import { CRELINK_LIMITS, type CrelinkApiErrorCode, type NoticeReason } from '@crelink/shared';
+import { CHANNEL_LINK_LIMITS, CRELINK_LIMITS, type CrelinkApiErrorCode, type NoticeReason } from '@crelink/shared';
 
 /** 업로드 이미지 크기 한도 표시(예: `4MB`). 숫자는 계약 `CRELINK_LIMITS.imageMaxBytes`에서만 옵니다. */
 export const IMAGE_MAX_LABEL = `${Math.floor(CRELINK_LIMITS.imageMaxBytes / (1024 * 1024))}MB`;
@@ -59,6 +59,10 @@ const API_ERROR_MESSAGES: Record<CrelinkApiErrorCode, string> = {
   banner_period_invalid: '게시 끝은 시작보다 뒤여야 해요.',
   // 광고 블록 켜고 끄기(R20 ⑩). 플랫폼 스위치가 꺼져 있는 동안 크리에이터 스위치를 바꾸려 할 때입니다.
   ad_block_unavailable: '크리링이 광고 블록 기능을 꺼 두어 지금은 바꿀 수 없어요.',
+  // 채널별 짧은 주소(docs/specs/channel-links.md). 한도 숫자는 계약 `CHANNEL_LINK_LIMITS`에서만 옵니다.
+  channel_link_not_found: '채널 주소를 찾을 수 없어요. 새로고침한 뒤 다시 시도해 주세요.',
+  channel_link_limit_reached: `채널 주소는 ${CHANNEL_LINK_LIMITS.perLanding}개까지 둘 수 있어요. 쓰지 않는 주소를 보관해 주세요.`,
+  channel_link_total_limit_reached: `보관한 주소를 포함해 채널 주소는 ${CHANNEL_LINK_LIMITS.totalPerLanding}개까지 만들 수 있어요.`,
   agent_run_not_found: '실행 기록을 찾을 수 없어요.',
   agent_run_in_progress: '다른 AI 실행이 진행 중이에요.',
   agent_run_closed: '이미 끝난 실행 기록이에요.',

@@ -84,4 +84,5 @@ AI 운영자: [AI 운영자 기술 설계](specs/crelink-ai-operator.md) — 전
 - [지표·통계 화면과 조회 권한](specs/crelink-analytics.md) — R10·R28, 관리자 전체/사용자 본인, 요약·상세4화면·공유API·보존과 누락 의미.
 - [출시 준비와 PR 브라우저 QA](specs/release-qa.md) — 카드2열 최신 기준, localhost 검증·필수 CI·시각/접근성·후속 기능 제안.
 - [리스트 밀도 선택](specs/list-density.md) —8개·10개·12개 설정의 페이지별 서버 저장·공통 렌더링·검증과 배포 경계.
+- [채널별 짧은 주소](specs/channel-links.md) — `{SHORT}/s/{code}`가 저장 프리셋을 UTM으로 기록하고 주소창에는 `via`만 남기는 설계. 두 표·API·프리셋·수용 기준 12개(승인, 0246~0248). 웹 화면 안내: [채널 주소 화면](../apps/web/docs/channel-links.md).
 - [리스트 밀도 QA 결과](reviews/0204-list-density-qa.md) — 실제 API/DB·3엔진34개 회귀와8/10/12 원본 캡처·실측·비교, 실물/최종CI 검증 한계.
