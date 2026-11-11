@@ -4,6 +4,8 @@
 
 ## 2026-11-11
 
+- 웹훅 시험 격리(0276): 실제 HTTP·트랜잭션·쿼리 횟수 검사를 유지하며 테스트 앱의 발송 worker bootstrap만 격리했습니다. 2초 주기 worker SQL이 쿼리 spy에 섞이는 것을 지연 변이로 재현했습니다. 제품 타이머·발송 동작은 바꾸지 않습니다. [진단](../../docs/work/orchestrator/0276-pr161-ci-regressions.md).
+
 - Instagram DM 자동 접미사 제거(0269): 웹훅이 `rule.message`를 그대로 저장하며 채널 링크와 수신 거부 토큰을 본문에 붙이지 않습니다. 사용하지 않는 채널 코드 조회를 제거하고 공백·줄바꿈·직접 입력 링크·이모지가 있는 문구의 본문 일치 회귀를 갱신했습니다. 근거: `src/instagram/webhook.service.ts`, `test/instagram-webhook.e2e-spec.ts`.
 
 - QA D1·D2·D4·D5·D6: 웹훅 원문·서명 디버그 로그를 제거하고 migration 검증을 갱신했습니다. 공개 답글 뒤 DM 직전에 발송 조건·lease를 재확인하며 granular scope 조회는 대상 10개 초과 및 개별 조회 실패 시 안전하게 실패합니다. 근거: `src/instagram/{webhook.controller,worker.service,graph}.ts`, `test/health.e2e-spec.ts`.

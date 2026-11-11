@@ -41,8 +41,12 @@ test('리스트 밀도: 실제 저장·새 세션·공개/미리보기·740px �
   await expect(page.getByRole('radio', { name: option(8) })).toBeChecked();
   expect(
     await page
-      .locator('.link-layout-picker label')
-      .evaluateAll((labels) => labels.every((label) => label.getBoundingClientRect().height >= 44)),
+      .locator('body')
+      .evaluate((body) =>
+        [...body.querySelectorAll('.link-layout-picker label')].every(
+          (label) => label.getBoundingClientRect().height >= 44,
+        ),
+      ),
   ).toBe(true);
   const visitor = await data.session(undefined, { ...mobile, viewport: { width: 390, height: 740 } });
   const measurements = [];
@@ -142,14 +146,18 @@ test('리스트 밀도: 실제 저장·새 세션·공개/미리보기·740px �
       ).toBeLessThan(2);
       expect(
         await visitor.page
-          .locator('.link-title,.link-description')
-          .evaluateAll((nodes) => nodes.every((node) => node.scrollHeight <= node.clientHeight + 1)),
+          .locator('body')
+          .evaluate((body) =>
+            [...body.querySelectorAll('.link-title,.link-description')].every(
+              (node) => node.scrollHeight <= node.clientHeight + 1,
+            ),
+          ),
       ).toBe(true);
       expect(
         await visitor.page
-          .locator('a.link-card')
-          .evaluateAll((cards) =>
-            cards.every(
+          .locator('body')
+          .evaluate((body) =>
+            [...body.querySelectorAll('a.link-card')].every(
               (card) => card.scrollWidth <= card.clientWidth + 1 && card.getBoundingClientRect().height >= 44,
             ),
           ),
@@ -162,9 +170,11 @@ test('리스트 밀도: 실제 저장·새 세션·공개/미리보기·740px �
     await expectNoHorizontalOverflow(visitor.page, `density/${density}/text200`);
     expect(
       await visitor.page
-        .locator('.link-title,.link-description')
-        .evaluateAll((nodes) =>
-          nodes.every((node) => node.scrollHeight <= node.clientHeight + 1 && node.scrollWidth <= node.clientWidth + 1),
+        .locator('body')
+        .evaluate((body) =>
+          [...body.querySelectorAll('.link-title,.link-description')].every(
+            (node) => node.scrollHeight <= node.clientHeight + 1 && node.scrollWidth <= node.clientWidth + 1,
+          ),
         ),
     ).toBe(true);
     await visitor.page.screenshot({ path: info.outputPath(`density-${density}-long-text200.png`), fullPage: true });
