@@ -4,6 +4,8 @@
 
 ## 2026-11-11
 
+- DM 성공 뒤 공개 답글(0282): `src/instagram/worker.service.ts`가 DM 응답 뒤 기존 상태 조회로 답글 자격을 확인하고 `finish(sent)` 반영 1행 뒤 답글을 호출합니다. 정지·수신 거부·취소·lease 상실에는 답글을 생략하고 DM 성공 기록은 기존 상태 조건으로 보존하며 답글 오류는 DM을 failed로 바꾸거나 재발송하지 않습니다. 기존 `test/instagram-worker.e2e-spec.ts`에 순서·sent 저장·DM 실패/재시도·도중 상태 변경·중복 방지 회귀를 갱신했습니다. 실제 실행 범위는 [티켓 진행 기록](../../docs/work/orchestrator/0282-instagram-reply-after-dm.md#진행-기록)에 둡니다.
+
 - 로컬 인증 검증 fixture(0281): `test/fixtures/instagram-graph.fixtures.ts`에 2026-11-11 관측 shape를 가짜 값으로 재현하고 `src/instagram/graph.spec.ts`에서 정상·연결 실패·timeout·형식 불일치와 복수 계정의 서비스 409를 고정했습니다. 기존 Graph 시험도 미등록 fetch를 차단해 실제 Meta로 새지 않게 했습니다. 제품 코드·운영값·DB 스키마는 바꾸지 않습니다. [검증 기록](../../docs/work/orchestrator/0281-scoped-verification.md).
 
 - Instagram 모든 댓글·최초 1회(0280): `0019_instagram_all_comments.sql`에 기본 false 모드·키워드 조건·계정/게시물/HMAC 마커와 pending·sending·sent·unknown 백필을 추가했습니다. 웹훅은 기존 자격·version 검사 뒤 earliest 후보의 마커와 delivery를 원자 저장하며 재연결·규칙 재생성·90일 파기 뒤에도 중복을 막고 Meta 삭제에서는 함께 파기합니다. 규칙/내역 API 필드·health 목록과 실제 DB 경합/파기/백필 시험을 보완했습니다. [시험·한계](../../docs/work/orchestrator/0280-instagram-all-comments.md).

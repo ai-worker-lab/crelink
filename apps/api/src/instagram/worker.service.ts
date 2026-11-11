@@ -279,41 +279,49 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
       countDm('token_unreadable');
       return;
     }
-    let replyCommentId: string | null = null;
-    let replyStatus: 'sent' | 'failed' | 'skipped' = 'skipped';
-    if (state.reply_status === 'skipped' && state.reply_message && state.reply_message.trim().length > 0) {
-      try {
-        const replyResult = await this.graph.replyToComment(accessToken, state.comment_id, state.reply_message);
-        replyCommentId = replyResult.commentId;
-        replyStatus = 'sent';
-      } catch (replyError) {
-        this.logger.warn(`공개 답글 작성 실패: ${errorName(replyError)}`);
-        replyStatus = 'failed';
-      }
-    }
-    if (replyStatus !== 'skipped') {
-      await this.database.query(
-        `UPDATE instagram_dm_deliveries SET reply_comment_id = $2, reply_status = $3
-         WHERE id = $1 AND status = 'sending' AND lease_until = $4::timestamptz`,
-        [claim.id, replyCommentId, replyStatus, claim.lease],
-      );
-    }
-    // 공개 답글 HTTP 호출 중 정지·수신 거부·취소·lease 변경을 DM 직전에 반영합니다.
+    // DM 직전 발송 조건과 자기 lease를 다시 확인합니다.
     const current = await this.readSendState(claim);
     if (!current?.lease_held) return;
     if (!current.sendable) {
-      await this.finish(claim.id, 'cancelled', STOPPED_FAILURE_CODE, replyCommentId, replyStatus);
+      await this.finish(claim.id, 'cancelled', STOPPED_FAILURE_CODE);
       countDm('cancelled');
       return;
     }
     try {
       await this.graph.sendPrivateReply(accessToken, state.ig_user_id, state.comment_id, state.message_body);
     } catch (error) {
-      await this.recordFailure(claim.id, state, error, replyCommentId, replyStatus);
+      await this.recordFailure(claim.id, state, error);
       return;
     }
-    await this.finish(claim.id, 'sent', null, replyCommentId, replyStatus);
+    // finish가 lease를 지우기 전에 기존 조회로 답글 자격을 확인합니다.
+    const replyState = await this.readSendState(claim);
+    // 정지·lease 상실과 실제 DM 성공 기록은 구분하고, 이미 unknown/cancelled인 행은 덮지 않습니다.
+    const finished = await this.finish(claim.id, 'sent', null);
+    if (finished !== 1) return;
     countDm('sent');
+    if (
+      !replyState?.lease_held ||
+      !replyState.sendable ||
+      replyState.reply_status !== 'skipped' ||
+      !replyState.reply_message?.trim()
+    )
+      return;
+
+    let replyCommentId: string | null = null;
+    let replyStatus: 'sent' | 'failed';
+    try {
+      const replyResult = await this.graph.replyToComment(accessToken, state.comment_id, replyState.reply_message);
+      replyCommentId = replyResult.commentId;
+      replyStatus = 'sent';
+    } catch (replyError) {
+      this.logger.warn(`공개 답글 작성 실패: ${errorName(replyError)}`);
+      replyStatus = 'failed';
+    }
+    await this.database.query(
+      `UPDATE instagram_dm_deliveries SET reply_comment_id = $2, reply_status = $3
+       WHERE id = $1 AND status = 'sent' AND reply_status = 'skipped'`,
+      [claim.id, replyCommentId, replyStatus],
+    );
   }
 
   /** 호출 직전 재확인. 토큰·본문도 이 시점의 값을 읽어 정지·토큰 교체를 최대한 늦게 반영합니다. */
@@ -340,8 +348,8 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
     failureCode: string | null,
     replyCommentId: string | null = null,
     replyStatus: string = 'skipped',
-  ): Promise<void> {
-    await this.database.query(
+  ): Promise<number | null> {
+    const { rowCount } = await this.database.query(
       `UPDATE instagram_dm_deliveries
        SET status = $2, failure_code = $3, lease_until = NULL,
            reply_comment_id = COALESCE($4, reply_comment_id),
@@ -350,6 +358,7 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
        WHERE id = $1 AND status = 'sending'`,
       [id, status, failureCode, replyCommentId, replyStatus],
     );
+    return rowCount;
   }
 
   private async recordFailure(
