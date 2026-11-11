@@ -88,12 +88,14 @@ const filterLinkCurrent = (page, name) =>
     { scope: FILTERS, label: name },
   );
 
-async function pageViews(config, creator) {
+async function analyticsCounts(config, creator) {
   const { from, to } = config.ranges.recent30;
   const response = await fetch(`${config.apiUrl}/api/me/analytics?${stamp(from, to)}`, {
     headers: { cookie: `cl_session=${creator.sessionToken}` },
   });
-  return response.ok ? (await response.json()).summary.pageViews : 0;
+  if (!response.ok) return { pageViews: 0, ownerPageViews: null };
+  const report = await response.json();
+  return { pageViews: report.summary.pageViews, ownerPageViews: report.ownerVisits.pageViews };
 }
 
 async function waitForApp(page, url) {
@@ -114,10 +116,19 @@ async function runScenario({ page, config, report, watch, desktop }, scenario) {
   await applyDevice(page, desktop, 1280, 800);
   await page.goto(creator.landingUrl, { timeout: NAVIGATION_TIMEOUT });
   const views = await poll(
-    () => pageViews(config, creator),
-    (value) => value > 0,
+    () => analyticsCounts(config, creator),
+    (value) => value.pageViews > 0,
   );
   must(views.ok, `실수집 페이지뷰 ${JSON.stringify(views.value)} > 0`);
+
+  // 본인 세션의 실제 공개 방문도 수집합니다. 합계에는 남고 본인 건수만 따로 표시되어야 합니다.
+  await setSessionCookie(page, config, creator.sessionToken);
+  await page.goto(`${creator.landingUrl}?owner-check=1`, { timeout: NAVIGATION_TIMEOUT });
+  const ownerViews = await poll(
+    () => analyticsCounts(config, creator),
+    (value) => value.ownerPageViews === 1 && value.pageViews >= 2,
+  );
+  must(ownerViews.ok, `본인 방문을 포함한 실수집 합계 ${JSON.stringify(ownerViews.value)}`);
 
   must((await framesPerHalfSecond(page)) >= 10, '브라우저 프레임 생산 500ms당 10회 이상');
   await setSessionCookie(page, config, user.sessionToken);
@@ -158,6 +169,11 @@ async function runScenario({ page, config, report, watch, desktop }, scenario) {
     (value) => value === 7,
   );
   must(rows.ok, `최근 표 ${rows.value}행 = 7`);
+  const badges = await page.evaluate(() =>
+    [...document.querySelectorAll('.analytics-owner-badge')].map((node) => node.textContent.trim()),
+  );
+  must(badges.length >= 2 && badges.every((label) => label === '본인 1'), `본인 뱃지 ${JSON.stringify(badges)}`);
+
   const dates = await page.evaluate(
     (target) => [...document.querySelectorAll(`${target} tbody th`)].map((node) => node.textContent),
     RECENT,
@@ -250,6 +266,7 @@ async function runScenario({ page, config, report, watch, desktop }, scenario) {
   );
   must(empty.ok, `빈 기간 안내(status 1개) ${JSON.stringify(empty.value)}`);
   must((await countOf(page, '.analytics-trend')) === 0, '빈 기간 차트 없음');
+  must((await countOf(page, '.analytics-owner-badge')) === 0, '과거 빈 기간은 본인 0이 아닌 뱃지 없음');
   must((await countOf(page, `${FILTERS} [aria-current="date"]`)) === 0, '빈 기간 빠른 선택 해제');
   await page.waitForLoadState('networkidle', NETWORK_IDLE);
 

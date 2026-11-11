@@ -5,6 +5,8 @@ export const backendRules: ReadonlyArray<{
   pattern: RegExp;
   upload?: true;
   visitorEvent?: true;
+  /** 본인 방문 표시에만 세션 쿠키를 전달합니다. 가입 경로 수집에는 전달하지 않습니다. */
+  ownerSession?: true;
   /** Caddy가 넣은 방문자 IP를 API로 넘깁니다. 공개 쓰기 경로의 IP 한도에 씁니다. */
   forwardClientIp?: true;
   signupInAppKind?: true;
@@ -45,7 +47,7 @@ export const backendRules: ReadonlyArray<{
   { methods: ['POST'], pattern: /^api\/me\/files$/, upload: true },
   { methods: ['GET'], pattern: new RegExp(`^api/files/${ID}$`) },
   { methods: ['GET'], pattern: new RegExp(`^api/public/landings/${ID}$`) },
-  { methods: ['POST'], pattern: /^api\/landings\/[a-z0-9]{10}\/events$/, visitorEvent: true },
+  { methods: ['POST'], pattern: /^api\/landings\/[a-z0-9]{10}\/events$/, visitorEvent: true, ownerSession: true },
   { methods: ['POST'], pattern: /^api\/signup-funnel\/events$/, visitorEvent: true },
   { methods: ['GET'], pattern: /^api\/admin\/creators$/ },
   { methods: ['GET'], pattern: new RegExp(`^api/admin/creators/${ID}$`) },

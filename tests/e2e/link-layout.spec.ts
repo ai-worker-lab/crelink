@@ -98,9 +98,9 @@ test('생성자 표시 설정: 저장·미리보기·공개 그리드·모바일
   await visitor.page.addStyleTag({ content: '.link-card { font-size: 200%; } .link-title { font-size: inherit; }' });
   await expectNoHorizontalOverflow(visitor.page, `grid/${browserName}/text-200-percent`);
   expect(
-    await grid
-      .locator('.link-card')
-      .evaluateAll((cards) => cards.every((card) => card.scrollWidth <= card.clientWidth + 1)),
+    await grid.evaluate((root) =>
+      [...root.querySelectorAll('.link-card')].every((card) => card.scrollWidth <= card.clientWidth + 1),
+    ),
   ).toBe(true);
   await visitor.page.screenshot({ path: info.outputPath('visitor-text-200-percent-320.png'), fullPage: true });
   await visitor.page.reload();

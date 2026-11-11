@@ -6,6 +6,7 @@
 
 ## 2026-11-11
 
+- PR #161 원격 CI 시험 보완(0276): 웹훅 쿼리 감시에 발송 worker 타이머가 섞이는 경합을 격리하고 Firefox 분석 시험의 날짜 7개를 개별로 읽습니다. 제품 동작과 기존 검사·엔진은 유지합니다. 근거: [0276](docs/work/orchestrator/0276-pr161-ci-regressions.md).
 - Instagram DM 운영 설정 등록(0275): 사용자 SOPS 암호문의 필수 연동 설정을 검증하고 기존 배포 경로로 적용합니다. [작업 기록](docs/work/orchestrator/0275-instagram-dm-prod-settings.md), [인프라 계약](contracts/0275-instagram-dm-prod-settings/5-infra.contract.md).
 
 - 의존성 minor·patch 갱신(PR #166, 0274): 기존 Dependabot의 Playwright·NestJS·Next.js 등 10개 갱신과 lockfile을 최신 main에 통합합니다. 검증 근거·범위는 [0274](docs/work/orchestrator/0274-dependency-patch-update.md)에 둡니다.
@@ -19,6 +20,7 @@
 
 ## 2026-11-10
 
+- 지표의 본인 방문 표시와 Meta 링크 검사 제외(0233): `packages/shared`의 `AnalyticsReport`에 `ownerVisits`와 일별 본인 건수를 추가했습니다. 세부는 [백엔드 로그](apps/api/CHANGELOGS.md)와 [웹 로그](apps/web/CHANGELOGS.md), 근거는 [0233](docs/work/orchestrator/0233-owner-badge.md)에 있습니다.
 - 채널별 짧은 주소(0246, 0247, 0248): `{SHORT}/s/{code}`(7자 난수)가 저장된 채널·노출 위치를 UTM으로 기록하고 주소창에는 UTM 대신 `via={code}`만 남깁니다. 설계 `docs/specs/channel-links.md`를 추가했고 `packages/shared`에 `channel-links.ts`(프리셋 8채널·한도·`ChannelLinkView`·UTM 변환·API 경로·오류 코드 3개)와 공개 랜딩 응답의 선택 필드 `utm`을 더했습니다. 세부는 [백엔드 로그](apps/api/CHANGELOGS.md), [웹 로그](apps/web/CHANGELOGS.md), [인프라 로그](infra/CHANGELOGS.md)에 있습니다.
 - 공유관리 페이지 출시(0241~0245): 설계 문서의 공동 관리자 화면 경로를 실제(`/members`)로 맞췄습니다.
 - 공유관리 페이지 설계와 제품 요구 추가(0241, 0242): `docs/specs/shared-pages.md`, PRD R29, R19 공동 관리자 반영. 구현은 0243, 0244입니다.

@@ -4,6 +4,8 @@
 
 ## 2026-11-11
 
+- 웹훅 시험 격리(0276): 실제 HTTP·트랜잭션·쿼리 횟수 검사를 유지하며 테스트 앱의 발송 worker bootstrap만 격리했습니다. 2초 주기 worker SQL이 쿼리 spy에 섞이는 것을 지연 변이로 재현했습니다. 제품 타이머·발송 동작은 바꾸지 않습니다. [진단](../../docs/work/orchestrator/0276-pr161-ci-regressions.md).
+
 - Instagram DM 자동 접미사 제거(0269): 웹훅이 `rule.message`를 그대로 저장하며 채널 링크와 수신 거부 토큰을 본문에 붙이지 않습니다. 사용하지 않는 채널 코드 조회를 제거하고 공백·줄바꿈·직접 입력 링크·이모지가 있는 문구의 본문 일치 회귀를 갱신했습니다. 근거: `src/instagram/webhook.service.ts`, `test/instagram-webhook.e2e-spec.ts`.
 
 - QA D1·D2·D4·D5·D6: 웹훅 원문·서명 디버그 로그를 제거하고 migration 검증을 갱신했습니다. 공개 답글 뒤 DM 직전에 발송 조건·lease를 재확인하며 granular scope 조회는 대상 10개 초과 및 개별 조회 실패 시 안전하게 실패합니다. 근거: `src/instagram/{webhook.controller,worker.service,graph}.ts`, `test/health.e2e-spec.ts`.
@@ -19,6 +21,7 @@
 
 ## 2026-11-10
 
+- 본인 방문 표시와 Meta 링크 검사 제외(0233): migration `0018_landing_event_owner`(`landing_events.is_owner`, 추가 전용·기본 false). 공개 랜딩 페이지뷰에서 유효한 세션의 사용자가 소유자이면 표시하고 이후 이벤트는 페이지뷰 값을 따릅니다. 세션 확인이 실패해도 저장합니다. `AnalyticsReport.ownerVisits`·일별 본인 건수를 추가하고 합계에서는 빼지 않습니다. 첫 본인 표시 전·보존 집계 구간은 `null`입니다. 저장된 `ip`가 `2a03:2880::/32`이면 봇으로 봅니다(`isMetaCrawlerIp`). 근거 `docs/work/orchestrator/0233-owner-badge.md`.
 - 공유관리 페이지 API(0243): `0014_shared_pages.sql`, 초대·멤버·페이지 목록 계약과 경로를 추가했습니다. `SessionGuard` 다음 `PageAccessGuard`가 헤더 대상 권한을 매 요청 조회하고 인증 사용자·행위자를 유지한 채 서비스에 대상 소유자 id를 전달합니다. 파일 소유자·통계·방명록 공동 관리와 초대 보존을 적용했습니다. 초대는 SHA-256만 저장하고 소유자 행 잠금·조건부 소비로 동시 수락을 제한합니다. 웹/BFF 전달은 후속 0244 범위입니다. 검증 제한과 실행 결과는 [0243](../../docs/work/api/0243-shared-pages-api.md)에 기록합니다.
 
 - 채널별 짧은 주소(0246): migration `0015_channel_links`(`channel_link_codes` 영구 기록 + `channel_links` 의미 표, 페이지 삭제 시 의미만 CASCADE), `GET /s/{code}`(저장 프리셋만 `visits.utm`에 기록, 요청의 `utm_*` 무시, 302 `/p/{publicId}?pass=…&via={code}`), `/api/me/channel-links`(목록·생성·보관, 보관 제외 50개·보관 포함 200개 한도, 사용자 행 잠금으로 동시 생성 직렬화), 소유자 전용(`PageAccessGuard`+`@PageOwnerOnly()`, 멤버 403), 공개 랜딩 `via`(이 랜딩의 code이면 `shortUrl`=`/s/{code}`와 `utm`)를 추가했습니다. `SHORT_DOMAIN_ROUTES`가 다섯 정의가 되어 `health.e2e-spec.ts`의 경로·표·migration 목록을 갱신했습니다. 기존 `/{slug}`·`/c/`·`/a/`·`/b/` 동작은 그대로입니다. [설계](../../docs/specs/channel-links.md), [티켓](../../docs/work/orchestrator/0246-channel-links.md).

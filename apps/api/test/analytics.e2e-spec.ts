@@ -50,6 +50,8 @@ describe('본인·관리자 방문 분석', () => {
       userAgent?: string | null;
       referrerHost?: string;
       utmSource?: string;
+      ip?: string | null;
+      isOwner?: boolean;
     } = {},
   ) => {
     const pageViewId = options.pageViewId ?? randomUUID();
@@ -58,9 +60,9 @@ describe('본인·관리자 방문 분석', () => {
     await t.pool.query(
       `INSERT INTO landing_events(event_id,page_view_id,session_id,short_link_id,visitor_id,kind,target_kind,target_id,
         occurred_at,active_ms,scroll_percent,ip,user_agent,country,city,referrer_host,device_type,browser,os,language,time_zone,
-        viewport_width,viewport_height,screen_width,screen_height,pixel_ratio,utm)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'192.0.2.77',$26,
-         $12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
+        viewport_width,viewport_height,screen_width,screen_height,pixel_ratio,utm,is_owner)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$27,$26,
+         $12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$28)`,
       [
         randomUUID(),
         pageViewId,
@@ -99,17 +101,17 @@ describe('본인·관리자 방문 분석', () => {
             ]
           : [null, null, null, null, null, null, null, null, null, null, null, null, null, {}]),
         options.userAgent === undefined ? 'private-raw-user-agent' : options.userAgent,
+        options.ip === undefined ? '192.0.2.77' : options.ip,
+        options.isOwner ?? false,
       ],
     );
     return { pageViewId, visitorId, sessionId };
   };
-  const visit = (owner: Creator, at: string, userAgent: string | null) =>
-    t.pool.query("INSERT INTO visits(short_link_id,slug,visitor_id,occurred_at,user_agent) VALUES($1,'s',$2,$3,$4)", [
-      owner.shortId,
-      randomUUID(),
-      at,
-      userAgent,
-    ]);
+  const visit = (owner: Creator, at: string, userAgent: string | null, ip: string | null = null) =>
+    t.pool.query(
+      "INSERT INTO visits(short_link_id,slug,visitor_id,occurred_at,user_agent,ip) VALUES($1,'s',$2,$3,$4,$5)",
+      [owner.shortId, randomUUID(), at, userAgent, ip],
+    );
   const report = (path: string, cookie = operator) => api<AnalyticsReport>(t.baseUrl, 'GET', path, { cookie });
   const mine = (owner: Creator, from = '2026-10-10', to = from) =>
     report(`/api/me/analytics?from=${from}&to=${to}`, owner.cookie);
@@ -605,6 +607,130 @@ describe('본인·관리자 방문 분석', () => {
     });
     expect(after.visitorRecency).toEqual({ newVisitors: null, returningVisitors: null });
     expect(after.botExclusions).toEqual({ pageViews: null, visits: null, redirectClicks: null });
+  });
+
+  it('본인 방문은 합계에서 빠지지 않고 건수로 함께 내려오며 다른 크리에이터와 섞이지 않는다', async () => {
+    const owner = await creator();
+    const other = await creator();
+    const self = { visitorId: randomUUID() };
+    await event(owner, 'page_view', '2026-09-03 12:00+09', { ...self, isOwner: true, active: 1000 });
+    await event(owner, 'page_view', '2026-09-03 13:00+09', { ...self, isOwner: true, active: 1000 });
+    await event(owner, 'page_view', '2026-09-03 14:00+09', { active: 1000 });
+    await event(other, 'page_view', '2026-09-03 14:00+09', { active: 1000 });
+
+    const own = (await mine(owner, '2026-09-03')).body;
+    expect(own.summary).toMatchObject({ pageViews: 3, uniqueVisitors: 2, activeMs: 3000 });
+    expect(own.ownerVisits).toEqual({ pageViews: 2, uniqueVisitors: 1 });
+    expect(own.daily[0]).toMatchObject({ pageViews: 3, ownerPageViews: 2, ownerUniqueVisitors: 1 });
+    expect(own.breakdowns.devices.reduce((sum, row) => sum + row.count, 0)).toBe(3);
+
+    const others = (await mine(other, '2026-09-03')).body;
+    expect(others.summary.pageViews).toBe(1);
+    expect(others.ownerVisits).toEqual({ pageViews: null, uniqueVisitors: null });
+    expect(others.daily[0]).toMatchObject({ ownerPageViews: null, ownerUniqueVisitors: null });
+
+    const selected = (await report(`/api/admin/analytics?from=2026-09-03&to=2026-09-03&creatorId=${owner.userId}`))
+      .body;
+    expect(selected.ownerVisits).toEqual({ pageViews: 2, uniqueVisitors: 1 });
+    const service = (await report('/api/admin/analytics?from=2026-09-03&to=2026-09-03')).body;
+    expect(service.summary.pageViews).toBe(4);
+    expect(service.ownerVisits).toEqual({ pageViews: 2, uniqueVisitors: 1 });
+    expect(JSON.stringify(own)).not.toContain('is_owner');
+    expect(JSON.stringify(own)).not.toContain(self.visitorId);
+  });
+
+  it('첫 본인 표시 전 구간은 0이 아니라 null이고 표시가 시작된 뒤의 빈 날은 0이다', async () => {
+    const owner = await creator();
+    await event(owner, 'page_view', '2026-08-01 12:00+09');
+    await event(owner, 'page_view', '2026-08-03 12:00+09', { isOwner: true });
+
+    const past = (await mine(owner, '2026-08-01', '2026-08-02')).body;
+    expect(past.summary.pageViews).toBe(1);
+    expect(past.ownerVisits).toEqual({ pageViews: null, uniqueVisitors: null });
+    expect(past.daily.map((day) => day.ownerPageViews)).toEqual([null, null]);
+
+    const spanning = (await mine(owner, '2026-08-01', '2026-08-04')).body;
+    expect(spanning.ownerVisits).toEqual({ pageViews: 1, uniqueVisitors: 1 });
+    expect(spanning.daily.map((day) => day.ownerPageViews)).toEqual([null, null, 1, 0]);
+    expect(spanning.daily.map((day) => day.ownerUniqueVisitors)).toEqual([null, null, 1, 0]);
+
+    expect((await mine(owner, '2026-08-05')).body.ownerVisits).toEqual({ pageViews: 0, uniqueVisitors: 0 });
+    const never = await creator();
+    await event(never, 'page_view', '2026-08-03 12:00+09');
+    expect((await mine(never, '2026-08-03')).body.ownerVisits).toEqual({ pageViews: null, uniqueVisitors: null });
+  });
+
+  it('보존 집계가 섞인 구간의 본인 건수는 null이고 합계는 유지한다', async () => {
+    const owner = await creator();
+    const { old, recent } = (
+      await t.pool.query<{ old: string; recent: string }>(
+        `SELECT ((now() AT TIME ZONE 'Asia/Seoul')::date-368)::text AS old,
+           ((now() AT TIME ZONE 'Asia/Seoul')::date-363)::text AS recent`,
+      )
+    ).rows[0];
+    await event(owner, 'page_view', `${old} 12:00+09`, { isOwner: true });
+    await event(owner, 'page_view', `${recent} 12:00+09`, { isOwner: true });
+    expect((await mine(owner, old, recent)).body.ownerVisits).toEqual({ pageViews: 2, uniqueVisitors: 2 });
+
+    await t.app.get(RetentionService).runOnce();
+    const after = (await mine(owner, old, recent)).body;
+    expect(after.coverage.includesRollups).toBe(true);
+    expect(after.summary.pageViews).toBe(2);
+    expect(after.ownerVisits).toEqual({ pageViews: null, uniqueVisitors: null });
+    expect(after.daily[0]).toMatchObject({ pageViews: 1, ownerPageViews: null, ownerUniqueVisitors: null });
+    expect(after.daily.at(-1)).toMatchObject({ pageViews: 1, ownerPageViews: 1, ownerUniqueVisitors: 1 });
+    // 원본과 보존 합계가 같은 날에 섞이면 그날의 본인 수도 구분할 수 없습니다.
+    await t.pool.query(
+      `INSERT INTO landing_event_daily_rollups(day,short_link_id,kind,target_kind,target_id,events,unique_visitors,unique_sessions,active_ms,max_scroll_percent)
+       VALUES($1,$2,'page_view','','',1,1,1,0,0)`,
+      [recent, owner.shortId],
+    );
+    const mixed = (await mine(owner, recent)).body;
+    expect(mixed.daily[0]).toMatchObject({ pageViews: 2, ownerPageViews: null, ownerUniqueVisitors: null });
+  });
+
+  it('Meta 대역에서 온 요청은 User-Agent가 브라우저여도 합계에서 빠지고 제외 건수로만 남는다', async () => {
+    const owner = await creator();
+    const other = await creator();
+    const browser = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148 Safari/604.1';
+    const metaIp = '2a03:2880:f800:1::';
+    const day = '2026-07-14';
+    await event(owner, 'page_view', `${day} 12:00+09`, { userAgent: browser, ip: metaIp, context: true });
+    await event(owner, 'page_view', `${day} 12:00+09`, { userAgent: browser, ip: '2a03:2881::1', context: true });
+    await event(owner, 'page_view', `${day} 12:00+09`, { userAgent: browser, ip: '203.0.113.9', context: true });
+    await event(owner, 'page_view', `${day} 12:00+09`, { userAgent: browser, ip: null, context: true });
+    await event(other, 'page_view', `${day} 12:00+09`, { userAgent: browser, ip: '203.0.113.9', context: true });
+    await visit(owner, `${day} 12:00+09`, browser, metaIp);
+    await visit(owner, `${day} 12:00+09`, browser, '203.0.113.9');
+    await t.pool.query(
+      `INSERT INTO link_clicks(short_link_id,link_public_id,visitor_id,occurred_at,user_agent,ip)
+       VALUES($1,'metaclick1',$2,$3,$4,$5)`,
+      [owner.shortId, randomUUID(), `${day} 12:00+09`, browser, metaIp],
+    );
+    await t.pool.query(
+      `INSERT INTO creator_banner_clicks(banner_public_id,short_link_id,visitor_id,occurred_at,user_agent,ip)
+       VALUES('metabanner',$1,$2,$3,$4,$5)`,
+      [owner.shortId, randomUUID(), `${day} 12:00+09`, browser, metaIp],
+    );
+
+    const own = await mine(owner, day);
+    expect(own.body.summary.pageViews).toBe(3);
+    expect(own.body.legacy).toEqual({ visits: 1, linkClicks: 0, creatorBannerClicks: 0 });
+    expect(own.body.breakdowns.devices.reduce((sum, row) => sum + row.count, 0)).toBe(3);
+    expect(own.body.botExclusions).toEqual({ pageViews: 1, visits: 1, redirectClicks: 2 });
+    expect((await mine(other, day)).body.botExclusions).toEqual({ pageViews: 0, visits: 0, redirectClicks: 0 });
+    expect(JSON.stringify(own.body)).not.toMatch(/2a03|203\.0\.113/);
+  });
+
+  it('봇으로 판별된 본인 표시는 본인 건수와 표시 시작일에 넣지 않는다', async () => {
+    const owner = await creator();
+    await event(owner, 'page_view', '2026-06-02 12:00+09', { isOwner: true, userAgent: 'Googlebot/2.1' });
+    await event(owner, 'page_view', '2026-06-02 13:00+09', { isOwner: true, ip: '2a03:2880::1' });
+    expect((await mine(owner, '2026-06-02')).body.ownerVisits).toEqual({ pageViews: null, uniqueVisitors: null });
+    await event(owner, 'page_view', '2026-06-03 13:00+09', { isOwner: true });
+    const { ownerVisits, daily } = (await mine(owner, '2026-06-02', '2026-06-03')).body;
+    expect(ownerVisits).toEqual({ pageViews: 1, uniqueVisitors: 1 });
+    expect(daily.map((row) => row.ownerPageViews)).toEqual([null, 1]);
   });
 
   it('원본조회와집계조회사이보존커밋이있어도새analytics와기존stats는같은snapshot으로중복을막는다', async () => {

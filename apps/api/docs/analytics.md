@@ -27,7 +27,8 @@
 
 - `sources`는 유입 사이트(`referrer_host`)·UTM 소스 값별 페이지뷰, 한 번 이상 클릭한 페이지뷰, 그 비율입니다. 값 규칙은 분포와 같고 상위 20개 뒤는 `other`로 합칩니다. 선택 기간에 보존 집계가 섞이면 클릭 값은 null입니다.
 - `visitorRecency`는 선택 기간 익명 방문자를 같은 소유 범위의 기간 시작 전 원본 page_view 유무로 나눈 수입니다. 선택 기간에 보존 집계가 섞이면 null이고 원본이 없는 365일 이전 방문은 비교하지 못합니다.
-- 합계·분포·대상·`legacy`는 알려진 크롤러·자동화 도구를 뺀 값입니다(`isBotUserAgent`, `packages/shared/src/bot-user-agent.ts`). 저장된 `user_agent`로 판별해 `landing_events`와 `visits`·`link_clicks`·`creator_banner_clicks` 양쪽에 적용합니다. 값이 없으면 사람으로 둡니다. `botExclusions`에 뺀 건수만 내보내며 보존 집계 구간은 구분할 수 없어 합계에 남고 해당 건수는 null입니다.
+- 합계·분포·대상·`legacy`는 알려진 크롤러·자동화 도구를 뺀 값입니다(`isBotUserAgent`, `packages/shared/src/bot-user-agent.ts`). 저장된 `user_agent`로 판별해 `landing_events`와 `visits`·`link_clicks`·`creator_banner_clicks` 양쪽에 적용합니다. 값이 없으면 사람으로 둡니다. 저장된 `ip`가 Meta 링크 검사 대역 `2a03:2880::/32`인 행도 `isMetaCrawlerIp`(`src/analytics/bot-ip.ts`)로 같은 곳에서 뺍니다(0233). `botExclusions`에 뺀 건수만 내보내며 보존 집계 구간은 구분할 수 없어 합계에 남고 해당 건수는 null입니다.
+- `ownerVisits`와 일별 `ownerPageViews`·`ownerUniqueVisitors`는 `landing_events.is_owner`로 센 크리에이터 본인 방문입니다(0233). 합계에서 빼지 않습니다. 조회 범위의 첫 본인 표시 전 구간과 보존 집계가 섞인 구간은 구분할 수 없어 null이고, 그 뒤 본인 방문이 없는 날·기간은 0입니다. 건수만 응답합니다.
 
 분포는 페이지 표시를 분모로 유입 호스트·국가/도시·기기/브라우저/OS·언어/시간대·viewport/screen/DPR·UTM 여섯 항목을 집계합니다. 값이 없으면 `unknown`, 상위 20개 이후는 `other`로 합쳐 분모를 유지합니다. 이는 값별 합계이며 개별 방문자의 속성 조합이나 식별자를 제공하지 않습니다.
 

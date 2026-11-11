@@ -14,6 +14,7 @@ import {
   analyticsDimension,
   analyticsDuration,
   analyticsHref,
+  analyticsOwnerBadge,
   analyticsPercent,
   analyticsRawCount,
   analyticsRawPercent,
@@ -150,8 +151,16 @@ export function AnalyticsDashboard({ report, mode }: { report: AnalyticsReport; 
         <section className="card" aria-labelledby="analytics-summary-title">
           <h2 id="analytics-summary-title">방문자 행동 요약</h2>
           <dl className="stat-tiles analytics-tiles">
-            <Tile title="수집된 페이지뷰" value={analyticsCount(summary.pageViews)} />
-            <Tile title="익명 순 방문자" value={analyticsCount(summary.uniqueVisitors)} />
+            <Tile
+              title="수집된 페이지뷰"
+              value={analyticsCount(summary.pageViews)}
+              ownerCount={report.ownerVisits.pageViews}
+            />
+            <Tile
+              title="익명 순 방문자"
+              value={analyticsCount(summary.uniqueVisitors)}
+              ownerCount={report.ownerVisits.uniqueVisitors}
+            />
             <Tile title="처음 본 방문자" value={analyticsRawCount(report.visitorRecency.newVisitors)} />
             <Tile title="다시 온 방문자" value={analyticsRawCount(report.visitorRecency.returningVisitors)} />
             <Tile title="세션" value={analyticsCount(summary.sessions)} />
@@ -201,8 +210,11 @@ export function AnalyticsDashboard({ report, mode }: { report: AnalyticsReport; 
       <p className="field-help">
         봇·자동화 요청 제외: 페이지뷰 {analyticsRawCount(report.botExclusions.pageViews)} · 단축 주소 방문{' '}
         {analyticsRawCount(report.botExclusions.visits)} · 리디렉트 클릭{' '}
-        {analyticsRawCount(report.botExclusions.redirectClicks)}. 알려진 크롤러·자동화 도구만 뺀 수이고, 보존 집계
-        구간은 구분할 수 없어 합계에 남아 있어요.
+        {analyticsRawCount(report.botExclusions.redirectClicks)}. 알려진 크롤러·자동화 도구와 Meta 링크 검사만 뺀
+        수이고, 보존 집계 구간은 구분할 수 없어 합계에 남아 있어요.
+      </p>
+      <p className="field-help">
+        본인 표시는 페이지 주인의 방문이고 위 합계에 포함돼 있어요. 이번 배포 이후 로그인 상태의 방문만 표시해요.
       </p>
       {report.coverage.includesRollups ||
       (report.coverage.firstRecordedDay && report.from < report.coverage.firstRecordedDay) ? (
@@ -323,13 +335,21 @@ export function AnalyticsDashboard({ report, mode }: { report: AnalyticsReport; 
   );
 }
 
-export function Tile({ title, value }: { title: string; value: string }) {
+export function Tile({ title, value, ownerCount }: { title: string; value: string; ownerCount?: number | null }) {
   return (
     <div>
       <dt>{title}</dt>
-      <dd>{value}</dd>
+      <dd>
+        {value}
+        <OwnerBadge count={ownerCount ?? null} />
+      </dd>
     </div>
   );
+}
+
+function OwnerBadge({ count }: { count: number | null }) {
+  const label = analyticsOwnerBadge(count);
+  return label ? <span className="badge badge-muted analytics-owner-badge">{label}</span> : null;
 }
 
 function DailyTrend({ daily }: { daily: AnalyticsDaily[] }) {
@@ -428,8 +448,14 @@ function DailyTable({ daily, label }: { daily: AnalyticsDaily[]; label: string }
           {daily.map((day) => (
             <tr key={day.day}>
               <th scope="row">{day.day}</th>
-              <td className="num">{analyticsCount(day.pageViews)}</td>
-              <td className="num">{analyticsCount(day.uniqueVisitors)}</td>
+              <td className="num">
+                {analyticsCount(day.pageViews)}
+                <OwnerBadge count={day.ownerPageViews || null} />
+              </td>
+              <td className="num">
+                {analyticsCount(day.uniqueVisitors)}
+                <OwnerBadge count={day.ownerUniqueVisitors || null} />
+              </td>
               <td className="num">{analyticsCount(day.sessions)}</td>
               <td className="num">{analyticsCount(day.clicks)}</td>
               <td className="num">{analyticsCount(day.impressions)}</td>
