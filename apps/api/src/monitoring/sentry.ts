@@ -21,7 +21,19 @@ export const SCRUBBED_HEADERS = [
 ];
 
 /** URL 쿼리에서 값을 `[Filtered]`로 바꾸는 이름: OAuth `code`·`state`, 랜딩 통과 표시 `pass`, Meta 토큰·앱 시크릿·웹훅 확인 토큰. */
-const SCRUBBED_QUERY_PARAMS = ['code', 'state', 'pass', 'access_token', 'client_secret', 'hub.verify_token'];
+const SCRUBBED_QUERY_PARAMS = [
+  'code',
+  'state',
+  'pass',
+  'access_token',
+  'input_token',
+  'client_secret',
+  'hub.verify_token',
+];
+const SCRUBBED_QUERY_PATTERN = new RegExp(
+  `(^|[?&])(${SCRUBBED_QUERY_PARAMS.map((name) => name.replaceAll('.', '\\.')).join('|')})=[^&#]*`,
+  'gi',
+);
 
 const SCRUBBED_SPAN_ATTRIBUTE = new RegExp(`^http\\.(request|response)\\.header\\.(${SCRUBBED_HEADERS.join('|')})$`);
 
@@ -41,6 +53,8 @@ const JWT_PATTERN = /eyJ[\w-]{10,}(?:\.[\w-]+){0,2}/g;
 const META_TOKEN_PATTERN = /\bEAA[A-Za-z0-9_-]{20,}/g;
 
 const scrubMetaToken = (text: string) => text.replace(META_TOKEN_PATTERN, '[token]');
+/** 토큰 접두사와 무관하게 URL·쿼리의 민감한 값을 가립니다. 나머지 파라미터는 유지합니다. */
+const scrubQuery = (text: string) => scrubMetaToken(text.replace(SCRUBBED_QUERY_PATTERN, '$1$2=[Filtered]'));
 const scrubLogText = (text: string) =>
   scrubMetaToken(text.replace(EMAIL_PATTERN, '[email]').replace(JWT_PATTERN, '[token]'));
 
@@ -87,7 +101,7 @@ export function sentryOptions(env: NodeJS.ProcessEnv): NodeOptions | null {
   };
 }
 
-/** 오류 이벤트의 요청 정보에서 쿠키와 인증 헤더를 지우고 오류 문구·URL의 Meta 토큰을 가립니다(`dataCollection` 설정이 바뀌어도 남지 않게 하는 마지막 단계). */
+/** 오류 이벤트의 요청 정보에서 쿠키·인증 헤더·민감한 쿼리를 지우고 오류 문구의 Meta 토큰을 가립니다(`dataCollection` 뒤 마지막 단계). */
 export function scrubEvent(event: ErrorEvent): ErrorEvent {
   const request = event.request;
   if (request) {
@@ -97,8 +111,14 @@ export function scrubEvent(event: ErrorEvent): ErrorEvent {
         if (SCRUBBED_HEADERS.includes(name.toLowerCase())) delete request.headers[name];
       }
     }
-    if (request.url) request.url = scrubMetaToken(request.url);
-    if (typeof request.query_string === 'string') request.query_string = scrubMetaToken(request.query_string);
+    if (request.url) request.url = scrubQuery(request.url);
+    if (typeof request.query_string === 'string') request.query_string = scrubQuery(request.query_string);
+    else if (Array.isArray(request.query_string)) {
+      request.query_string = request.query_string.map(([name, value]): [string, string] => [
+        name,
+        SCRUBBED_QUERY_PARAMS.includes(name.toLowerCase()) ? '[Filtered]' : scrubMetaToken(value),
+      ]);
+    }
   }
   if (typeof event.message === 'string') event.message = scrubMetaToken(event.message);
   for (const exception of event.exception?.values ?? []) {
@@ -109,11 +129,12 @@ export function scrubEvent(event: ErrorEvent): ErrorEvent {
 
 type StreamedSpan = Parameters<NonNullable<NodeOptions['beforeSendSpan']>>[0];
 
-/** span 속성에서 쿠키·인증 헤더(`http.request.header.cookie` 등)를 지우고, 남은 문자열 속성의 Meta 토큰을 가립니다. */
+/** span에서 쿠키·인증 헤더를 지우고 이름·문자열 속성의 민감한 쿼리와 Meta 토큰을 가립니다. */
 export function scrubSpan(span: StreamedSpan): StreamedSpan {
+  span.name = scrubQuery(span.name);
   for (const [key, value] of Object.entries(span.attributes)) {
     if (SCRUBBED_SPAN_ATTRIBUTE.test(key)) delete span.attributes[key];
-    else if (typeof value === 'string') span.attributes[key] = scrubMetaToken(value);
+    else if (typeof value === 'string') span.attributes[key] = scrubQuery(value);
   }
   return span;
 }

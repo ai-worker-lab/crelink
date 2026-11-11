@@ -83,7 +83,7 @@ export interface GraphInstagramAccount {
 }
 
 export interface GraphAccountLookup {
-  /** BISU id. 삭제 콜백의 `user_id`와 일치하는지는 미실측(S9). */
+  /** 검증한 debug_token.data.user_id. 삭제 콜백의 `user_id`와 일치하는지는 미실측(S9). */
   metaUserId: string | null;
   accounts: GraphInstagramAccount[];
 }
@@ -119,7 +119,7 @@ export abstract class InstagramGraph {
   /** authorization code를 토큰으로 바꿉니다. `[M?]` S7. */
   abstract exchangeCode(config: InstagramGraphConfig, code: string): Promise<GraphAccessToken>;
   /** 토큰으로 볼 수 있는 Instagram 계정. 1개가 아니면 호출자가 409입니다. `[M?]` S7. */
-  abstract fetchAccounts(accessToken: string, config?: InstagramGraphConfig): Promise<GraphAccountLookup>;
+  abstract fetchAccounts(accessToken: string, config: InstagramGraphConfig): Promise<GraphAccountLookup>;
   /** `POST /<IG_ID>/subscribed_apps?subscribed_fields=comments`. */
   abstract subscribeApp(accessToken: string, igUserId: string): Promise<void>;
   /** 구독 해제. `[M?]` 경로는 미실측입니다. */
@@ -170,7 +170,7 @@ function allowed(value: unknown, list: ReadonlySet<number>): number | null {
 
 interface GraphRequest {
   method: 'GET' | 'POST' | 'DELETE';
-  /** `[M?]` 토큰은 URL에 넣지 않고 Authorization 헤더로 보냅니다. 헤더 인증 지원은 미실측입니다. */
+  /** 호출 인증은 Authorization 헤더로 보냅니다. debug_token의 검사 대상만 input_token 쿼리입니다. */
   accessToken?: string;
   query?: Record<string, string>;
   form?: Record<string, string>;
@@ -214,17 +214,25 @@ export class FetchInstagramGraph extends InstagramGraph {
     return { accessToken, expiresAt: expiresIn === null ? null : new Date(Date.now() + expiresIn * 1000) };
   }
 
-  async fetchAccounts(accessToken: string): Promise<GraphAccountLookup> {
-    // Unified Login의 /me는 Instagram 계정이 아니라 비즈니스 통합 시스템 사용자(BISU)입니다.
+  async fetchAccounts(accessToken: string, config: InstagramGraphConfig): Promise<GraphAccountLookup> {
+    // 실응답에서 /me.id가 생략되므로 앱 인증으로 토큰 principal을 검증합니다. IG 선택 대체 경로가 아닙니다.
     const body = record(
-      await this.request('fetchAccounts', '/me', {
+      await this.request('fetchAccounts', '/debug_token', {
         method: 'GET',
-        accessToken,
-        query: { fields: 'id,client_business_id' },
+        accessToken: `${config.appId}|${config.appSecret}`,
+        query: { input_token: accessToken },
       }),
     );
-    const metaUserId = text(body.id);
-    if (!metaUserId) throw this.malformed('fetchAccounts');
+    const principal = record(body.data);
+    const metaUserId = text(principal.user_id);
+    if (
+      principal.app_id !== config.appId ||
+      principal.type !== 'SYSTEM_USER' ||
+      principal.is_valid !== true ||
+      !metaUserId
+    ) {
+      throw this.malformed('fetchAccounts');
+    }
 
     const accounts: GraphInstagramAccount[] = [];
     const cursors = new Set<string>();

@@ -109,10 +109,10 @@ describe('Sentry 설정', () => {
   describe('Meta 토큰·웹훅 서명', () => {
     const metaToken = `EAA${'Bw0ZCabc123'.repeat(4)}`;
 
-    it('쿼리 access_token·client_secret·hub.verify_token을 지우고 x-hub-signature-256 헤더도 지운다', () => {
+    it('쿼리 access_token·input_token·client_secret·hub.verify_token을 지우고 x-hub-signature-256 헤더도 지운다', () => {
       const options = sentryOptions({ SENTRY_DSN: 'https://public@o1.ingest.us.sentry.io/1' })!;
       expect(options.dataCollection?.urlQueryParams).toEqual({
-        deny: expect.arrayContaining(['access_token', 'client_secret', 'hub.verify_token']),
+        deny: expect.arrayContaining(['access_token', 'input_token', 'client_secret', 'hub.verify_token']),
       });
       expect(options.dataCollection?.httpHeaders).toEqual({
         request: { deny: expect.arrayContaining(['x-hub-signature-256']) },
@@ -133,6 +133,45 @@ describe('Sentry 설정', () => {
         attributes: { 'http.request.header.x-hub-signature-256': ['sha256=abc'], 'http.method': 'POST' },
       });
       expect(span.attributes).toEqual({ 'http.method': 'POST' });
+    });
+
+    it('EAA 접두사가 없는 input_token도 URL·query·span에서 가리고 다른 쿼리는 유지한다', () => {
+      const opaqueToken = 'opaque-suat/+?=&value';
+      const query = `input_token=${encodeURIComponent(opaqueToken)}&fields=id&input_token=another-opaque`;
+      const url = `https://graph.facebook.com/v27.0/debug_token?${query}`;
+      const filteredQuery = 'input_token=[Filtered]&fields=id&input_token=[Filtered]';
+      const filteredUrl = `https://graph.facebook.com/v27.0/debug_token?${filteredQuery}`;
+      const event = scrubEvent({ type: undefined, request: { url, query_string: query } } as ErrorEvent);
+      expect(event.request).toEqual({ url: filteredUrl, query_string: filteredQuery });
+      const tupleEvent = scrubEvent({
+        type: undefined,
+        request: {
+          query_string: [
+            ['input_token', opaqueToken],
+            ['fields', 'id'],
+          ],
+        },
+      } as ErrorEvent);
+      expect(tupleEvent.request?.query_string).toEqual([
+        ['input_token', '[Filtered]'],
+        ['fields', 'id'],
+      ]);
+      const span = scrubSpan({
+        trace_id: 't',
+        span_id: 's',
+        name: `GET ${url}`,
+        start_timestamp: 0,
+        status: 'ok',
+        is_segment: true,
+        attributes: { 'url.full': url, 'http.url': url, 'url.query': query },
+      });
+      expect(span.name).toBe(`GET ${filteredUrl}`);
+      expect(span.attributes).toEqual({ 'url.full': filteredUrl, 'http.url': filteredUrl, 'url.query': filteredQuery });
+      for (const scrubbed of [event, tupleEvent, span]) {
+        expect(JSON.stringify(scrubbed)).not.toContain(opaqueToken);
+        expect(JSON.stringify(scrubbed)).not.toContain(encodeURIComponent(opaqueToken));
+        expect(JSON.stringify(scrubbed)).not.toContain('another-opaque');
+      }
     });
 
     it('오류 이벤트의 문구와 URL에서 Meta 토큰 형식을 가린다', () => {
