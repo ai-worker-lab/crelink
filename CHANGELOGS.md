@@ -6,6 +6,7 @@
 
 ## 2026-11-11
 
+- 의존성 minor·patch 갱신(PR #166, 0274): 기존 Dependabot의 Playwright·NestJS·Next.js 등 10개 갱신과 lockfile을 최신 main에 통합합니다. 검증 근거·범위는 [0274](docs/work/orchestrator/0274-dependency-patch-update.md)에 둡니다.
 - PR #178 Caddy 패치 갱신 준비(0273): 관련 검증과 인프라 계약을 추가했습니다. 세부는 [인프라 로그](infra/CHANGELOGS.md), 근거는 [0273](docs/work/orchestrator/0273-caddy-patch-update.md)와 [인프라 계약](contracts/0273-caddy-patch-update/5-infra.contract.md)에 있습니다.
 
 - Instagram DM 정책 문구 정정(0269): 처리방침·약관의 발송 설명과 처리방침의 이용 목적을 ‘작성한 문구 그대로’로 맞췄습니다. 근거: [웹 변경 기록](apps/web/CHANGELOGS.md), [0269 진행 기록](docs/work/orchestrator/0269-instagram-dm-integration.md).
