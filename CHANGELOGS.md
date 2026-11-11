@@ -6,6 +6,8 @@
 
 ## 2026-11-11
 
+- Instagram 로그인 수정(0276 CTO R2): 공식 Unified Login authorize와 BISU·assigned 계정 조회로 정리하고 SSoT 인증 리비전을 `r2-unified-2026-11-11`로 갱신했습니다. 기존 Meta 설정·null 만료·소유권/state/revision을 유지합니다. 세부는 [API 로그](apps/api/CHANGELOGS.md), [웹 로그](apps/web/CHANGELOGS.md), [0276 진행 기록](docs/work/orchestrator/0277-instagram-direct-login.md).
+
 - Instagram DM 운영 설정 등록(0275): 사용자 SOPS 암호문의 필수 연동 설정을 검증하고 기존 배포 경로로 적용합니다. [작업 기록](docs/work/orchestrator/0275-instagram-dm-prod-settings.md), [인프라 계약](contracts/0275-instagram-dm-prod-settings/5-infra.contract.md).
 
 - 의존성 minor·patch 갱신(PR #166, 0274): 기존 Dependabot의 Playwright·NestJS·Next.js 등 10개 갱신과 lockfile을 최신 main에 통합합니다. 검증 근거·범위는 [0274](docs/work/orchestrator/0274-dependency-patch-update.md)에 둡니다.

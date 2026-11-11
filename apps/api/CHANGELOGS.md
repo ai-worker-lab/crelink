@@ -4,6 +4,8 @@
 
 ## 2026-11-11
 
+- Instagram 로그인 수정(0276 CTO R2): `src/instagram/graph.ts`의 authorize를 공식 `/dialog/oauth`와 콘솔 확인 override 값으로 맞추고 BISU id·client_business_id 확인 및 assigned 계정 조회만 사용합니다. 페이지·debug_token 대체 조회를 제거하고 필수 응답·pagination·계정 상한에서 안전하게 실패합니다. 기존 Meta 설정·null 만료·암호화·state/revision·삭제 경로는 유지합니다. fetch mock·기존 연결 E2E 시험을 갱신했으며 실제 결과·미확인 범위는 [0276](../../docs/work/orchestrator/0277-instagram-direct-login.md)에 기록합니다.
+
 - Instagram DM 자동 접미사 제거(0269): 웹훅이 `rule.message`를 그대로 저장하며 채널 링크와 수신 거부 토큰을 본문에 붙이지 않습니다. 사용하지 않는 채널 코드 조회를 제거하고 공백·줄바꿈·직접 입력 링크·이모지가 있는 문구의 본문 일치 회귀를 갱신했습니다. 근거: `src/instagram/webhook.service.ts`, `test/instagram-webhook.e2e-spec.ts`.
 
 - QA D1·D2·D4·D5·D6: 웹훅 원문·서명 디버그 로그를 제거하고 migration 검증을 갱신했습니다. 공개 답글 뒤 DM 직전에 발송 조건·lease를 재확인하며 granular scope 조회는 대상 10개 초과 및 개별 조회 실패 시 안전하게 실패합니다. 근거: `src/instagram/{webhook.controller,worker.service,graph}.ts`, `test/health.e2e-spec.ts`.

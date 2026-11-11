@@ -41,7 +41,7 @@
 | `SENTRY_ENVIRONMENT` | 아니오 | 이벤트 환경 이름. 비면 `NODE_ENV=production`이면 `production`, 아니면 `development`. |
 | `SENTRY_RELEASE` | 아니오 | release. 운영 이미지는 빌드 인자로 배포 커밋 SHA가 이미지 ENV에 들어가 소스맵 업로드 release와 같습니다. 비면 release 없이 보냅니다. |
 | `SENTRY_TRACES_SAMPLE_RATE` | 아니오 | 성능 추적 비율(기본 0.1). 0~1 사이 수가 아니면 기동 거부. |
-| `META_APP_ID`, `META_APP_SECRET`, `META_LOGIN_CONFIG_ID`, `META_WEBHOOK_VERIFY_TOKEN` | Instagram DM에 필요(전부 또는 전무, 비밀) | Meta 앱 ID·시크릿, Facebook Login for Business 구성 ID, 웹훅 확인 토큰. [Instagram 댓글 자동 DM](#instagram-댓글-자동-dm). |
+| `META_APP_ID`, `META_APP_SECRET`, `META_LOGIN_CONFIG_ID`, `META_WEBHOOK_VERIFY_TOKEN` | Instagram DM에 필요(전부 또는 전무, 비밀) | Meta 앱 ID·시크릿, Instagram 로그인 호환 Unified Login 구성 ID(비밀 아님), 웹훅 확인 토큰. [Instagram 댓글 자동 DM](#instagram-댓글-자동-dm). |
 | `INSTAGRAM_TOKEN_KEYS`, `INSTAGRAM_TOKEN_KEY_CURRENT` | Instagram DM에 필요(전부 또는 전무, 비밀) | 토큰 암호화 키 `1:<b64>,2:<b64>`(32바이트)와 현재 버전. 형식이 틀리면 기동 거부. |
 | `INSTAGRAM_COMMENTER_HASH_KEY`, `INSTAGRAM_OPT_OUT_KEY` | Instagram DM에 필요(전부 또는 전무, 비밀) | 작성자 해시 키와 수신 거부 토큰 키(각 32바이트 base64). 토큰 키를 포함해 서로 달라야 하고, 같으면 기동 거부. |
 | `INSTAGRAM_DM_HOURLY_LIMIT` | 아니오 | 연결당 시간당 DM 발송 한도(기본 700). 1 이상의 정수가 아니면 기동 거부. |
@@ -371,8 +371,10 @@ pnpm --filter @crelink/api --silent ai-operator list-tokens   # 또는 node apps
 
 ### Instagram 공개 답글과 Unified Login 보강
 
-- `src/instagram/graph.ts`는 동의 URL에 `display=popup`, `prompt=login`을 넣고 페이지 계정, 직접 할당 계정(`assigned_instagram_accounts`), `granular_scopes` 순으로 계정을 조회합니다. granular scope 대상이 10개를 초과하거나 개별 조회가 실패하면 불완전한 계정 목록을 반환하지 않고 실패합니다. 실제 Meta 응답은 별도 실측이 필요합니다.
+- 현재 인증 기준은 설계의 `r2-unified-2026-11-11`입니다. `src/instagram/graph.ts`는 공식 `https://www.facebook.com/dialog/oauth`에 기존 `client_id`·`config_id`·`redirect_uri`·`state`, `override_default_response_type=true`, `prompt=login`, `response_type=code`, `display=popup`을 전달합니다. 사용자는 Instagram 계정으로 로그인하고 공유할 계정을 하나만 선택합니다. 기존 Meta 자격 증명·verify token·암호키를 유지합니다.
+- 계정 조회는 `/me?fields=id,client_business_id`로 BISU 필수 식별자를 확인한 뒤 `/me/assigned_instagram_accounts?fields=id,username`만 사용합니다. 다음 페이지는 고정 Graph edge에 cursor로 요청하며 최대 10쪽·계정 10개입니다. 필드 누락·중복·불완전 pagination·조회 실패·상한 초과는 502, 0개·복수개는 409로 거부합니다. 페이지/accounts/debug_token 대체 조회나 임의 Facebook 페이지 연결 요구는 없습니다.
+- `meta_user_id`에는 BISU id를 저장하고 client_business_id는 확인만 합니다. 삭제 콜백 user_id와 BISU id의 실제 대응은 미실측이며 기존 콜백 시험이 이를 입증하지는 않습니다. 선택 config는 콘솔에서 SUAT·만료 없음으로 확인했고 `token_expires_at=null`을 유지합니다. 새 설정·migration·60일 refresh·관리 API 호출은 없습니다. 실제 code 교환·BISU/assigned 응답·연결 완료와 webhook은 Coordinator의 후속 확인 범위입니다.
 - `src/instagram/rules.service.ts`의 선택 `replyMessage`는 최대 300 코드 포인트이며 null·빈 문자열은 공개 답글을 해제합니다. migration `0017_instagram_public_reply.sql`을 먼저 적용합니다.
 - `src/instagram/worker.service.ts`는 공개 답글 뒤 DM을 보냅니다. 답글 실패도 DM을 막지 않으며 답글 결과를 DM 전에 저장해 DM 재시도 시 답글을 반복하지 않습니다. DM 직전 발송 조건과 lease를 다시 확인하며 공개 답글 중 정지·수신 거부·취소·lease 상실이 발생하면 DM을 보내지 않습니다. 외부 발송과 DB 기록 사이 프로세스 종료는 원자적으로 묶을 수 없습니다.
 
-검증 기록(2026-11-11): `pnpm test --runTestsByPath src/instagram/instagram-crypto.spec.ts` 31개 통과, `pnpm typecheck` 통과, 변경 TypeScript 7개 파일의 ESLint 통과, `git diff --check` 통과, `pnpm work:scope` 통과. 지정 명령 `pnpm --filter @crelink/api test -- instagram`은 12 suite 통과·35 suite 실패이며 로컬 DB `127.0.0.1:6652` 연결이 샌드박스에서 `EPERM`으로 차단됩니다. 추가한 HTTP/DB 통합 회귀의 통과와 실제 Meta 연동은 확인하지 못했습니다. 작업 경로 자체에 `instagram`이 포함되어 지정 명령이 다른 API 테스트도 선택합니다.
+0276 CTO R2의 지정 시험·타입 검사·lint 결과와 로컬 DB 접근 한계는 [0276 진행 기록](../../../docs/work/orchestrator/0277-instagram-direct-login.md#진행-기록)에 있습니다. 기존 Graph 대역의 HTTP/DB 회귀와 실제 Meta 식별자·응답은 별도 검증 범위이며 fetch mock 통과로 실측 완료를 주장하지 않습니다.
