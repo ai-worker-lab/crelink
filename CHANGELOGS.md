@@ -6,6 +6,8 @@
 
 ## 2026-11-11
 
+- Instagram DM 성공 후 답글 hotfix(0282): worker ordering을 `r5-dm-before-reply/u1`로 동기화하고 DM 성공 저장 뒤에만 답글을 허용합니다. [티켓](docs/work/orchestrator/0282-instagram-reply-after-dm.md), [API 로그](apps/api/CHANGELOGS.md).
+
 - 0281 Graph source selector 보완: 기존 `instagram-crypto.spec.ts`의 crypto/Graph 보안경계와 새 `graph.spec.ts` fixture 검사를 함께 선택하고 두 시험 파일도 덮습니다. fixture-only 범위는 유지하며 기존 mapping unit에서 auth/hotfix의 API typecheck 포함·DB/스택/EGO/이미지 자동 미추가를 확인합니다. [티켓](docs/work/orchestrator/0281-scoped-verification.md), [실행 원본](scripts/lib/ci-local.mjs).
 
 - 0281 report 환경 지문 보정: `exec_command`의 호출별 `CODEX_TOOL_CALL_ID`만 기존 제외 목록에 추가했습니다. hermetic 검증→report에서 호출 ID가 달라도 검사 0회 재사용하고 `TEST_DATABASE_URL` 변경은 거부하도록 검사합니다. 실제 첫 full 성공·첫 report 거부 근거는 [티켓](docs/work/orchestrator/0281-scoped-verification.md)에 기록합니다.

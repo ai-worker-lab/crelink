@@ -878,28 +878,42 @@ describe('Instagram DM 발송 worker', () => {
     });
   });
 
-  it.each(['pause', 'opt_out', 'cancel', 'lease'])('공개 답글 도중 %s 발생 시 DM을 보내지 않는다', async (stop) => {
-    const account = await seedAccount();
-    const delivery = await seedDelivery(account);
-    await t.pool.query('UPDATE instagram_dm_rules SET reply_message = $2 WHERE id = $1', [account.ruleId, '안내']);
-    jest.spyOn(t.app.get(InstagramGraph), 'replyToComment').mockImplementationOnce(async () => {
-      if (stop === 'pause') await t.pool.query('UPDATE instagram_connections SET dm_paused_at = now()');
-      if (stop === 'opt_out')
-        await t.pool.query('INSERT INTO instagram_dm_opt_outs (ig_user_id, commenter_hash) VALUES ($1, $2)', [
-          account.igUserId,
-          delivery.hash,
-        ]);
-      if (stop === 'cancel') await t.pool.query("UPDATE instagram_dm_deliveries SET status = 'cancelled'");
-      if (stop === 'lease')
-        await t.pool.query("UPDATE instagram_dm_deliveries SET lease_until = now() + interval '1 hour'");
-      return { commentId: 'public-reply' };
-    });
-    await tick(worker());
-    expect(send).not.toHaveBeenCalled();
-    expect((await row(delivery.id)).status).toBe(stop === 'lease' ? 'sending' : 'cancelled');
-  });
+  it.each(['pause', 'opt_out', 'cancel', 'unknown', 'lease', 'lease_expired'])(
+    'DM 도중 %s 발생 시 답글을 보내지 않는다',
+    async (stop) => {
+      const account = await seedAccount();
+      const delivery = await seedDelivery(account);
+      await t.pool.query('UPDATE instagram_dm_rules SET reply_message = $2 WHERE id = $1', [account.ruleId, '안내']);
+      const reply = jest
+        .spyOn(t.app.get(InstagramGraph), 'replyToComment')
+        .mockResolvedValue({ commentId: 'public-reply' });
+      send.mockImplementationOnce(async () => {
+        if (stop === 'pause') await t.pool.query('UPDATE instagram_connections SET dm_paused_at = now()');
+        if (stop === 'opt_out')
+          await t.pool.query('INSERT INTO instagram_dm_opt_outs (ig_user_id, commenter_hash) VALUES ($1, $2)', [
+            account.igUserId,
+            delivery.hash,
+          ]);
+        if (stop === 'cancel') await t.pool.query("UPDATE instagram_dm_deliveries SET status = 'cancelled'");
+        if (stop === 'unknown') await t.pool.query("UPDATE instagram_dm_deliveries SET status = 'unknown'");
+        if (stop === 'lease')
+          await t.pool.query("UPDATE instagram_dm_deliveries SET lease_until = now() + interval '1 hour'");
+        if (stop === 'lease_expired')
+          await t.pool.query("UPDATE instagram_dm_deliveries SET lease_until = now() - interval '1 second'");
+        return { messageId: 'm' };
+      });
+      const target = worker();
+      await tick(target);
+      const saved = await row(delivery.id);
+      expect(saved.status).toBe(stop === 'cancel' ? 'cancelled' : stop === 'unknown' ? 'unknown' : 'sent');
+      if (saved.status === 'sent') expect(saved.sent_at).not.toBeNull();
+      await tick(target);
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(reply).not.toHaveBeenCalled();
+    },
+  );
 
-  it.each([false, true])('공개 답글 실패=%s여도 DM을 보내고 재시도 때 답글을 반복하지 않는다', async (fails) => {
+  it.each([false, true])('DM 성공 저장 뒤 공개 답글 실패=%s여도 sent를 유지하고 재발송하지 않는다', async (fails) => {
     const account = await seedAccount();
     await t.pool.query('UPDATE instagram_dm_rules SET reply_message = $2 WHERE id = $1', [
       account.ruleId,
@@ -907,13 +921,20 @@ describe('Instagram DM 발송 worker', () => {
     ]);
     const delivery = await seedDelivery(account);
     const reply = jest.spyOn(t.app.get(InstagramGraph), 'replyToComment');
-    if (fails) reply.mockRejectedValue(new Error(RAW_GRAPH_TEXT));
-    else reply.mockResolvedValue({ commentId: 'public-reply' });
-    send.mockRejectedValueOnce(graphError('connect_failed', null));
+    let stateAtReply: Awaited<ReturnType<typeof row>> | undefined;
+    reply.mockImplementation(async () => {
+      stateAtReply = await row(delivery.id);
+      expect(stateAtReply).toMatchObject({ status: 'sent', failure_code: null, lease_until: null });
+      expect(stateAtReply.sent_at).not.toBeNull();
+      if (fails) throw new Error(RAW_GRAPH_TEXT);
+      return { commentId: 'public-reply' };
+    });
     const target = worker();
     await tick(target);
+    expect(stateAtReply).toMatchObject({ status: 'sent', failure_code: null, lease_until: null });
+    expect(stateAtReply!.sent_at).not.toBeNull();
     expect(reply).toHaveBeenCalledWith(TOKEN, delivery.commentId, 'DM을 확인해 주세요');
-    expect(reply.mock.invocationCallOrder[0]).toBeLessThan(send.mock.invocationCallOrder[0]);
+    expect(send.mock.invocationCallOrder[0]).toBeLessThan(reply.mock.invocationCallOrder[0]);
     const saved = await t.pool.query(
       'SELECT reply_status, reply_comment_id FROM instagram_dm_deliveries WHERE id = $1',
       [delivery.id],
@@ -924,9 +945,93 @@ describe('Instagram DM 발송 worker', () => {
     });
     await makeDue(delivery.id);
     await tick(target);
+    expect(send).toHaveBeenCalledTimes(1);
     expect(reply).toHaveBeenCalledTimes(1);
     expect((await row(delivery.id)).status).toBe('sent');
     expect(loggedText()).not.toContain(delivery.commentId);
+    expect(loggedText()).not.toContain(RAW_GRAPH_TEXT);
+  });
+
+  it.each<[string, Error, string]>([
+    ['수신 거절', graphError('rejected', 400), 'failed'],
+    ['권한 거절', graphError('rejected', 403, 990001), 'failed'],
+    ['응답 불명·timeout', graphError('indeterminate', null), 'unknown'],
+    ['연결 전 실패', graphError('connect_failed', null), 'pending'],
+  ])('DM %s에는 답글이 없고 연결 전 실패의 재시도 성공에만 답글을 보낸다', async (_name, error, status) => {
+    const account = await seedAccount();
+    const delivery = await seedDelivery(account);
+    await t.pool.query('UPDATE instagram_dm_rules SET reply_message = $2 WHERE id = $1', [account.ruleId, '안내']);
+    const reply = jest.spyOn(t.app.get(InstagramGraph), 'replyToComment').mockImplementation(async () => {
+      expect((await row(delivery.id)).status).toBe('sent');
+      return { commentId: 'public-reply' };
+    });
+    send.mockRejectedValueOnce(error);
+    const target = worker();
+
+    await tick(target);
+    expect((await row(delivery.id)).status).toBe(status);
+    expect(reply).not.toHaveBeenCalled();
+    await tick(target);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(reply).not.toHaveBeenCalled();
+
+    await makeDue(delivery.id);
+    await tick(target);
+    expect(send).toHaveBeenCalledTimes(status === 'pending' ? 2 : 1);
+    expect(reply).toHaveBeenCalledTimes(status === 'pending' ? 1 : 0);
+    if (status === 'pending') {
+      expect(send.mock.invocationCallOrder[1]).toBeLessThan(reply.mock.invocationCallOrder[0]);
+      expect(await row(delivery.id)).toMatchObject({ status: 'sent', attempts: 1, failure_code: null });
+      const saved = await t.pool.query('SELECT reply_status FROM instagram_dm_deliveries WHERE id = $1', [delivery.id]);
+      expect(saved.rows[0].reply_status).toBe('sent');
+    }
+    await tick(target);
+    expect(send).toHaveBeenCalledTimes(status === 'pending' ? 2 : 1);
+    expect(reply).toHaveBeenCalledTimes(status === 'pending' ? 1 : 0);
+  });
+
+  it('DM을 보내기 전에 정지되면 DM과 답글 모두 호출하지 않는다', async () => {
+    const account = await seedAccount();
+    const delivery = await seedDelivery(account);
+    await t.pool.query('UPDATE instagram_dm_rules SET reply_message = $2 WHERE id = $1', [account.ruleId, '안내']);
+    const reply = jest
+      .spyOn(t.app.get(InstagramGraph), 'replyToComment')
+      .mockResolvedValue({ commentId: 'public-reply' });
+    const target = worker();
+    afterClaim(target, () => t.pool.query('UPDATE instagram_connections SET dm_paused_at = now()'));
+
+    await tick(target);
+    await tick(target);
+
+    expect((await row(delivery.id)).status).toBe('cancelled');
+    expect(send).not.toHaveBeenCalled();
+    expect(reply).not.toHaveBeenCalled();
+  });
+
+  it('답글 자격 확인 뒤 sent 저장이 0행이면 답글을 보내지 않는다', async () => {
+    const account = await seedAccount();
+    const delivery = await seedDelivery(account);
+    await t.pool.query('UPDATE instagram_dm_rules SET reply_message = $2 WHERE id = $1', [account.ruleId, '안내']);
+    const reply = jest
+      .spyOn(t.app.get(InstagramGraph), 'replyToComment')
+      .mockResolvedValue({ commentId: 'public-reply' });
+    const target = worker();
+    const spied = target as unknown as {
+      finish(id: string, status: string, code: string | null): Promise<number | null>;
+    };
+    const original = spied.finish.bind(target);
+    jest.spyOn(spied, 'finish').mockImplementation(async (id, status, code) => {
+      if (status === 'sent')
+        await t.pool.query("UPDATE instagram_dm_deliveries SET status = 'unknown' WHERE id = $1", [id]);
+      return original(id, status, code);
+    });
+
+    await tick(target);
+    await tick(target);
+
+    expect((await row(delivery.id)).status).toBe('unknown');
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(reply).not.toHaveBeenCalled();
   });
 
   describe('시작과 종료', () => {

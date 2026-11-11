@@ -1,7 +1,7 @@
 # Instagram 댓글 자동 DM 기술 설계
 
 - 상태: 초안
-- 현재 기능 리비전: `r4-all-comments-2026-11-11/u1` ([0280 CTO 계약 R2](../../contracts/0280-instagram-all-comments/1-cto-interface.contract.md)·사용자 확정)
+- 현재 기능 리비전: `r5-dm-before-reply/u1` ([API worker ordering](../../apps/api/docs/README.md#instagram-공개-답글과-unified-login-보강)·0282 사용자 확정)
 - 현재 인증 리비전: `r3-token-identity-2026-11-11` (0279 CTO 승인·실응답 반영)
 - 작성일: 2026-11-11
 - 에픽: `docs/work/epics/0251-instagram-comment-dm.md`
@@ -81,7 +81,7 @@
        → 규칙 조회 1회 → 규칙 일치분의 최초 발송 기회 마커·delivery 원자 저장 → 커밋 뒤 200
 
 [발송] worker(2초 tick, 두 색 동시 가능) → 빈 슬롯 수만큼 SKIP LOCKED로 sending 선점 → 커밋
-       → 호출 직전 재확인 → Graph POST(트랜잭션 밖) → status='sending' 조건으로 결과 기록
+       → DM 직전 재확인 → DM Graph POST(트랜잭션 밖) → 기존 readSendState로 답글 자격 재확인 → status='sending' 조건으로 sent 저장(반영 1행) → 자격이 있을 때만 공개 답글(세부 기준: API 안내의 worker ordering)
 
 [수신 거부] 수신자 → {WEB}/dm-opt-out#t={token} → 확인 버튼(페이지 JS) → BFF → POST /api/public/instagram-dm-opt-outs {token}
        → 수신 거부 기록과 그 사람의 pending 취소를 한 트랜잭션으로
