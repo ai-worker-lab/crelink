@@ -4,6 +4,8 @@
 
 ## 2026-11-11
 
+- Instagram 모든 댓글·최초 1회(0280): `0019_instagram_all_comments.sql`에 기본 false 모드·키워드 조건·계정/게시물/HMAC 마커와 pending·sending·sent·unknown 백필을 추가했습니다. 웹훅은 기존 자격·version 검사 뒤 earliest 후보의 마커와 delivery를 원자 저장하며 재연결·규칙 재생성·90일 파기 뒤에도 중복을 막고 Meta 삭제에서는 함께 파기합니다. 규칙/내역 API 필드·health 목록과 실제 DB 경합/파기/백필 시험을 보완했습니다. [시험·한계](../../docs/work/orchestrator/0280-instagram-all-comments.md).
+
 - Instagram 토큰 principal 수정(0279 CTO R3): `src/instagram/graph.ts`의 `fetchAccounts(token, config)`에서 `/me`를 제거하고 앱 `Authorization: Bearer appId|appSecret`의 `/debug_token?input_token=<SUAT>`로 바꿨습니다. `data.app_id` 일치·`type=SYSTEM_USER`·`is_valid=true`·비어 있지 않은 문자열 `user_id`를 모두 검증한 뒤 user_id를 metaUserId로 사용합니다. IG 선택은 기존 assigned 목록·필드·페이지·상한·0개/복수개 409를 유지하며 secret query·응답 원문 로그는 추가하지 않습니다. `src/monitoring/sentry.ts`에 `input_token` deny와 opaque 토큰 URL·query·span 가림을 보강했고 단위 시험·typecheck 근거는 [0279](../../docs/work/orchestrator/0279-instagram-token-identity.md)에 남깁니다. 기존 0278·CTO R2 기록은 당시 이력입니다.
 
 - Instagram 계정 응답 검증 보완(0278): `src/instagram/graph.ts`의 `fetchAccounts`에서 저장·사용하지 않는 `client_business_id` 필수 guard만 제거했습니다. BISU id 필수, assigned IG 필수값·페이지 오류·상한, 서비스의 0개·복수개 거부를 유지하며 `instagram-crypto.spec.ts`에서 해당 필드 생략 회귀를 보강했습니다. 추가 로그 없이 해결하며 검증 결과는 [0278](../../docs/work/orchestrator/0278-instagram-account-response.md)에 기록합니다.

@@ -41,6 +41,7 @@ export function RuleEditor({
   const baseId = useId();
   const [media, setMedia] = useState<InstagramDmMediaView | null>(null);
   const [keyword, setKeyword] = useState(rule?.keyword ?? '');
+  const [matchAllComments, setMatchAllComments] = useState(rule?.matchAllComments ?? false);
   const [message, setMessage] = useState(rule?.message ?? '');
   const [replyMessage, setReplyMessage] = useState(rule?.replyMessage ?? '');
   const [problem, setProblem] = useState<keyof typeof PROBLEM_TEXT | null>(null);
@@ -53,7 +54,7 @@ export function RuleEditor({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const found = ruleDraftProblem({ mediaId: media?.id ?? '', keyword, message }, rule === null);
+    const found = ruleDraftProblem({ mediaId: media?.id ?? '', keyword, matchAllComments, message }, rule === null);
     setProblem(found);
     if (found) {
       root.current?.querySelector<HTMLElement>(`[data-field="${found}"]`)?.focus();
@@ -63,7 +64,8 @@ export function RuleEditor({
       const trimmedReply = replyMessage.trim() || null;
       if (rule) {
         const body: UpdateInstagramDmRuleRequest = {
-          keyword: keyword.trim(),
+          keyword,
+          matchAllComments,
           message,
           replyMessage: trimmedReply,
         };
@@ -76,7 +78,8 @@ export function RuleEditor({
       } else {
         const body: CreateInstagramDmRuleRequest = {
           mediaId: media!.id,
-          keyword: keyword.trim(),
+          keyword,
+          matchAllComments,
           message,
           replyMessage: trimmedReply,
         };
@@ -122,6 +125,27 @@ export function RuleEditor({
         </div>
       )}
       <div className="field">
+        <label htmlFor={`${baseId}-all-comments`}>
+          <input
+            id={`${baseId}-all-comments`}
+            type="checkbox"
+            data-autofocus={rule ? '' : undefined}
+            checked={matchAllComments}
+            onChange={(event) => {
+              setMatchAllComments(event.target.checked);
+              setProblem(null);
+            }}
+            disabled={save.pending}
+            aria-describedby={`${baseId}-all-comments-help`}
+          />{' '}
+          모든 댓글에 DM 보내기
+        </label>
+        <p id={`${baseId}-all-comments-help`} className="field-help">
+          같은 사람에게 같은 게시물에서는 최초 한 번만 보내요. 다른 게시물에서는 각각 한 번 보낼 수 있어요. 규칙을
+          고치거나 다시 만들어도, 연결을 해제했다 다시 연결해도 중복 발송하지 않아요.
+        </p>
+      </div>
+      <div className="field">
         <label htmlFor={`${baseId}-keyword`}>키워드</label>
         <input
           id={`${baseId}-keyword`}
@@ -132,13 +156,14 @@ export function RuleEditor({
           placeholder={RULE_FIELD_COPY.keywordPlaceholder}
           autoComplete="off"
           data-field="keyword"
-          data-autofocus={rule ? '' : undefined}
           aria-invalid={problem === 'keyword' || undefined}
           aria-describedby={`${baseId}-keyword-help`}
-          disabled={save.pending}
+          disabled={save.pending || matchAllComments}
         />
         <p id={`${baseId}-keyword-help`} className="field-help">
-          댓글에 이 말이 들어 있으면 DM을 보내요. 최대 {INSTAGRAM_DM_LIMITS.keywordMaxLength}자예요.
+          {matchAllComments
+            ? '키워드와 관계없이 모든 댓글에 적용해요. 체크를 끄면 입력해 둔 키워드가 다시 적용돼요.'
+            : `댓글에 이 말이 들어 있으면 DM을 보내요. 최대 ${INSTAGRAM_DM_LIMITS.keywordMaxLength}자예요.`}
         </p>
         {problem === 'keyword' ? <p className="form-error-inline">{PROBLEM_TEXT.keyword}</p> : null}
       </div>

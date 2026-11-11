@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { CRELINK_API_PATHS } from './crelink.ts';
-import { INSTAGRAM_DM_LIMITS } from './instagram-dm.ts';
+import { INSTAGRAM_DM_LIMITS, isInstagramDmKeyword } from './instagram-dm.ts';
 
 test('Instagram 댓글 자동 DM 한도는 설계와 같다', () => {
   assert.deepEqual(INSTAGRAM_DM_LIMITS, {
@@ -63,4 +63,15 @@ test('Instagram 규칙 텍스트 경계는 유니코드 코드 포인트 기준�
   assert.equal(within('😀', INSTAGRAM_DM_LIMITS.messageMaxLength), true);
   assert.equal(within('😀'.repeat(250), INSTAGRAM_DM_LIMITS.messageMaxLength), true);
   assert.equal(within('😀'.repeat(251), INSTAGRAM_DM_LIMITS.messageMaxLength), false);
+});
+
+test('0280 키워드 모드 1~30자·모든 댓글 모드 0~30자와 원문 보존 경계', () => {
+  for (const mode of [false, true]) {
+    assert.equal(isInstagramDmKeyword('😀'.repeat(30), mode), true);
+    assert.equal(isInstagramDmKeyword('😀'.repeat(31), mode), false);
+    for (const value of [null, undefined, 1, 'a\u0000']) assert.equal(isInstagramDmKeyword(value, mode), false);
+    assert.equal(isInstagramDmKeyword('  링크  ', mode), true);
+    assert.equal(isInstagramDmKeyword('', mode), mode);
+    assert.equal(isInstagramDmKeyword('   ', mode), mode);
+  }
 });

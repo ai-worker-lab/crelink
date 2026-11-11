@@ -90,3 +90,17 @@ test('기본 문구에 독점 콘텐츠 표현과 팔로우 조건이 없다', (
   const copy = [...Object.values(RULE_FIELD_COPY), ...Object.values(CONNECT_FAILURE_MESSAGES)].join('\n');
   assert.doesNotMatch(copy, /독점|댓글해야|팔로우|follow/i);
 });
+
+test('0280 모든 댓글은 빈 키워드를 허용하고 끄면 같은 초안을 다시 검증한다', () => {
+  const draft = { mediaId: 'post', keyword: '', message: '안내', matchAllComments: true };
+  assert.equal(ruleDraftProblem(draft, true), null);
+  assert.equal(ruleDraftProblem({ ...draft, matchAllComments: false }, true), 'keyword');
+  assert.equal(ruleDraftProblem({ ...draft, keyword: '😀'.repeat(30) }, true), null);
+  assert.equal(ruleDraftProblem({ ...draft, keyword: '😀'.repeat(31) }, true), 'keyword');
+  assert.equal(ruleDraftProblem({ ...draft, keyword: 'a\u0000' }, true), 'keyword');
+  assert.equal(ruleDraftProblem({ ...draft, mediaId: '' }, true), 'media');
+  assert.equal(ruleDraftProblem({ ...draft, message: 'a'.repeat(251) }, true), 'message');
+  const savedKeyword = { ...draft, keyword: '  링크  ' };
+  assert.equal(ruleDraftProblem({ ...savedKeyword, matchAllComments: false }, false), null);
+  assert.equal(savedKeyword.keyword, '  링크  ');
+});

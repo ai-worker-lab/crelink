@@ -100,7 +100,12 @@ describe('Instagram 규칙 API (0260)', () => {
     });
     expect(result.status).toBe(201);
     const rule = result.body;
-    expect(rule).toMatchObject({ mediaId: 'post', mediaPermalink: media('post').permalink, enabled: true });
+    expect(rule).toMatchObject({
+      mediaId: 'post',
+      mediaPermalink: media('post').permalink,
+      enabled: true,
+      matchAllComments: false,
+    });
     expect(rule.publicId).toMatch(/^[a-z0-9]{10}$/);
     expect((await stored(rule.publicId)).ig_media_child_ids).toEqual([]);
     const link = (await t.pool.query('SELECT * FROM channel_links WHERE code = $1', [rule.channelLinkCode])).rows[0];
@@ -114,6 +119,46 @@ describe('Instagram 규칙 API (0260)', () => {
     expect(visit.headers.get('location')).toContain(`/p/${owner.pageId}?`);
     expect((await request(owner, 'GET', '/rules')).body).toEqual({ rules: [rule] });
     expect(graph).toHaveBeenCalledWith('test-ig-token', expect.any(String), null);
+  });
+
+  it('0280 모든 댓글 생성·목록·수정·토글은 빈/기존 키워드를 보존하고 최종 모드를 검증한다', async () => {
+    const owner = await creator();
+    for (const matchAllComments of [null, 'true', 1]) {
+      expect((await create(owner, { mediaId: 'post', keyword: '', matchAllComments, message: '안내' })).status).toBe(
+        400,
+      );
+    }
+    for (const keyword of [null, 1, 'a'.repeat(31), 'a\u0000']) {
+      expect((await create(owner, { mediaId: 'post', keyword, matchAllComments: true, message: '안내' })).status).toBe(
+        400,
+      );
+    }
+    const made = await create(owner, { mediaId: 'post', keyword: '', matchAllComments: true, message: '안내' });
+    expect(made.status).toBe(201);
+    expect(made.body).toMatchObject({ keyword: '', matchAllComments: true });
+    const campaign = (
+      await t.pool.query('SELECT campaign FROM channel_links WHERE code=$1', [made.body.channelLinkCode])
+    ).rows[0].campaign;
+    expect(campaign).toBe(normalizeChannelCampaign(`dm-all-${made.body.publicId.slice(0, 6)}`));
+    const path = `/rules/${made.body.publicId}`;
+    expect((await request(owner, 'PATCH', path, { message: '수정' })).status).toBe(200);
+    expect((await request(owner, 'PATCH', path, { matchAllComments: false })).status).toBe(400);
+    expect((await stored(made.body.publicId)).match_all_comments).toBe(true);
+    for (const body of [{ matchAllComments: null }, { matchAllComments: 'false' }, { keyword: 'a'.repeat(31) }]) {
+      expect((await request(owner, 'PATCH', path, body)).status).toBe(400);
+    }
+    const changed = await request<InstagramDmRuleView>(owner, 'PATCH', path, {
+      keyword: '  자료  ',
+      matchAllComments: false,
+    });
+    expect(changed.body).toMatchObject({ keyword: '  자료  ', matchAllComments: false });
+    for (const matchAllComments of [true, false]) {
+      const toggled = await request<InstagramDmRuleView>(owner, 'PATCH', path, { matchAllComments });
+      expect(toggled.status).toBe(200);
+      expect(toggled.body).toMatchObject({ keyword: '  자료  ', matchAllComments });
+    }
+    const unchanged = await request<InstagramDmRuleView>(owner, 'PATCH', path, {});
+    expect((await request(owner, 'GET', '/rules')).body).toEqual({ rules: [unchanged.body] });
   });
 
   it('공개 답글 300자 경계·수정·해제와 잘못된 입력을 검증한다', async () => {
@@ -226,7 +271,7 @@ describe('Instagram 규칙 API (0260)', () => {
     }
   });
 
-  it.each([{ keyword: '새 키워드' }, { message: '새 메시지' }, { enabled: false }])(
+  it.each([{ keyword: '새 키워드' }, { message: '새 메시지' }, { enabled: false }, { matchAllComments: true }])(
     '수정 %j는 version 증가와 pending 취소를 함께 수행한다',
     async (body) => {
       const owner = await creator();

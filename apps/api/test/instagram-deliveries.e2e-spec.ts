@@ -138,14 +138,26 @@ describe('Instagram 발송 내역 API (0261)', () => {
     expect(result.body.items.map((item) => item.status).sort()).toEqual(statuses.sort());
     for (const item of result.body.items) {
       expect(Object.keys(item).sort()).toEqual(
-        ['id', 'ruleId', 'keyword', 'mediaPreview', 'status', 'createdAt', 'sentAt'].sort(),
+        ['id', 'ruleId', 'keyword', 'matchAllComments', 'mediaPreview', 'status', 'createdAt', 'sentAt'].sort(),
       );
-      expect(item).toMatchObject({ ruleId: seeded.publicId, keyword: '자료', mediaPreview: '게시물 미리보기' });
+      expect(item).toMatchObject({
+        ruleId: seeded.publicId,
+        keyword: '자료',
+        matchAllComments: false,
+        mediaPreview: '게시물 미리보기',
+      });
       expect(item.sentAt).toBe(item.status === 'sent' ? '2026-11-01T01:00:00.000Z' : null);
     }
     for (const key of ['commenter_hash', 'comment_id', 'failure_code', 'message_body']) {
       expect(JSON.stringify(result.body)).not.toContain(key);
     }
+  });
+
+  it('0280 모든 댓글 규칙의 내역은 빈 키워드와 matchAllComments를 반환한다', async () => {
+    const owner = await creator();
+    const seeded = await rule(owner, 1);
+    await t.pool.query("UPDATE instagram_dm_rules SET match_all_comments=true, keyword='' WHERE id=$1", [seeded.id]);
+    expect((await request(owner)).body.items[0]).toMatchObject({ keyword: '', matchAllComments: true });
   });
 
   it('보관 규칙도 필터링하며 타 소유자·없는 규칙은 404로 보호한다', async () => {

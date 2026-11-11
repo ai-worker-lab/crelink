@@ -1,6 +1,7 @@
 # Instagram 댓글 자동 DM 기술 설계
 
 - 상태: 초안
+- 현재 기능 리비전: `r4-all-comments-2026-11-11/u1` ([0280 CTO 계약 R2](../../contracts/0280-instagram-all-comments/1-cto-interface.contract.md)·사용자 확정)
 - 현재 인증 리비전: `r3-token-identity-2026-11-11` (0279 CTO 승인·실응답 반영)
 - 작성일: 2026-11-11
 - 에픽: `docs/work/epics/0251-instagram-comment-dm.md`
@@ -51,8 +52,8 @@
 | 요구 | 화면 | API | 데이터 | 티켓 |
 | --- | --- | --- | --- | --- |
 | R30-1 계정 연결·해제 | 연결 | `/api/me/instagram*`, OAuth 콜백 | `instagram_connections` | 0256, 0263, 0264 |
-| R30-2 게시물·키워드 규칙 | 규칙 설정 | `/rules`, `/media` | `instagram_dm_rules` | 0255, 0260, 0264 |
-| R30-3 키워드 댓글에 링크 DM 1건 | 없음 | 웹훅, worker | `instagram_dm_deliveries` | 0257, 0258, 0262 |
+| R30-2 게시물·키워드 또는 모든 댓글 규칙 | 규칙 설정 | `/rules`, `/media` | `instagram_dm_rules` | 0255, 0260, 0264 |
+| R30-3 규칙에 맞는 댓글에 같은 사람·같은 게시물 최초 DM 1건 | 없음 | 웹훅, worker | `instagram_dm_deliveries` | 0257, 0258, 0262 |
 | R30-4 발송 내역 | 발송 내역 | `/deliveries` | 위와 같음 | 0261, 0265 |
 | R30-5 긴급 정지 | 연결 화면, 운영자 카드 | `/pause`, `/api/admin/instagram-dm*` | `platform_settings` 열, 정지 열 | 0259, 0264, 0266 |
 | R30-6 삭제·파기 | 삭제 확인 페이지 | 데이터 삭제 콜백 | `instagram_deletion_requests`, 보존 작업 | 0257, 0259, 0267 |
@@ -77,7 +78,7 @@
        → {WEB}/me/integrations/instagram/callback → POST /api/me/instagram/callback → 암호화 저장·구독
 
 [수신] Meta → Cloudflare → Caddy(웹 호스트의 웹훅 경로만 API로) → raw 미들웨어 → 서명 검증
-       → 규칙 조회 1회 → 키워드 일치분만 INSERT ON CONFLICT DO NOTHING → 커밋 뒤 200
+       → 규칙 조회 1회 → 규칙 일치분의 최초 발송 기회 마커·delivery 원자 저장 → 커밋 뒤 200
 
 [발송] worker(2초 tick, 두 색 동시 가능) → 빈 슬롯 수만큼 SKIP LOCKED로 sending 선점 → 커밋
        → 호출 직전 재확인 → Graph POST(트랜잭션 밖) → status='sending' 조건으로 결과 기록
@@ -88,7 +89,7 @@
 
 ## 데이터 모델
 
-`apps/api/migrations/0016_instagram_dm.sql` 1건으로 만듭니다. 추가만 하므로 두 색이 겹쳐도 안전합니다(E4, E6). 되돌림 주석은 0014 형식을 따르고, 운영 데이터가 생긴 뒤에는 다음 migration으로 고칩니다(E19). 0252 뒤에 작성하므로 실측 결과를 반영합니다.
+`apps/api/migrations/0016_instagram_dm.sql`이 초기 모델이며 아래 SQL은 당시 기반 모델입니다. 현재 공개 답글은 `0017_instagram_public_reply.sql`, 모든 댓글·최초 1회는 `0019_instagram_all_comments.sql`의 추가 변경을 함께 적용합니다. 추가만 하므로 두 색이 겹쳐도 안전합니다(E4, E6). 되돌림 주석은 0014 형식을 따르고, 운영 데이터가 생긴 뒤에는 다음 migration으로 고칩니다(E19). 0252 뒤에 작성하므로 실측 결과를 반영합니다.
 
 ```sql
 SET LOCAL lock_timeout = '5s';
@@ -193,11 +194,15 @@ CREATE TABLE instagram_deletion_requests (
 );
 ```
 
+**모든 댓글·최초 1회(0280 확정).** `rules.match_all_comments`는 기본 false이며 기존 행도 false입니다. false는 keyword 1~30자, true는 0~30자이고 토글 시 기존 keyword를 보존합니다. 생성 시 비어 있는 keyword의 채널 campaign 부분은 `all`입니다. 변경은 기존 편집과 같이 version 증가·pending 취소를 수행합니다. 실행 원본은 `apps/api/migrations/0019_instagram_all_comments.sql`, `apps/api/src/instagram/rules.service.ts`입니다.
+
+`instagram_dm_recipients`는 `(ig_user_id, scope_key, commenter_hash)` PK와 created_at만 저장합니다. scope_key는 규칙의 canonical `ig_media_id`만 사용하며 자식 ID·계정 전체 모드·옵션은 없습니다. 같은 사람은 같은 게시물에서 최초 유효 댓글 1회만 발송 기회를 소비하고 다른 게시물에서는 각각 1회입니다. 취소·실패·토글·편집·보관 후 규칙 재생성·연결 해제/재연결·90일 내역 파기 뒤에도 마커는 유지합니다. FK와 90일 자동 파기는 없으며 Meta 데이터 삭제 콜백에서 해당 계정 마커를 같은 트랜잭션으로 파기합니다. 0019는 기존 pending·sending·sent·unknown을 백필합니다. worker의 기존 안전한 네트워크 재시도·unknown·정지·한도·공개 답글은 유지합니다.
+
 **댓글 작성자 식별자.**
 
 - 원문 댓글, 사용자명, 원본 작성자 ID는 저장하지 않습니다.
 - 핸들러가 `HMAC-SHA256(키, ig_user_id || from.id)`만 저장합니다. 연결이 아니라 IG 계정 기준이라 재연결해도 값이 같습니다. 사람별 1건 제한과 수신 거부에 필요한 값이 이것뿐입니다. 발송은 `comment_id`로 하므로 원본 ID가 필요 없습니다.
-- 키워드에 맞지 않는 댓글은 행을 만들지 않습니다.
+- 키워드 모드에서는 키워드에 맞지 않는 댓글의 행을 만들지 않습니다. 모든 댓글 모드에서도 자격·24시간·수신 거부·최초 1회 조건을 통과해야 저장합니다.
 
 **보관과 파기.**
 
@@ -208,14 +213,15 @@ CREATE TABLE instagram_deletion_requests (
 | 토큰 무효 | 즉시 | 토큰 파기, `reauth_required`, 대기 건 취소 |
 | 데이터 삭제 콜백 | 즉시 | 연결 행 삭제, 소유 대응표 파기, 확인 코드만 남김 |
 | 수신 거부 소유 대응표(`instagram_opt_out_owners`) | Meta 데이터 삭제 요청 때 즉시 | 연결 때 `(ig_user_id, meta_user_id)`를 upsert하고 일반 해제 뒤에도 남긴다. `meta_user_id`에는 검증한 debug_token의 user_id를 저장하며, signed_request의 user_id와 실제 일치는 미실측이다(S9). 일치할 때 일반 해제 뒤에도 ig_user_id를 찾는 근거다 |
+| 최초 발송 기회 마커(`instagram_dm_recipients`) | Meta 데이터 삭제 요청 때 해당 계정분 즉시 | 일반 해제·재연결·규칙 재생성·90일 내역 파기와 별도. 콜백에서 같은 트랜잭션으로 DELETE |
 | 확인 코드 | 90일 | 보존 작업 DELETE |
 | 수신 거부 기록(`instagram_dm_opt_outs`) | 크리링 회원 탈퇴·Meta 데이터 삭제 요청 때 해당 `ig_user_id`분 즉시 | 90일 파기 대상이 아님. 일반 해제·재연결·재인증에서는 유지. FK가 없으므로 데이터 삭제 콜백(0257)이 같은 트랜잭션에서 소유 대응표와 연결 행으로 찾은 `ig_user_id`로 직접 DELETE. 현재 API에 회원 탈퇴 경로가 없어 이번 티켓은 없고, 탈퇴 기능을 만들 때 같은 파기를 넣는다 |
 
-90일이 지나면 같은 사람이 같은 규칙으로 다시 DM을 받을 수 있습니다. 수용합니다. 다만 수신 거부 의사가 90일 뒤 사라지면 안 되므로 거부 기록은 90일 파기에서 뺍니다. 수신 거부 링크는 서버에 저장하지 않는 서명 토큰이라 90일 뒤에도 옛 링크가 동작합니다.
+발송 내역이 90일 뒤 지워져도 최초 발송 기회 마커가 남아 같은 사람·같은 게시물에는 새 delivery를 만들지 않습니다. 수신 거부 의사가 90일 뒤 사라지면 안 되므로 거부 기록은 90일 파기에서 뺍니다. 수신 거부 링크는 서버에 저장하지 않는 서명 토큰이라 90일 뒤에도 옛 링크가 동작합니다.
 
 **객체 권한.** 규칙·내역의 모든 조회·변경은 연결 소유자 조건(`connection.user_id = 세션 사용자`)을 SQL에 포함합니다. 다른 크리에이터의 `publicId` 요청은 404입니다. `instagram_dm_rules`의 `UNIQUE (id, connection_id)`와 발송 행의 복합 FK `(rule_id, connection_id)`로 규칙과 발송 행의 연결이 어긋나지 않게 합니다.
 
-**규칙 변경 경합.** keyword·message 수정, 비활성화, 보관은 `version`을 올리고 같은 트랜잭션에서 그 규칙의 `pending`을 `cancelled`로 바꿉니다. 발송 행의 `message_body`가 저장 시점의 최종 본문이라 발송은 이 값으로만 합니다. 저장 때 규칙 `version`을 `rule_version`에 함께 기록해, 선점·호출 직전 재확인·재시도 복귀 어디서든 현재 `version`과 다르면 옛 문구이므로 보내지 않고 `cancelled`로 끝냅니다.
+**규칙 변경 경합.** match_all_comments·keyword·message 수정, 비활성화, 보관은 `version`을 올리고 같은 트랜잭션에서 그 규칙의 `pending`을 `cancelled`로 바꿉니다. 발송 행의 `message_body`가 저장 시점의 최종 본문이라 발송은 이 값으로만 합니다. 저장 때 규칙 `version`을 `rule_version`에 함께 기록해, 선점·호출 직전 재확인·재시도 복귀 어디서든 현재 `version`과 다르면 옛 문구이므로 보내지 않고 `cancelled`로 끝냅니다.
 
 **한도.** 연결당 활성 규칙 10개, 보관 포함 100개(E13의 총 200개 안). 게시물당 활성 규칙 1개.
 
@@ -246,7 +252,7 @@ CREATE TABLE instagram_deletion_requests (
    - `commented_at`은 `entry.time`을 쓰고, 없거나 잘못되면 수신 시각을 씁니다. 필드 존재 여부는 S5로 확정합니다.
    - 위 필드명과 시각 필드는 S5의 필드표로 확정합니다.
 6. **유실 방지.** 커밋 뒤에만 200입니다. DB 오류면 503을 돌려 Meta 재전송에 맡깁니다. 재시도는 36시간입니다 `[문서]`. 배포 중에는 옛 색이 진행 중 요청을 마치고(E4), 전환 순간의 연결 실패는 Caddy `lb_try_duration`이 덮습니다.
-7. **멱등성.** 중복 제거가 필수입니다 `[문서]`. `ON CONFLICT DO NOTHING`은 두 유니크 제약(`(connection_id, comment_id)`, `(rule_id, commenter_hash)`)만 처리하고, 이 둘로 충분하므로 같은 웹훅 재전송과 같은 사람의 반복 댓글은 행이 생기지 않습니다.
+7. **멱등성.** `webhook.service.ts`의 CTE는 현재 version·자격·수신 거부·24시간 조건을 먼저 검사하고, 계정·canonical 게시물·해시 키별 가장 이른 댓글(동률은 comment_id·rule_id)을 고릅니다. 정렬한 recipients INSERT의 `ON CONFLICT DO NOTHING RETURNING`을 받은 행만 같은 문장에서 delivery로 저장합니다. 동시 웹훅·재전송·여러 댓글도 1건이며 옛 version은 마커를 소비하지 않습니다. 실패 시 전체 트랜잭션이 롤백됩니다. 기존 delivery 유니크 제약도 유지합니다.
 
 **댓글·게시물 ID.**
 
@@ -321,7 +327,7 @@ S4에서 같은 `comment_id` 재호출이 구분되는 오류로 거부된다고
 
 웹훅 저장·규칙 변경·worker·관리자·연결이 모두 같은 순서로 잠가 교착(40P01)을 막습니다. 근거는 `apps/api/src/instagram/lock-order.ts`입니다.
 
-`platform_settings` → `instagram_connections`(여러 행이면 id 순) → `users` → `instagram_dm_rules`(여러 행이면 id 순) → `instagram_dm_deliveries`
+`platform_settings` → `instagram_connections`(여러 행이면 id 순) → `users` → `instagram_dm_rules`(여러 행이면 id 순) → `instagram_dm_recipients`(계정·게시물·해시 순) → `instagram_dm_deliveries`
 
 - 여러 발송 행을 바꾸는 트랜잭션은 먼저 그 행들의 연결 행을 잡습니다(규칙 변경·정지·재인증·해제는 이미 잡고, `audience` 변경은 전체 연결을 id 순으로, 수신 거부는 그 IG 계정의 연결을 잡습니다). 연결 행을 잡지 않는 일괄 변경(worker `sweep`)은 `SKIP LOCKED`로 기다리지 않습니다.
 - 웹훅은 단일 INSERT의 잠금 절에 순서를 맡기지 않고 트랜잭션에서 위 순서로 잠근 뒤 저장합니다. 트랜잭션이 실패하면(40P01 포함) 503입니다.
@@ -366,14 +372,14 @@ S4에서 같은 `comment_id` 재호출이 구분되는 오류로 거부된다고
 
 **해제.** `DELETE /api/me/instagram`은 구독 해제를 시도하고(실패 무시) 연결 행을 삭제합니다. 규칙과 내역도 함께 지워지며 화면에 그렇게 안내합니다. 운영자 정지(`operator_paused_at`)가 있으면 행을 지우지 않습니다. 재인증 전이(토큰 파기·`pending` 취소)를 하고 규칙을 보관한 뒤 행을 남기며, 구독 해제 뒤에 행을 잠그고 다시 읽어 호출 중에 걸린 정지도 놓치지 않습니다. 재연결(같은 `user_id`)은 그 행을 갱신하므로 정지가 유지됩니다. 응답은 똑같이 204이고, 데이터 삭제 콜백은 운영자 정지와 관계없이 행을 지웁니다.
 
-**데이터 삭제 콜백.** HTTPS, `signed_request` 검증, `{url, confirmation_code}` 응답입니다 `[문서]`. `meta_user_id`로 연결을 찾아 삭제하고, 일반 해제로 연결 행이 없어도 소유 대응표(`instagram_opt_out_owners`)로 `ig_user_id`를 찾아 그 수신 거부 기록과 대응표 행을 같은 트랜잭션에서 파기합니다. 못 찾아도 같은 응답을 줍니다. 응답 `url`은 `{WEB}/privacy/instagram-deletion/{code}`입니다. 현재 `meta_user_id`에 저장한 검증된 debug_token `user_id`와 실제 삭제 콜백의 `user_id`가 같은 식별자인지는 미실측입니다(S9) `[M?]`. 기존 서명 검증과 일치 식별자에 대한 삭제 시험은 실제 Meta 식별자 일치의 증거가 아닙니다. 불일치 시 다른 식별자나 Facebook 페이지를 임의로 대입하지 않고 삭제 경로를 다시 결정해야 합니다. 확인 페이지는 코드 존재 여부만 표시합니다. 댓글 작성자는 앱을 승인한 적이 없어 콜백이 오지 않습니다 `[M?]`. 90일 자동 파기와 처리방침의 문의 경로로 대응합니다.
+**데이터 삭제 콜백.** HTTPS, `signed_request` 검증, `{url, confirmation_code}` 응답입니다 `[문서]`. `meta_user_id`로 연결을 찾아 삭제하고, 일반 해제로 연결 행이 없어도 소유 대응표(`instagram_opt_out_owners`)로 `ig_user_id`를 찾아 그 수신 거부 기록·최초 발송 기회 마커·대응표 행을 같은 트랜잭션에서 파기합니다. 못 찾아도 같은 응답을 줍니다. 응답 `url`은 `{WEB}/privacy/instagram-deletion/{code}`입니다. 현재 `meta_user_id`에 저장한 검증된 debug_token `user_id`와 실제 삭제 콜백의 `user_id`가 같은 식별자인지는 미실측입니다(S9) `[M?]`. 기존 서명 검증과 일치 식별자에 대한 삭제 시험은 실제 Meta 식별자 일치의 증거가 아닙니다. 불일치 시 다른 식별자나 Facebook 페이지를 임의로 대입하지 않고 삭제 경로를 다시 결정해야 합니다. 확인 페이지는 코드 존재 여부만 표시합니다. 댓글 작성자는 앱을 승인한 적이 없어 콜백이 오지 않습니다 `[M?]`. 90일 자동 파기와 처리방침의 문의 경로로 대응합니다.
 
 ## DM 링크와 측정
 
 **측정할 수 있습니다.** 규칙을 만들 때 `instagram`/`dm` 프리셋(E13)으로 규칙 전용 코드를 만들고, DM에는 `{SHORT}/s/{code}`만 넣습니다.
 
 - 임의 URL을 받지 않아 피싱 표면이 없고, 도착지는 R14 검사를 받는 랜딩입니다.
-- `utm_campaign`은 `dm-<키워드>-<public_id 앞 6자>`로 정규화합니다.
+- `utm_campaign`은 `dm-<키워드(비면 all)>-<public_id 앞 6자>`로 정규화합니다.
 - `/s/{code}` 처리로 UTM이 저장되고(E13), 기존 통계의 `utm_id` 분포에서 코드별로 봅니다(E14). 봇 UA는 제외되며 `facebookexternalhit`도 포함됩니다.
 - 규칙이 한도(50/200)를 소모합니다. 초과하면 기존 409를 그대로 돌려줍니다.
 - 규칙 생성은 코드 생성과 규칙 저장을 한 트랜잭션으로 묶습니다. 저장이 실패하면 코드도 되돌아가므로 실패한 시도가 주소를 소모하지 않고, 같은 조합은 기존 코드를 돌려줍니다.
@@ -395,10 +401,10 @@ S4에서 같은 `comment_id` 재호출이 구분되는 오류로 거부된다고
 | `PUT /api/me/instagram/pause` | 소유자 | `{ paused }` | 연결 뷰 | 409 `instagram_operator_paused` |
 | `GET /api/me/instagram/media` | 소유자 | `?after=` | `{ items: [{ id, caption, permalink, thumbnailUrl, timestamp }], nextCursor }` 25건 | 409 `instagram_reauth_required`, 502 |
 | `GET /api/me/instagram/rules` | 소유자 | 없음 | `{ rules: [InstagramDmRuleView] }` 상한 10 | 공통 |
-| `POST /api/me/instagram/rules` | 소유자 | `{ mediaId, keyword, message }`. `message` 상한 250자 | 201 규칙 뷰 | 400 `validation_failed`, 409 `instagram_rule_limit_reached`, 409 `instagram_rule_media_taken`, 409 `channel_link_*` |
-| `PATCH /api/me/instagram/rules/:publicId` | 소유자 | `{ keyword?, message?, enabled? }`. `message` 상한 250자 | 규칙 뷰 | 400, 404 `instagram_rule_not_found` |
+| `POST /api/me/instagram/rules` | 소유자 | `{ mediaId, keyword, matchAllComments?, message }`. matchAllComments 기본 false, keyword는 false 1~30·true 0~30자, `message` 상한 250자 | 201 규칙 뷰 | 400 `validation_failed`, 409 `instagram_rule_limit_reached`, 409 `instagram_rule_media_taken`, 409 `channel_link_*` |
+| `PATCH /api/me/instagram/rules/:publicId` | 소유자 | `{ keyword?, matchAllComments?, message?, enabled? }`. 저장된 모드와 입력을 합쳐 keyword 검증, 모드만 변경하면 keyword 보존. `message` 상한 250자 | 규칙 뷰 | 400, 404 `instagram_rule_not_found` |
 | `DELETE /api/me/instagram/rules/:publicId` | 소유자 | 없음 | 204(보관) | 404 |
-| `GET /api/me/instagram/deliveries` | 소유자 | `?cursor=&rule=` | `{ items: [{ id, ruleId, keyword, mediaPreview, status, createdAt, sentAt }], nextCursor }` 20건, keyset(`common/cursor.ts`) | 400 |
+| `GET /api/me/instagram/deliveries` | 소유자 | `?cursor=&rule=` | `{ items: [{ id, ruleId, keyword, matchAllComments, mediaPreview, status, createdAt, sentAt }], nextCursor }` 20건, keyset(`common/cursor.ts`) | 400 |
 | `GET·PUT /api/admin/instagram-dm` | 운영자 | `{ audience }` | 설정 뷰 | 400, 감사 기록 |
 | `PUT /api/admin/instagram-dm/connections/:userId/pause` | 운영자 | `{ paused }` | 204 | 404, 감사 기록 |
 | `GET·POST /api/webhooks/instagram` | 서명 | Meta 형식 | 200 | 403, 503 |
@@ -431,14 +437,14 @@ S4에서 같은 `comment_id` 재호출이 구분되는 오류로 거부된다고
 | 운영자 정지 | `operatorPaused=true` | 스위치 비활성, 안내 |
 | 규칙 없음 | `rules=[]` | 안내와 `규칙 추가` |
 | 게시물 선택 | `/media` | 목록과 더 보기, 빈 상태, 502 재시도 |
-| 규칙 편집 | 입력 | 키워드, 메시지(글자 수, 상한 250), 한도 안내, 코드와 통계 링크 |
+| 규칙 편집 | 입력 | 모든 댓글 체크박스(기본 꺼짐), 켜면 키워드 입력 disabled·값 보존, 끄면 복귀·재검증. 키워드, 메시지(글자 수, 상한 250), 한도 안내, 코드와 통계 링크 |
 | 내역 로딩·빈·오류 | `/deliveries` | 스켈레톤, 빈 안내, 재시도 |
 | 내역 행 | `status` | `대기`, `보냄`, `실패`, `확인 필요`(`unknown`), `시간 초과`, `취소` |
 | 수신 거부 페이지 `/dm-opt-out` | 공개, 프래그먼트 `#t` 토큰 | 확인 버튼, 완료, 유효하지 않음(400 `opt_out_invalid`). `ROBOTS_DISALLOW`에 `/dm-opt-out` 추가 |
 
 규칙 화면의 기본 문구, placeholder, 예시에 "댓글해야만 받는 독점 콘텐츠" 표현과 팔로우 조건을 넣지 않습니다 `[문서]`. 서버 문구 검사는 만들지 않습니다.
 
-390px·1280px에서 가로 넘침이 없어야 합니다.
+규칙 목록·발송 내역·필터는 모든 댓글 모드를 `모든 댓글`로 표시하고, 같은 사람·같은 게시물 최초 1회임을 안내합니다. 390px·1280px에서 가로 넘침과 콘솔 오류가 없어야 합니다.
 
 ## 권한·보안·개인정보
 
@@ -447,9 +453,9 @@ S4에서 같은 `comment_id` 재호출이 구분되는 오류로 거부된다고
 **처리방침·약관 변경 항목(E17, A7, 같은 배포).**
 
 1. 크리에이터 수집 항목: Instagram 계정 ID·사용자명·계정 유형, 암호화한 토큰, 지정 게시물 ID·캡션 일부
-2. 새 절 `인스타그램 댓글 자동 DM`: 키워드가 일치한 댓글의 ID와 작성자 식별값의 해시. 원문과 사용자명은 저장하지 않음
+2. 새 절 `인스타그램 댓글 자동 DM`: 키워드 또는 모든 댓글 규칙에 맞는 댓글의 ID와 작성자 식별값의 해시, 계정·게시물·해시만 담은 최초 발송 기회 마커. 원문과 사용자명은 저장하지 않음
 3. 이용 목적: 크리에이터 지정 링크 DM 발송, 중복 발송 방지
-4. 보관: 90일, 연결 해제와 삭제 요청 시 즉시
+4. 보관: 실제 발송 내역 90일, 연결 해제와 삭제 요청 시 즉시. 최초 발송 기회 마커는 90일 파기·일반 해제·규칙 재생성에서 유지하고 Meta 데이터 삭제 때 같은 트랜잭션에서 파기
 5. 제공·국외 이전: Meta로 전송되는 DM 내용과 댓글 ID. 이전받는 자·국가·표현은 법률 검토 대상
 6. 크리에이터와 크리링의 처리 관계(위탁 여부)는 법률 검토 대상
 7. 열람 권한: 소유자만, 공동 관리자 제외
@@ -593,7 +599,7 @@ R 등급의 정의 문서는 `docs/development`, `docs/alm`, `WORKFLOW.md`, `doc
 | A4 | 0269 | 운영 `audience=operators`, 회사 계정 실발송 |
 | A5 | 0270 | Business Verification, App Review, Advanced Access 요청, 앱 Live 전환. 사업자 확보 후 재개 |
 | A6 | 검수 통과 후 | `audience=everyone`. 사업자 확보 후 재개 |
-| A7 | 0267 전 | 처리방침·약관 문구, 법률 검토 여부 |
+| A7 | 0267 전(이력) | 처리방침·약관 문구, 법률 검토 여부. 0280의 마커 저장·기간·해제 정정은 사용자 기능 요청에 필수인 연동 문구로 함께 반영하며 별도 승인 대기하지 않음 |
 | A8 | 운영 시작 후 | 연 1회 Data Use Checkup 담당과 일정 지정. 사업자 확보 후 재개 |
 
 ## 미정
@@ -608,6 +614,8 @@ R 등급의 정의 문서는 `docs/development`, `docs/alm`, `WORKFLOW.md`, `doc
 - 2026-11-11 Codex Sol xhigh 반대 의견 10건 검토, 전부 반영(6번으로 10번 해소). api·web·product 검토 전
 
 ## 변경 기록
+
+- 2026-11-11 0280 사용자 확정·CTO R2(`r4-all-comments-2026-11-11/u1`): R30-2·3·4·6에 모든 댓글 체크박스와 같은 사람·같은 게시물 최초 1회, 별도 마커·0019 백필·처리방침을 동기화했습니다. 인증 r3와 과거 계약·미실측 S 항목은 유지합니다.
 
 - 2026-11-11 0279 CTO 승인(`r3-token-identity-2026-11-11`): 실제 `/me.id` 누락에 따라 identity를 앱 Bearer로 검증한 debug_token user_id로 바꿨습니다. assigned 계정 선택과 기존 보안·설정·DB는 유지하며 opaque input_token 가림을 반영했습니다. R2·0278 당시 판단과 검증 이력은 보존합니다.
 

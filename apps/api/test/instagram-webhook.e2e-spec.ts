@@ -10,6 +10,8 @@ import { Database } from '../src/database';
 import { commenterHash } from '../src/instagram/crypto';
 import { LOCK_CONNECTIONS, LOCK_RULES, LOCK_SETTINGS } from '../src/instagram/lock-order';
 import { INSTAGRAM_WEBHOOK_BODY_LIMIT } from '../src/instagram/raw-body';
+import { RetentionService } from '../src/retention/retention.service';
+import { InstagramGraph } from '../src/instagram/graph';
 import { InstagramWorkerService } from '../src/instagram/worker.service';
 import { api, createTestApp, login, TestApp, WEB_URL } from './test-app';
 
@@ -619,7 +621,8 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
       expect(query).toHaveBeenCalledTimes(1);
       expect(sqls.slice(0, 3)).toEqual([LOCK_SETTINGS, LOCK_CONNECTIONS, LOCK_RULES]);
       expect(sqls).toHaveLength(4);
-      expect(sqls[3].trim().startsWith(INSERT_SQL)).toBe(true);
+      expect(sqls[3]).toContain('WITH eligible AS MATERIALIZED');
+      expect(sqls[3]).toContain(INSERT_SQL);
       expect(await rowsOf(account)).toHaveLength(1000);
     });
 
@@ -760,6 +763,208 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
     }, 60_000);
   });
 
+  describe('0280 모든 댓글·canonical 게시물 최초 1회 (T2~T10)', () => {
+    const allMode = (account: Account) =>
+      t.pool.query("UPDATE instagram_dm_rules SET match_all_comments=true, keyword='' WHERE id=$1", [account.ruleId]);
+    const markers = async (account: Account) =>
+      (await t.pool.query('SELECT * FROM instagram_dm_recipients WHERE ig_user_id=$1', [account.igUserId])).rows;
+    const recreateRule = async (account: Account, connectionId = account.connectionId) => {
+      const result = await t.pool.query<{ id: string }>(
+        `INSERT INTO instagram_dm_rules (public_id, connection_id, ig_media_id, media_permalink, keyword, match_all_comments, message, channel_link_code, created_at)
+         VALUES ($1,$2,$3,'https://instagram.test/p/1','',true,$4,$5,now()-interval '1 hour') RETURNING id`,
+        [randomId(10), connectionId, account.mediaId, RULE_MESSAGE, account.code],
+      );
+      return { ...account, connectionId, ruleId: result.rows[0].id };
+    };
+
+    it('T2~T5 모든 댓글은 빈 본문·비키워드도 저장하고 사람·게시물마다 각 1건이다. 자식은 부모 키를 쓴다', async () => {
+      const account = await newAccount();
+      await allMode(account);
+      await t.pool.query("UPDATE instagram_dm_rules SET ig_media_child_ids=ARRAY['canonical-child'] WHERE id=$1", [
+        account.ruleId,
+      ]);
+      const from = { id: 'same-person' };
+      expect(
+        (
+          await post(
+            webhook(account, [
+              change(account, { from, text: '' }),
+              change(account, { from, text: '키워드 없음', media: { id: 'canonical-child' } }),
+            ]),
+          )
+        ).status,
+      ).toBe(200);
+      await post(
+        webhook(account, [
+          change(account, { from }),
+          change(account, { from: { id: 'other-person' }, text: '안녕하세요' }),
+        ]),
+      );
+      expect(await rowsOf(account)).toHaveLength(2);
+      const second = await recreateRule({ ...account, mediaId: 'other-post' });
+      expect((await post(webhook(second, [change(second, { from, text: '안녕하세요' })]))).status).toBe(200);
+      expect(await rowsOf(account)).toHaveLength(3);
+      expect((await markers(account)).map((row) => row.scope_key).sort()).toEqual(
+        [account.mediaId, account.mediaId, 'other-post'].sort(),
+      );
+      const marker = (await markers(account))[0];
+      expect(Object.keys(marker).sort()).toEqual(['ig_user_id', 'scope_key', 'commenter_hash', 'created_at'].sort());
+      expect(marker.commenter_hash.length).toBe(32);
+    });
+
+    it('T3·T6 반대 순서 배치와 동시 서로 다른 댓글 20회는 earliest 댓글 한 건만 저장한다', async () => {
+      const account = await newAccount();
+      await allMode(account);
+      const from = { id: 'concurrent-person' };
+      const entries = [
+        ...webhook(account, [change(account, { from, id: 'later-comment' })], nowSeconds() - 1).entry,
+        ...webhook(
+          account,
+          [change(account, { from, id: 'z-early-comment' }), change(account, { from, id: 'a-early-comment' })],
+          nowSeconds() - 60,
+        ).entry,
+      ];
+      const responses = await Promise.all(
+        Array.from({ length: 20 }, (_, i) =>
+          post({ object: 'instagram', entry: i % 2 ? entries : [...entries].reverse() }),
+        ),
+      );
+      expect(responses.map((response) => response.status)).toEqual(Array(20).fill(200));
+      expect((await rowsOf(account)).map((row) => row.comment_id)).toEqual(['a-early-comment']);
+      expect(await markers(account)).toHaveLength(1);
+    });
+
+    it.each(['failed', 'expired', 'cancelled', 'unknown'])(
+      'T3 최초 기회를 소비한 뒤 %s여도 후속 댓글로 새 delivery를 만들지 않는다',
+      async (status) => {
+        const account = await newAccount();
+        await allMode(account);
+        const from = { id: 'consumed-person' };
+        await post(webhook(account, [change(account, { from })]));
+        await t.pool.query('UPDATE instagram_dm_deliveries SET status=$2 WHERE connection_id=$1', [
+          account.connectionId,
+          status,
+        ]);
+        await post(webhook(account, [change(account, { from })]));
+        expect(await rowsOf(account)).toHaveLength(1);
+        expect((await rowsOf(account))[0].status).toBe(status);
+        expect(await markers(account)).toHaveLength(1);
+      },
+    );
+
+    it('T7 편집·토글·보관 후 재생성에도 마커를 유지한다', async () => {
+      const account = await newAccount();
+      await allMode(account);
+      const from = { id: 'edited-person' };
+      await post(webhook(account, [change(account, { from })]));
+      for (const body of [
+        { keyword: KEYWORD, matchAllComments: false },
+        { matchAllComments: true },
+        { message: '수정' },
+      ]) {
+        expect(
+          (
+            await api(t.baseUrl, 'PATCH', `/api/me/instagram/rules/${account.publicId}`, {
+              cookie: account.cookie,
+              body,
+            })
+          ).status,
+        ).toBe(200);
+        await post(webhook(account, [change(account, { from })]));
+      }
+      expect(await rowsOf(account)).toHaveLength(1);
+      expect(
+        (await api(t.baseUrl, 'DELETE', `/api/me/instagram/rules/${account.publicId}`, { cookie: account.cookie }))
+          .status,
+      ).toBe(204);
+      const next = await recreateRule(account);
+      await post(webhook(next, [change(next, { from })]));
+      expect(await rowsOf(account)).toHaveLength(1);
+      expect(await markers(account)).toHaveLength(1);
+    });
+
+    it('T8 옛 version은 마커를 소비하지 않고 새 version 재전송만 저장한다', async () => {
+      const account = await newAccount();
+      await allMode(account);
+      const raw = JSON.stringify(webhook(account, [change(account)]));
+      const real = database.transaction.bind(database);
+      jest
+        .spyOn(database, 'transaction')
+        .mockImplementationOnce(((run: (client: PoolClient) => Promise<unknown>) =>
+          t.pool
+            .query('UPDATE instagram_dm_rules SET version=version+1 WHERE id=$1', [account.ruleId])
+            .then(() => real(run))) as never);
+      expect((await send(raw)).status).toBe(200);
+      expect(await markers(account)).toHaveLength(0);
+      expect(await rowsOf(account)).toHaveLength(0);
+      expect((await send(raw)).status).toBe(200);
+      expect(await markers(account)).toHaveLength(1);
+      expect(await rowsOf(account)).toHaveLength(1);
+    });
+
+    it('T9 90일 실제 보존 작업 뒤 내역만 파기하고 후속 댓글은 0건이다', async () => {
+      const account = await newAccount();
+      await allMode(account);
+      const from = { id: 'retained-person' };
+      await post(webhook(account, [change(account, { from })]));
+      await t.pool.query(
+        "UPDATE instagram_dm_deliveries SET created_at=now()-interval '91 days' WHERE connection_id=$1",
+        [account.connectionId],
+      );
+      await t.pool.query("UPDATE instagram_dm_recipients SET created_at=now()-interval '91 days' WHERE ig_user_id=$1", [
+        account.igUserId,
+      ]);
+      await t.app.get(RetentionService).runOnce();
+      expect(await rowsOf(account)).toHaveLength(0);
+      expect(await markers(account)).toHaveLength(1);
+      await post(webhook(account, [change(account, { from })]));
+      expect(await rowsOf(account)).toHaveLength(0);
+    });
+
+    it('T10 실제 해제 후 새 연결·새 규칙에서도 같은 canonical 게시물은 0건이다', async () => {
+      const account = await newAccount();
+      await allMode(account);
+      const from = { id: 'reconnected-person' };
+      await post(webhook(account, [change(account, { from })]));
+      jest.spyOn(t.app.get(InstagramGraph), 'unsubscribeApp').mockResolvedValue(undefined);
+      expect((await api(t.baseUrl, 'DELETE', '/api/me/instagram', { cookie: account.cookie })).status).toBe(204);
+      expect(await rowsOf(account)).toHaveLength(0);
+      expect(await markers(account)).toHaveLength(1);
+      const reconnected = await t.pool.query<{ id: string }>(
+        `INSERT INTO instagram_connections
+        (user_id, ig_user_id, meta_user_id, ig_username, status, token_ciphertext, token_key_version)
+        VALUES ($1,$2,$3,'reconnected','active','\\x00',1) RETURNING id`,
+        [account.userId, account.igUserId, account.metaUserId],
+      );
+      const next = await recreateRule(account, reconnected.rows[0].id);
+      await post(webhook(next, [change(next, { from })]));
+      expect(await rowsOf(next)).toHaveLength(0);
+      expect(await markers(account)).toHaveLength(1);
+    });
+
+    it('마커 INSERT 뒤 delivery 오류는 마커까지 롤백하며 재전송으로 복구한다', async () => {
+      const account = await newAccount();
+      await allMode(account);
+      // 유효 후보를 만든 뒤 delivery의 CHECK만 실패시켜 CTE 전체 원자성을 확인합니다.
+      await t.pool.query(
+        `ALTER TABLE instagram_dm_deliveries ADD CONSTRAINT test_0280_delivery_failure CHECK (message_body <> '0280-fail')`,
+      );
+      try {
+        await t.pool.query("UPDATE instagram_dm_rules SET message='0280-fail' WHERE id=$1", [account.ruleId]);
+        const raw = JSON.stringify(webhook(account, [change(account)]));
+        expect((await send(raw)).status).toBe(503);
+        expect(await markers(account)).toHaveLength(0);
+        expect(await rowsOf(account)).toHaveLength(0);
+        await t.pool.query('UPDATE instagram_dm_rules SET message=$2 WHERE id=$1', [account.ruleId, RULE_MESSAGE]);
+        expect((await send(raw)).status).toBe(200);
+        expect(await markers(account)).toHaveLength(1);
+        expect(await rowsOf(account)).toHaveLength(1);
+      } finally {
+        await t.pool.query('ALTER TABLE instagram_dm_deliveries DROP CONSTRAINT test_0280_delivery_failure');
+      }
+    });
+  });
+
   describe('DB 실패', () => {
     it('규칙 조회가 실패하면 503이고 재전송으로 저장된다', async () => {
       const account = await newAccount();
@@ -890,6 +1095,9 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
       expect(await rowsOf(account)).toHaveLength(0);
       expect((await t.pool.query('SELECT 1 FROM instagram_dm_rules WHERE id=$1', [account.ruleId])).rowCount).toBe(0);
       expect(await optOutCount(account.igUserId)).toBe(0);
+      expect(
+        (await t.pool.query('SELECT 1 FROM instagram_dm_recipients WHERE ig_user_id=$1', [account.igUserId])).rowCount,
+      ).toBe(0);
       expect(await connectionExists(other)).toBe(true);
       expect(await optOutCount(other.igUserId)).toBe(1);
 
@@ -912,6 +1120,10 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
           target.metaUserId,
         ]);
         await addOptOut(target.igUserId);
+        await t.pool.query(
+          'INSERT INTO instagram_dm_recipients (ig_user_id,scope_key,commenter_hash) VALUES ($1,$2,$3)',
+          [target.igUserId, target.mediaId, randomBytes(32)],
+        );
       }
       await t.pool.query('DELETE FROM instagram_connections WHERE id=$1', [account.connectionId]);
 
@@ -919,6 +1131,9 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
       expect(response.status).toBe(200);
 
       expect(await optOutCount(account.igUserId)).toBe(0);
+      expect(
+        (await t.pool.query('SELECT 1 FROM instagram_dm_recipients WHERE ig_user_id=$1', [account.igUserId])).rowCount,
+      ).toBe(0);
       expect(
         (await t.pool.query('SELECT 1 FROM instagram_opt_out_owners WHERE ig_user_id=$1', [account.igUserId])).rowCount,
       ).toBe(0);
@@ -980,6 +1195,7 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
 
     it('중간에 DB가 실패하면 503이고 모두 되돌린다', async () => {
       const account = await newAccount();
+      await post(webhook(account, [change(account)]));
       await addOptOut(account.igUserId);
       const original = Client.prototype.query as (...args: unknown[]) => unknown;
       jest.spyOn(Client.prototype, 'query').mockImplementation(function (this: Client, ...args: unknown[]) {
@@ -993,6 +1209,9 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
       expect(response.status).toBe(503);
       expect(await connectionExists(account)).toBe(true);
       expect(await optOutCount(account.igUserId)).toBe(1);
+      expect(
+        (await t.pool.query('SELECT 1 FROM instagram_dm_recipients WHERE ig_user_id=$1', [account.igUserId])).rowCount,
+      ).toBe(1);
     });
 
     it.each(['aaaaaaaaaaaaaaaa', 'short', 'UPPERCASEUPPERCA'])('없거나 형식이 틀린 코드 %s는 404', async (code) => {

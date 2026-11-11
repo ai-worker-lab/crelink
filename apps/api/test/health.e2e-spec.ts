@@ -98,6 +98,7 @@ describe('API 기동과 health', () => {
         'instagram_deletion_requests',
         'instagram_dm_deliveries',
         'instagram_dm_opt_outs',
+        'instagram_dm_recipients',
         'instagram_dm_rules',
         'instagram_opt_out_owners',
         'landing_blocks',
@@ -147,6 +148,7 @@ describe('API 기동과 health', () => {
         { version: '0016_instagram_dm' },
         { version: '0017_instagram_public_reply' },
         { version: '0018_landing_event_owner' },
+        { version: '0019_instagram_all_comments' },
       ]);
     } finally {
       await client.end();

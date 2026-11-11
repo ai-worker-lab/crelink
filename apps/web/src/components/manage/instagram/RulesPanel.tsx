@@ -113,8 +113,8 @@ export function RulesPanel({
             자동 DM 규칙
           </h2>
           <p className="card-subtitle">
-            고른 게시물에 키워드가 들어간 댓글이 달리면 댓글 단 사람에게 메시지를 보내요. 활성 규칙은{' '}
-            {limits.activeRules}개, 보관한 규칙까지 {limits.totalRules}개까지 둘 수 있어요.
+            고른 게시물의 키워드 댓글 또는 모든 댓글에 메시지를 보내요. 같은 사람·같은 게시물에서는 최초 한 번만 보내요.
+            활성 규칙은 {limits.activeRules}개, 보관한 규칙까지 {limits.totalRules}개까지 둘 수 있어요.
           </p>
         </div>
         <Link className="secondary" href={`${managerHref(state.landing.publicId, 'instagram')}/deliveries`}>
@@ -152,7 +152,7 @@ export function RulesPanel({
         <>
           {rules.length === 0 && editing !== 'new' ? (
             <p className="empty-text">
-              아직 규칙이 없어요. 게시물을 고르고 키워드와 메시지를 정하면 자동 DM이 시작돼요.
+              아직 규칙이 없어요. 게시물을 고르고 댓글 조건과 메시지를 정하면 자동 DM이 시작돼요.
             </p>
           ) : (
             <ul className="edit-list channel-list">
@@ -175,7 +175,7 @@ export function RulesPanel({
                   ) : (
                     <>
                       <div className="ig-rule-main">
-                        <strong className="item-title">{rule.keyword}</strong>
+                        <strong className="item-title">{rule.matchAllComments ? '모든 댓글' : rule.keyword}</strong>
                         <p className="ig-rule-media">{rule.mediaCaptionPreview || '캡션 없음'}</p>
                         <p className="ig-rule-message">{rule.message}</p>
                         {rule.replyMessage ? (
@@ -194,7 +194,7 @@ export function RulesPanel({
                           role="switch"
                           className="hide-switch"
                           aria-checked={rule.enabled}
-                          aria-label={`${rule.keyword} 규칙 켜기`}
+                          aria-label={`${rule.matchAllComments ? '모든 댓글' : rule.keyword} 규칙 켜기`}
                           aria-disabled={busy || !editable || (!rule.enabled && limit === 'active_full') || undefined}
                           onClick={() => {
                             if (busy || !editable || (!rule.enabled && limit === 'active_full')) return;
@@ -214,7 +214,7 @@ export function RulesPanel({
                               type="button"
                               className="secondary"
                               disabled={busy}
-                              aria-label={`${rule.keyword} 규칙 고치기`}
+                              aria-label={`${rule.matchAllComments ? '모든 댓글' : rule.keyword} 규칙 고치기`}
                               onClick={(event) => {
                                 trigger.current = event.currentTarget;
                                 setEditing(rule);
@@ -226,7 +226,7 @@ export function RulesPanel({
                               type="button"
                               className="secondary danger"
                               disabled={busy}
-                              aria-label={`${rule.keyword} 규칙 삭제`}
+                              aria-label={`${rule.matchAllComments ? '모든 댓글' : rule.keyword} 규칙 삭제`}
                               onClick={(event) => {
                                 trigger.current = event.currentTarget;
                                 remove.setError(null);
@@ -296,8 +296,8 @@ export function RulesPanel({
           onConfirm={() => void archive(removing)}
         >
           <p>
-            “{removing.keyword}” 규칙을 삭제하면 이 게시물에는 더 이상 자동 DM이 가지 않고, 아직 보내지 않은 DM은
-            취소돼요.
+            “{removing.matchAllComments ? '모든 댓글' : removing.keyword}” 규칙을 삭제하면 이 게시물에는 더 이상 자동
+            DM이 가지 않고, 아직 보내지 않은 DM은 취소돼요.
           </p>
         </ConfirmSheet>
       ) : null}

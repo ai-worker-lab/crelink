@@ -82,7 +82,7 @@ export function InstagramDeliveries({ publicId }: { publicId: string }) {
           <option value="">전체 규칙</option>
           {(rules ?? []).map((item) => (
             <option key={item.publicId} value={item.publicId}>
-              {item.keyword} · {item.mediaCaptionPreview || '캡션 없음'}
+              {item.matchAllComments ? '모든 댓글' : item.keyword} · {item.mediaCaptionPreview || '캡션 없음'}
             </option>
           ))}
         </select>
@@ -174,7 +174,7 @@ function DeliveryList({ rule, onForbidden }: { rule: string; onForbidden: (value
           {items.map((item) => (
             <li key={item.id} className="item-card ig-rule">
               <div className="ig-rule-main">
-                <strong className="ig-rule-message">{item.keyword}</strong>
+                <strong className="ig-rule-message">{item.matchAllComments ? '모든 댓글' : item.keyword}</strong>
                 <p className="ig-rule-media">{item.mediaPreview || '캡션 없음'}</p>
                 <p className="field-help">
                   접수 <time dateTime={item.createdAt}>{formatDateTime(item.createdAt)}</time>

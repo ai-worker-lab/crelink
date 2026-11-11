@@ -4,6 +4,8 @@
 
 ## 2026-11-11
 
+- Instagram 모든 댓글 체크박스(0280): 생성 기본 꺼짐·키워드 비활성/값 보존·토글 후 재검증과 저장을 추가하고 목록·내역·필터에 모든 댓글을 표시합니다. 같은 사람·같은 게시물 최초 1회와 영속 마커의 보존·삭제를 연결 안내와 처리방침에 반영했습니다. Coordinator용 실제 API/격리 DB local fixture를 준비했습니다. [시험·브라우저 인계](../../docs/work/orchestrator/0280-instagram-all-comments.md).
+
 - Instagram 연결 안내 수정(0276 CTO R2): `src/components/manage/instagram/ConnectionPanel.tsx`의 인스타그램(페이스북) 문구를 “Instagram 계정으로 로그인하고 연결할 계정을 선택해요.”로 바꿨습니다. 브라우저 검증은 Coordinator 범위입니다.
 
 - Instagram DM 정책 문구 정정(0269): `src/app/(public)/privacy/page.tsx`와 `src/app/(public)/terms/page.tsx`의 발송 설명을 ‘작성한 문구 그대로’로 통일하고, 처리방침의 이용 목적에서도 링크를 담는다는 잔존 표현을 제거했습니다.

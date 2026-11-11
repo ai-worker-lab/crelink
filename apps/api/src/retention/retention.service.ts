@@ -167,6 +167,7 @@ export class RetentionService implements OnApplicationBootstrap, OnModuleDestroy
       ]);
       await client.query("DELETE FROM signup_funnel_oauth_contexts WHERE created_at < now() - interval '15 minutes'");
       await client.query("DELETE FROM page_invites WHERE coalesce(used_at, expires_at) < now() - interval '7 days'");
+      // 최초 발송 기회 마커(instagram_dm_recipients)는 90일 파기 대상이 아닙니다(0280).
       const instagramDeliveries = await client.query(
         "DELETE FROM instagram_dm_deliveries WHERE created_at < now() - ($1::int * interval '1 day')",
         [INSTAGRAM_DM_RETENTION_DAYS],

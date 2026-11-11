@@ -21,6 +21,7 @@ interface RuleRow {
   connection_id: string;
   version: number;
   keyword: string;
+  match_all_comments: boolean;
   message: string;
   ig_media_id: string;
   ig_media_child_ids: string[];
@@ -39,7 +40,7 @@ const RULE_ELIGIBLE = `
   AND (s.instagram_dm_audience = 'everyone' OR (s.instagram_dm_audience = 'operators' AND u.role = 'operator'))`;
 
 const SELECT_RULES = `
-  SELECT r.id, r.connection_id, r.version, r.keyword, r.message, r.ig_media_id, r.ig_media_child_ids, c.ig_user_id
+  SELECT r.id, r.connection_id, r.version, r.keyword, r.match_all_comments, r.message, r.ig_media_id, r.ig_media_child_ids, c.ig_user_id
   FROM instagram_dm_rules r ${RULE_JOINS}
   WHERE c.ig_user_id = ANY($1::text[]) AND ${RULE_ELIGIBLE}
   ORDER BY r.created_at, r.id`;
@@ -47,30 +48,48 @@ const SELECT_RULES = `
 /**
  * 규칙을 읽은 뒤 바뀌었으면 저장하지 않습니다. 호출자가 같은 트랜잭션에서 `lock-order.ts`의 순서로 설정 → 연결 → 규칙을 `FOR SHARE`로 잡은 뒤 실행합니다.
  * 그쪽이 먼저면 커밋을 기다렸다가 이 문장의 새 스냅샷이 새 값을 보고, 이쪽이 먼저면 그쪽의 취소가 이 행까지 봅니다.
+ * 마커도 delivery와 같은 문장에서 저장합니다. canonical의 가장 이른 유효 댓글만 기회를 소비합니다.
  * ORDER BY는 겹치는 배치가 서로의 유니크 키를 기다리다 교착되지 않게 순서를 맞춥니다.
  */
 const INSERT_DELIVERIES = `
+  WITH eligible AS MATERIALIZED (
+    SELECT r.connection_id, r.id AS rule_id, c.ig_user_id, r.ig_media_id AS scope_key,
+           i.rule_version, i.comment_id, i.commenter_hash, i.commented_at, i.message_body
+    FROM unnest($1::uuid[], $2::int[], $3::text[], $4::bytea[], $5::timestamptz[], $6::text[])
+      AS i(rule_id, rule_version, comment_id, commenter_hash, commented_at, message_body)
+    JOIN instagram_dm_rules r ON r.id = i.rule_id AND r.version = i.rule_version ${RULE_JOINS}
+    WHERE ${RULE_ELIGIBLE}
+      AND i.commented_at >= r.created_at
+      AND i.commented_at > now() - interval '24 hours'
+      AND NOT EXISTS (
+        SELECT 1 FROM instagram_dm_opt_outs o
+        WHERE o.ig_user_id = c.ig_user_id AND o.commenter_hash = i.commenter_hash
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM instagram_dm_deliveries d
+        WHERE d.connection_id = r.connection_id AND d.comment_id = i.comment_id
+      )
+  ), canonical AS MATERIALIZED (
+    SELECT DISTINCT ON (ig_user_id, scope_key, commenter_hash) * FROM eligible
+    ORDER BY ig_user_id, scope_key, commenter_hash, commented_at, comment_id, rule_id
+  ), recipients AS (
+    INSERT INTO instagram_dm_recipients (ig_user_id, scope_key, commenter_hash)
+    SELECT ig_user_id, scope_key, commenter_hash FROM canonical
+    ORDER BY ig_user_id, scope_key, commenter_hash
+    ON CONFLICT DO NOTHING RETURNING ig_user_id, scope_key, commenter_hash
+  )
   INSERT INTO instagram_dm_deliveries
     (connection_id, rule_id, rule_version, comment_id, commenter_hash, commented_at, message_body, status)
-  SELECT r.connection_id, r.id, i.rule_version, i.comment_id, i.commenter_hash, i.commented_at, i.message_body, 'pending'
-  FROM unnest($1::uuid[], $2::int[], $3::text[], $4::bytea[], $5::timestamptz[], $6::text[])
-    AS i(rule_id, rule_version, comment_id, commenter_hash, commented_at, message_body)
-  JOIN instagram_dm_rules r ON r.id = i.rule_id AND r.version = i.rule_version ${RULE_JOINS}
-  WHERE ${RULE_ELIGIBLE}
-    AND i.commented_at >= r.created_at
-    AND i.commented_at > now() - interval '24 hours'
-    AND NOT EXISTS (
-      SELECT 1 FROM instagram_dm_opt_outs o
-      WHERE o.ig_user_id = c.ig_user_id AND o.commenter_hash = i.commenter_hash
-    )
-  ORDER BY r.id, i.commenter_hash, i.comment_id
+  SELECT i.connection_id, i.rule_id, i.rule_version, i.comment_id, i.commenter_hash, i.commented_at, i.message_body, 'pending'
+  FROM canonical i JOIN recipients USING (ig_user_id, scope_key, commenter_hash)
+  ORDER BY i.rule_id, i.commenter_hash, i.comment_id
   ON CONFLICT DO NOTHING`;
 
 function findRule(rules: RuleRow[], comment: WebhookComment): RuleRow | undefined {
   return rules.find(
     (rule) =>
       (rule.ig_media_id === comment.mediaId || rule.ig_media_child_ids.includes(comment.mediaId)) &&
-      matchesKeyword(comment.text, rule.keyword),
+      (rule.match_all_comments || matchesKeyword(comment.text, rule.keyword)),
   );
 }
 
@@ -207,7 +226,7 @@ export class InstagramWebhookService {
   }
 
   /**
-   * `signed_request` 검증 뒤 연결(규칙·내역은 CASCADE)과 해당 `ig_user_id`의 수신 거부 기록을 한 트랜잭션에서 지웁니다.
+   * `signed_request` 검증 뒤 연결(규칙·내역은 CASCADE)과 해당 `ig_user_id`의 수신 거부·최초 발송 기회 마커를 한 트랜잭션에서 지웁니다.
    * 일반 해제로 연결 행이 없어도 `instagram_opt_out_owners`로 `ig_user_id`를 찾아 파기하고, 대응표 행도 함께 지웁니다.
    */
   async handleDataDeletion(signedRequest: unknown): Promise<{ url: string; confirmation_code: string }> {
@@ -230,6 +249,7 @@ export class InstagramWebhookService {
         );
         const accounts = [...new Set([...removed.rows, ...owners.rows].map((row) => row.ig_user_id))];
         if (accounts.length > 0) {
+          await client.query('DELETE FROM instagram_dm_recipients WHERE ig_user_id = ANY($1::text[])', [accounts]);
           await client.query('DELETE FROM instagram_dm_opt_outs WHERE ig_user_id = ANY($1::text[])', [accounts]);
         }
         return insertWithRandomId(CONFIRMATION_CODE_LENGTH, async (candidate) => {
