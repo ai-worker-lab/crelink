@@ -1,4 +1,4 @@
-# 0274 Instagram DM 운영 연동 설정 배포
+# 0275 Instagram DM 운영 연동 설정 배포
 
 - 단계: 티켓
 - 역할: orchestrator
@@ -29,7 +29,7 @@
 ## 연결
 
 - [운영 런북](../../../infra/docs/prod-runbook.md)
-- [인프라 계약](../../../contracts/0274-instagram-dm-prod-settings/5-infra.contract.md)
+- [인프라 계약](../../../contracts/0275-instagram-dm-prod-settings/5-infra.contract.md)
 - [Instagram 설계](../../specs/instagram-comment-dm.md)
 
 ## 진행 기록
@@ -39,3 +39,4 @@
 - 2026-11-11: 운영 읽기 전용 조회로 공개 범위 `operators`, 연결 0·활성 규칙 0·대기/발송 중 0건 확인. 기존 운영 설정값은 변경되지 않았고 필수 8개만 추가되었음을 메모리 내 비교로 확인했다.
 - 2026-11-11: prod Compose blue·green·edge `config --quiet`, `bash -n`, `shellcheck -x` 통과. `prod/tests/*.sh`는 라우팅 172·cutover 57·배포/롤백 97·무중단 26개 통과. 무중단 시험 요청 1576건에서 오류 0, 긴 요청 34/34 완료. 이 수치는 로컬 더미 서비스 시험이며 운영 실측이 아니다.
 - 2026-11-11: `pnpm ci:local` 12단계 통과(verify·ego 4모음·앱 이미지 포함, 103.1초). 기준 Node 24 대신 Node 26으로 실행됐다는 경고가 있어 기록한다. 로컬 CI의 WebKit·Firefox·amd64 등 미포함 범위는 기존 도구 안내와 같다. 테스트 통과, 양측 검수 전. 배포 후 결과는 운영 기록 저장소 settings-sync의 당일 journal에 남긴다.
+- 2026-11-11: CI 이후 PR #166이 main에 병합되어 최신 main을 통합했다. 변경 기록 양쪽 항목을 보존하고 겹친 작업 번호를 0275로 변경했다. 기존 검수 증거를 새 코드에 재사용하지 않고 최종 통합본에 양측 검수를 다시 실행한다.

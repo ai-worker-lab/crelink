@@ -1,9 +1,9 @@
 # [Infra Deployment Contract] Instagram DM 운영 설정
 
-- 계약 ID: 0274-infra-r1
+- 계약 ID: 0275-infra-r1
 - 현재 기준: [Instagram 설계](../../docs/specs/instagram-comment-dm.md), 실행 원본 `apps/api/src/config.service.ts`와 `infra/prod/compose.yaml`.
 - 변경 권한·사유: 사용자가 Meta 연동 방법을 요청하고 SOPS 설정 등록 완료를 보고함. 기존 인가된 PR 배포 경로로 운영 메뉴를 활성화한다.
-- 작업 이력: [0274](../../docs/work/orchestrator/0274-instagram-dm-prod-settings.md). 비밀값은 계약·로그에 기록하지 않는다.
+- 작업 이력: [0275](../../docs/work/orchestrator/0275-instagram-dm-prod-settings.md). 비밀값은 계약·로그에 기록하지 않는다.
 
 ## 1. 인프라 변경 및 영향 범위
 
@@ -19,4 +19,4 @@ DB 풀·CPU·메모리 상한 변경 없음. 기존 API 프로세스에서 Insta
 
 ## 4. 헬스체크 및 관측 가능성 검증
 
-API 파서의 필수 키·32바이트 base64·키 분리 검증과 SOPS 암호화 확인을 메인 세션에서 수행한다. 검수 에이전트는 복호화·키체인·Meta 호출을 금지한다. 로컬 CI·prod 구성/스크립트/회귀 검사를 수행하고 Deploy job, 설정 존재 여부 및 운영 메뉴를 읽기 전용으로 확인한다. 값은 출력하지 않는다. 실제 결과는 0274 진행 기록에 남긴다.
+API 파서의 필수 키·32바이트 base64·키 분리 검증과 SOPS 암호화 확인을 메인 세션에서 수행한다. 검수 에이전트는 복호화·키체인·Meta 호출을 금지한다. 로컬 CI·prod 구성/스크립트/회귀 검사를 수행하고 Deploy job, 설정 존재 여부 및 운영 메뉴를 읽기 전용으로 확인한다. 값은 출력하지 않는다. 실제 결과는 0275 진행 기록에 남긴다.
