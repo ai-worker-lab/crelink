@@ -16,7 +16,7 @@ PR #178의 Caddy 패치 갱신을 로컬 검증하고 원래 PR 브랜치에 CI 
 - [x] 제품 변경은 `infra/prod/edge/compose.yaml`의 Caddy 2.11.9-alpine 갱신뿐이며, 라우팅 시험도 같은 이미지를 사용합니다.
 - [x] prod Compose 문법·셸 검사·로컬 시험 4개가 통과합니다.
 - [x] `pnpm install --frozen-lockfile`, `pnpm work:scope 0273 --base origin/main`, `pnpm ci:local`이 통과합니다.
-- [ ] 검증 후 커밋·일반 push하고 같은 SHA에서 `pnpm ci:local --report`가 성공합니다.
+- [x] 검증 후 커밋·일반 push하고 같은 SHA에서 `pnpm ci:local --report`가 성공합니다(초회 `ea361f5`, 아래 후속 변경은 새 SHA에서 재실행).
 
 ## 범위
 
@@ -40,3 +40,5 @@ PR #178의 Caddy 패치 갱신을 로컬 검증하고 원래 PR 브랜치에 CI 
 - 2026-11-11: 하위 개발 프로세스는 sandbox의 npm DNS·Docker 소켓·PM2 접근 제약으로 검증을 마치지 못해 중단했습니다. coordinator가 같은 worktree에서 직접 설치·검증을 이어받았습니다. `CI=true PATH=/opt/homebrew/opt/node@24/bin:$PATH pnpm install --frozen-lockfile` 통과, Node 24.22.2 기준 `pnpm ci:local` 11단계 통과·실패 0·스택 정리 1단계 건너뜀(118.9초). API 47개 suite·739 tests 통과. 최초 실행의 문서 anchor 2건은 수정 후 재검증했습니다.
 - 2026-11-11: prod blue·green·edge `config --quiet`, `bash -n`, `shellcheck -x` 통과. Docker 격리 시험은 caddy-routing 172·deploy-rollback 97·zero-downtime 26·cutover-rehearsal 57건 모두 통과했습니다. 무중단 부하 1,560건 중 오류 0, 긴 요청 34/34 완료. cutover/revert 공백은 각각 최대 0.3/1.4/0.5초로 측정됐으며 고정 edge 이미지 재생성의 운영 측정은 아닙니다. 원본 로그는 Git 밖 `/tmp/crelink-pr178-*-parent.log`에만 있습니다.
 - 머지 전 고정 커밋에 `pnpm ci:local --report`와 양측 검수 완료 게이트를 실행합니다. 결과는 GitHub PR 검사 및 settings-sync 실행 기록에 남기며 이 문서에서 미실행 결과를 선기재하지 않습니다. 운영 edge 이미지 적용은 별도입니다.
+
+- 2026-11-11: `ea361f5`의 `pnpm ci:local --report`가 11단계 통과·실패 0으로 GitHub `CI 통과` success를 기록했습니다(2026-11-11T07:51:43Z). 양측 최종 검수 중 Claude FAIL·Codex PASS여서 머지하지 않았습니다. 별도 qa-logic 진단은 동일 SHA의 로직·172건 라우팅 재실행에서 차단 결함 없이 SHIP이었고, 배포 설계 문서의 옛 이미지 태그 1건을 Minor로 발견했습니다. 이 중복 태그도 원본 참조로 고쳤습니다. 최종 양측 검수 완료를 뜻하지 않으며 문서 수정 커밋 후 CI status와 양측 검수를 다시 수행합니다.
