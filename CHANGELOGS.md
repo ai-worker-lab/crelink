@@ -6,6 +6,8 @@
 
 ## 2026-11-11
 
+- Instagram DM 운영 설정 등록(0275): 사용자 SOPS 암호문의 필수 연동 설정을 검증하고 기존 배포 경로로 적용합니다. [작업 기록](docs/work/orchestrator/0275-instagram-dm-prod-settings.md), [인프라 계약](contracts/0275-instagram-dm-prod-settings/5-infra.contract.md).
+
 - 의존성 minor·patch 갱신(PR #166, 0274): 기존 Dependabot의 Playwright·NestJS·Next.js 등 10개 갱신과 lockfile을 최신 main에 통합합니다. 검증 근거·범위는 [0274](docs/work/orchestrator/0274-dependency-patch-update.md)에 둡니다.
 - PR #178 Caddy 패치 갱신 준비(0273): 관련 검증과 인프라 계약을 추가했습니다. 세부는 [인프라 로그](infra/CHANGELOGS.md), 근거는 [0273](docs/work/orchestrator/0273-caddy-patch-update.md)와 [인프라 계약](contracts/0273-caddy-patch-update/5-infra.contract.md)에 있습니다.
 
