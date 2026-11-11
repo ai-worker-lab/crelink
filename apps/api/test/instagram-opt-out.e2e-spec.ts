@@ -181,9 +181,6 @@ describe('Instagram DM 수신 거부 API (0271, docs/specs/instagram-comment-dm.
       )
     ).rows;
 
-  /** 웹훅이 DM 본문에 넣은 토큰을 프래그먼트에서 꺼냅니다. */
-  const tokenInBody = (row: DeliveryRow) => /#t=([\w-]+)$/.exec(row.message_body)![1];
-
   const newPerson = () => `f${randomId(16)}`;
 
   /** 계정과, 그 계정의 게시물에 댓글을 달아 `pending`이 하나 있는 사람. */
@@ -193,7 +190,8 @@ describe('Instagram DM 수신 거부 API (0271, docs/specs/instagram-comment-dm.
     await comment(account, fromId);
     const rows = await deliveries(account);
     expect(rows.map((row) => row.status)).toEqual(['pending']);
-    return { account, fromId, token: tokenInBody(rows[0]) };
+    const token = signOptOutToken(OPT_OUT_KEY, account.igUserId, hashOf(account, fromId));
+    return { account, fromId, token };
   };
 
   beforeAll(async () => {

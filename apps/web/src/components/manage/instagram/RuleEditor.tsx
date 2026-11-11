@@ -42,6 +42,7 @@ export function RuleEditor({
   const [media, setMedia] = useState<InstagramDmMediaView | null>(null);
   const [keyword, setKeyword] = useState(rule?.keyword ?? '');
   const [message, setMessage] = useState(rule?.message ?? '');
+  const [replyMessage, setReplyMessage] = useState(rule?.replyMessage ?? '');
   const [problem, setProblem] = useState<keyof typeof PROBLEM_TEXT | null>(null);
   const save = useAction();
   const root = useRef<HTMLFormElement>(null);
@@ -59,8 +60,13 @@ export function RuleEditor({
       return;
     }
     await save.run(async () => {
+      const trimmedReply = replyMessage.trim() || null;
       if (rule) {
-        const body: UpdateInstagramDmRuleRequest = { keyword: keyword.trim(), message: message.trim() };
+        const body: UpdateInstagramDmRuleRequest = {
+          keyword: keyword.trim(),
+          message,
+          replyMessage: trimmedReply,
+        };
         onSaved(
           await browserApi<InstagramDmRuleView>(CRELINK_API_PATHS.meInstagramRule(rule.publicId), {
             method: 'PATCH',
@@ -71,7 +77,8 @@ export function RuleEditor({
         const body: CreateInstagramDmRuleRequest = {
           mediaId: media!.id,
           keyword: keyword.trim(),
-          message: message.trim(),
+          message,
+          replyMessage: trimmedReply,
         };
         onSaved(
           await browserApi<InstagramDmRuleView>(CRELINK_API_PATHS.meInstagramRules, {
@@ -153,10 +160,31 @@ export function RuleEditor({
         <p id={`${baseId}-message-help`} className="field-help">
           <span className="ig-count">
             {messageLength}/{INSTAGRAM_DM_LIMITS.messageMaxLength}자
-          </span>{' '}
-          · 메시지 뒤에 이 규칙의 채널 주소 링크와 수신 거부 안내 줄이 자동으로 붙어요.
+          </span>
         </p>
         {problem === 'message' ? <p className="form-error-inline">{PROBLEM_TEXT.message}</p> : null}
+      </div>
+      <div className="field">
+        <label htmlFor={`${baseId}-reply-message`}>
+          댓글 공개 답글 <span className="ig-optional">(선택)</span>
+        </label>
+        <input
+          id={`${baseId}-reply-message`}
+          aria-describedby={`${baseId}-reply-message-help`}
+          className="input"
+          value={replyMessage}
+          onChange={(event) => setReplyMessage(event.target.value)}
+          maxLength={INSTAGRAM_DM_LIMITS.replyMessageMaxLength}
+          placeholder="예: DM으로 요청하신 링크를 보내드렸어요! 확인해 보세요 💌"
+          autoComplete="off"
+          disabled={save.pending}
+        />
+        <p id={`${baseId}-reply-message-help`} className="field-help">
+          <span className="ig-count">
+            {replyMessage.length}/{INSTAGRAM_DM_LIMITS.replyMessageMaxLength}자
+          </span>{' '}
+          · 적어 두시면 댓글에 먼저 공개 답글을 작성한 뒤 DM을 발송해요. 비워 두시면 DM만 보냅니다.
+        </p>
       </div>
       <div className="form-actions edit-form-actions">
         <button type="button" className="secondary" onClick={onCancel} disabled={save.pending}>

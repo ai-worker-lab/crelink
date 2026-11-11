@@ -4,6 +4,10 @@
 
 ## 2026-11-11
 
+- Instagram DM 정책 문구 정정(0269): `src/app/(public)/privacy/page.tsx`와 `src/app/(public)/terms/page.tsx`의 발송 설명을 ‘작성한 문구 그대로’로 통일하고, 처리방침의 이용 목적에서도 링크를 담는다는 잔존 표현을 제거했습니다.
+
+- Instagram DM 자동 접미사 안내 제거·입력 보존(0269): `src/components/manage/instagram/RuleEditor.tsx`에서 채널 링크·수신 거부 안내 자동 부착 설명을 제거했습니다. 규칙 생성·수정 요청의 `message.trim()`을 제거해 메시지 앞뒤 개행·공백을 그대로 서버에 전달합니다.
+
 - 인스타그램 DM QA 결함 수정 연동(0269): 연결 실패 코드에 `instagram_operator_paused`를 더해 콜백 화면에 안내합니다(다른 크리링 계정이 운영자 정지된 IG 계정을 연결할 때). 처리방침의 운영자 정지 해제 항목과 삭제용 소유 대응표, 약관의 정지 유지 문구를 실제 동작에 맞췄습니다.
 - 인스타그램 DM 콜백·발송 내역과 통합 보정(0263, 0265, 0269): OAuth 콜백 route(`/me/integrations/instagram/callback`)와 BFF 허용 목록, 발송 내역 화면(`/me/landings/[publicId]/instagram/deliveries`)을 더했습니다. 보정(0269): 규칙 카드에 발송 내역 링크를 넣고, 동의 거부 코드 `instagram_access_denied`의 안내 문구를 더했으며, `instagramMenuVisible`이 공유 계약의 `CreatorLandingState['instagramDmAvailable']`을 그대로 읽도록 임시 선택 필드를 없앴습니다. [설계](../../docs/specs/instagram-comment-dm.md), [티켓](../../docs/work/orchestrator/0269-instagram-dm-integration.md).
 - 운영자 인스타그램 DM 카드(0266): `/admin/ad-banners`의 광고 블록 카드 아래에 `공개 범위`(끔·운영자만·모든 크리에이터)를 고르는 카드를 더했습니다. 기본은 꺼짐이고, `모든 크리에이터`는 일반 공개라 비즈니스 인증·앱 검수 전에는 켜지 말라는 경고를 늘 보이며 고르면 확인 시트(첫 초점 취소)를 거칩니다. 설정을 못 읽으면 카드 자리에 오류와 `다시 시도`를 둡니다. BFF 허용 목록에 운영자 `PUT /api/admin/instagram-dm`과 `PUT .../connections/:userId/pause`를 더했고(조회 GET은 서버 렌더만 부름), 계정별 정지 화면은 설계에 없어 만들지 않았습니다. 근거: [설계](../../docs/specs/instagram-comment-dm.md), [티켓](../../docs/work/web/0266-instagram-dm-admin-card.md).

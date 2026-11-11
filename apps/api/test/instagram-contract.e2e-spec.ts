@@ -13,6 +13,7 @@ const RULE_KEYS = [
   'mediaCaptionPreview',
   'keyword',
   'message',
+  'replyMessage',
   'channelLinkCode',
   'enabled',
   'createdAt',

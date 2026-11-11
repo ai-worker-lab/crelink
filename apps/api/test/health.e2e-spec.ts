@@ -145,6 +145,7 @@ describe('API 기동과 health', () => {
         { version: '0014_shared_pages' },
         { version: '0015_channel_links' },
         { version: '0016_instagram_dm' },
+        { version: '0017_instagram_public_reply' },
       ]);
     } finally {
       await client.end();
@@ -203,6 +204,7 @@ describe('Instagram DM 부분 설정', () => {
   it('키가 일부만 있으면 실제 기동이 거부되고 비밀값은 오류에 없다', async () => {
     const database = await createTestDatabase();
     setTestEnvironment(database.url);
+    for (const key of INSTAGRAM_REQUIRED_KEYS) process.env[key] = '';
     process.env.META_APP_ID = 'app-id';
     process.env.META_APP_SECRET = 'partial-secret-value';
     const app = await NestFactory.create(AppModule, { logger: false, abortOnError: false });

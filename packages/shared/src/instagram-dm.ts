@@ -11,6 +11,7 @@ export const INSTAGRAM_DM_LIMITS = {
   deliveryPageSize: 20,
   keywordMaxLength: 30,
   messageMaxLength: 250,
+  replyMessageMaxLength: 300,
 } as const;
 
 export type InstagramConnectionStatus = 'active' | 'messages_access_required' | 'reauth_required';
@@ -54,23 +55,26 @@ export interface InstagramDmRuleView {
   mediaCaptionPreview: string;
   keyword: string;
   message: string;
+  replyMessage: string | null;
   channelLinkCode: string;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-/** 규칙 생성 요청. keyword 1~30자, message 1~250자입니다. */
+/** 규칙 생성 요청. keyword 1~30자, message 1~250자, replyMessage 1~300자(선택)입니다. */
 export interface CreateInstagramDmRuleRequest {
   mediaId: string;
   keyword: string;
   message: string;
+  replyMessage?: string | null;
 }
 
-/** 규칙 부분 수정 요청. keyword 1~30자, message 1~250자입니다. */
+/** 규칙 부분 수정 요청. keyword 1~30자, message 1~250자, replyMessage 1~300자(선택)입니다. */
 export interface UpdateInstagramDmRuleRequest {
   keyword?: string;
   message?: string;
+  replyMessage?: string | null;
   enabled?: boolean;
 }
 

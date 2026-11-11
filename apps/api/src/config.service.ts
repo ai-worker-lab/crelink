@@ -305,7 +305,8 @@ export class AppConfig implements OnModuleInit {
   /** Instagram DM 설정. 키가 하나도 없으면 null이며 API는 503 `instagram_not_configured`, worker는 시작하지 않습니다. */
   get instagram(): (InstagramSettings & { redirectUri: string }) | null {
     const settings = parseInstagramSettings(process.env);
-    return settings && { ...settings, redirectUri: `${this.webUrl}/me/integrations/instagram/callback` };
+    const redirectBase = process.env.INSTAGRAM_REDIRECT_BASE_URL?.trim() || this.webUrl;
+    return settings && { ...settings, redirectUri: `${redirectBase}/me/integrations/instagram/callback` };
   }
 
   /** 운영자 구글 이메일(쉼표 구분, 대소문자 무시). */

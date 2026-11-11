@@ -5,7 +5,7 @@ import { apiError, insertWithRandomId } from '../common/http';
 import { AppConfig, InstagramSettings } from '../config.service';
 import { Database } from '../database';
 import { countBusinessMetric } from '../monitoring/metrics';
-import { commenterHash, signOptOutToken } from './crypto';
+import { commenterHash } from './crypto';
 import { matchesKeyword } from './keyword';
 import { LOCK_CONNECTIONS, LOCK_RULES, LOCK_SETTINGS } from './lock-order';
 import { constantTimeEquals, parseSignedRequest, verifyWebhookSignature } from './signed-request';
@@ -22,7 +22,6 @@ interface RuleRow {
   version: number;
   keyword: string;
   message: string;
-  channel_link_code: string;
   ig_media_id: string;
   ig_media_child_ids: string[];
   ig_user_id: string;
@@ -40,7 +39,7 @@ const RULE_ELIGIBLE = `
   AND (s.instagram_dm_audience = 'everyone' OR (s.instagram_dm_audience = 'operators' AND u.role = 'operator'))`;
 
 const SELECT_RULES = `
-  SELECT r.id, r.connection_id, r.version, r.keyword, r.message, r.channel_link_code, r.ig_media_id, r.ig_media_child_ids, c.ig_user_id
+  SELECT r.id, r.connection_id, r.version, r.keyword, r.message, r.ig_media_id, r.ig_media_child_ids, c.ig_user_id
   FROM instagram_dm_rules r ${RULE_JOINS}
   WHERE c.ig_user_id = ANY($1::text[]) AND ${RULE_ELIGIBLE}
   ORDER BY r.created_at, r.id`;
@@ -181,7 +180,7 @@ export class InstagramWebhookService {
     }
   }
 
-  /** 키워드가 맞는 댓글만 INSERT 파라미터로 만듭니다. 최종 본문과 수신 거부 토큰은 저장 시점에 고정합니다. */
+  /** 키워드가 맞는 댓글만 INSERT 파라미터로 만듭니다. 저장 시점의 규칙 문구를 그대로 최종 본문으로 고정합니다. */
   private buildRows(settings: InstagramSettings, comments: WebhookComment[], rulesByAccount: Map<string, RuleRow[]>) {
     const rows = {
       connectionIds: [] as string[],
@@ -196,17 +195,13 @@ export class InstagramWebhookService {
       const rule = findRule(rulesByAccount.get(comment.igUserId) ?? [], comment);
       if (!rule) continue;
       const hash = commenterHash(settings.commenterHashKey, comment.igUserId, comment.fromId);
-      const token = signOptOutToken(settings.optOutKey, comment.igUserId, hash);
       rows.connectionIds.push(rule.connection_id);
       rows.ruleIds.push(rule.id);
       rows.ruleVersions.push(rule.version);
       rows.commentIds.push(comment.commentId);
       rows.hashes.push(hash);
       rows.commentedAt.push(comment.commentedAt.toISOString());
-      rows.bodies.push(
-        `${rule.message}\n\n${this.config.shortLinkBaseUrl}/s/${rule.channel_link_code}\n\n` +
-          `자동 발송 메시지 · 수신 거부: ${this.config.webUrl}/dm-opt-out#t=${token}`,
-      );
+      rows.bodies.push(rule.message);
     }
     return rows;
   }

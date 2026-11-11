@@ -66,6 +66,8 @@ interface Claim {
 interface SendState {
   comment_id: string;
   message_body: string;
+  reply_message: string | null;
+  reply_status: string;
   connection_id: string;
   ig_user_id: string;
   token_ciphertext: Buffer | null;
@@ -277,20 +279,47 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
       countDm('token_unreadable');
       return;
     }
+    let replyCommentId: string | null = null;
+    let replyStatus: 'sent' | 'failed' | 'skipped' = 'skipped';
+    if (state.reply_status === 'skipped' && state.reply_message && state.reply_message.trim().length > 0) {
+      try {
+        const replyResult = await this.graph.replyToComment(accessToken, state.comment_id, state.reply_message);
+        replyCommentId = replyResult.commentId;
+        replyStatus = 'sent';
+      } catch (replyError) {
+        this.logger.warn(`공개 답글 작성 실패: ${errorName(replyError)}`);
+        replyStatus = 'failed';
+      }
+    }
+    if (replyStatus !== 'skipped') {
+      await this.database.query(
+        `UPDATE instagram_dm_deliveries SET reply_comment_id = $2, reply_status = $3
+         WHERE id = $1 AND status = 'sending' AND lease_until = $4::timestamptz`,
+        [claim.id, replyCommentId, replyStatus, claim.lease],
+      );
+    }
+    // 공개 답글 HTTP 호출 중 정지·수신 거부·취소·lease 변경을 DM 직전에 반영합니다.
+    const current = await this.readSendState(claim);
+    if (!current?.lease_held) return;
+    if (!current.sendable) {
+      await this.finish(claim.id, 'cancelled', STOPPED_FAILURE_CODE, replyCommentId, replyStatus);
+      countDm('cancelled');
+      return;
+    }
     try {
       await this.graph.sendPrivateReply(accessToken, state.ig_user_id, state.comment_id, state.message_body);
     } catch (error) {
-      await this.recordFailure(claim.id, state, error);
+      await this.recordFailure(claim.id, state, error, replyCommentId, replyStatus);
       return;
     }
-    await this.finish(claim.id, 'sent', null);
+    await this.finish(claim.id, 'sent', null, replyCommentId, replyStatus);
     countDm('sent');
   }
 
   /** 호출 직전 재확인. 토큰·본문도 이 시점의 값을 읽어 정지·토큰 교체를 최대한 늦게 반영합니다. */
   private async readSendState(claim: Claim): Promise<SendState | undefined> {
     const { rows } = await this.database.query<SendState>(
-      `SELECT d.comment_id, d.message_body, c.id AS connection_id, c.ig_user_id,
+      `SELECT d.comment_id, d.message_body, r.reply_message, d.reply_status, c.id AS connection_id, c.ig_user_id,
               c.token_ciphertext, c.token_key_version, c.token_revision,
               (d.status = 'sending' AND d.lease_until = $2::timestamptz AND d.lease_until > now()) AS lease_held,
               (${SENDABLE_SQL}) AS sendable
@@ -305,17 +334,31 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
     return rows[0];
   }
 
-  private async finish(id: string, status: string, failureCode: string | null): Promise<void> {
+  private async finish(
+    id: string,
+    status: string,
+    failureCode: string | null,
+    replyCommentId: string | null = null,
+    replyStatus: string = 'skipped',
+  ): Promise<void> {
     await this.database.query(
       `UPDATE instagram_dm_deliveries
        SET status = $2, failure_code = $3, lease_until = NULL,
+           reply_comment_id = COALESCE($4, reply_comment_id),
+           reply_status = CASE WHEN $5::text <> 'skipped' THEN $5 ELSE reply_status END,
            sent_at = CASE WHEN $2::text = 'sent' THEN now() ELSE sent_at END
        WHERE id = $1 AND status = 'sending'`,
-      [id, status, failureCode],
+      [id, status, failureCode, replyCommentId, replyStatus],
     );
   }
 
-  private async recordFailure(id: string, state: SendState, error: unknown): Promise<void> {
+  private async recordFailure(
+    id: string,
+    state: SendState,
+    error: unknown,
+    replyCommentId: string | null = null,
+    replyStatus: string = 'skipped',
+  ): Promise<void> {
     const failure = classifySendFailure(error, this.errorCodes);
     countDm(failure.kind);
     switch (failure.kind) {
@@ -323,13 +366,13 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
         await this.scheduleRetry(id);
         return;
       case 'unknown':
-        await this.finish(id, 'unknown', 'indeterminate');
+        await this.finish(id, 'unknown', 'indeterminate', replyCommentId, replyStatus);
         return;
       case 'rate_limited':
         await this.waitForRateLimit(id, state.connection_id, failure.waitSeconds);
         return;
       case 'token_invalid':
-        await this.finish(id, 'failed', 'token_invalid');
+        await this.finish(id, 'failed', 'token_invalid', replyCommentId, replyStatus);
         await this.requireReauth(state);
         return;
       case 'messages_access':
@@ -339,7 +382,7 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
         await this.pauseForPolicy(id, state.connection_id);
         return;
       case 'rejected':
-        await this.finish(id, 'failed', 'rejected');
+        await this.finish(id, 'failed', 'rejected', replyCommentId, replyStatus);
         return;
     }
   }

@@ -116,6 +116,31 @@ describe('Instagram 규칙 API (0260)', () => {
     expect(graph).toHaveBeenCalledWith('test-ig-token', expect.any(String), null);
   });
 
+  it('공개 답글 300자 경계·수정·해제와 잘못된 입력을 검증한다', async () => {
+    const owner = await creator();
+    for (const replyMessage of ['가'.repeat(301), 123, 'a\u0000b']) {
+      expect((await create(owner, { mediaId: 'post', keyword: '자료', message: '안내', replyMessage })).status).toBe(
+        400,
+      );
+    }
+    const result = await create(owner, {
+      mediaId: 'post',
+      keyword: '자료',
+      message: '안내',
+      replyMessage: '😀'.repeat(300),
+    });
+    expect(result.status).toBe(201);
+    expect(result.body.replyMessage).toBe('😀'.repeat(300));
+    const updated = await request<InstagramDmRuleView>(owner, 'PATCH', `/rules/${result.body.publicId}`, {
+      replyMessage: '확인해 주세요',
+    });
+    expect(updated.body.replyMessage).toBe('확인해 주세요');
+    const cleared = await request<InstagramDmRuleView>(owner, 'PATCH', `/rules/${result.body.publicId}`, {
+      replyMessage: null,
+    });
+    expect(cleared.body.replyMessage).toBeNull();
+  });
+
   it('게시물은 커서·25건 상한·공유 필드만 반환하며 뒤 페이지에서도 생성할 수 있다', async () => {
     const owner = await creator();
     const page = await request(owner, 'GET', '/media?after=next');

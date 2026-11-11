@@ -370,6 +370,85 @@ describe('Graph 경계', () => {
     await expect(graph.listMedia('t', 'ig', null)).resolves.toEqual({ items: [], nextCursor: null });
   });
 
+  it('공개 답글은 댓글 replies에 POST하고 토큰을 헤더로 보낸다', async () => {
+    respond(200, { id: 'reply-1' });
+    await expect(graph.replyToComment(META_TOKEN, 'c/a', '보냈어요')).resolves.toEqual({ commentId: 'reply-1' });
+    const [url, init] = lastCall();
+    expect(url).toBe('https://graph.facebook.com/v27.0/c%2Fa/replies');
+    expect(init.method).toBe('POST');
+    expect(init.headers.authorization).toBe(`Bearer ${META_TOKEN}`);
+    expect(JSON.parse(init.body as string)).toEqual({ message: '보냈어요' });
+    respond(400, { error: { code: 190 } });
+    await expect(failure(graph.replyToComment('t', 'c', 'm'))).resolves.toMatchObject({ kind: 'rejected', code: 190 });
+  });
+
+  it('공개 답글 ID가 없는 성공 응답은 불확정 실패로 처리한다', async () => {
+    respond(200, {});
+    await expect(failure(graph.replyToComment('t', 'c', 'm'))).resolves.toMatchObject({ kind: 'indeterminate' });
+  });
+
+  it('직접 할당 edge 미지원은 granular 조회로 이어지고 토큰 무효는 전파한다', async () => {
+    respond(200, { id: 'meta' });
+    respond(400, { error: { code: 100 } });
+    respond(200, { data: { granular_scopes: [{ scope: 'instagram_basic', target_ids: ['ig'] }] } });
+    respond(200, { id: 'ig', username: 'me' });
+    await expect(graph.fetchAccounts('t', config)).resolves.toMatchObject({ accounts: [{ igUserId: 'ig' }] });
+    respond(200, { id: 'meta' });
+    respond(400, { error: { code: 190 } });
+    await expect(failure(graph.fetchAccounts('t', config))).resolves.toMatchObject({ code: 190 });
+  });
+
+  it('Unified Login 직접 할당 계정을 중복 없이 조회한다', async () => {
+    respond(200, { id: 'meta', accounts: { data: [] } });
+    respond(200, { data: [{ id: 'ig', username: 'me' }, { id: 'ig', username: 'me' }, { id: 'bad' }] });
+    await expect(graph.fetchAccounts('t', config)).resolves.toEqual({
+      metaUserId: 'meta',
+      accounts: [{ igUserId: 'ig', username: 'me', isProfessional: true }],
+    });
+    expect(lastCall()[0]).toContain('/me/assigned_instagram_accounts?');
+  });
+
+  it.each(['instagram_basic', 'pages_show_list'])('granular_scopes %s 계정 조회를 지원한다', async (scope) => {
+    respond(200, { id: 'meta' });
+    respond(200, { data: [] });
+    respond(200, { data: { granular_scopes: [{ scope, target_ids: ['target', null, 123] }] } });
+    respond(
+      200,
+      scope === 'instagram_basic'
+        ? { id: 'ig', username: 'me' }
+        : { instagram_business_account: { id: 'ig', username: 'me' } },
+    );
+    await expect(graph.fetchAccounts('t', config)).resolves.toEqual({
+      metaUserId: 'meta',
+      accounts: [{ igUserId: 'ig', username: 'me', isProfessional: true }],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it.each(['instagram_basic', 'pages_show_list'])('%s 대상 10개 초과는 안전하게 실패한다', async (scope) => {
+    respond(200, { id: 'meta' });
+    respond(200, { data: [] });
+    respond(200, {
+      data: { granular_scopes: [{ scope, target_ids: Array.from({ length: 11 }, (_, i) => String(i)) }] },
+    });
+    await expect(graph.fetchAccounts('t', config)).rejects.toBeInstanceOf(InstagramGraphError);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it.each(['instagram_basic', 'pages_show_list'])('%s 개별 조회 실패를 전파한다', async (scope) => {
+    respond(200, { id: 'meta' });
+    respond(200, { data: [] });
+    respond(200, { data: { granular_scopes: [{ scope, target_ids: ['one', 'two'] }] } });
+    respond(
+      200,
+      scope === 'instagram_basic'
+        ? { id: 'ig', username: 'me' }
+        : { instagram_business_account: { id: 'ig', username: 'me' } },
+    );
+    respond(500, { error: { code: 2 } });
+    await expect(graph.fetchAccounts('t', config)).rejects.toBeInstanceOf(InstagramGraphError);
+  });
+
   it('구독·해제와 동의 URL', async () => {
     respond(200, { success: true });
     await graph.subscribeApp('t', 'ig');
@@ -386,6 +465,8 @@ describe('Graph 경계', () => {
       redirect_uri: 'https://w.test/cb',
       config_id: 'cfg',
       response_type: 'code',
+      display: 'popup',
+      prompt: 'login',
       state: 'st',
     });
   });

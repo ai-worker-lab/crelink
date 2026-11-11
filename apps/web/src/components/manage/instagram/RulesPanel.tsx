@@ -178,6 +178,11 @@ export function RulesPanel({
                         <strong className="item-title">{rule.keyword}</strong>
                         <p className="ig-rule-media">{rule.mediaCaptionPreview || '캡션 없음'}</p>
                         <p className="ig-rule-message">{rule.message}</p>
+                        {rule.replyMessage ? (
+                          <p className="ig-rule-reply field-help" style={{ color: '#047857', fontWeight: 500 }}>
+                            💬 공개 답글: {rule.replyMessage}
+                          </p>
+                        ) : null}
                         <p className="field-help">
                           채널 주소 코드 <code className="url-text">{rule.channelLinkCode}</code> ·{' '}
                           <Link href={statsHref}>통계에서 보기</Link>

@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import type { NextFunction, Request, Response } from 'express';
 import { ApiExceptionFilter } from './common/http';
 import { instagramWebhookRawBody } from './instagram/raw-body';
 import { sentryRequestUser } from './monitoring/request-user';
@@ -10,6 +11,14 @@ export function configureApp(app: INestApplication): void {
   app.use(sentryRequestUser);
   // Instagram 웹훅 POST만 서명 검증용 원문을 보관합니다. Nest의 본문 파서보다 먼저 스트림을 읽어야 합니다.
   app.use(instagramWebhookRawBody);
+  // 터널(HTTPS)로 들어온 Instagram OAuth 콜백을 로컬 웹(HTTP)으로 릴레이합니다.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path === '/me/integrations/instagram/callback') {
+      const target = `${process.env.WEB_URL || 'http://localhost:6393'}${req.originalUrl}`;
+      return res.redirect(302, target);
+    }
+    next();
+  });
   // 단축 도메인(`GET /{slug}`, `GET /c/…`, `GET /a/…/…`, `GET /b/…`, `SHORT_DOMAIN_ROUTES`)만 `/api` 밖에서 처리합니다.
   app.setGlobalPrefix('api', { exclude: SHORT_DOMAIN_ROUTES });
   app.useGlobalFilters(new ApiExceptionFilter());

@@ -360,10 +360,19 @@ pnpm --filter @crelink/api --silent ai-operator list-tokens   # 또는 node apps
 - 설정: [환경변수](#환경변수)의 8개 키는 전부 있거나 전부 없어야 합니다. 일부만 있으면 기동을 거부하고 오류에는 키 이름만 넣습니다. 전부 없으면 `AppConfig.instagram`이 null이고 기능이 꺼집니다. 시크릿 등록 전 배포가 막히지 않도록 `PRODUCTION_REQUIRED_KEYS`에는 넣지 않습니다.
 - 토큰: AES-256-GCM(`iv || tag || ct`)이고 행 ID를 AAD로 묶어 다른 행으로 복사하면 복호화되지 않습니다. 저장할 행의 ID가 필요하므로 새 연결은 ID를 먼저 정합니다. 키는 `INSTAGRAM_TOKEN_KEYS`의 버전으로 회전하고, 옛 버전은 저장된 토큰을 모두 다시 암호화할 때까지 남겨 둡니다.
 - 작성자 해시: `HMAC-SHA256(INSTAGRAM_COMMENTER_HASH_KEY, ig_user_id || from.id)` 32바이트만 저장합니다. 원문·사용자명·원본 ID는 저장하지 않습니다.
-- 수신 거부 토큰: 저장하지 않는 서명 토큰(만료 없음)입니다. base64url(`len(1) || ig_user_id || commenter_hash || MAC 앞 16바이트`)이고 키는 `INSTAGRAM_OPT_OUT_KEY`입니다.
+- DM 본문: `src/instagram/webhook.service.ts`가 저장 시점의 `rule.message`를 `message_body`에 그대로 넣고 worker가 전송합니다. 채널 링크와 자동 발송·수신 거부 안내 접미사는 자동으로 붙이지 않습니다.
+- 수신 거부 토큰: 새 DM에는 자동으로 발급·첨부하지 않으며 기존 토큰의 검증과 수신 거부 처리는 유지합니다. 저장하지 않는 서명 토큰(만료 없음)입니다. base64url(`len(1) || ig_user_id || commenter_hash || MAC 앞 16바이트`)이고 키는 `INSTAGRAM_OPT_OUT_KEY`입니다.
 - Graph 경계: `InstagramGraph`(`src/instagram/graph.ts`)가 `GoogleOAuth`와 같은 교체 지점입니다. API 버전 상수는 `GRAPH_API_VERSION`(`v27.0`)이고, 호출 형식이 미실측인 곳은 코드 주석에 `[M?]`로 표시했습니다(S3·S5·S7·S8). 오류는 `InstagramGraphError` 하나이며 종류·HTTP 상태와 허용 목록(`GRAPH_ALLOWED_ERROR_CODES`·`GRAPH_ALLOWED_ERROR_SUBCODES`) 안의 코드만 남기고 응답 원문은 버립니다. 실측으로 코드가 정해지면 이 목록에 더합니다.
 - 로그 차단: Sentry는 `x-hub-signature-256` 헤더, 쿼리 `access_token`·`client_secret`·`hub.verify_token`, 문자열 속의 Meta 토큰 형식(`EAA…`)을 지웁니다.
 - 발송 worker(`worker.service.ts`): 설정이 있을 때만 앱 기동과 함께 2초 tick으로 돕니다. 프로세스당 동시 5건(두 색 합쳐 10건)이고 빈 슬롯 수만큼만 `sending`으로 선점합니다. lease는 2분이며 끝나면 `unknown`으로 마감합니다. 결과를 모르는 호출(타임아웃·5xx·응답 전 끊김)은 다시 보내지 않습니다. 연결 전 실패만 30초·2분·10분·1시간 간격으로 4회 재시도하고, 레이트 제한은 연결 전체를 쉬게 하되 시도 횟수를 쓰지 않습니다. 댓글 시각에서 24시간이 지난 `pending`은 `expired`입니다. 시간당 한도는 `INSTAGRAM_DM_HOURLY_LIMIT`입니다. 종료 때 선점을 멈추고 진행 중인 호출을 기다립니다.
 - 긴급 정지: 운영자 스위치 `audience=off`(`PUT /api/admin/instagram-dm`)와 계정 정지(`PUT /api/admin/instagram-dm/connections/:userId/pause`)는 대기 건을 같은 트랜잭션에서 취소합니다. 호출 중이던 건이 재시도·레이트 대기로 돌아올 때 스위치 off, 계정·사용자 정지, 규칙 비활성·보관이면 `pending`이 아니라 `cancelled`(`failure_code=stopped_before_send`)로 끝납니다. 이 판정은 연결·규칙·설정 행을 잠가 진행 중인 정지 트랜잭션을 기다립니다. 재개해도 취소된 건은 보내지 않습니다.
 - 연결 해제: `DELETE /api/me/instagram`은 행을 지우고 규칙·내역은 CASCADE로 함께 지웁니다. 다만 `operator_paused_at`이 있으면 행을 남기고 재인증 전이(토큰 파기·대기 취소)와 규칙 보관만 해서 재연결(같은 `user_id`, 행 갱신)로 운영자 정지가 풀리지 않습니다. 응답은 똑같이 204입니다. Meta 데이터 삭제 콜백은 운영자 정지와 관계없이 행을 지웁니다.
 - 지표는 [로그·지표·Cron](#로그지표cron)의 `crelink.instagram.webhook`·`crelink.instagram.dm`입니다. 정책 제재와 재인증 전이는 경고 로그를 남기고, 정책 제재는 Sentry 경고도 보냅니다.
+
+### Instagram 공개 답글과 Unified Login 보강
+
+- `src/instagram/graph.ts`는 동의 URL에 `display=popup`, `prompt=login`을 넣고 페이지 계정, 직접 할당 계정(`assigned_instagram_accounts`), `granular_scopes` 순으로 계정을 조회합니다. granular scope 대상이 10개를 초과하거나 개별 조회가 실패하면 불완전한 계정 목록을 반환하지 않고 실패합니다. 실제 Meta 응답은 별도 실측이 필요합니다.
+- `src/instagram/rules.service.ts`의 선택 `replyMessage`는 최대 300 코드 포인트이며 null·빈 문자열은 공개 답글을 해제합니다. migration `0017_instagram_public_reply.sql`을 먼저 적용합니다.
+- `src/instagram/worker.service.ts`는 공개 답글 뒤 DM을 보냅니다. 답글 실패도 DM을 막지 않으며 답글 결과를 DM 전에 저장해 DM 재시도 시 답글을 반복하지 않습니다. DM 직전 발송 조건과 lease를 다시 확인하며 공개 답글 중 정지·수신 거부·취소·lease 상실이 발생하면 DM을 보내지 않습니다. 외부 발송과 DB 기록 사이 프로세스 종료는 원자적으로 묶을 수 없습니다.
+
+검증 기록(2026-11-11): `pnpm test --runTestsByPath src/instagram/instagram-crypto.spec.ts` 31개 통과, `pnpm typecheck` 통과, 변경 TypeScript 7개 파일의 ESLint 통과, `git diff --check` 통과, `pnpm work:scope` 통과. 지정 명령 `pnpm --filter @crelink/api test -- instagram`은 12 suite 통과·35 suite 실패이며 로컬 DB `127.0.0.1:6652` 연결이 샌드박스에서 `EPERM`으로 차단됩니다. 추가한 HTTP/DB 통합 회귀의 통과와 실제 Meta 연동은 확인하지 못했습니다. 작업 경로 자체에 `instagram`이 포함되어 지정 명령이 다른 API 테스트도 선택합니다.

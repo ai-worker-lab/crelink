@@ -240,7 +240,7 @@ export class InstagramConnectionService {
     code: string,
   ): Promise<{ token: GraphAccessToken; account: GraphInstagramAccount; metaUserId: string | null }> {
     const token = await this.graphCall(() => this.graph.exchangeCode(settings, code));
-    const lookup = await this.graphCall(() => this.graph.fetchAccounts(token.accessToken));
+    const lookup = await this.graphCall(() => this.graph.fetchAccounts(token.accessToken, settings));
     if (lookup.accounts.length !== 1) {
       throw apiError(
         HttpStatus.CONFLICT,

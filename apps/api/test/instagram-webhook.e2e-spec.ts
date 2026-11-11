@@ -7,10 +7,10 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { Client, type PoolClient } from 'pg';
 import { randomId } from '../src/common/http';
 import { Database } from '../src/database';
-import { commenterHash, verifyOptOutToken } from '../src/instagram/crypto';
+import { commenterHash } from '../src/instagram/crypto';
 import { LOCK_CONNECTIONS, LOCK_RULES, LOCK_SETTINGS } from '../src/instagram/lock-order';
 import { INSTAGRAM_WEBHOOK_BODY_LIMIT } from '../src/instagram/raw-body';
-import { api, createTestApp, login, SHORT_URL, TestApp, WEB_URL } from './test-app';
+import { api, createTestApp, login, TestApp, WEB_URL } from './test-app';
 
 const APP_SECRET = randomBytes(32).toString('hex');
 const VERIFY_TOKEN = randomBytes(16).toString('hex');
@@ -314,39 +314,39 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
   });
 
   describe('저장', () => {
-    it('최종 본문을 고정하고 원문·from.id는 저장하지 않으며 해시는 ig_user_id 기준이다', async () => {
-      const account = await newAccount();
-      const fromId = `from${randomId(16)}`;
-      const commentId = `comment${randomId(16)}`;
-      const response = await post(
-        webhook(account, [change(account, { id: commentId, from: { id: fromId, username: 'secret_name' } })]),
-      );
-      expect(response.status).toBe(200);
-      expect(await response.text()).toBe('');
+    it.each([RULE_MESSAGE, '  신청해 주셔서 고마워요 💌\n\nhttps://creator.test/content?from=dm  '])(
+      '규칙 문구를 접미사 없이 그대로 저장하고 댓글 원문·from.id를 저장하지 않는다 (%s)',
+      async (message) => {
+        const account = await newAccount();
+        await t.pool.query('UPDATE instagram_dm_rules SET message = $2 WHERE id = $1', [account.ruleId, message]);
+        const fromId = `from${randomId(16)}`;
+        const commentId = `comment${randomId(16)}`;
+        const response = await post(
+          webhook(account, [change(account, { id: commentId, from: { id: fromId, username: 'secret_name' } })]),
+        );
+        expect(response.status).toBe(200);
+        expect(await response.text()).toBe('');
 
-      const [row, ...rest] = await rowsOf(account);
-      expect(rest).toHaveLength(0);
-      expect(row).toMatchObject({ comment_id: commentId, rule_id: account.ruleId, status: 'pending' });
+        const [row, ...rest] = await rowsOf(account);
+        expect(rest).toHaveLength(0);
+        expect(row).toMatchObject({ comment_id: commentId, rule_id: account.ruleId, status: 'pending' });
 
-      const expectedHash = commenterHash(HASH_KEY, account.igUserId, fromId);
-      expect(row.commenter_hash.equals(expectedHash)).toBe(true);
+        const expectedHash = commenterHash(HASH_KEY, account.igUserId, fromId);
+        expect(row.commenter_hash.equals(expectedHash)).toBe(true);
 
-      const prefix = `${RULE_MESSAGE}\n\n${SHORT_URL}/s/${account.code}\n\n자동 발송 메시지 · 수신 거부: ${WEB_URL}/dm-opt-out#t=`;
-      expect(row.message_body.startsWith(prefix)).toBe(true);
-      const verified = verifyOptOutToken(OPT_OUT_KEY, row.message_body.slice(prefix.length));
-      expect(verified?.igUserId).toBe(account.igUserId);
-      expect(verified?.commenterHash.equals(expectedHash)).toBe(true);
+        expect(row.message_body).toBe(message);
 
-      const dump = (
-        await t.pool.query<{ text: string }>(
-          'SELECT to_jsonb(d)::text AS text FROM instagram_dm_deliveries d WHERE connection_id=$1',
-          [account.connectionId],
-        )
-      ).rows[0].text;
-      expect(dump).not.toContain(MATCHING_TEXT);
-      expect(dump).not.toContain(fromId);
-      expect(dump).not.toContain('secret_name');
-    });
+        const dump = (
+          await t.pool.query<{ text: string }>(
+            'SELECT to_jsonb(d)::text AS text FROM instagram_dm_deliveries d WHERE connection_id=$1',
+            [account.connectionId],
+          )
+        ).rows[0].text;
+        expect(dump).not.toContain(MATCHING_TEXT);
+        expect(dump).not.toContain(fromId);
+        expect(dump).not.toContain('secret_name');
+      },
+    );
 
     it('value.id와 value.comment_id를 모두 받는다', async () => {
       const account = await newAccount();

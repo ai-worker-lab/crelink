@@ -6,6 +6,10 @@
 
 ## 2026-11-11
 
+- Instagram DM 정책 문구 정정(0269): 처리방침·약관의 발송 설명과 처리방침의 이용 목적을 ‘작성한 문구 그대로’로 맞췄습니다. 근거: [웹 변경 기록](apps/web/CHANGELOGS.md), [0269 진행 기록](docs/work/orchestrator/0269-instagram-dm-integration.md).
+
+- Instagram DM 자동 접미사 제거(0269): 규칙 문구를 그대로 전송하도록 채널 링크·자동 발송·수신 거부 안내 자동 부착을 제거하고 PRD·설계를 맞췄습니다. 편집기의 생성·수정 요청에서 `message.trim()`을 제거해 앞뒤 개행·공백도 보존합니다. 근거: `apps/api/src/instagram/webhook.service.ts`, `apps/web/src/components/manage/instagram/RuleEditor.tsx`.
+
 - Instagram 댓글 자동 DM 제품 요구와 에픽 추가(0251): PRD R30을 추가하고, R12의 제외 범위가 프로필 SNS 주소 인증만 가리키도록 문구를 고쳤습니다. 일반 크리에이터 공개는 범위에서 뺐습니다.
 
 ## 2026-11-10

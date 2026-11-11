@@ -11,6 +11,7 @@ test('Instagram 댓글 자동 DM 한도는 설계와 같다', () => {
     deliveryPageSize: 20,
     keywordMaxLength: 30,
     messageMaxLength: 250,
+    replyMessageMaxLength: 300,
   });
 });
 

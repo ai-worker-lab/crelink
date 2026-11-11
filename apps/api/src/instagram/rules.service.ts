@@ -29,6 +29,7 @@ interface RuleRow {
   media_caption_preview: string;
   keyword: string;
   message: string;
+  reply_message: string | null;
   channel_link_code: string;
   enabled: boolean;
   created_at: Date;
@@ -47,6 +48,17 @@ function ruleText(value: unknown, max: number): string {
   }
   return value;
 }
+function optionalReplyText(value: unknown, max: number): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', '문자열이어야 합니다.');
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  if (trimmed.includes('\u0000') || Array.from(trimmed).length > max) {
+    throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', `공개 답글은 최대 ${max}자까지 입력해 주세요.`);
+  }
+  return trimmed;
+}
+
 function view(row: RuleRow): InstagramDmRuleView {
   return {
     publicId: row.public_id,
@@ -55,6 +67,7 @@ function view(row: RuleRow): InstagramDmRuleView {
     mediaCaptionPreview: row.media_caption_preview,
     keyword: row.keyword,
     message: row.message,
+    replyMessage: row.reply_message ?? null,
     channelLinkCode: row.channel_link_code,
     enabled: row.enabled,
     createdAt: row.created_at.toISOString(),
@@ -177,6 +190,7 @@ export class InstagramRulesService {
     const mediaId = ruleText(input.mediaId, 255);
     const keyword = ruleText(input.keyword, INSTAGRAM_DM_LIMITS.keywordMaxLength);
     const message = ruleText(input.message, INSTAGRAM_DM_LIMITS.messageMaxLength);
+    const replyMessage = optionalReplyText(input.replyMessage, INSTAGRAM_DM_LIMITS.replyMessageMaxLength);
     // 외부 호출 전에 막을 수 있는 실패를 먼저 거릅니다. Graph 호출 중에는 연결 행을 잠그지 않습니다(웹훅·worker를 막지 않게).
     const connection = await this.connection(this.database.pool, userId);
     await this.checkLimits(this.database.pool, userId, mediaId);
@@ -200,9 +214,9 @@ export class InstagramRulesService {
       );
       const result = await client.query<RuleRow>(
         `INSERT INTO instagram_dm_rules (public_id, connection_id, ig_media_id, ig_media_child_ids,
-         media_permalink, media_caption_preview, keyword, message, channel_link_code)
-         SELECT $1, c.id, $3, '{}'::text[], $4, $5, $6, $7, $8 FROM instagram_connections c
-         WHERE c.id = $2 AND c.user_id = $9 RETURNING *`,
+         media_permalink, media_caption_preview, keyword, message, reply_message, channel_link_code)
+         SELECT $1, c.id, $3, '{}'::text[], $4, $5, $6, $7, $8, $9 FROM instagram_connections c
+         WHERE c.id = $2 AND c.user_id = $10 RETURNING *`,
         [
           publicId,
           connection.id,
@@ -211,6 +225,7 @@ export class InstagramRulesService {
           Array.from(media.caption).slice(0, 200).join(''),
           keyword,
           message,
+          replyMessage,
           link.code,
           userId,
         ],
@@ -244,6 +259,10 @@ export class InstagramRulesService {
       input.keyword === undefined ? undefined : ruleText(input.keyword, INSTAGRAM_DM_LIMITS.keywordMaxLength);
     const message =
       input.message === undefined ? undefined : ruleText(input.message, INSTAGRAM_DM_LIMITS.messageMaxLength);
+    const replyMessage =
+      input.replyMessage === undefined
+        ? undefined
+        : optionalReplyText(input.replyMessage, INSTAGRAM_DM_LIMITS.replyMessageMaxLength);
     const enabled = optionalBoolean(input.enabled, 'enabled');
     return this.database.transaction(async (client) => {
       // 잠금 순서: 연결 → 규칙 → 발송 행(`lock-order.ts`). 없는 연결도 남의 publicId와 똑같이 404입니다.
@@ -253,16 +272,18 @@ export class InstagramRulesService {
       const invalidate =
         (keyword !== undefined && keyword !== rule.keyword) ||
         (message !== undefined && message !== rule.message) ||
+        (replyMessage !== undefined && replyMessage !== rule.reply_message) ||
         (enabled === false && rule.enabled);
       const result = await client.query<RuleRow>(
-        `UPDATE instagram_dm_rules r SET keyword = $3, message = $4, enabled = $5,
-         version = version + $6, updated_at = now() FROM instagram_connections c
+        `UPDATE instagram_dm_rules r SET keyword = $3, message = $4, reply_message = $5, enabled = $6,
+         version = version + $7, updated_at = now() FROM instagram_connections c
          WHERE c.id = r.connection_id AND c.user_id = $1 AND r.public_id = $2 AND r.archived_at IS NULL RETURNING r.*`,
         [
           userId,
           publicId,
           keyword ?? rule.keyword,
           message ?? rule.message,
+          replyMessage !== undefined ? replyMessage : rule.reply_message,
           enabled ?? rule.enabled,
           invalidate ? 1 : 0,
         ],

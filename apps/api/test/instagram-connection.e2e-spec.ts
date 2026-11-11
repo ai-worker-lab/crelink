@@ -1,3 +1,4 @@
+import { AppConfig } from '../src/config.service';
 import { randomBytes } from 'node:crypto';
 import {
   CreatorLandingState,
@@ -29,6 +30,7 @@ const META_ENV = {
   INSTAGRAM_TOKEN_KEY_CURRENT: '2',
   INSTAGRAM_COMMENTER_HASH_KEY: b64Key(),
   INSTAGRAM_OPT_OUT_KEY: b64Key(),
+  INSTAGRAM_REDIRECT_BASE_URL: '',
 };
 const keyring = parseTokenKeyring(KEYS_VALUE, '2');
 
@@ -374,6 +376,7 @@ describe('Instagram 연결 API', () => {
       });
       expect(JSON.stringify(response.body)).not.toContain(secret);
       expect(spies.subscribe).toHaveBeenCalledWith(secret, ig);
+      expect(spies.accounts).toHaveBeenCalledWith(secret, t.app.get(AppConfig).instagram);
       const stored = await requireRow(owner.userId);
       expect(stored.token_ciphertext!.includes(Buffer.from(secret))).toBe(false);
       const dump = await t.pool.query<{ dump: string }>(

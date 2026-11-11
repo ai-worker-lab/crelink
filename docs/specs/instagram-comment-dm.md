@@ -282,7 +282,7 @@ CREATE TABLE instagram_deletion_requests (
 - **종료.** `onModuleDestroy`에서 claim을 멈추고 진행 중 호출을 기다립니다. Database가 마지막에 닫히므로 순서가 보장되고(E5), 최악 10초는 30초 유예 안입니다(E4).
 - **Lease(2분) 만료**: `sending`을 `unknown`으로 바꾸고 재시도하지 않습니다.
 
-**DM 본문.** `{규칙 문구}\n\n{/s/ 링크}\n\n자동 발송 메시지 · 수신 거부: {WEB}/dm-opt-out#t={token}`입니다. 토큰은 웹훅 저장 시점에 만들어 `message_body`에 포함합니다. 고정 줄은 크리에이터가 뺄 수 없습니다. 규칙 문구 상한 250자는 링크와 고정 줄을 더해도 Graph 메시지 길이 안에 들게 하기 위한 값이며, 바이트·글자 기준은 S11로 확정합니다 `[M?]`. 자동 발송 표시는 이 수신 거부 안내 줄에 합쳤습니다.
+**DM 본문.** 웹훅 저장 시점의 `rule.message`를 `message_body`에 그대로 저장하고 worker가 그 값을 전송합니다. 채널 링크·자동 발송 표시·수신 거부 안내 접미사는 자동으로 붙이지 않습니다. 링크가 필요하면 크리에이터가 규칙 문구에 직접 넣습니다. 문구 길이 제한은 `packages/shared/src/instagram-dm.ts`의 `INSTAGRAM_DM_LIMITS.messageMaxLength`를 따릅니다. 근거: `apps/api/src/instagram/webhook.service.ts`, `apps/api/src/instagram/worker.service.ts`.
 
 **오류 분류.** 코드 확정은 S4·S8에서 합니다.
 
@@ -402,7 +402,7 @@ S7에서 토큰이 만료되고 갱신 수단이 있다고 확인되면 후속 m
 | `GET /api/public/instagram-deletions/:code` | 공개 | 없음 | `{ processedAt }` | 404 |
 | `POST /api/public/instagram-dm-opt-outs` | 공개, BFF의 같은 출처 검사 사용, 기존 공개 쓰기 경로(`apps/api/src/telemetry/landing-events.service.ts`)와 같은 수준의 IP 요청 한도 | `{ token }` | 204, 멱등. 수신 거부 기록과 그 사람의 `pending` 취소를 한 트랜잭션으로 | 400 `opt_out_invalid`, 429 |
 
-- 수신 거부 토큰은 서버에 저장하지 않는 서명 토큰입니다(`ig_user_id`, `commenter_hash`, MAC 앞 16바이트, 키는 `INSTAGRAM_OPT_OUT_KEY`, 만료 없음). `commenter_hash` 32바이트를 포함해 base64url 약 90자이며, 이 길이를 더한 `message_body` 전체가 S11의 상한 안에 드는지 0253의 시험으로 확인합니다. 경로가 아니라 URL 프래그먼트(`#t=`)로 보내 서버 로그에 남지 않습니다.
+- 수신 거부 토큰은 서버에 저장하지 않는 서명 토큰입니다(`ig_user_id`, `commenter_hash`, MAC 앞 16바이트, 키는 `INSTAGRAM_OPT_OUT_KEY`, 만료 없음). `commenter_hash` 32바이트를 포함해 base64url 약 90자입니다. 새 DM 본문에는 자동으로 발급·첨부하지 않으며 기존에 발급된 토큰의 검증과 수신 거부 처리는 유지합니다. 경로가 아니라 URL 프래그먼트(`#t=`)로 보내 서버 로그에 남지 않습니다.
 - 수신 거부는 GET으로 처리하지 않습니다. 링크 미리보기 크롤러가 거부를 일으키면 안 되기 때문입니다.
 - 응답에는 `commenter_hash`, `comment_id`, 토큰, `failure_code` 원문을 넣지 않습니다. 화면에는 `status`만 보입니다.
 - `CreatorLandingState`에 `instagramDmAvailable`을 더합니다. 메뉴 표시 전용이고 `platform_settings` 조회에 합칠 수 있습니다(`apps/api/src/creator/creator.service.ts:133`).
@@ -482,7 +482,7 @@ S7에서 토큰이 만료되고 갱신 수단이 있다고 확인되면 후속 m
 | **S3 (③)** | `comment_id` 비공개 답장 호출. S2와 독립 | 0258 | `GET /<media>/comments`로 얻은 ID로 호출, 수신 계정 화면 확인 |
 | S4 | 같은 `comment_id` 재호출 결과 | 0258 | 두 번째 응답 코드 기록 |
 | S5 | 실제 원문의 `value.id`/`value.comment_id`, 캐러셀의 `media.id` | 0254, 0257, 0260 | 필드표와 캐러셀 처리 결정. S2 실패 시 Advanced 뒤로 이월 |
-| S6 | `/s/{code}`와 수신 거부 링크 포함 DM의 전달, 크롤러, 탭 1회 기록 | 0260 | visits·page_view 건수, 수신 거부 링크의 `#t=` 프래그먼트 유지 여부 |
+| S6 | 규칙 문구에 직접 넣은 `/s/{code}` 링크 포함 DM의 전달, 크롤러, 탭 1회 기록 | 0260 | 본문이 규칙 문구와 일치, visits·page_view 건수 |
 | S7 | Unified 토큰 발급, 추가 권한, 만료 값, IG ID 조회, 계정 복수 | 0254, 0256 | 응답 형식표 |
 | S8 | 메시지 접근 꺼짐과 토큰 무효의 오류 코드, BUC 헤더 형식 | 0258 | 코드표 |
 | S9 | 데이터 삭제 콜백 `user_id`와 해제 콜백 존재 여부 | 0257 | 호출 원문(비식별) 또는 문서 근거 |

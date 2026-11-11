@@ -878,6 +878,57 @@ describe('Instagram DM 발송 worker', () => {
     });
   });
 
+  it.each(['pause', 'opt_out', 'cancel', 'lease'])('공개 답글 도중 %s 발생 시 DM을 보내지 않는다', async (stop) => {
+    const account = await seedAccount();
+    const delivery = await seedDelivery(account);
+    await t.pool.query('UPDATE instagram_dm_rules SET reply_message = $2 WHERE id = $1', [account.ruleId, '안내']);
+    jest.spyOn(t.app.get(InstagramGraph), 'replyToComment').mockImplementationOnce(async () => {
+      if (stop === 'pause') await t.pool.query('UPDATE instagram_connections SET dm_paused_at = now()');
+      if (stop === 'opt_out')
+        await t.pool.query('INSERT INTO instagram_dm_opt_outs (ig_user_id, commenter_hash) VALUES ($1, $2)', [
+          account.igUserId,
+          delivery.hash,
+        ]);
+      if (stop === 'cancel') await t.pool.query("UPDATE instagram_dm_deliveries SET status = 'cancelled'");
+      if (stop === 'lease')
+        await t.pool.query("UPDATE instagram_dm_deliveries SET lease_until = now() + interval '1 hour'");
+      return { commentId: 'public-reply' };
+    });
+    await tick(worker());
+    expect(send).not.toHaveBeenCalled();
+    expect((await row(delivery.id)).status).toBe(stop === 'lease' ? 'sending' : 'cancelled');
+  });
+
+  it.each([false, true])('공개 답글 실패=%s여도 DM을 보내고 재시도 때 답글을 반복하지 않는다', async (fails) => {
+    const account = await seedAccount();
+    await t.pool.query('UPDATE instagram_dm_rules SET reply_message = $2 WHERE id = $1', [
+      account.ruleId,
+      'DM을 확인해 주세요',
+    ]);
+    const delivery = await seedDelivery(account);
+    const reply = jest.spyOn(t.app.get(InstagramGraph), 'replyToComment');
+    if (fails) reply.mockRejectedValue(new Error(RAW_GRAPH_TEXT));
+    else reply.mockResolvedValue({ commentId: 'public-reply' });
+    send.mockRejectedValueOnce(graphError('connect_failed', null));
+    const target = worker();
+    await tick(target);
+    expect(reply).toHaveBeenCalledWith(TOKEN, delivery.commentId, 'DM을 확인해 주세요');
+    expect(reply.mock.invocationCallOrder[0]).toBeLessThan(send.mock.invocationCallOrder[0]);
+    const saved = await t.pool.query(
+      'SELECT reply_status, reply_comment_id FROM instagram_dm_deliveries WHERE id = $1',
+      [delivery.id],
+    );
+    expect(saved.rows[0]).toEqual({
+      reply_status: fails ? 'failed' : 'sent',
+      reply_comment_id: fails ? null : 'public-reply',
+    });
+    await makeDue(delivery.id);
+    await tick(target);
+    expect(reply).toHaveBeenCalledTimes(1);
+    expect((await row(delivery.id)).status).toBe('sent');
+    expect(loggedText()).not.toContain(delivery.commentId);
+  });
+
   describe('시작과 종료', () => {
     it('onModuleDestroy는 선점을 멈추고 진행 중 호출을 기다린다', async () => {
       const account = await seedAccount();
