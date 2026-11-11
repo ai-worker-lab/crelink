@@ -95,6 +95,8 @@ const upstreamFailed = (): HttpException =>
   );
 const notConnected = (): HttpException =>
   apiError(HttpStatus.CONFLICT, 'instagram_reauth_required', '연결된 인스타그램 계정이 없습니다.');
+const operatorPaused = (): HttpException =>
+  apiError(HttpStatus.CONFLICT, 'instagram_operator_paused', '운영자가 자동 DM을 멈춘 계정입니다.');
 
 function audienceAllows(audience: InstagramDmAudience, user: SessionUser): boolean {
   return audience === 'everyone' || (audience === 'operators' && user.role === 'operator');
@@ -195,7 +197,7 @@ export class InstagramConnectionService {
   }
 
   /**
-   * `POST /api/me/instagram/callback`. state 검증 → code 교환 → 계정 조회 → 충돌 검사 → 구독 → 암호화 저장 순서입니다.
+   * `POST /api/me/instagram/callback`. state 검증 → code 교환 → 계정 조회 → 운영자 정지 확인 → 충돌 검사 → 구독 → 암호화 저장 순서입니다.
    * 외부 호출은 트랜잭션 밖이고, 저장 트랜잭션이 revision과 계정을 다시 확인합니다.
    */
   async complete(
@@ -227,6 +229,7 @@ export class InstagramConnectionService {
     const { token, account, metaUserId } = await this.exchange(settings, code);
     // 연결된 페이지의 계정을 바꾸면 규칙의 게시물 ID가 다른 계정을 가리키므로 해제부터 하도록 막습니다.
     if (access.igUserId !== null && access.igUserId !== account.igUserId) throw accountInUse();
+    await this.assertNotPausedElsewhere(user.id, account.igUserId);
     await this.resolveConflict(settings, user.id, account.igUserId);
     await this.graphCall(() => this.graph.subscribeApp(token.accessToken, account.igUserId));
     return toConnectionView(await this.save(settings, user.id, payload.rev, account, metaUserId, token));
@@ -254,6 +257,19 @@ export class InstagramConnectionService {
       );
     }
     return { token, account, metaUserId: lookup.metaUserId };
+  }
+
+  /**
+   * 다른 크리링 계정이 쥔 같은 IG 계정의 행에 운영자 정지가 있으면(재인증 대기 행 포함) 구독·저장 전에 409입니다.
+   * 같은 크리링 계정의 재연결은 그 행을 갱신해 정지가 그대로 유지되므로 막지 않습니다. 저장 트랜잭션이 잠금 뒤 한 번 더 봅니다.
+   */
+  private async assertNotPausedElsewhere(userId: string, igUserId: string): Promise<void> {
+    const paused = await this.database.query(
+      `SELECT 1 FROM instagram_connections
+       WHERE ig_user_id = $1 AND user_id <> $2 AND operator_paused_at IS NOT NULL LIMIT 1`,
+      [igUserId, userId],
+    );
+    if (paused.rowCount) throw operatorPaused();
   }
 
   /**
@@ -317,13 +333,32 @@ export class InstagramConnectionService {
   ): Promise<ConnectionViewRow> {
     try {
       return await this.database.transaction(async (client) => {
-        const current = await client.query<{ id: string; ig_user_id: string; token_revision: number }>(
-          'SELECT id, ig_user_id, token_revision FROM instagram_connections WHERE user_id = $1 FOR UPDATE',
-          [userId],
+        // 내 행과 같은 IG 계정의 다른 행을 id 순으로 함께 잠급니다(`lock-order.ts`).
+        const current = await client.query<{
+          id: string;
+          user_id: string;
+          ig_user_id: string;
+          token_revision: number;
+          operator_paused_at: Date | null;
+        }>(
+          `SELECT id, user_id, ig_user_id, token_revision, operator_paused_at FROM instagram_connections
+           WHERE user_id = $1 OR ig_user_id = $2 ORDER BY id FOR UPDATE`,
+          [userId, account.igUserId],
         );
-        const row = current.rows[0];
+        const row = current.rows.find((candidate) => candidate.user_id === userId);
         if ((row?.token_revision ?? 0) !== expectedRevision) throw stateInvalid();
         if (row && row.ig_user_id !== account.igUserId) throw accountInUse();
+        if (current.rows.some((candidate) => candidate.user_id !== userId && candidate.operator_paused_at)) {
+          throw operatorPaused();
+        }
+        // 일반 해제 뒤에도 데이터 삭제 콜백이 수신 거부 기록을 찾도록 대응표를 남깁니다. 해제해도 지우지 않습니다.
+        if (metaUserId !== null) {
+          await client.query(
+            `INSERT INTO instagram_opt_out_owners (ig_user_id, meta_user_id) VALUES ($1, $2)
+             ON CONFLICT (ig_user_id) DO UPDATE SET meta_user_id = EXCLUDED.meta_user_id`,
+            [account.igUserId, metaUserId],
+          );
+        }
         // AAD가 행 ID이므로 새 연결은 ID를 먼저 정합니다.
         const id = row?.id ?? randomUUID();
         const encrypted = encryptToken(settings.tokenKeyring, id, token.accessToken);
@@ -419,12 +454,13 @@ export class InstagramConnectionService {
         await client.query('DELETE FROM instagram_connections WHERE id = $1', [connectionId]);
         return;
       }
-      await this.applyReauthRequired(client, connectionId, row.token_revision);
+      // 연결(위 FOR UPDATE) → 규칙 → 발송 행 순서입니다(`lock-order.ts`).
       await client.query(
         `UPDATE instagram_dm_rules SET archived_at = now(), version = version + 1, updated_at = now()
          WHERE connection_id = $1 AND archived_at IS NULL`,
         [connectionId],
       );
+      await this.applyReauthRequired(client, connectionId, row.token_revision);
     });
   }
 

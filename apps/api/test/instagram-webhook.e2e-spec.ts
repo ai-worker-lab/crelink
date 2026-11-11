@@ -4,10 +4,11 @@ import { ChannelLinkView } from '@crelink/shared';
 import { createHmac, randomBytes } from 'node:crypto';
 import { request as httpRequest } from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { Client } from 'pg';
+import { Client, type PoolClient } from 'pg';
 import { randomId } from '../src/common/http';
 import { Database } from '../src/database';
 import { commenterHash, verifyOptOutToken } from '../src/instagram/crypto';
+import { LOCK_CONNECTIONS, LOCK_RULES, LOCK_SETTINGS } from '../src/instagram/lock-order';
 import { INSTAGRAM_WEBHOOK_BODY_LIMIT } from '../src/instagram/raw-body';
 import { api, createTestApp, login, SHORT_URL, TestApp, WEB_URL } from './test-app';
 
@@ -34,6 +35,8 @@ const RULE_MESSAGE = '신청해 주셔서 고마워요';
 const INSERT_SQL = 'INSERT INTO instagram_dm_deliveries';
 
 interface Account {
+  cookie: string;
+  publicId: string;
   userId: string;
   igUserId: string;
   metaUserId: string;
@@ -104,6 +107,7 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
     n += 1;
     const signedIn = await login(t.baseUrl, `ig-${n}|ig${n}@example.com`);
     const cookie = signedIn.cookie!;
+    const publicId = randomId(10);
     const created = await api<ChannelLinkView>(t.baseUrl, 'POST', '/api/me/channel-links', {
       cookie,
       body: { channel: 'instagram', placement: 'dm' },
@@ -122,9 +126,38 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
     const rule = await t.pool.query<{ id: string }>(
       `INSERT INTO instagram_dm_rules (public_id, connection_id, ig_media_id, media_permalink, keyword, message, channel_link_code, created_at)
        VALUES ($1,$2,$3,'https://instagram.test/p/1',$4,$5,$6, COALESCE($7::timestamptz, now() - interval '48 hours')) RETURNING id`,
-      [randomId(10), connectionId, mediaId, KEYWORD, RULE_MESSAGE, created.body.code, options.ruleCreatedAt ?? null],
+      [publicId, connectionId, mediaId, KEYWORD, RULE_MESSAGE, created.body.code, options.ruleCreatedAt ?? null],
     );
-    return { userId, igUserId, metaUserId, mediaId, connectionId, ruleId: rule.rows[0].id, code: created.body.code };
+    return {
+      cookie,
+      publicId,
+      userId,
+      igUserId,
+      metaUserId,
+      mediaId,
+      connectionId,
+      ruleId: rule.rows[0].id,
+      code: created.body.code,
+    };
+  };
+
+  /**
+   * 저장 트랜잭션(`database.transaction`)의 쿼리를 관찰하거나 끼어듭니다. 돌려주는 배열에 SQL이 순서대로 쌓입니다.
+   * `intercept`가 없으면 그대로 실행합니다.
+   */
+  const interceptTransaction = (intercept?: (sql: string, forward: () => Promise<unknown>) => Promise<unknown>) => {
+    const real = database.transaction.bind(database);
+    const sqls: string[] = [];
+    jest.spyOn(database, 'transaction').mockImplementation(((run: (client: PoolClient) => Promise<unknown>) =>
+      real((client) => {
+        const query = (...args: unknown[]) => {
+          sqls.push(String(args[0]));
+          const forward = () => (client.query as (...values: unknown[]) => Promise<unknown>)(...args);
+          return intercept ? intercept(String(args[0]), forward) : forward();
+        };
+        return run({ query } as unknown as PoolClient);
+      })) as never);
+    return sqls;
   };
 
   beforeAll(async () => {
@@ -379,7 +412,7 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
   describe('저장하지 않는 경우', () => {
     it('키워드나 게시물이 맞지 않으면 저장 0, INSERT 없음', async () => {
       const account = await newAccount();
-      const query = jest.spyOn(database.pool, 'query');
+      const sqls = interceptTransaction();
       const response = await post(
         webhook(account, [
           change(account, { text: '전혀 다른 댓글' }),
@@ -387,7 +420,7 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
         ]),
       );
       expect(response.status).toBe(200);
-      expect(query.mock.calls.filter(([sql]) => String(sql).includes(INSERT_SQL))).toHaveLength(0);
+      expect(sqls.filter((sql) => sql.includes(INSERT_SQL))).toHaveLength(0);
       expect(await rowsOf(account)).toHaveLength(0);
     });
 
@@ -484,7 +517,7 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
     it('불량 항목은 건너뛰고 지표를 남기며 정상분만 한 INSERT로 저장한다', async () => {
       const account = await newAccount();
       const count = jest.spyOn(Sentry.metrics, 'count');
-      const query = jest.spyOn(database.pool, 'query');
+      const sqls = interceptTransaction();
       const first = change(account);
       const second = change(account);
       const noMedia = change(account);
@@ -518,7 +551,7 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
       expect((await rowsOf(account)).map((row) => row.comment_id).sort()).toEqual(
         [first.value.id as string, second.value.id as string].sort(),
       );
-      expect(query.mock.calls.filter(([sql]) => String(sql).includes(INSERT_SQL))).toHaveLength(1);
+      expect(sqls.filter((sql) => sql.includes(INSERT_SQL))).toHaveLength(1);
       expect(count).toHaveBeenCalledWith('crelink.instagram.webhook', 11, { attributes: { result: 'malformed' } });
       expect(count).toHaveBeenCalledWith('crelink.instagram.webhook', 2, { attributes: { result: 'stored' } });
     });
@@ -567,14 +600,17 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
       expect(await rowsOf(account)).toHaveLength(50);
     });
 
-    it('1000건 배치는 규칙 조회 1회, INSERT 1회로 저장한다', async () => {
+    it('1000건 배치는 규칙 조회 1회와 저장 트랜잭션(설정 → 연결 → 규칙 잠금, INSERT 1회)으로 저장한다', async () => {
       const account = await newAccount();
       const query = jest.spyOn(database.pool, 'query');
+      const sqls = interceptTransaction();
       const changes = Array.from({ length: 1000 }, () => change(account));
       const response = await post(webhook(account, changes));
       expect(response.status).toBe(200);
-      expect(query).toHaveBeenCalledTimes(2);
-      expect(query.mock.calls.filter(([sql]) => String(sql).includes(INSERT_SQL))).toHaveLength(1);
+      expect(query).toHaveBeenCalledTimes(1);
+      expect(sqls.slice(0, 3)).toEqual([LOCK_SETTINGS, LOCK_CONNECTIONS, LOCK_RULES]);
+      expect(sqls).toHaveLength(4);
+      expect(sqls[3].trim().startsWith(INSERT_SQL)).toBe(true);
       expect(await rowsOf(account)).toHaveLength(1000);
     });
 
@@ -582,24 +618,41 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
       const first = await newAccount();
       const second = await newAccount();
       const query = jest.spyOn(database.pool, 'query');
+      const sqls = interceptTransaction();
       const response = await post({
         object: 'instagram',
         entry: [...webhook(first, [change(first)]).entry, ...webhook(second, [change(second)]).entry],
       });
       expect(response.status).toBe(200);
-      expect(query).toHaveBeenCalledTimes(2);
+      expect(query).toHaveBeenCalledTimes(1);
+      expect(sqls.filter((sql) => sql.includes(INSERT_SQL))).toHaveLength(1);
       expect(await rowsOf(first)).toHaveLength(1);
       expect(await rowsOf(second)).toHaveLength(1);
     });
   });
 
   describe('규칙 변경 경합', () => {
+    /** 규칙을 읽은 뒤, 저장 트랜잭션의 잠금 전에 상태를 바꿉니다. 잠금 뒤의 INSERT가 새 값을 보는지 확인합니다. */
     const changeBeforeInsert = (mutate: () => Promise<unknown>) => {
-      const original = database.pool.query.bind(database.pool) as (...args: unknown[]) => Promise<unknown>;
-      jest.spyOn(database.pool, 'query').mockImplementation(((...args: unknown[]) => {
-        if (String(args[0]).includes(INSERT_SQL)) return mutate().then(() => original(...args));
-        return original(...args);
-      }) as never);
+      const real = database.transaction.bind(database);
+      jest
+        .spyOn(database, 'transaction')
+        .mockImplementation(((run: (client: PoolClient) => Promise<unknown>) =>
+          mutate().then(() => real(run))) as never);
+    };
+
+    /** 웹훅의 저장 트랜잭션이 잠금에서 기다릴 때까지 폴링합니다. */
+    const waitForWebhookLock = async (match: string) => {
+      for (let attempt = 0; attempt < 150; attempt += 1) {
+        const activity = await t.pool.query(
+          `SELECT 1 FROM pg_stat_activity
+           WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE $1`,
+          [match],
+        );
+        if (activity.rowCount) return true;
+        await sleep(20);
+      }
+      return false;
     };
 
     it.each([
@@ -648,17 +701,8 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
           settled = true;
           return response;
         });
-        // INSERT가 규칙 행 잠금에서 기다리는 것을 확인합니다.
-        let waiting = 0;
-        for (let attempt = 0; attempt < 100 && waiting === 0; attempt += 1) {
-          await sleep(20);
-          const activity = await t.pool.query<{ count: string }>(
-            `SELECT count(*) FROM pg_stat_activity
-             WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%INSERT INTO instagram_dm_deliveries%'`,
-          );
-          waiting = Number(activity.rows[0].count);
-        }
-        expect(waiting).toBe(1);
+        // 저장 트랜잭션이 규칙 행의 FOR SHARE에서 기다리는 것을 확인합니다.
+        expect(await waitForWebhookLock('%instagram_dm_rules%FOR SHARE%')).toBe(true);
         expect(settled).toBe(false);
         await client.query('COMMIT');
         expect((await pending).status).toBe(200);
@@ -668,6 +712,43 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
       }
       expect(await rowsOf(account)).toHaveLength(0);
     });
+
+    it('규칙 변경이 연결 행을 쥔 채 규칙 행을 기다려도 웹훅과 교착하지 않는다', async () => {
+      const account = await newAccount();
+      const client = await t.pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SELECT id FROM instagram_connections WHERE id=$1 FOR UPDATE', [account.connectionId]);
+        const pending = post(webhook(account, [change(account)]));
+        // 웹훅은 연결 행(FOR SHARE)에서 기다립니다. 옛 순서(규칙 → 연결)였다면 규칙 행을 이미 쥐고 있어 다음 줄이 교착됩니다.
+        expect(await waitForWebhookLock('%instagram_connections%FOR SHARE%')).toBe(true);
+        await client.query('SELECT id FROM instagram_dm_rules WHERE id=$1 FOR UPDATE', [account.ruleId]);
+        await client.query('UPDATE instagram_dm_rules SET version=version+1 WHERE id=$1', [account.ruleId]);
+        await client.query('COMMIT');
+        expect((await pending).status).toBe(200);
+      } finally {
+        await client.query('ROLLBACK').catch(() => undefined);
+        client.release();
+      }
+      expect(await rowsOf(account)).toHaveLength(0);
+    });
+
+    it('규칙 변경과 웹훅을 40회 겹쳐도 40P01·500이 없다', async () => {
+      const account = await newAccount();
+      const errors = jest.spyOn(Logger.prototype, 'error');
+      for (let i = 0; i < 40; i += 1) {
+        const [patch, ...hooks] = await Promise.all([
+          api(t.baseUrl, 'PATCH', `/api/me/instagram/rules/${account.publicId}`, {
+            cookie: account.cookie,
+            body: { message: `문구 ${i}` },
+          }),
+          ...Array.from({ length: 5 }, () => post(webhook(account, [change(account)]))),
+        ]);
+        expect(patch.status).toBe(200);
+        expect(hooks.map((hook) => hook.status)).toEqual(Array(5).fill(200));
+      }
+      expect(JSON.stringify(errors.mock.calls)).not.toContain('40P01');
+    }, 60_000);
   });
 
   describe('DB 실패', () => {
@@ -685,24 +766,32 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
 
     it('INSERT가 실패하면 503이다', async () => {
       const account = await newAccount();
-      const original = database.pool.query.bind(database.pool) as (...args: unknown[]) => Promise<unknown>;
-      jest
-        .spyOn(database.pool, 'query')
-        .mockImplementation(((...args: unknown[]) =>
-          String(args[0]).includes(INSERT_SQL) ? Promise.reject(new Error('down')) : original(...args)) as never);
+      interceptTransaction((sql, forward) =>
+        sql.includes(INSERT_SQL) ? Promise.reject(new Error('down')) : forward(),
+      );
       expect((await post(webhook(account, [change(account)]))).status).toBe(503);
       expect(await rowsOf(account)).toHaveLength(0);
     });
 
+    it('교착(40P01)으로 트랜잭션이 실패하면 503이고 재전송으로 저장된다', async () => {
+      const account = await newAccount();
+      const raw = JSON.stringify(webhook(account, [change(account)]));
+      interceptTransaction((sql, forward) =>
+        sql.includes(INSERT_SQL) ? Promise.reject(Object.assign(new Error('deadlock'), { code: '40P01' })) : forward(),
+      );
+      const failed = await send(raw);
+      expect(failed.status).toBe(503);
+      expect(await failed.json()).toMatchObject({ code: 'database_unavailable' });
+      jest.restoreAllMocks();
+      expect((await send(raw)).status).toBe(200);
+      expect(await rowsOf(account)).toHaveLength(1);
+    });
+
     it('INSERT가 끝나기 전에는 응답하지 않는다', async () => {
       const account = await newAccount();
-      const original = database.pool.query.bind(database.pool) as (...args: unknown[]) => Promise<unknown>;
       let release!: () => void;
       const gate = new Promise<void>((resolve) => (release = resolve));
-      jest
-        .spyOn(database.pool, 'query')
-        .mockImplementation(((...args: unknown[]) =>
-          String(args[0]).includes(INSERT_SQL) ? gate.then(() => original(...args)) : original(...args)) as never);
+      interceptTransaction((sql, forward) => (sql.includes(INSERT_SQL) ? gate.then(forward) : forward()));
       let settled = false;
       const pending = post(webhook(account, [change(account)])).then((response) => {
         settled = true;
@@ -728,13 +817,11 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
         jest.spyOn(Sentry.metrics, 'count'),
         jest.spyOn(Sentry.metrics, 'distribution'),
       ];
-      const original = database.pool.query.bind(database.pool) as (...args: unknown[]) => Promise<unknown>;
-      jest
-        .spyOn(database.pool, 'query')
-        .mockImplementation(((...args: unknown[]) =>
-          String(args[0]).includes(INSERT_SQL)
-            ? Promise.reject(Object.assign(new Error(`values (${commentId}, ${fromId})`), { code: '23514' }))
-            : original(...args)) as never);
+      interceptTransaction((sql, forward) =>
+        sql.includes(INSERT_SQL)
+          ? Promise.reject(Object.assign(new Error(`values (${commentId}, ${fromId})`), { code: '23514' }))
+          : forward(),
+      );
       const response = await post(webhook(account, [change(account, { id: commentId, from: { id: fromId } })]));
       expect(response.status).toBe(503);
       const logged = JSON.stringify(spies.flatMap((spy) => spy.mock.calls));
@@ -805,6 +892,31 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
       expect(status.status).toBe(200);
       expect(Number.isNaN(Date.parse(status.body.processedAt))).toBe(false);
       expect(Object.keys(status.body)).toEqual(['processedAt']);
+    });
+
+    it('일반 해제로 연결 행이 사라진 뒤에도 대응표로 수신 거부 기록과 대응표 행을 지운다', async () => {
+      const account = await newAccount();
+      const other = await newAccount();
+      for (const target of [account, other]) {
+        await t.pool.query('INSERT INTO instagram_opt_out_owners (ig_user_id, meta_user_id) VALUES ($1,$2)', [
+          target.igUserId,
+          target.metaUserId,
+        ]);
+        await addOptOut(target.igUserId);
+      }
+      await t.pool.query('DELETE FROM instagram_connections WHERE id=$1', [account.connectionId]);
+
+      const response = await deleteCallback(signedRequest(payloadFor(account)));
+      expect(response.status).toBe(200);
+
+      expect(await optOutCount(account.igUserId)).toBe(0);
+      expect(
+        (await t.pool.query('SELECT 1 FROM instagram_opt_out_owners WHERE ig_user_id=$1', [account.igUserId])).rowCount,
+      ).toBe(0);
+      expect(await optOutCount(other.igUserId)).toBe(1);
+      expect(
+        (await t.pool.query('SELECT 1 FROM instagram_opt_out_owners WHERE ig_user_id=$1', [other.igUserId])).rowCount,
+      ).toBe(1);
     });
 
     it('연결을 못 찾아도 같은 형식으로 응답한다', async () => {

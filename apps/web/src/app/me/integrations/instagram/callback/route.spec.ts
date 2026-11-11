@@ -162,6 +162,7 @@ describe('Instagram 연결 콜백 route', () => {
     for (const [status, code] of [
       [400, 'oauth_state_invalid'],
       [409, 'instagram_account_in_use'],
+      [409, 'instagram_operator_paused'],
       [409, 'instagram_account_selection_required'],
       [422, 'instagram_account_not_professional'],
       [502, 'instagram_upstream_failed'],

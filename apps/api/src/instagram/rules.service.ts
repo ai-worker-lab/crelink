@@ -12,7 +12,7 @@ import { AppConfig } from '../config.service';
 import { ChannelLinksService } from '../creator/channel-links.service';
 import { Database, Queryable } from '../database';
 import { decryptToken } from './crypto';
-import { GraphMediaPage, InstagramGraph } from './graph';
+import { GraphMedia, GraphMediaPage, InstagramGraph } from './graph';
 
 interface ConnectionRow {
   id: string;
@@ -37,10 +37,12 @@ interface RuleRow {
 const notFound = () => apiError(HttpStatus.NOT_FOUND, 'instagram_rule_not_found', '규칙을 찾을 수 없습니다.');
 const reauth = () => apiError(HttpStatus.CONFLICT, 'instagram_reauth_required', '인스타그램을 다시 연결해 주세요.');
 const mediaTaken = () => apiError(HttpStatus.CONFLICT, 'instagram_rule_media_taken', '이미 규칙이 있는 게시물입니다.');
+/** 게시물 소유 확인의 페이지 순회 상한(최악 건당 10초). 이 범위 밖의 게시물은 고를 수 없는 것으로 처리합니다. */
+const MEDIA_OWNERSHIP_MAX_PAGES = 10;
 
-/** DB의 char_length와 같은 유니코드 코드 포인트 단위로 검사하며 문구 내용은 제한하지 않습니다. */
+/** DB의 char_length와 같은 유니코드 코드 포인트 단위로 검사하며 문구 내용은 제한하지 않습니다. NUL은 PostgreSQL text에 넣을 수 없어 막습니다. */
 function ruleText(value: unknown, max: number): string {
-  if (typeof value !== 'string' || !value.trim() || Array.from(value).length > max) {
+  if (typeof value !== 'string' || !value.trim() || value.includes('\u0000') || Array.from(value).length > max) {
     throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', `1~${max}자로 입력해 주세요.`);
   }
   return value;
@@ -137,8 +139,22 @@ export class InstagramRulesService {
     };
   }
 
-  private async checkLimits(client: PoolClient, userId: string, mediaId?: string): Promise<void> {
-    const result = await client.query<{ active: number; total: number; taken: boolean }>(
+  /** 연결 계정의 게시물에 있는지 페이지를 따라가며 확인합니다. 상한을 넘으면 없는 것으로 봅니다. */
+  private async ownedMedia(connection: ConnectionRow, mediaId: string): Promise<GraphMedia> {
+    let page = await this.mediaPage(connection, null);
+    const seen = new Set<string>();
+    let media = page.items.find((item) => item.id === mediaId);
+    while (!media && page.nextCursor && !seen.has(page.nextCursor) && seen.size + 1 < MEDIA_OWNERSHIP_MAX_PAGES) {
+      seen.add(page.nextCursor);
+      page = await this.mediaPage(connection, page.nextCursor);
+      media = page.items.find((item) => item.id === mediaId);
+    }
+    if (!media) throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', '연결한 계정의 게시물을 골라 주세요.');
+    return media;
+  }
+
+  private async checkLimits(db: Queryable, userId: string, mediaId?: string): Promise<void> {
+    const result = await db.query<{ active: number; total: number; taken: boolean }>(
       `SELECT count(*) FILTER (WHERE r.archived_at IS NULL AND r.enabled)::int AS active,
        count(*)::int AS total,
        coalesce(bool_or(r.ig_media_id = $2 AND r.archived_at IS NULL), false) AS taken
@@ -161,26 +177,27 @@ export class InstagramRulesService {
     const mediaId = ruleText(input.mediaId, 255);
     const keyword = ruleText(input.keyword, INSTAGRAM_DM_LIMITS.keywordMaxLength);
     const message = ruleText(input.message, INSTAGRAM_DM_LIMITS.messageMaxLength);
-    // 규칙 생성·변경은 연결 행 잠금으로 한도와 게시물 중복 검사를 줄 세웁니다.
+    // 외부 호출 전에 막을 수 있는 실패를 먼저 거릅니다. Graph 호출 중에는 연결 행을 잠그지 않습니다(웹훅·worker를 막지 않게).
+    const connection = await this.connection(this.database.pool, userId);
+    await this.checkLimits(this.database.pool, userId, mediaId);
+    const media = await this.ownedMedia(connection, mediaId);
+    const publicId = randomId(10);
+    // 규칙 생성·변경은 연결 행 잠금으로 한도와 게시물 중복 검사를 줄 세웁니다. 호출 사이 바뀌었을 수 있어 잠근 뒤 다시 봅니다.
+    // 채널 주소도 같은 트랜잭션이라 규칙 저장이 실패하면 주소를 소비하지 않습니다. 잠금은 연결 → 사용자 순서입니다(`lock-order.ts`).
     return this.database.transaction(async (client) => {
-      const connection = await this.connection(client, userId, true);
+      const locked = await this.connection(client, userId, true);
+      if (locked.status === 'reauth_required' || locked.ig_user_id !== connection.ig_user_id) throw reauth();
       await this.checkLimits(client, userId, mediaId);
-      let page = await this.mediaPage(connection, null);
-      const seen = new Set<string>();
-      let media = page.items.find((item) => item.id === mediaId);
-      while (!media && page.nextCursor && !seen.has(page.nextCursor)) {
-        seen.add(page.nextCursor);
-        page = await this.mediaPage(connection, page.nextCursor);
-        media = page.items.find((item) => item.id === mediaId);
-      }
-      if (!media) throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', '연결한 계정의 게시물을 골라 주세요.');
-      const publicId = randomId(10);
-      // 기존 서비스의 코드 영구 기록·프리셋·50/200 한도와 오류를 그대로 씁니다. 코드가 먼저 저장됩니다.
-      const { view: link } = await this.channelLinks.create(userId, {
-        channel: 'instagram',
-        placement: 'dm',
-        campaign: normalizeChannelCampaign(`dm-${keyword}-${publicId.slice(0, 6)}`),
-      });
+      // 기존 서비스의 코드 영구 기록·프리셋·50/200 한도와 오류를 그대로 씁니다.
+      const { view: link } = await this.channelLinks.create(
+        userId,
+        {
+          channel: 'instagram',
+          placement: 'dm',
+          campaign: normalizeChannelCampaign(`dm-${keyword}-${publicId.slice(0, 6)}`),
+        },
+        client,
+      );
       const result = await client.query<RuleRow>(
         `INSERT INTO instagram_dm_rules (public_id, connection_id, ig_media_id, ig_media_child_ids,
          media_permalink, media_caption_preview, keyword, message, channel_link_code)
@@ -229,7 +246,7 @@ export class InstagramRulesService {
       input.message === undefined ? undefined : ruleText(input.message, INSTAGRAM_DM_LIMITS.messageMaxLength);
     const enabled = optionalBoolean(input.enabled, 'enabled');
     return this.database.transaction(async (client) => {
-      // 없는 연결도 남의 publicId와 똑같이 404입니다.
+      // 잠금 순서: 연결 → 규칙 → 발송 행(`lock-order.ts`). 없는 연결도 남의 publicId와 똑같이 404입니다.
       await client.query('SELECT id FROM instagram_connections WHERE user_id = $1 FOR UPDATE', [userId]);
       const rule = await this.ownedRule(client, userId, publicId);
       if (enabled === true && !rule.enabled) await this.checkLimits(client, userId);

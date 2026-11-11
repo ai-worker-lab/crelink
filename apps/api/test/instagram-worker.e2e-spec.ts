@@ -150,8 +150,8 @@ describe('Instagram DM 발송 worker', () => {
     const hash = options.hash ?? randomBytes(32);
     const body = `저장된 본문 ${sequence}`;
     const { rows } = await t.pool.query<{ id: string }>(
-      `INSERT INTO instagram_dm_deliveries (connection_id, rule_id, comment_id, commenter_hash, commented_at, message_body, status)
-       VALUES ($1, $2, $3, $4, COALESCE($5::timestamptz, now() - interval '1 minute'), $6, 'pending') RETURNING id`,
+      `INSERT INTO instagram_dm_deliveries (connection_id, rule_id, rule_version, comment_id, commenter_hash, commented_at, message_body, status)
+       VALUES ($1, $2, 1, $3, $4, COALESCE($5::timestamptz, now() - interval '1 minute'), $6, 'pending') RETURNING id`,
       [account.connectionId, account.ruleId, commentId, hash, options.commentedAt ?? null, body],
     );
     return { id: rows[0].id, commentId, body, hash };
@@ -397,6 +397,7 @@ describe('Instagram DM 발송 worker', () => {
       ['운영자 정지', `UPDATE instagram_connections SET operator_paused_at = now()`],
       ['규칙 비활성', `UPDATE instagram_dm_rules SET enabled = false`],
       ['규칙 보관', `UPDATE instagram_dm_rules SET archived_at = now()`],
+      ['규칙 문구 수정', `UPDATE instagram_dm_rules SET message = '새 문구', version = version + 1`],
     ])('선점 뒤 %s이면 호출 0건이고 취소로 끝난다', async (_name, sql) => {
       const account = await seedAccount();
       const delivery = await seedDelivery(account);
@@ -411,6 +412,34 @@ describe('Instagram DM 발송 worker', () => {
         failure_code: 'stopped_before_send',
         lease_until: null,
       });
+    });
+
+    it('선점 뒤 수신 거부가 커밋되면 호출 0건이고 취소로 끝난다', async () => {
+      const account = await seedAccount();
+      const delivery = await seedDelivery(account);
+      const target = worker();
+      afterClaim(target, () =>
+        t.pool.query('INSERT INTO instagram_dm_opt_outs (ig_user_id, commenter_hash) VALUES ($1, $2)', [
+          account.igUserId,
+          delivery.hash,
+        ]),
+      );
+
+      expect((await tick(target)).claimed).toBe(1);
+
+      expect(send).not.toHaveBeenCalled();
+      expect(await row(delivery.id)).toMatchObject({ status: 'cancelled', failure_code: 'stopped_before_send' });
+    });
+
+    it('규칙 version이 달라진 pending은 선점하지 않고 다음 tick에 취소한다', async () => {
+      const account = await seedAccount();
+      const delivery = await seedDelivery(account);
+      await t.pool.query('UPDATE instagram_dm_rules SET version = version + 1 WHERE id = $1', [account.ruleId]);
+
+      expect((await tick(worker())).claimed).toBe(0);
+
+      expect(send).not.toHaveBeenCalled();
+      expect(await row(delivery.id)).toMatchObject({ status: 'cancelled', failure_code: 'stopped_before_send' });
     });
 
     it('자기 lease가 끝났으면 호출하지 않고 만료 처리가 unknown으로 끝낸다', async () => {
@@ -529,6 +558,7 @@ describe('Instagram DM 발송 worker', () => {
         ['운영자 정지', `UPDATE instagram_connections SET operator_paused_at = now()`],
         ['규칙 비활성', `UPDATE instagram_dm_rules SET enabled = false`],
         ['규칙 보관', `UPDATE instagram_dm_rules SET archived_at = now()`],
+        ['규칙 문구 수정', `UPDATE instagram_dm_rules SET message = '새 문구', version = version + 1`],
       ];
 
       it.each(STOPS)('연결 전 실패 중 %s이면 pending으로 되돌리지 않고 취소한다', async (_name, sql) => {

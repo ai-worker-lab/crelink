@@ -61,8 +61,13 @@ export class ChannelLinksService {
   /**
    * 같은 조합의 보관되지 않은 주소가 있으면 그것(`created: false`), 없으면 새로 만듭니다.
    * 사용자 행을 잠가 같은 조합의 동시 요청과 한도 검사를 줄 세웁니다(`LinksService`와 같은 방식).
+   * `client`를 주면 호출자의 트랜잭션에서 실행합니다(호출자가 실패하면 주소도 함께 되돌아갑니다).
    */
-  async create(userId: string, body: unknown): Promise<{ view: ChannelLinkView; created: boolean }> {
+  async create(
+    userId: string,
+    body: unknown,
+    client?: PoolClient,
+  ): Promise<{ view: ChannelLinkView; created: boolean }> {
     const input = bodyObject(body);
     const preset = findChannelPreset(input.channel, input.placement);
     if (!preset) {
@@ -82,7 +87,7 @@ export class ChannelLinksService {
     const channel = preset.channel.value;
     const placement = preset.placement.value;
     const campaign = channelLinkCampaign(placement, normalized);
-    return this.database.transaction(async (client) => {
+    const run = async (client: PoolClient) => {
       await client.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [userId]);
       const landingId = await this.landingId(client, userId);
       const existing = await client.query<ChannelLinkRow>(
@@ -125,7 +130,8 @@ export class ChannelLinksService {
         [code, landingId, channel, placement, campaign],
       );
       return { view: this.view(row.rows[0]), created: true };
-    });
+    };
+    return client ? run(client) : this.database.transaction(run);
   }
 
   /** 보관: 목록에서만 숨기고 주소는 계속 동작합니다. 이미 보관이면 그대로 성공. 남의 주소·없는 code는 404 `channel_link_not_found`. */

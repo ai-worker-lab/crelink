@@ -148,6 +148,7 @@ CREATE TABLE instagram_dm_deliveries (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   connection_id uuid NOT NULL REFERENCES instagram_connections (id) ON DELETE CASCADE,
   rule_id uuid NOT NULL,
+  rule_version int NOT NULL,           -- 저장 시점의 규칙 version. 다르면 옛 문구이므로 보내지 않는다
   comment_id text NOT NULL,
   commenter_hash bytea NOT NULL CHECK (octet_length(commenter_hash) = 32),
   commented_at timestamptz NOT NULL,   -- 웹훅의 댓글 시각, 24시간 규칙의 기준
@@ -178,6 +179,12 @@ CREATE TABLE instagram_dm_opt_outs (
   PRIMARY KEY (ig_user_id, commenter_hash)
 );
 
+CREATE TABLE instagram_opt_out_owners (
+  ig_user_id text PRIMARY KEY,         -- Meta 데이터 삭제 콜백이 일반 해제 뒤에도 수신 거부 기록을 찾게 하는 대응표
+  meta_user_id text NOT NULL
+);
+CREATE INDEX instagram_opt_out_owners_meta_user ON instagram_opt_out_owners (meta_user_id);
+
 CREATE TABLE instagram_deletion_requests (
   confirmation_code text PRIMARY KEY CHECK (confirmation_code ~ '^[a-z0-9]{16}$'),
   created_at timestamptz NOT NULL DEFAULT now()
@@ -197,21 +204,23 @@ CREATE TABLE instagram_deletion_requests (
 | `instagram_dm_deliveries` 전체(해시, 댓글 ID, 최종 본문 포함) | 생성 후 90일 | 보존 작업 DELETE(E7) |
 | 연결 해제 | 즉시 | 연결 행 삭제, CASCADE. 운영자 정지 중이면 행을 남기고 토큰 파기·대기 취소·규칙 보관(아래 `해제`). 이때 발송 내역은 90일 보존 작업으로 지운다 |
 | 토큰 무효 | 즉시 | 토큰 파기, `reauth_required`, 대기 건 취소 |
-| 데이터 삭제 콜백 | 즉시 | 연결 행 삭제, 확인 코드만 남김 |
+| 데이터 삭제 콜백 | 즉시 | 연결 행 삭제, 소유 대응표 파기, 확인 코드만 남김 |
+| 수신 거부 소유 대응표(`instagram_opt_out_owners`) | Meta 데이터 삭제 요청 때 즉시 | 연결 때 `(ig_user_id, meta_user_id)`를 upsert하고 일반 해제 뒤에도 남긴다. `signed_request`는 `meta_user_id`만 주므로 연결 행이 사라진 뒤 `ig_user_id`를 찾는 유일한 근거다 |
 | 확인 코드 | 90일 | 보존 작업 DELETE |
-| 수신 거부 기록(`instagram_dm_opt_outs`) | 크리링 회원 탈퇴·Meta 데이터 삭제 요청 때 해당 `ig_user_id`분 즉시 | 90일 파기 대상이 아님. 일반 해제·재연결·재인증에서는 유지. FK가 없으므로 데이터 삭제 콜백(0257)이 같은 트랜잭션에서 `ig_user_id`로 직접 DELETE. 현재 API에 회원 탈퇴 경로가 없어 이번 티켓은 없고, 탈퇴 기능을 만들 때 같은 파기를 넣는다 |
+| 수신 거부 기록(`instagram_dm_opt_outs`) | 크리링 회원 탈퇴·Meta 데이터 삭제 요청 때 해당 `ig_user_id`분 즉시 | 90일 파기 대상이 아님. 일반 해제·재연결·재인증에서는 유지. FK가 없으므로 데이터 삭제 콜백(0257)이 같은 트랜잭션에서 소유 대응표와 연결 행으로 찾은 `ig_user_id`로 직접 DELETE. 현재 API에 회원 탈퇴 경로가 없어 이번 티켓은 없고, 탈퇴 기능을 만들 때 같은 파기를 넣는다 |
 
 90일이 지나면 같은 사람이 같은 규칙으로 다시 DM을 받을 수 있습니다. 수용합니다. 다만 수신 거부 의사가 90일 뒤 사라지면 안 되므로 거부 기록은 90일 파기에서 뺍니다. 수신 거부 링크는 서버에 저장하지 않는 서명 토큰이라 90일 뒤에도 옛 링크가 동작합니다.
 
 **객체 권한.** 규칙·내역의 모든 조회·변경은 연결 소유자 조건(`connection.user_id = 세션 사용자`)을 SQL에 포함합니다. 다른 크리에이터의 `publicId` 요청은 404입니다. `instagram_dm_rules`의 `UNIQUE (id, connection_id)`와 발송 행의 복합 FK `(rule_id, connection_id)`로 규칙과 발송 행의 연결이 어긋나지 않게 합니다.
 
-**규칙 변경 경합.** keyword·message 수정, 비활성화, 보관은 `version`을 올리고 같은 트랜잭션에서 그 규칙의 `pending`을 `cancelled`로 바꿉니다. 발송 행의 `message_body`가 저장 시점의 최종 본문이라 발송은 이 값으로만 합니다.
+**규칙 변경 경합.** keyword·message 수정, 비활성화, 보관은 `version`을 올리고 같은 트랜잭션에서 그 규칙의 `pending`을 `cancelled`로 바꿉니다. 발송 행의 `message_body`가 저장 시점의 최종 본문이라 발송은 이 값으로만 합니다. 저장 때 규칙 `version`을 `rule_version`에 함께 기록해, 선점·호출 직전 재확인·재시도 복귀 어디서든 현재 `version`과 다르면 옛 문구이므로 보내지 않고 `cancelled`로 끝냅니다.
 
 **한도.** 연결당 활성 규칙 10개, 보관 포함 100개(E13의 총 200개 안). 게시물당 활성 규칙 1개.
 
 **충돌 규칙.**
 
 - 크리링 페이지 1개에 IG 계정 1개, IG 계정 1개에 살아 있는 연결 1개(`instagram_connections_ig_live`, `status <> 'reauth_required'`)입니다. 웹훅의 `entry.id`가 정확히 한 소유자로 풀리므로 중복 DM 방지 조건이기도 합니다.
+- 같은 `ig_user_id`의 다른 크리링 계정 행에 `operator_paused_at`이 있으면(상태 무관, 재인증 대기 행 포함) 구독·저장 전에 409 `instagram_operator_paused`입니다. 저장 트랜잭션이 내 행과 그 행들을 id 순으로 잠그고 다시 봅니다. 그 행의 소유자가 같은 계정을 재연결하는 것은 행을 갱신할 뿐이라 허용하고 정지는 유지됩니다.
 - 다른 페이지가 같은 계정을 연결하려 하고 기존 행이 살아 있으면, 콜백이 **기존 토큰을 1회 점검**합니다. 무효이면(`token_revision`이 같을 때만) 재인증 전이 함수로 기존 행을 `reauth_required`로 바꾸고 연결을 진행합니다. 유효이면 409 `instagram_account_in_use`이며 어느 페이지인지는 밝히지 않습니다. 해제 콜백의 존재가 미확인이라 자동 해소를 전제하지 않습니다.
 - 새 연결은 OAuth로 계정 권한을 증명한 뒤에만 가능합니다.
 - 소유자 이전은 없습니다.
@@ -225,7 +234,7 @@ CREATE TABLE instagram_deletion_requests (
 2. **raw body와 파싱(E2, E3).** `configureApp`에 이 경로 전용 미들웨어를 둡니다. 스트림을 6MB까지 읽어 `Buffer`로 보관합니다. 상한은 Caddy 웹 호스트 상한(`infra/prod/Caddyfile:89-91`)과 맞춘 값이고, 배치가 최대 1000건이라 `[문서]` 작은 상한은 413으로 배치 전체를 잃습니다. 본문 크기를 지표로 남깁니다. 서명 통과 뒤 JSON은 raw 미들웨어가 넘긴 `Buffer`를 웹훅 핸들러가 직접 파싱합니다. 항목별로 필드와 타입을 검사해 불량 항목은 건너뛰고 지표만 남기며, 유효 항목만 한 INSERT에 넣습니다. 전역 `rawBody: true`는 실행과 시험 두 곳을 고쳐야 하고 다른 경로까지 원문을 보관하므로 쓰지 않습니다. 새 의존성은 없습니다. 삭제 콜백은 폼 본문이라 기존 파서를 쓰고 그 안의 `signed_request`를 검증합니다.
 3. **서명.** `X-Hub-Signature-256`를 raw 바이트의 HMAC-SHA256과 비교합니다. 길이 확인 뒤 `timingSafeEqual`을 씁니다. 어떤 시크릿으로 서명하는지는 S1로 확정합니다 `[M?]`. 실패하면 403이고 metric만 남깁니다.
 4. **GET 검증.** `hub.verify_token`(`META_WEBHOOK_VERIFY_TOKEN`)을 상수 시간으로 비교하고, `hub.challenge`는 형식 검사 뒤 `text/plain`으로 돌려줍니다.
-5. **빠른 200.** 한 배치(최대 1000건 `[문서]`)에 쿼리 2회입니다(`ig_user_id = ANY` 규칙 조회 1회, 다중 행 `INSERT ... SELECT` 1회). INSERT는 규칙의 현재 `version`·`enabled`·`archived_at`을 다시 검사합니다. 외부 호출은 없습니다. 제외 조건은 다음과 같습니다.
+5. **빠른 200.** 한 배치(최대 1000건 `[문서]`)에 규칙 조회 1회(`ig_user_id = ANY`)와 저장 트랜잭션 1회입니다. 트랜잭션은 [잠금 순서](#잠금-순서)대로 설정 → 연결 → 규칙을 `FOR SHARE`로 잡은 뒤 다중 행 `INSERT ... SELECT` 1회를 실행합니다. INSERT는 규칙의 현재 `version`·`enabled`·`archived_at`을 다시 검사합니다. 외부 호출은 없습니다. 제외 조건은 다음과 같습니다.
    - `field≠comments`
    - `from.id=entry.id`(본인 댓글) `[M?]`
    - `parent_id` 있음(답글) `[M?]`
@@ -267,7 +276,7 @@ CREATE TABLE instagram_deletion_requests (
 **Worker.** `RetentionService`처럼 앱 기동 시 시작합니다. 설정이 없으면 시작하지 않고, 시험은 `runOnce`를 직접 부릅니다.
 
 - **선점(짧은 트랜잭션).** 프로세스의 빈 발송 슬롯 수만큼만 `sending`으로 바꾸고 커밋한 뒤 바로 호출합니다. 메모리 대기열을 두지 않습니다. 조건은 `audience≠off`, 연결 `status='active'`, `token_expires_at IS NULL OR token_expires_at > now()`, 정지 아님, `rate_limited_until` 경과, 사용자 정지 아님, 규칙 `enabled`이고 보관 아님, 수신 거부 없음이며 `SKIP LOCKED`로 잡습니다. 연결별 시간당 예산을 넘기지 않습니다.
-- **호출 직전 재확인.** 전체 스위치, 연결 정지, 규칙 활성, 자기 lease가 유효한지 다시 확인합니다.
+- **호출 직전 재확인.** 전체 스위치, 연결 정지, 규칙 활성과 저장 시점 `version` 일치, 수신 거부 없음, 자기 lease가 유효한지 다시 확인합니다. 선점·재확인·재시도 복귀가 같은 조건(`SENDABLE_SQL`)을 씁니다.
 - **발송은 트랜잭션 밖**에서 프로세스당 동시 5건(두 색 합쳐 최대 10건), 요청 타임아웃 10초로 합니다. DB 연결을 물고 외부 호출을 하지 않습니다(E6). 본문은 발송 행의 `message_body`입니다.
 - **기록.** `WHERE id=$1 AND status='sending'` 조건으로 결과를 씁니다.
 - **종료.** `onModuleDestroy`에서 claim을 멈추고 진행 중 호출을 기다립니다. Database가 마지막에 닫히므로 순서가 보장되고(E5), 최악 10초는 30초 유예 안입니다(E4).
@@ -302,9 +311,19 @@ S4에서 같은 `comment_id` 재호출이 구분되는 오류로 거부된다고
 | 계정 | `dm_paused_at`(크리에이터), `operator_paused_at`(운영자) | 같은 동작을 해당 계정에만 적용 |
 | 기능 전체 | 설정 키 없음 | API 503 `instagram_not_configured`, worker 미시작 |
 
-진행 중이던 호출은 프로세스당 최대 5건이며 회수할 수 없습니다. 재개해도 취소된 건은 보내지 않습니다. 호출이 연결 전 실패나 레이트 제한으로 끝났을 때 이미 정지·비활성이면(`SENDABLE_SQL`이 거짓) `pending`으로 되돌리지 않고 `cancelled`(`stopped_before_send`)로 끝냅니다. 이 판정은 연결·규칙·설정 행을 잠가 진행 중인 정지 트랜잭션을 기다립니다.
+진행 중이던 호출은 프로세스당 최대 5건이며 회수할 수 없습니다. 재개해도 취소된 건은 보내지 않습니다. 호출이 연결 전 실패나 레이트 제한으로 끝났을 때 이미 정지·비활성·규칙 수정·수신 거부 상태면(`SENDABLE_SQL`이 거짓) `pending`으로 되돌리지 않고 `cancelled`(`stopped_before_send`)로 끝냅니다. 이 판정은 설정·연결·규칙 행을 잠가 진행 중인 정지 트랜잭션을 기다립니다.
 
 `audience`는 출시 제어도 겸합니다. `off`(기본), `operators`(회사 계정 시범, 운영자 역할만), `everyone`(사업자 확보와 검수 통과 뒤, 이번 에픽 범위 밖)입니다. 그래서 main에 머지되어도 켜기 전까지 동작하지 않습니다(E19).
+
+### 잠금 순서
+
+웹훅 저장·규칙 변경·worker·관리자·연결이 모두 같은 순서로 잠가 교착(40P01)을 막습니다. 근거는 `apps/api/src/instagram/lock-order.ts`입니다.
+
+`platform_settings` → `instagram_connections`(여러 행이면 id 순) → `users` → `instagram_dm_rules`(여러 행이면 id 순) → `instagram_dm_deliveries`
+
+- 여러 발송 행을 바꾸는 트랜잭션은 먼저 그 행들의 연결 행을 잡습니다(규칙 변경·정지·재인증·해제는 이미 잡고, `audience` 변경은 전체 연결을 id 순으로, 수신 거부는 그 IG 계정의 연결을 잡습니다). 연결 행을 잡지 않는 일괄 변경(worker `sweep`)은 `SKIP LOCKED`로 기다리지 않습니다.
+- 웹훅은 단일 INSERT의 잠금 절에 순서를 맡기지 않고 트랜잭션에서 위 순서로 잠근 뒤 저장합니다. 트랜잭션이 실패하면(40P01 포함) 503입니다.
+- worker 선점은 `SKIP LOCKED`라 기다리지 않습니다. 재시도 복귀의 재확인은 `FOR SHARE OF s FOR NO KEY UPDATE OF c FOR SHARE OF r`로 같은 순서를 지킵니다.
 
 ## OAuth·토큰·삭제
 
@@ -339,11 +358,11 @@ S7에서 토큰이 만료되고 갱신 수단이 있다고 확인되면 후속 m
 
 **재인증 전이.** 모든 `reauth_required` 전이(만료, 충돌 점검, 발송 오류, 일일 점검)는 공통 함수 하나로 처리합니다. 한 트랜잭션에서 상태 변경, `token_ciphertext`·`token_key_version` NULL 처리, 그 연결의 `pending`을 `cancelled`로 바꾸는 일을 함께 합니다. `CHECK ((status = 'reauth_required') = (token_ciphertext IS NULL))` 제약은 유지합니다.
 
-**토큰 세대.** `token_revision`은 새 토큰을 저장할 때와 재인증 전이로 토큰을 파기할 때 올립니다. 같은 토큰을 다시 암호화할 때는 올리지 않습니다. 외부 호출 결과(일일 점검, 충돌 점검, worker의 토큰 무효)는 읽었던 `token_revision`이 그대로일 때만 적용하고 다르면 버립니다. 외부 호출 중에는 DB 잠금을 잡지 않습니다.
+**토큰 세대.** `token_revision`은 새 토큰을 저장할 때와 재인증 전이로 토큰을 파기할 때 올립니다. 같은 토큰을 다시 암호화할 때는 올리지 않습니다. 외부 호출 결과(일일 점검, 충돌 점검, worker의 토큰 무효)는 읽었던 `token_revision`이 그대로일 때만 적용하고 다르면 버립니다. 외부 호출 중에는 DB 잠금을 잡지 않습니다. 규칙 생성의 게시물 소유 확인도 연결 행 잠금 밖에서 부르고(페이지 순회 최대 10쪽), 호출 뒤 연결 행을 잠가 한도·중복과 계정을 다시 검사한 다음 채널 주소 생성과 규칙 저장을 같은 트랜잭션으로 합니다.
 
 **해제.** `DELETE /api/me/instagram`은 구독 해제를 시도하고(실패 무시) 연결 행을 삭제합니다. 규칙과 내역도 함께 지워지며 화면에 그렇게 안내합니다. 운영자 정지(`operator_paused_at`)가 있으면 행을 지우지 않습니다. 재인증 전이(토큰 파기·`pending` 취소)를 하고 규칙을 보관한 뒤 행을 남기며, 구독 해제 뒤에 행을 잠그고 다시 읽어 호출 중에 걸린 정지도 놓치지 않습니다. 재연결(같은 `user_id`)은 그 행을 갱신하므로 정지가 유지됩니다. 응답은 똑같이 204이고, 데이터 삭제 콜백은 운영자 정지와 관계없이 행을 지웁니다.
 
-**데이터 삭제 콜백.** HTTPS, `signed_request` 검증, `{url, confirmation_code}` 응답입니다 `[문서]`. `meta_user_id`로 연결을 찾아 삭제하고, 해당 `ig_user_id`의 수신 거부 기록도 같은 트랜잭션에서 파기합니다. 못 찾아도 같은 응답을 줍니다. 응답 `url`은 `{WEB}/privacy/instagram-deletion/{code}`입니다. `user_id` 대응이 안 되면(S9) 콜백 대신 안내 URL과 제품 내 해제로 바꿉니다. 확인 페이지는 코드 존재 여부만 표시합니다. 댓글 작성자는 앱을 승인한 적이 없어 콜백이 오지 않습니다 `[M?]`. 90일 자동 파기와 처리방침의 문의 경로로 대응합니다.
+**데이터 삭제 콜백.** HTTPS, `signed_request` 검증, `{url, confirmation_code}` 응답입니다 `[문서]`. `meta_user_id`로 연결을 찾아 삭제하고, 일반 해제로 연결 행이 없어도 소유 대응표(`instagram_opt_out_owners`)로 `ig_user_id`를 찾아 그 수신 거부 기록과 대응표 행을 같은 트랜잭션에서 파기합니다. 못 찾아도 같은 응답을 줍니다. 응답 `url`은 `{WEB}/privacy/instagram-deletion/{code}`입니다. `user_id` 대응이 안 되면(S9) 콜백 대신 안내 URL과 제품 내 해제로 바꿉니다. 확인 페이지는 코드 존재 여부만 표시합니다. 댓글 작성자는 앱을 승인한 적이 없어 콜백이 오지 않습니다 `[M?]`. 90일 자동 파기와 처리방침의 문의 경로로 대응합니다.
 
 ## DM 링크와 측정
 
@@ -353,7 +372,7 @@ S7에서 토큰이 만료되고 갱신 수단이 있다고 확인되면 후속 m
 - `utm_campaign`은 `dm-<키워드>-<public_id 앞 6자>`로 정규화합니다.
 - `/s/{code}` 처리로 UTM이 저장되고(E13), 기존 통계의 `utm_id` 분포에서 코드별로 봅니다(E14). 봇 UA는 제외되며 `facebookexternalhit`도 포함됩니다.
 - 규칙이 한도(50/200)를 소모합니다. 초과하면 기존 409를 그대로 돌려줍니다.
-- 규칙 생성은 코드 생성을 먼저 하고 규칙을 저장합니다. 같은 조합은 기존 코드를 돌려주므로 재시도해도 안전합니다.
+- 규칙 생성은 코드 생성과 규칙 저장을 한 트랜잭션으로 묶습니다. 저장이 실패하면 코드도 되돌아가므로 실패한 시도가 주소를 소모하지 않고, 같은 조합은 기존 코드를 돌려줍니다.
 - 수신자별 클릭은 측정하지 않습니다. 수신자별 코드는 개인 추적이 되므로 만들지 않습니다.
 - 새 집계 쿼리를 만들지 않습니다. 화면에서는 규칙의 코드와 통계 화면 링크만 보여 줍니다.
 - 1회 탭이 1회로 세어지는지, 미리보기 크롤러가 잡히는지는 S6으로 확인합니다.
@@ -366,7 +385,7 @@ S7에서 토큰이 만료되고 갱신 수단이 있다고 확인되면 후속 m
 | --- | --- | --- | --- | --- |
 | `GET /api/me/instagram` | 소유자 | 없음 | `{ available, connection: null \| { igUsername, status, paused, operatorPaused, connectedAt, tokenExpiresAt }, limits }`. `status`는 `active`·`messages_access_required`·`reauth_required`, `tokenExpiresAt`은 null 허용 | 공통 |
 | `POST /api/me/instagram/connect` | 소유자·사람 | 없음 | `{ authorizationUrl }`, state 쿠키 | 403 `instagram_unavailable` |
-| `POST /api/me/instagram/callback` | 로그인·사람 | `{ code, state }` | `InstagramConnectionView` | 400 `oauth_state_invalid`, 409 `instagram_account_in_use`, 409 `instagram_account_selection_required`, 422 `instagram_account_not_professional`, 502 `instagram_upstream_failed` |
+| `POST /api/me/instagram/callback` | 로그인·사람 | `{ code, state }` | `InstagramConnectionView` | 400 `oauth_state_invalid`, 409 `instagram_account_in_use`, 409 `instagram_account_selection_required`, 409 `instagram_operator_paused`, 422 `instagram_account_not_professional`, 502 `instagram_upstream_failed` |
 | `POST /api/me/instagram/recheck` | 소유자 | 없음 | 연결 뷰. `messages_access_required`를 `active`로 되돌림. 다음 발송 결과가 실제 확인이다 | 공통 |
 | `DELETE /api/me/instagram` | 소유자 | 없음 | 204(운영자 정지 중이면 행 유지, `해제` 참고) | 공통 |
 | `PUT /api/me/instagram/pause` | 소유자 | `{ paused }` | 연결 뷰 | 409 `instagram_operator_paused` |
@@ -438,7 +457,7 @@ S7에서 토큰이 만료되고 갱신 수단이 있다고 확인되면 후속 m
 
 ## 비기능 요구
 
-- 웹훅은 외부 호출 없이 쿼리 2회입니다. 목표는 p95 500ms 이내(0269에서 측정)이고 Cloudflare 경유 제외값입니다.
+- 웹훅은 외부 호출 없이 규칙 조회 1회와 짧은 저장 트랜잭션 1회입니다. 목표는 p95 500ms 이내(0269에서 측정)이고 Cloudflare 경유 제외값입니다.
 - 모든 목록에 상한이 있습니다(`/media` 25, `/deliveries` 20 keyset, 규칙 10/100). 규칙 조회와 claim에 N+1이 없습니다.
 - 지표는 `crelink.instagram.webhook{result}`, `crelink.instagram.dm{result}`이고 웹훅 본문 크기를 남깁니다. 속성은 낮은 카디널리티만 씁니다. 정책 제재와 `reauth_required`는 Sentry에 경고를 남깁니다.
 
@@ -588,6 +607,7 @@ R 등급의 정의 문서는 `docs/development`, `docs/alm`, `WORKFLOW.md`, `doc
 
 - 승인 전 없음
 - 2026-11-11 0269 통합 보정: 운영자 정지 중 해제 동작, 정지 중 재시도 복귀 취소, `instagram_access_denied`, 삭제 확인 주소 `/privacy/instagram-deletion/{code}` 반영
+- 2026-11-11 0269 QA 결함 수정: `rule_version`, 다른 계정 재연결의 운영자 정지 유지, 호출 직전 수신 거부 판정, [잠금 순서](#잠금-순서) 고정, `instagram_opt_out_owners`, 규칙 생성의 트랜잭션 묶음과 외부 호출 중 잠금 제거 반영
 
 ## 나중으로 미룬 항목
 

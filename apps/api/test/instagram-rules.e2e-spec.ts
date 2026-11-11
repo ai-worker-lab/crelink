@@ -6,6 +6,9 @@ import { GraphMedia, InstagramGraph, InstagramGraphError } from '../src/instagra
 import { api, createAiOperator, createTestApp, login, TestApp } from './test-app';
 
 const ROOT = '/api/me/instagram';
+const waitFor = async (ready: () => boolean) => {
+  for (let i = 0; i < 200 && !ready(); i += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+};
 const media = (id: string): GraphMedia => ({
   id,
   caption: `게시물 ${id}`,
@@ -82,8 +85,8 @@ describe('Instagram 규칙 API (0260)', () => {
   const pending = async (who: Creator, ruleId: string) => {
     const id = randomUUID();
     await t.pool.query(
-      `INSERT INTO instagram_dm_deliveries (connection_id, rule_id, comment_id, commenter_hash, commented_at, message_body, status)
-       VALUES ($1, $2, $3, $4, now(), '저장된 본문', 'pending')`,
+      `INSERT INTO instagram_dm_deliveries (connection_id, rule_id, rule_version, comment_id, commenter_hash, commented_at, message_body, status)
+       VALUES ($1, $2, 1, $3, $4, now(), '저장된 본문', 'pending')`,
       [who.connectionId, ruleId, id, Buffer.alloc(32, 1)],
     );
   };
@@ -179,13 +182,21 @@ describe('Instagram 규칙 API (0260)', () => {
       { mediaId: 'post', keyword: '가'.repeat(31), message: '안내' },
       { mediaId: 'post', keyword: '자료', message: '😀'.repeat(251) },
       { mediaId: 'post', keyword: '자료', message: '   ' },
+      { mediaId: 'post', keyword: '자\u0000료', message: '안내' },
+      { mediaId: 'post', keyword: '자료', message: '안내\u0000' },
     ]) {
       const result = await create(owner, body);
       expect([result.status, result.body.code]).toEqual([400, 'validation_failed']);
     }
     const result = await create(owner, { mediaId: 'post', keyword: '가'.repeat(30), message: '😀'.repeat(250) });
     expect(result.status).toBe(201);
-    for (const body of [{ message: '가'.repeat(251) }, { keyword: null }, { enabled: 'false' }]) {
+    for (const body of [
+      { message: '가'.repeat(251) },
+      { keyword: null },
+      { enabled: 'false' },
+      { message: '안내\u0000' },
+      { keyword: '\u0000' },
+    ]) {
       expect((await request(owner, 'PATCH', `/rules/${result.body.publicId}`, body)).status).toBe(400);
     }
   });
@@ -199,8 +210,8 @@ describe('Instagram 규칙 API (0260)', () => {
       await pending(owner, row.id);
       // pending 이외의 행은 바꾸지 않습니다.
       await t.pool.query(
-        `INSERT INTO instagram_dm_deliveries (connection_id, rule_id, comment_id, commenter_hash, commented_at, message_body, status)
-       VALUES ($1, $2, $3, $4, now(), '발송 중', 'sending')`,
+        `INSERT INTO instagram_dm_deliveries (connection_id, rule_id, rule_version, comment_id, commenter_hash, commented_at, message_body, status)
+       VALUES ($1, $2, 1, $3, $4, now(), '발송 중', 'sending')`,
         [owner.connectionId, row.id, randomUUID(), Buffer.alloc(32, 2)],
       );
       const result = await request<InstagramDmRuleView>(owner, 'PATCH', `/rules/${rule.publicId}`, body);
@@ -211,11 +222,88 @@ describe('Instagram 규칙 API (0260)', () => {
         await t.pool.query('SELECT status FROM instagram_dm_deliveries WHERE rule_id = $1 ORDER BY status', [row.id])
       ).rows;
       expect(statuses).toEqual([{ status: 'cancelled' }, { status: 'sending' }]);
+      // `sending`은 그대로지만 규칙 version과 어긋나 worker가 다시 보내지 못합니다.
+      expect(
+        (
+          await t.pool.query(
+            "SELECT rule_version FROM instagram_dm_deliveries WHERE rule_id = $1 AND status='sending'",
+            [row.id],
+          )
+        ).rows,
+      ).toEqual([{ rule_version: 1 }]);
       expect(result.body.channelLinkCode).toBe(rule.channelLinkCode);
       expect((await request(owner, 'PATCH', `/rules/${rule.publicId}`, body)).status).toBe(200);
       expect((await stored(rule.publicId)).version).toBe(2);
     },
   );
+
+  describe('규칙 생성의 외부 호출과 잠금 (R12, C4)', () => {
+    const channelLinkCount = async (who: Creator) =>
+      (
+        await t.pool.query<{ count: number }>(
+          'SELECT count(*)::int AS count FROM channel_links l JOIN landings a ON a.id = l.landing_id WHERE a.user_id = $1',
+          [who.userId],
+        )
+      ).rows[0].count;
+
+    it('NUL이 있으면 Graph를 부르지 않고 400이며 채널 주소를 쓰지 않는다', async () => {
+      const owner = await creator();
+      const before = await channelLinkCount(owner);
+      const result = await create(owner, { mediaId: 'post', keyword: '키', message: '안내\u0000' });
+      expect([result.status, result.body.code]).toEqual([400, 'validation_failed']);
+      expect(graph).not.toHaveBeenCalled();
+      expect(await channelLinkCount(owner)).toBe(before);
+    });
+
+    it('Graph 호출 중에는 연결 행을 잠그지 않는다', async () => {
+      const owner = await creator();
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      const entered = jest.fn();
+      graph.mockImplementationOnce(async () => {
+        entered();
+        await gate;
+        return { items: [media('post')], nextCursor: null };
+      });
+      const creating = create(owner);
+      await waitFor(() => entered.mock.calls.length > 0);
+      const unlocked = await t.pool.query('SELECT id FROM instagram_connections WHERE id = $1 FOR UPDATE NOWAIT', [
+        owner.connectionId,
+      ]);
+      expect(unlocked.rowCount).toBe(1);
+      release();
+      expect((await creating).status).toBe(201);
+    });
+
+    it('Graph 호출 뒤 잠금을 잡고 중복을 다시 검사하며 채널 주소는 되돌린다', async () => {
+      const owner = await creator();
+      const before = await channelLinkCount(owner);
+      graph.mockImplementationOnce(async () => {
+        await t.pool.query(`INSERT INTO channel_link_codes (code) VALUES ('rcdup001') ON CONFLICT DO NOTHING`);
+        await t.pool.query(
+          `INSERT INTO instagram_dm_rules (public_id, connection_id, ig_media_id, media_permalink, keyword, message, channel_link_code)
+           VALUES ($1, $2, 'post', 'https://example.com/p', '다른', '문구', 'rcdup001')`,
+          [`rc${randomUUID().replaceAll('-', '').slice(0, 8)}`, owner.connectionId],
+        );
+        return { items: [media('post')], nextCursor: null };
+      });
+      const result = await create(owner);
+      expect([result.status, result.body.code]).toEqual([409, 'instagram_rule_media_taken']);
+      expect(await channelLinkCount(owner)).toBe(before);
+    });
+
+    it('게시물 소유 확인의 페이지 순회에 상한이 있다', async () => {
+      const owner = await creator();
+      let page = 0;
+      graph.mockImplementation(async () => {
+        page += 1;
+        return { items: [media(`other-${page}`)], nextCursor: `c${page}` };
+      });
+      const result = await create(owner);
+      expect([result.status, result.body.code]).toEqual([400, 'validation_failed']);
+      expect(graph.mock.calls.length).toBe(10);
+    });
+  });
 
   it('보관은 version 증가·pending 취소·목록 제외 후 같은 게시물의 새 규칙을 허용한다', async () => {
     const owner = await creator();

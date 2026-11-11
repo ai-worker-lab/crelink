@@ -16,7 +16,10 @@ const LEASE_MS = 2 * 60 * 1000;
 /** 연결 전 실패의 재시도 간격(초). 길이가 곧 최대 재시도 횟수입니다. */
 const RETRY_DELAYS_SECONDS = [30, 2 * 60, 10 * 60, 60 * 60];
 
-/** 선점과 호출 직전 재확인이 같이 쓰는 조건. 별칭 s(설정), c(연결), u(사용자), r(규칙)이 있는 쿼리에서만 씁니다. */
+/**
+ * 선점, 호출 직전 재확인, 재시도 복귀가 같이 쓰는 조건. 별칭 s(설정), c(연결), u(사용자), r(규칙), d(발송)가 있는 쿼리에서만 씁니다.
+ * `d.rule_version`이 규칙의 현재 version과 다르면 저장된 문구가 옛 문구이므로, 수신 거부와 함께 여기서 막습니다.
+ */
 const SENDABLE_SQL = `s.instagram_dm_audience <> 'off'
     AND (s.instagram_dm_audience = 'everyone' OR u.role = 'operator')
     AND c.status = 'active'
@@ -25,14 +28,19 @@ const SENDABLE_SQL = `s.instagram_dm_audience <> 'off'
     AND c.operator_paused_at IS NULL
     AND u.suspended_at IS NULL
     AND r.enabled
-    AND r.archived_at IS NULL`;
+    AND r.archived_at IS NULL
+    AND d.rule_version = r.version
+    AND NOT EXISTS (
+      SELECT 1 FROM instagram_dm_opt_outs o
+      WHERE o.ig_user_id = c.ig_user_id AND o.commenter_hash = d.commenter_hash
+    )`;
 
 const WINDOW_EXPIRED_SQL = `c.rate_window_started_at <= now() - interval '1 hour'`;
 
 /**
  * `sending`을 `pending`으로 되돌리기 전에 지금도 보낼 수 있는지 봅니다. `$1`은 발송 행 ID입니다.
- * 정지·비활성화 트랜잭션은 `sending`을 취소하지 않으므로, 연결·규칙·설정 행을 잠가 그 트랜잭션과 줄을 세웁니다.
- * 잠금 순서는 규칙 변경과 같은 연결 → 규칙이고, 같은 트랜잭션에서 연결을 갱신할 수 있어 연결은 처음부터 쓰기 잠금입니다.
+ * 정지·비활성화·규칙 수정 트랜잭션은 `sending`을 취소하지 않으므로, 연결·규칙·설정 행을 잠가 그 트랜잭션과 줄을 세웁니다.
+ * 잠금 순서는 `lock-order.ts`의 설정 → 연결 → 규칙이고(FOR 절 순서가 곧 잠금 순서입니다), 같은 트랜잭션에서 연결을 갱신할 수 있어 연결은 처음부터 쓰기 잠금입니다.
  */
 const RETRY_GATE_CTE = `gate AS (
          SELECT d.id, (${SENDABLE_SQL}) AS sendable
@@ -42,8 +50,9 @@ const RETRY_GATE_CTE = `gate AS (
          JOIN instagram_dm_rules r ON r.id = d.rule_id
          JOIN platform_settings s ON s.id
          WHERE d.id = $1 AND d.status = 'sending'
+         FOR SHARE OF s
          FOR NO KEY UPDATE OF c
-         FOR SHARE OF r, s
+         FOR SHARE OF r
        )`;
 
 const STOPPED_FAILURE_CODE = 'stopped_before_send';
@@ -153,27 +162,47 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
     return { claimed: claims.length, ...swept };
   }
 
-  /** lease가 끝난 `sending`은 호출 여부를 모르므로 `unknown`, 24시간 지난 `pending`은 `expired`로 끝냅니다. */
+  /**
+   * lease가 끝난 `sending`은 호출 여부를 모르므로 `unknown`, 24시간 지난 `pending`은 `expired`, 규칙 version이 달라진 `pending`은 `cancelled`로 끝냅니다.
+   * 일괄 변경이지만 연결 행을 잡지 않으므로 `SKIP LOCKED`로 기다리지 않고, 다음 tick에 나머지를 처리합니다(`lock-order.ts`).
+   */
   private async sweep(): Promise<Pick<InstagramWorkerTick, 'leaseExpired' | 'expired'>> {
-    const { rows } = await this.database.query<{ lease_expired: number; expired: number }>(
+    const { rows } = await this.database.query<{ lease_expired: number; expired: number; stale_version: number }>(
       `WITH lease AS (
          UPDATE instagram_dm_deliveries SET status = 'unknown', failure_code = 'lease_expired', lease_until = NULL
-         WHERE status = 'sending' AND lease_until < now()
+         WHERE id IN (
+           SELECT id FROM instagram_dm_deliveries WHERE status = 'sending' AND lease_until < now() FOR UPDATE SKIP LOCKED
+         )
          RETURNING 1
        ), stale AS (
          UPDATE instagram_dm_deliveries SET status = 'expired'
-         WHERE status = 'pending' AND commented_at <= now() - interval '24 hours'
+         WHERE id IN (
+           SELECT id FROM instagram_dm_deliveries
+           WHERE status = 'pending' AND commented_at <= now() - interval '24 hours' FOR UPDATE SKIP LOCKED
+         )
+         RETURNING 1
+       ), version_changed AS (
+         UPDATE instagram_dm_deliveries SET status = 'cancelled', failure_code = $1
+         WHERE id IN (
+           SELECT d.id FROM instagram_dm_deliveries d JOIN instagram_dm_rules r ON r.id = d.rule_id
+           WHERE d.status = 'pending' AND d.commented_at > now() - interval '24 hours' AND d.rule_version <> r.version
+           FOR UPDATE OF d SKIP LOCKED
+         )
          RETURNING 1
        )
-       SELECT (SELECT count(*)::int FROM lease) AS lease_expired, (SELECT count(*)::int FROM stale) AS expired`,
+       SELECT (SELECT count(*)::int FROM lease) AS lease_expired, (SELECT count(*)::int FROM stale) AS expired,
+              (SELECT count(*)::int FROM version_changed) AS stale_version`,
+      [STOPPED_FAILURE_CODE],
     );
     countDm('lease_expired', rows[0].lease_expired);
     countDm('expired', rows[0].expired);
+    countDm('cancelled', rows[0].stale_version);
     return { leaseExpired: rows[0].lease_expired, expired: rows[0].expired };
   }
 
   /**
    * 한 문장(한 트랜잭션)으로 빈 슬롯 수만큼 선점하고 시간당 예산을 씁니다. 연결 행도 잠가 두 프로세스가 예산을 겹쳐 쓰지 못하게 합니다.
+   * 잠금은 연결 → 발송 순서이고(`lock-order.ts`), 둘 다 `SKIP LOCKED`라 기다리지 않습니다.
    * 예산은 호출 시도 수를 넘기지 않기 위한 상한이라 선점 때 쓰고 돌려주지 않습니다.
    */
   private async claim(slots: number, hourlyLimit: number): Promise<Claim[]> {
@@ -192,14 +221,10 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
            AND ${SENDABLE_SQL}
            AND (c.rate_limited_until IS NULL OR c.rate_limited_until <= now())
            AND (${WINDOW_EXPIRED_SQL} OR c.rate_window_count < $2::int)
-           AND NOT EXISTS (
-             SELECT 1 FROM instagram_dm_opt_outs o
-             WHERE o.ig_user_id = c.ig_user_id AND o.commenter_hash = d.commenter_hash
-           )
          ORDER BY d.next_attempt_at, d.id
          LIMIT $1
-         FOR UPDATE OF d SKIP LOCKED
          FOR NO KEY UPDATE OF c SKIP LOCKED
+         FOR UPDATE OF d SKIP LOCKED
        ), ranked AS (
          SELECT locked.*, row_number() OVER (PARTITION BY connection_id ORDER BY next_attempt_at, id) AS position
          FROM locked
@@ -376,7 +401,7 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
     }
   }
 
-  /** 토큰은 유지합니다. 호출 중 토큰이 바뀌었으면 옛 토큰의 결과이므로 연결은 건드리지 않습니다. */
+  /** 토큰은 유지합니다. 호출 중 토큰이 바뀌었으면 옛 토큰의 결과이므로 연결은 건드리지 않습니다. 바깥 문장이 `changed`를 참조해 연결 행을 먼저 잠급니다(`lock-order.ts`). */
   private async disableMessagesAccess(id: string, state: SendState): Promise<void> {
     await this.database.query(
       `WITH finished AS (
@@ -395,7 +420,10 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
     );
   }
 
-  /** 운영자 정지와 같은 효과입니다. 크리에이터가 스스로 풀 수 없어야 하므로 `operator_paused_at`을 씁니다. */
+  /**
+   * 운영자 정지와 같은 효과입니다. 크리에이터가 스스로 풀 수 없어야 하므로 `operator_paused_at`을 씁니다.
+   * 바깥 문장이 `paused`를 참조해야 연결 행을 먼저 잠급니다(`lock-order.ts`). `finished`는 바깥 문장 뒤에 실행됩니다.
+   */
   private async pauseForPolicy(id: string, connectionId: string): Promise<void> {
     await this.database.query(
       `WITH finished AS (
@@ -405,10 +433,11 @@ export class InstagramWorkerService implements OnApplicationBootstrap, OnModuleD
        ), paused AS (
          UPDATE instagram_connections SET operator_paused_at = COALESCE(operator_paused_at, now()), updated_at = now()
          WHERE id = $2
+         RETURNING id
        )
        UPDATE instagram_dm_deliveries
        SET status = 'cancelled', failure_code = 'policy_restricted'
-       WHERE status = 'pending' AND connection_id = $2`,
+       WHERE status = 'pending' AND connection_id IN (SELECT id FROM paused)`,
       [id, connectionId],
     );
     this.logger.warn(`연결 ${connectionId}을 정책 제재 응답으로 자동 정지했습니다.`);

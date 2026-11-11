@@ -75,9 +75,9 @@ describe('Instagram 발송 내역 API (0261)', () => {
       [ruleId, publicId, connection, code],
     );
     const seeded = await t.pool.query<{ id: string }>(
-      `INSERT INTO instagram_dm_deliveries (connection_id, rule_id, comment_id, commenter_hash,
+      `INSERT INTO instagram_dm_deliveries (connection_id, rule_id, rule_version, comment_id, commenter_hash,
          commented_at, message_body, status, failure_code, created_at)
-       SELECT $1, $2, i::text, decode(lpad(to_hex(i), 64, '0'), 'hex'), now(), '비공개 발송 본문',
+       SELECT $1, $2, 1, i::text, decode(lpad(to_hex(i), 64, '0'), 'hex'), now(), '비공개 발송 본문',
          'failed', '비공개 실패 코드', timestamptz '2026-11-01 00:00:00+00' + ((i-1)/2) * interval '1 microsecond'
        FROM generate_series(1, $3::int) i RETURNING id`,
       [connection, ruleId, count],
@@ -109,9 +109,9 @@ describe('Instagram 발송 내역 API (0261)', () => {
     expect(decoded.split('.')[0].endsWith('000')).toBe(false);
     // 첫 페이지보다 최신인 행이 들어와도 다음 페이지에는 섞이지 않습니다.
     await t.pool.query(
-      `INSERT INTO instagram_dm_deliveries (connection_id, rule_id, comment_id, commenter_hash,
+      `INSERT INTO instagram_dm_deliveries (connection_id, rule_id, rule_version, comment_id, commenter_hash,
          commented_at, message_body, status)
-       SELECT connection_id, id, 'new-comment', decode(repeat('ff', 32), 'hex'), now(), '본문', 'failed'
+       SELECT connection_id, id, version, 'new-comment', decode(repeat('ff', 32), 'hex'), now(), '본문', 'failed'
        FROM instagram_dm_rules WHERE id = $1`,
       [seeded.id],
     );

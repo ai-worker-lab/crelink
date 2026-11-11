@@ -135,8 +135,8 @@ describe('Instagram DM 긴급 정지·보존', () => {
     const db = options.queryable ?? t.pool;
     const { rows } = await db.query<{ id: string }>(
       `INSERT INTO instagram_dm_deliveries
-         (connection_id, rule_id, comment_id, commenter_hash, commented_at, message_body, status, created_at)
-       VALUES ($1, $2, $3, $4, now() - interval '1 minute', '본문', $5, COALESCE($6::timestamptz, now())) RETURNING id`,
+         (connection_id, rule_id, rule_version, comment_id, commenter_hash, commented_at, message_body, status, created_at)
+       VALUES ($1, $2, 1, $3, $4, now() - interval '1 minute', '본문', $5, COALESCE($6::timestamptz, now())) RETURNING id`,
       [
         account.connectionId,
         account.ruleId,
@@ -186,7 +186,11 @@ describe('Instagram DM 긴급 정지·보존', () => {
     return rows[0];
   }
 
-  async function connectThroughApi(igUserId: string): Promise<void> {
+  function connectThroughApi(igUserId: string) {
+    return connectAs(creatorCookie, igUserId).then((saved) => expect(saved.status).toBe(200));
+  }
+
+  async function connectAs(cookie: string, igUserId: string) {
     const graph = t.app.get(InstagramGraph);
     jest.spyOn(graph, 'exchangeCode').mockResolvedValueOnce({ accessToken: 'plain-new-token', expiresAt: null });
     jest.spyOn(graph, 'fetchAccounts').mockResolvedValueOnce({
@@ -194,7 +198,7 @@ describe('Instagram DM 긴급 정지·보존', () => {
       accounts: [{ igUserId, username: `user_${igUserId}`, isProfessional: true }],
     });
     const started = await api<{ authorizationUrl: string }>(t.baseUrl, 'POST', '/api/me/instagram/connect', {
-      cookie: creatorCookie,
+      cookie,
     });
     expect(started.status).toBe(200);
     const stateCookie = started.headers
@@ -202,11 +206,10 @@ describe('Instagram DM 긴급 정지·보존', () => {
       .find((cookie) => cookie.startsWith(`${INSTAGRAM_OAUTH_STATE_COOKIE}=`))!
       .split(';')[0];
     const state = decodeURIComponent(stateCookie.slice(stateCookie.indexOf('=') + 1));
-    const saved = await api<InstagramConnectionView>(t.baseUrl, 'POST', '/api/me/instagram/callback', {
-      cookie: `${creatorCookie}; ${stateCookie}`,
+    return api<InstagramConnectionView>(t.baseUrl, 'POST', '/api/me/instagram/callback', {
+      cookie: `${cookie}; ${stateCookie}`,
       body: { code: 'code-1', state },
     });
-    expect(saved.status).toBe(200);
   }
 
   describe('권한', () => {
@@ -548,6 +551,33 @@ describe('Instagram DM 긴급 정지·보존', () => {
       expect((await tick()).claimed).toBe(0);
       expect(send).not.toHaveBeenCalled();
       expect(await status(pending)).toBe('pending');
+    });
+
+    it('해제해 재인증 대기로 남은 정지 행의 IG 계정은 다른 크리링 계정으로도 연결할 수 없다', async () => {
+      const account = await pausedAccount();
+      expect((await disconnect()).status).toBe(204);
+      const other = await login(t.baseUrl, 'ig-admin-other|ig-admin-other@example.com');
+
+      const result = await connectAs(other.cookie!, account.igUserId);
+
+      expect(result.status).toBe(409);
+      expect(result.body).toMatchObject({ code: 'instagram_operator_paused' });
+      expect(t.app.get(InstagramGraph).subscribeApp).not.toHaveBeenCalled();
+      expect(
+        (await t.pool.query('SELECT 1 FROM instagram_connections WHERE user_id = $1', [other.body.user!.id])).rowCount,
+      ).toBe(0);
+      expect((await connectionRow(creatorId)).operator_paused_at).not.toBeNull();
+    });
+
+    it('살아 있는 정지 행의 IG 계정도 다른 크리링 계정으로 연결할 수 없다', async () => {
+      const account = await pausedAccount();
+      const other = await login(t.baseUrl, 'ig-admin-other2|ig-admin-other2@example.com');
+
+      const result = await connectAs(other.cookie!, account.igUserId);
+
+      expect(result.status).toBe(409);
+      expect(result.body).toMatchObject({ code: 'instagram_operator_paused' });
+      expect(t.app.get(InstagramGraph).checkToken).not.toHaveBeenCalled();
     });
 
     it('구독 해제 호출 중에 운영자가 정지하면 행을 남긴다', async () => {

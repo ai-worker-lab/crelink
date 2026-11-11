@@ -7,6 +7,7 @@ import { AppConfig } from '../config.service';
 import { Database } from '../database';
 import { clientIp } from '../short-link/tracking.service';
 import { OptOutTokenPayload, verifyOptOutToken } from './crypto';
+import { LOCK_CONNECTIONS_OF_ACCOUNT } from './lock-order';
 
 /** `crypto.ts` 형식의 최대 길이(`ig_user_id` 255바이트일 때 406자)보다 넉넉한 입력 상한. */
 const TOKEN_MAX_LENGTH = 512;
@@ -103,6 +104,8 @@ export class InstagramOptOutService {
   /** 다시 불러도 결과가 같습니다. 재요청도 취소를 다시 실행해 웹훅과 경합해 남은 `pending`을 닫습니다. */
   private async record(person: OptOutTokenPayload): Promise<void> {
     await this.database.transaction(async (client) => {
+      // 연결별 일괄 취소와 같은 발송 행을 겹쳐 바꾸므로 연결 행을 먼저 잡습니다(`lock-order.ts`).
+      await client.query(LOCK_CONNECTIONS_OF_ACCOUNT, [person.igUserId]);
       await client.query(
         'INSERT INTO instagram_dm_opt_outs (ig_user_id, commenter_hash) VALUES ($1, $2) ON CONFLICT DO NOTHING',
         [person.igUserId, person.commenterHash],

@@ -2,7 +2,7 @@ SET LOCAL lock_timeout = '5s';
 -- Instagram 댓글 자동 DM(0254). 근거: docs/specs/instagram-comment-dm.md (데이터 모델).
 -- 추가만 하므로 두 색이 겹쳐도 안전합니다. 기능은 instagram_dm_audience 기본값 off로 꺼져 있습니다.
 -- 되돌리기(운영 데이터 생성 전, 운영 DB는 명시적 승인 뒤):
--- DROP TABLE instagram_deletion_requests, instagram_dm_opt_outs, instagram_dm_deliveries, instagram_dm_rules, instagram_connections;
+-- DROP TABLE instagram_deletion_requests, instagram_opt_out_owners, instagram_dm_opt_outs, instagram_dm_deliveries, instagram_dm_rules, instagram_connections;
 -- ALTER TABLE platform_settings DROP COLUMN instagram_dm_audience;
 -- DELETE FROM schema_migrations WHERE version = '0016_instagram_dm';
 -- 데이터 생성 뒤에는 다음 migration으로 고칩니다.
@@ -32,6 +32,8 @@ CREATE TABLE instagram_connections (
 );
 CREATE UNIQUE INDEX instagram_connections_ig_live
   ON instagram_connections (ig_user_id) WHERE status <> 'reauth_required';
+-- 운영자 정지 확인(연결 시)과 수신 거부의 연결 잠금은 재인증 대기 행까지 ig_user_id로 찾습니다.
+CREATE INDEX instagram_connections_ig_user ON instagram_connections (ig_user_id);
 CREATE INDEX instagram_connections_check
   ON instagram_connections (token_checked_at) WHERE status <> 'reauth_required';
 CREATE INDEX instagram_connections_meta_user
@@ -64,6 +66,7 @@ CREATE TABLE instagram_dm_deliveries (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   connection_id uuid NOT NULL REFERENCES instagram_connections (id) ON DELETE CASCADE,
   rule_id uuid NOT NULL,
+  rule_version int NOT NULL,           -- 저장 시점의 규칙 version. 다르면 옛 문구이므로 보내지 않는다
   comment_id text NOT NULL,
   commenter_hash bytea NOT NULL CHECK (octet_length(commenter_hash) = 32),
   commented_at timestamptz NOT NULL,   -- 웹훅의 댓글 시각, 24시간 규칙의 기준
@@ -93,6 +96,13 @@ CREATE TABLE instagram_dm_opt_outs (
   created_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (ig_user_id, commenter_hash)
 );
+
+-- Meta 데이터 삭제 콜백은 meta_user_id만 줍니다. 연결 행이 해제로 사라져도 수신 거부 기록을 찾아 파기하려고 대응표를 남깁니다.
+CREATE TABLE instagram_opt_out_owners (
+  ig_user_id text PRIMARY KEY,
+  meta_user_id text NOT NULL
+);
+CREATE INDEX instagram_opt_out_owners_meta_user ON instagram_opt_out_owners (meta_user_id);
 
 CREATE TABLE instagram_deletion_requests (
   confirmation_code text PRIMARY KEY CHECK (confirmation_code ~ '^[a-z0-9]{16}$'),

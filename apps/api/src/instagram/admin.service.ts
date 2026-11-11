@@ -4,6 +4,7 @@ import { OperatorActor, recordOperatorAction } from '../ai-operator/audit';
 import { apiError, UUID_PATTERN } from '../common/http';
 import { bodyObject, booleanField } from '../common/input';
 import { Database, type Queryable } from '../database';
+import { LOCK_ALL_CONNECTIONS } from './lock-order';
 
 const AUDIENCES: readonly InstagramDmAudience[] = ['off', 'operators', 'everyone'];
 
@@ -25,6 +26,8 @@ function audienceField(body: unknown): InstagramDmAudience {
  */
 async function cancelDisallowedPending(client: Queryable, audience: InstagramDmAudience): Promise<number> {
   if (audience === 'everyone') return 0;
+  // 여러 연결의 `pending`을 한 번에 바꾸므로 연결 행을 id 순으로 먼저 잡습니다(`lock-order.ts`).
+  await client.query(LOCK_ALL_CONNECTIONS);
   const cancelled = await client.query(
     `UPDATE instagram_dm_deliveries d SET status = 'cancelled'
      FROM instagram_connections c JOIN users u ON u.id = c.user_id
@@ -50,7 +53,7 @@ export class InstagramAdminService {
   }
 
   /**
-   * `PUT /api/admin/instagram-dm`. 설정 행을 `FOR UPDATE`로 잡아 웹훅 저장의 `FOR SHARE`와 줄 세우므로, 먼저 커밋된 저장은 아래 취소가 보고
+   * `PUT /api/admin/instagram-dm`. 잠금 순서 `lock-order.ts`대로 설정 행을 먼저 `FOR UPDATE`로 잡아 웹훅 저장의 `FOR SHARE`와 줄 세우므로, 먼저 커밋된 저장은 아래 취소가 보고
    * 뒤늦은 저장은 새 값으로 다시 평가돼 들어오지 않습니다. `updated_at`·`updated_by`는 광고 블록 카드가 보여 주는 값이라 건드리지 않고,
    * 누가 언제 바꿨는지는 행동 기록에 남습니다.
    */

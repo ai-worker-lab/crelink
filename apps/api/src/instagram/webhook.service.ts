@@ -7,6 +7,7 @@ import { Database } from '../database';
 import { countBusinessMetric } from '../monitoring/metrics';
 import { commenterHash, signOptOutToken } from './crypto';
 import { matchesKeyword } from './keyword';
+import { LOCK_CONNECTIONS, LOCK_RULES, LOCK_SETTINGS } from './lock-order';
 import { constantTimeEquals, parseSignedRequest, verifyWebhookSignature } from './signed-request';
 import { parseWebhookPayload, WebhookComment } from './webhook-payload';
 
@@ -17,6 +18,7 @@ const CONFIRMATION_CODE_PATTERN = /^[a-z0-9]{16}$/;
 
 interface RuleRow {
   id: string;
+  connection_id: string;
   version: number;
   keyword: string;
   message: string;
@@ -38,20 +40,20 @@ const RULE_ELIGIBLE = `
   AND (s.instagram_dm_audience = 'everyone' OR (s.instagram_dm_audience = 'operators' AND u.role = 'operator'))`;
 
 const SELECT_RULES = `
-  SELECT r.id, r.version, r.keyword, r.message, r.channel_link_code, r.ig_media_id, r.ig_media_child_ids, c.ig_user_id
+  SELECT r.id, r.connection_id, r.version, r.keyword, r.message, r.channel_link_code, r.ig_media_id, r.ig_media_child_ids, c.ig_user_id
   FROM instagram_dm_rules r ${RULE_JOINS}
   WHERE c.ig_user_id = ANY($1::text[]) AND ${RULE_ELIGIBLE}
   ORDER BY r.created_at, r.id`;
 
 /**
- * 규칙을 읽은 뒤 바뀌었으면 저장하지 않습니다. `FOR SHARE`는 규칙·연결·스위치를 바꾸며 `pending`을 취소하는 트랜잭션과 순서를 정합니다.
- * 그쪽이 먼저면 커밋을 기다렸다가 새 값으로 조건을 다시 평가하고, 이쪽이 먼저면 그쪽의 취소가 이 행까지 봅니다.
+ * 규칙을 읽은 뒤 바뀌었으면 저장하지 않습니다. 호출자가 같은 트랜잭션에서 `lock-order.ts`의 순서로 설정 → 연결 → 규칙을 `FOR SHARE`로 잡은 뒤 실행합니다.
+ * 그쪽이 먼저면 커밋을 기다렸다가 이 문장의 새 스냅샷이 새 값을 보고, 이쪽이 먼저면 그쪽의 취소가 이 행까지 봅니다.
  * ORDER BY는 겹치는 배치가 서로의 유니크 키를 기다리다 교착되지 않게 순서를 맞춥니다.
  */
 const INSERT_DELIVERIES = `
   INSERT INTO instagram_dm_deliveries
-    (connection_id, rule_id, comment_id, commenter_hash, commented_at, message_body, status)
-  SELECT r.connection_id, r.id, i.comment_id, i.commenter_hash, i.commented_at, i.message_body, 'pending'
+    (connection_id, rule_id, rule_version, comment_id, commenter_hash, commented_at, message_body, status)
+  SELECT r.connection_id, r.id, i.rule_version, i.comment_id, i.commenter_hash, i.commented_at, i.message_body, 'pending'
   FROM unnest($1::uuid[], $2::int[], $3::text[], $4::bytea[], $5::timestamptz[], $6::text[])
     AS i(rule_id, rule_version, comment_id, commenter_hash, commented_at, message_body)
   JOIN instagram_dm_rules r ON r.id = i.rule_id AND r.version = i.rule_version ${RULE_JOINS}
@@ -63,7 +65,6 @@ const INSERT_DELIVERIES = `
       WHERE o.ig_user_id = c.ig_user_id AND o.commenter_hash = i.commenter_hash
     )
   ORDER BY r.id, i.commenter_hash, i.comment_id
-  FOR SHARE OF r, c, s
   ON CONFLICT DO NOTHING`;
 
 function findRule(rules: RuleRow[], comment: WebhookComment): RuleRow | undefined {
@@ -124,7 +125,7 @@ export class InstagramWebhookService {
     return challenge;
   }
 
-  /** 서명 검증 뒤 쿼리 2회(규칙 조회, 다중 행 INSERT)로 저장합니다. 이 함수가 끝나면 커밋된 상태입니다. */
+  /** 서명 검증 뒤 규칙을 한 번 읽고, 저장 트랜잭션(순서대로 잠금 3회, 다중 행 INSERT 1회)을 커밋합니다. 이 함수가 끝나면 커밋된 상태입니다. */
   async receive(rawBody: Buffer | undefined, signature: unknown): Promise<void> {
     const settings = this.requireSettings();
     if (!rawBody || !verifyWebhookSignature(settings.appSecret, rawBody, signature)) {
@@ -160,14 +161,19 @@ export class InstagramWebhookService {
       countResult('unmatched', comments.length - rows.ruleIds.length);
       if (rows.ruleIds.length === 0) return;
 
-      const inserted = await this.database.query(INSERT_DELIVERIES, [
-        rows.ruleIds,
-        rows.ruleVersions,
-        rows.commentIds,
-        rows.hashes,
-        rows.commentedAt,
-        rows.bodies,
-      ]);
+      const inserted = await this.database.transaction(async (client) => {
+        await client.query(LOCK_SETTINGS);
+        await client.query(LOCK_CONNECTIONS, [[...new Set(rows.connectionIds)]]);
+        await client.query(LOCK_RULES, [[...new Set(rows.ruleIds)]]);
+        return client.query(INSERT_DELIVERIES, [
+          rows.ruleIds,
+          rows.ruleVersions,
+          rows.commentIds,
+          rows.hashes,
+          rows.commentedAt,
+          rows.bodies,
+        ]);
+      });
       countResult('stored', inserted.rowCount ?? 0);
       countResult('not_stored', rows.ruleIds.length - (inserted.rowCount ?? 0));
     } catch (error) {
@@ -178,6 +184,7 @@ export class InstagramWebhookService {
   /** 키워드가 맞는 댓글만 INSERT 파라미터로 만듭니다. 최종 본문과 수신 거부 토큰은 저장 시점에 고정합니다. */
   private buildRows(settings: InstagramSettings, comments: WebhookComment[], rulesByAccount: Map<string, RuleRow[]>) {
     const rows = {
+      connectionIds: [] as string[],
       ruleIds: [] as string[],
       ruleVersions: [] as number[],
       commentIds: [] as string[],
@@ -190,6 +197,7 @@ export class InstagramWebhookService {
       if (!rule) continue;
       const hash = commenterHash(settings.commenterHashKey, comment.igUserId, comment.fromId);
       const token = signOptOutToken(settings.optOutKey, comment.igUserId, hash);
+      rows.connectionIds.push(rule.connection_id);
       rows.ruleIds.push(rule.id);
       rows.ruleVersions.push(rule.version);
       rows.commentIds.push(comment.commentId);
@@ -203,7 +211,10 @@ export class InstagramWebhookService {
     return rows;
   }
 
-  /** `signed_request` 검증 뒤 연결(규칙·내역은 CASCADE)과 해당 `ig_user_id`의 수신 거부 기록을 한 트랜잭션에서 지웁니다. */
+  /**
+   * `signed_request` 검증 뒤 연결(규칙·내역은 CASCADE)과 해당 `ig_user_id`의 수신 거부 기록을 한 트랜잭션에서 지웁니다.
+   * 일반 해제로 연결 행이 없어도 `instagram_opt_out_owners`로 `ig_user_id`를 찾아 파기하고, 대응표 행도 함께 지웁니다.
+   */
   async handleDataDeletion(signedRequest: unknown): Promise<{ url: string; confirmation_code: string }> {
     const settings = this.requireSettings();
     const parsed = typeof signedRequest === 'string' ? parseSignedRequest(settings.appSecret, signedRequest) : null;
@@ -217,10 +228,14 @@ export class InstagramWebhookService {
           'DELETE FROM instagram_connections WHERE meta_user_id = $1 RETURNING ig_user_id',
           [parsed.userId],
         );
-        if (removed.rows.length > 0) {
-          await client.query('DELETE FROM instagram_dm_opt_outs WHERE ig_user_id = ANY($1::text[])', [
-            removed.rows.map((row) => row.ig_user_id),
-          ]);
+        const owners = await client.query<{ ig_user_id: string }>(
+          `DELETE FROM instagram_opt_out_owners WHERE meta_user_id = $1 OR ig_user_id = ANY($2::text[])
+           RETURNING ig_user_id`,
+          [parsed.userId, removed.rows.map((row) => row.ig_user_id)],
+        );
+        const accounts = [...new Set([...removed.rows, ...owners.rows].map((row) => row.ig_user_id))];
+        if (accounts.length > 0) {
+          await client.query('DELETE FROM instagram_dm_opt_outs WHERE ig_user_id = ANY($1::text[])', [accounts]);
         }
         return insertWithRandomId(CONFIRMATION_CODE_LENGTH, async (candidate) => {
           const inserted = await client.query(

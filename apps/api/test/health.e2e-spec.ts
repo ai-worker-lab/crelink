@@ -99,6 +99,7 @@ describe('API 기동과 health', () => {
         'instagram_dm_deliveries',
         'instagram_dm_opt_outs',
         'instagram_dm_rules',
+        'instagram_opt_out_owners',
         'landing_blocks',
         'landing_event_daily_rollups',
         'landing_event_dimension_rollups',
@@ -274,6 +275,7 @@ describe('0016_instagram_dm 제약', () => {
     return insert('instagram_dm_deliveries', {
       connection_id: connection,
       rule_id: rule,
+      rule_version: 1,
       comment_id: `comment${seq}`,
       commenter_hash: hash(1),
       commented_at: new Date(),
@@ -340,6 +342,23 @@ describe('0016_instagram_dm 제약', () => {
       ig_user_id: 'ig-live',
       status: 'reauth_required',
       token_ciphertext: null,
+    });
+  });
+
+  it('발송 행의 rule_version은 필수이고 수신 거부 대응표는 IG 계정당 한 행이다', async () => {
+    const connection = await connectionId();
+    const rule = await ruleId(connection);
+    await expect(insertDelivery(connection, rule, { rule_version: null })).rejects.toMatchObject({
+      code: '23502',
+      column: 'rule_version',
+    });
+    await insert('instagram_opt_out_owners', { ig_user_id: 'ig-owner', meta_user_id: 'meta-a' });
+    await expect(
+      insert('instagram_opt_out_owners', { ig_user_id: 'ig-owner', meta_user_id: 'meta-b' }),
+    ).rejects.toMatchObject({ code: '23505', constraint: 'instagram_opt_out_owners_pkey' });
+    await expect(insert('instagram_opt_out_owners', { ig_user_id: 'ig-x', meta_user_id: null })).rejects.toMatchObject({
+      code: '23502',
+      column: 'meta_user_id',
     });
   });
 

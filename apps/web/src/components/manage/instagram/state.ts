@@ -51,6 +51,7 @@ export function instagramMenuVisible(state: Pick<CreatorLandingState, 'pageAcces
 /** 콜백 route(0263)가 화면으로 돌려보낼 때 붙이는 오류 코드 중 이 화면이 안내하는 것. 그 밖의 값은 무시합니다. */
 export const CONNECT_FAILURE_CODES = [
   'instagram_account_in_use',
+  'instagram_operator_paused',
   'instagram_account_selection_required',
   'instagram_account_not_professional',
   'instagram_upstream_failed',
@@ -69,6 +70,7 @@ export function readConnectFailure(value: string | string[] | undefined): Connec
 /** 연결 실패 문구. 계정 선택 오류는 별도 안내(하나만 골라 다시 연결)라 `selection`으로 구분해 그립니다. */
 export const CONNECT_FAILURE_MESSAGES: Record<ConnectFailureCode, string> = {
   instagram_account_in_use: '이 인스타그램 계정은 이미 다른 페이지에 연결되어 있어요. 다른 계정으로 연결해 주세요.',
+  instagram_operator_paused: '운영자가 자동 DM을 멈춘 인스타그램 계정이라 연결할 수 없어요.',
   instagram_account_selection_required:
     '연결할 계정을 하나만 골라야 해요. 동의 화면에서 계정을 하나만 선택한 뒤 다시 연결해 주세요.',
   instagram_account_not_professional:

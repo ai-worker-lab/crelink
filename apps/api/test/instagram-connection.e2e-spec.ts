@@ -131,8 +131,8 @@ describe('Instagram 연결 API', () => {
     );
     for (const status of ['pending', 'sending']) {
       await t.pool.query(
-        `INSERT INTO instagram_dm_deliveries (connection_id, rule_id, comment_id, commenter_hash, commented_at, message_body, status)
-         VALUES ($1, $2, $3, $4, now(), '본문', $5)`,
+        `INSERT INTO instagram_dm_deliveries (connection_id, rule_id, rule_version, comment_id, commenter_hash, commented_at, message_body, status)
+         VALUES ($1, $2, 1, $3, $4, now(), '본문', $5)`,
         [connectionId, rule.rows[0].id, `comment-${status}`, randomBytes(32), status],
       );
     }
@@ -657,6 +657,39 @@ describe('Instagram 연결 API', () => {
         [ig],
       );
       expect(live.rowCount).toBe(1);
+    });
+  });
+
+  describe('수신 거부 소유 대응표', () => {
+    const ownerOf = async (igUserId: string) =>
+      (await t.pool.query('SELECT meta_user_id FROM instagram_opt_out_owners WHERE ig_user_id = $1', [igUserId]))
+        .rows[0]?.meta_user_id as string | undefined;
+
+    it('연결 때 기록하고 일반 해제 뒤에도 남기며 재연결로 갱신한다', async () => {
+      const who = await member();
+      const ig = igId();
+      await connect(who, ig);
+      expect(await ownerOf(ig)).toBe(`meta-${ig}`);
+
+      expect((await api(t.baseUrl, 'DELETE', '/api/me/instagram', { cookie: who.cookie })).status).toBe(204);
+      expect(await row(who.userId)).toBeUndefined();
+      expect(await ownerOf(ig)).toBe(`meta-${ig}`);
+
+      spies.exchange.mockResolvedValueOnce({ accessToken: 'plain-token-again', expiresAt: null });
+      spies.accounts.mockResolvedValueOnce({ metaUserId: 'meta-new', accounts: [account(ig)] });
+      const { state, stateCookie } = await startFlow(who);
+      expect((await callback(who, state, stateCookie)).status).toBe(200);
+      expect(await ownerOf(ig)).toBe('meta-new');
+    });
+
+    it('meta_user_id가 없으면 기록하지 않는다', async () => {
+      const who = await member();
+      const ig = igId();
+      spies.exchange.mockResolvedValueOnce({ accessToken: 'plain-token-null', expiresAt: null });
+      spies.accounts.mockResolvedValueOnce({ metaUserId: null, accounts: [account(ig)] });
+      const { state, stateCookie } = await startFlow(who);
+      expect((await callback(who, state, stateCookie)).status).toBe(200);
+      expect(await ownerOf(ig)).toBeUndefined();
     });
   });
 

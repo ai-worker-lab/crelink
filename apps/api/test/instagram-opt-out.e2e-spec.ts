@@ -235,13 +235,15 @@ describe('Instagram DM 수신 거부 API (0271, docs/specs/instagram-comment-dm.
       expect(await statusesOf(account, other)).toEqual(['pending']);
     });
 
-    it('이미 발송 중이거나 끝난 행은 바꾸지 않는다', async () => {
+    // 호출이 끝난 `sent`는 되돌릴 수 없고, `sending`의 취소는 worker의 호출 직전 재확인이 맡습니다(instagram-worker 시험).
+    it.each(['sent', 'sending'])('%s 행은 이 API가 바꾸지 않는다', async (status) => {
       const { account, fromId, token } = await accountWithPending();
-      await t.pool.query("UPDATE instagram_dm_deliveries SET status='sent' WHERE connection_id=$1", [
+      await t.pool.query('UPDATE instagram_dm_deliveries SET status=$1 WHERE connection_id=$2', [
+        status,
         account.connectionId,
       ]);
       expect((await optOut(token)).status).toBe(204);
-      expect(await statusesOf(account, fromId)).toEqual(['sent']);
+      expect(await statusesOf(account, fromId)).toEqual([status]);
     });
 
     it('거부 뒤 같은 사람의 새 댓글은 저장되지 않고, 다른 사람의 댓글은 저장된다', async () => {
