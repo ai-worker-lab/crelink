@@ -6,6 +6,8 @@
 
 ## 2026-11-11
 
+- 부분 검증·결과 재사용(0281): 기존 로컬 CI에 범위 registry와 clean 성공 receipt를 추가했습니다. report는 동일 대상·명령·필수 결과를 대조해 검사 0회로 status만 등록하고, 사전 선언한 외부 관측 외 실패는 차단합니다. test-only Meta fixture와 정책 안내를 동기화했습니다. Instagram 소스/시험 그룹별 관련 검사·모듈 e2e, 소비자 전 shared build의 hermetic 회귀, 기존 8개 설정 키 최초 일괄 등록 경계를 보정하고 무관한 visitor QA 예시를 제거했습니다. [티켓](docs/work/orchestrator/0281-scoped-verification.md), [검증 루프](docs/development/verification.md#로컬-ci), [API 로그](apps/api/CHANGELOGS.md).
+
 - Instagram 모든 댓글·최초 1회(0280): 사용자 확정 범위를 SSoT `r4-all-comments-2026-11-11/u1`와 shared에 동기화하고 0019·API·체크박스·처리방침 및 Coordinator용 격리 DB/웹 fixture를 추가했습니다. 인증 r3와 미실측 이력은 유지합니다. [티켓](docs/work/orchestrator/0280-instagram-all-comments.md), [API 로그](apps/api/CHANGELOGS.md), [웹 로그](apps/web/CHANGELOGS.md).
 
 - Instagram 토큰 principal 수정(0279 CTO R3): 실제 `/me.id` 누락 확인에 따라 앱 Bearer로 검증한 `debug_token.data.user_id`를 identity로 사용합니다. assigned 계정 선택·기존 보안/설정/DB를 유지하고 opaque `input_token` 가림 회귀와 현재 identity 문서를 보완했습니다. 0278·CTO R2 이력은 보존합니다. [API 로그](apps/api/CHANGELOGS.md), [0279](docs/work/orchestrator/0279-instagram-token-identity.md).
