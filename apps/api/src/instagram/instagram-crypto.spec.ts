@@ -1,5 +1,8 @@
 import { createHmac } from 'node:crypto';
 import { Logger } from '@nestjs/common';
+import type { AppConfig } from '../config.service';
+import type { Database } from '../database';
+import { InstagramConnectionService, signOAuthState } from './connection.service';
 import {
   commenterHash,
   decodeSecretKey,
@@ -378,28 +381,31 @@ describe('Graph 경계', () => {
     await expect(failure(graph.replyToComment('t', 'c', 'm'))).resolves.toMatchObject({ kind: 'indeterminate' });
   });
 
-  it('BISU를 확인하고 페이지 연결 없이 assigned 계정만 사용한다', async () => {
-    respond(200, {
-      id: 'bisu',
-      client_business_id: 'business',
-      accounts: { data: [{ instagram_business_account: { id: 'page-ig', username: 'unused' } }] },
-    });
-    respond(200, { data: [{ id: 'ig', username: 'me' }] });
-    await expect(graph.fetchAccounts(META_TOKEN)).resolves.toEqual({
-      metaUserId: 'bisu',
-      accounts: [{ igUserId: 'ig', username: 'me', isProfessional: true }],
-    });
-    expect(fetchMock.mock.calls.map(([url, init]) => [url, init.method, init.headers.authorization])).toEqual([
-      ['https://graph.facebook.com/v27.0/me?fields=id%2Cclient_business_id', 'GET', `Bearer ${META_TOKEN}`],
-      [
-        'https://graph.facebook.com/v27.0/me/assigned_instagram_accounts?fields=id%2Cusername',
-        'GET',
-        `Bearer ${META_TOKEN}`,
-      ],
-    ]);
-  });
+  it.each([{}, { client_business_id: null }, { client_business_id: 123 }, { client_business_id: 'business' }])(
+    'client_business_id는 필수가 아니며 BISU와 assigned 계정만 사용한다: %p',
+    async (optionalFields) => {
+      respond(200, {
+        id: 'bisu',
+        ...optionalFields,
+        accounts: { data: [{ instagram_business_account: { id: 'page-ig', username: 'unused' } }] },
+      });
+      respond(200, { data: [{ id: 'ig', username: 'me' }] });
+      await expect(graph.fetchAccounts(META_TOKEN)).resolves.toEqual({
+        metaUserId: 'bisu',
+        accounts: [{ igUserId: 'ig', username: 'me', isProfessional: true }],
+      });
+      expect(fetchMock.mock.calls.map(([url, init]) => [url, init.method, init.headers.authorization])).toEqual([
+        ['https://graph.facebook.com/v27.0/me?fields=id%2Cclient_business_id', 'GET', `Bearer ${META_TOKEN}`],
+        [
+          'https://graph.facebook.com/v27.0/me/assigned_instagram_accounts?fields=id%2Cusername',
+          'GET',
+          `Bearer ${META_TOKEN}`,
+        ],
+      ]);
+    },
+  );
 
-  it.each([{}, { id: 'bisu' }, { client_business_id: 'business' }, { id: 'bisu', client_business_id: 123 }])(
+  it.each([{}, { id: '' }, { client_business_id: 'business' }, { id: 123, client_business_id: 'business' }])(
     'BISU 필수 식별자가 없으면 assigned 조회 전에 실패한다: %p',
     async (body) => {
       respond(200, body);
@@ -416,12 +422,37 @@ describe('Graph 경계', () => {
         { id: 'two', username: 'two' },
       ],
     },
-  ])('0개·복수개는 선택 개수를 숨기지 않고 호출자에게 전달한다: %p', async ({ data }) => {
-    respond(200, { id: 'bisu', client_business_id: 'business' });
+  ])('client_business_id 없이도 0개·복수개를 전달하고 서비스는 409로 거부한다: %p', async ({ data }) => {
+    respond(200, { id: 'bisu' });
     respond(200, { data });
     const result = await graph.fetchAccounts('t');
     expect(result.accounts).toHaveLength(data.length);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const query = jest.fn().mockResolvedValue({
+      rows: [{ audience: 'everyone', token_revision: null, ig_user_id: null }],
+    });
+    const service = new InstagramConnectionService(
+      { query } as unknown as Database,
+      { instagram: config } as unknown as AppConfig,
+      graph,
+    );
+    const user = { id: ROW_ID, email: 'creator@example.test', role: 'creator' as const };
+    const state = signOAuthState(config.appSecret, {
+      uid: user.id,
+      exp: Math.floor(Date.now() / 1000) + 600,
+      nonce: 'nonce',
+      rev: 0,
+    });
+    respond(200, { access_token: META_TOKEN });
+    respond(200, { id: 'bisu' });
+    respond(200, { data });
+    await expect(service.complete(user, 'code', state, state)).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'instagram_account_selection_required' },
+    });
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 
   it.each([
@@ -429,6 +460,7 @@ describe('Graph 경계', () => {
     { data: null },
     { data: [{}] },
     { data: [{ id: 'ig' }] },
+    { data: [{ username: 'me' }] },
     {
       data: [
         { id: 'ig', username: 'me' },
@@ -436,14 +468,14 @@ describe('Graph 경계', () => {
       ],
     },
   ])('assigned 목록이 불완전하면 일부 계정만 반환하지 않는다: %p', async (body) => {
-    respond(200, { id: 'bisu', client_business_id: 'business' });
+    respond(200, { id: 'bisu' });
     respond(200, body);
     await expect(graph.fetchAccounts('t')).rejects.toBeInstanceOf(InstagramGraphError);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it.each([100, 190, 500])('assigned 오류 %s는 대체 경로 없이 실패한다', async (code) => {
-    respond(200, { id: 'bisu', client_business_id: 'business' });
+    respond(200, { id: 'bisu' });
     respond(code === 500 ? 500 : 400, { error: { code } });
     await expect(graph.fetchAccounts('t')).rejects.toBeInstanceOf(InstagramGraphError);
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -456,7 +488,7 @@ describe('Graph 경계', () => {
   });
 
   it('assigned 다음 페이지도 확인하고 next URL 대신 cursor만 사용한다', async () => {
-    respond(200, { id: 'bisu', client_business_id: 'business' });
+    respond(200, { id: 'bisu' });
     respond(200, {
       data: [{ id: 'one', username: 'one' }],
       paging: { next: 'https://untrusted.test/next', cursors: { after: 'a b&c' } },
@@ -471,7 +503,7 @@ describe('Graph 경계', () => {
   });
 
   it('다음 페이지 실패는 첫 페이지의 한 계정을 반환하지 않는다', async () => {
-    respond(200, { id: 'bisu', client_business_id: 'business' });
+    respond(200, { id: 'bisu' });
     respond(200, { data: [{ id: 'one', username: 'one' }], paging: { next: 'next', cursors: { after: 'a' } } });
     respond(500, {});
     await expect(graph.fetchAccounts('t')).rejects.toBeInstanceOf(InstagramGraphError);
@@ -481,7 +513,7 @@ describe('Graph 경계', () => {
   it.each([{ next: 'next' }, { next: 'next', cursors: { after: '' } }, { next: 123, cursors: { after: 'a' } }])(
     '다음 페이지 정보가 불완전하면 실패한다: %p',
     async (paging) => {
-      respond(200, { id: 'bisu', client_business_id: 'business' });
+      respond(200, { id: 'bisu' });
       respond(200, { data: [{ id: 'one', username: 'one' }], paging });
       await expect(graph.fetchAccounts('t')).rejects.toBeInstanceOf(InstagramGraphError);
       expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -489,21 +521,21 @@ describe('Graph 경계', () => {
   );
 
   it('페이지 cursor 반복은 실패한다', async () => {
-    respond(200, { id: 'bisu', client_business_id: 'business' });
+    respond(200, { id: 'bisu' });
     for (let i = 0; i < 2; i++) respond(200, { data: [], paging: { next: 'next', cursors: { after: 'a' } } });
     await expect(graph.fetchAccounts('t')).rejects.toBeInstanceOf(InstagramGraphError);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('10쪽 뒤에도 다음 페이지가 있으면 불완전한 목록을 반환하지 않는다', async () => {
-    respond(200, { id: 'bisu', client_business_id: 'business' });
+    respond(200, { id: 'bisu' });
     for (let i = 0; i < 10; i++) respond(200, { data: [], paging: { next: 'next', cursors: { after: String(i) } } });
     await expect(graph.fetchAccounts('t')).rejects.toBeInstanceOf(InstagramGraphError);
     expect(fetchMock).toHaveBeenCalledTimes(11);
   });
 
   it('assigned 계정 10개 초과는 페이지를 넘어도 실패한다', async () => {
-    respond(200, { id: 'bisu', client_business_id: 'business' });
+    respond(200, { id: 'bisu' });
     respond(200, {
       data: Array.from({ length: 10 }, (_, i) => ({ id: String(i), username: 'me' })),
       paging: { next: 'next', cursors: { after: 'a' } },
