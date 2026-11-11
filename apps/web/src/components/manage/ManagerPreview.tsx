@@ -1,18 +1,22 @@
 'use client';
 
 import { CRELINK_LIMITS } from '@crelink/shared';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { targetKey, type LandingEditTarget } from '../../lib/landing-edit';
 import { DRAFT_ITEM_ID, previewBannerSlot, toLandingPreview, type LandingDrafts } from '../../lib/landing-preview';
+import { useCopyResult } from '../../lib/use-copy-result';
 import { CopyButton } from '../CopyButton';
 import { Landing } from '../landing/Landing';
 import type { LandingEditControl } from '../landing/LandingEdit';
 import type { LandingTab } from '../landing/LandingTabs';
+import { isPageOwner } from '../../lib/api/page-context';
+import { AddressBar } from './AddressBar';
+import { CopyResultLine, lockIcon, openIcon, pencilIcon } from './AddressParts';
 import { useManager } from './ManagerContext';
 import { linkLimitNotice } from './limits';
 import { managerHref } from './menu';
+import { SlugSheet } from './SlugSheet';
 
 /** 미리보기 쓰임: `edit` 페이지 편집(고르기 층), `profile` 프로필 메뉴(머리·SNS만 강조), `plain` 방문자 모습. */
 export type PreviewMode = 'edit' | 'profile' | 'plain';
@@ -23,41 +27,15 @@ function useHasDraft(): boolean {
   return Object.values(dirty).some(Boolean);
 }
 
-const openIcon = (
-  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-    <path
-      d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
 /**
- * 1024px 이상 가운데 무대(디자인 design/preview-direct-edit/handoff.md): 주소 막대(단축 주소·복사·주소 변경·공개 페이지 열기·
- * `저장하지 않은 변경 포함`) 아래 휴대폰 프레임 미리보기. 무대는 sticky이고 프레임 안만 스크롤합니다.
+ * 1024px 이상 가운데 무대(디자인 design/preview-direct-edit/handoff.md, 주소 막대는 design/manager-address-bar/handoff.md): 주소 막대(`AddressBar`)와
+ * `저장하지 않은 변경 포함` 아래 휴대폰 프레임 미리보기. 무대는 sticky이고 프레임 안만 스크롤합니다.
  */
 export function ManagerStage({ mode }: { mode: PreviewMode }) {
-  const { state, requestSlugFocus, firstRunGuide } = useManager();
   const hasDraft = useHasDraft();
-  const { landing, shortLink } = state;
   return (
     <section className="manager-stage" aria-label="미리보기">
-      <div className="address-bar">
-        <code className="url-text">{shortLink.url.replace(/^https?:\/\//, '')}</code>
-        <div className="address-actions">
-          <CopyButton text={shortLink.url} label="내 크리링 링크 복사" onCopied={firstRunGuide.recordCopy} />
-          <Link className="secondary" href={managerHref(landing.publicId, 'settings')} onClick={requestSlugFocus}>
-            주소 변경
-          </Link>
-          <a className="secondary" href={landing.url} target="_blank" rel="noopener">
-            공개 페이지 열기<span className="visually-hidden"> (새 창)</span>
-          </a>
-        </div>
-      </div>
+      <AddressBar />
       <div className="preview-device">
         {hasDraft ? <span className="badge dirty-chip device-chip">저장하지 않은 변경 포함</span> : null}
         <PreviewLanding mode={mode} framed />
@@ -67,7 +45,8 @@ export function ManagerStage({ mode }: { mode: PreviewMode }) {
 }
 
 /**
- * 1023px 이하 탭 아래 sticky 줄: 단축 주소·복사·공개 페이지 열기(아이콘)와 `편집 | 미리보기` 전환.
+ * 1023px 이하 탭 아래 sticky 줄: 단축 주소·복사·주소 변경(잠겼으면 다음 변경 가능일)·공개 페이지 열기(아이콘)와 `편집 | 미리보기` 전환.
+ * 주소를 바꿀 입력란을 둘 폭이 없고 고정 막대의 입력은 모바일 키보드와 부딪혀 주소 변경은 하단 시트로 엽니다.
  * `미리보기`면 편집 칩·폼 대신 방문자 모습을 보여 줍니다(0053의 떠 있는 `미리보기` 버튼을 대신함).
  */
 export function NarrowBar({
@@ -79,10 +58,58 @@ export function NarrowBar({
 }) {
   const { state, firstRunGuide } = useManager();
   const { landing, shortLink } = state;
+  const copy = useCopyResult();
+  const copyRef = useRef<HTMLButtonElement>(null);
+  const sheetButtonRef = useRef<HTMLButtonElement>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetClosed, setSheetClosed] = useState(0);
+  const [messageClosed, setMessageClosed] = useState(0);
+  const locked = shortLink.nextChangeAvailableAt !== null;
+
+  // 시트가 사라진 뒤에야 초점을 옮길 수 있습니다(`EditSheet` 규칙대로 연 쪽이 맡음).
+  useEffect(() => {
+    if (sheetClosed > 0) sheetButtonRef.current?.focus();
+  }, [sheetClosed]);
+  useEffect(() => {
+    if (messageClosed > 0) copyRef.current?.focus();
+  }, [messageClosed]);
+
+  // 이 줄은 메뉴를 옮겨도 마운트가 유지되므로 메뉴 이동을 직접 보고 복사 결과를 닫습니다.
+  const pathname = usePathname();
+  const [seenPathname, setSeenPathname] = useState(pathname);
+  if (seenPathname !== pathname) {
+    setSeenPathname(pathname);
+    copy.clear();
+  }
+
+  const failed = copy.result === 'failed';
+  const messageClass = ['address-message', copy.result ? '' : 'is-empty', failed ? '' : 'is-passive']
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <div className="narrow-bar">
       <code className="url-text">{shortLink.url.replace(/^https?:\/\//, '')}</code>
-      <CopyButton text={shortLink.url} label="내 크리링 링크 복사" onCopied={firstRunGuide.recordCopy} />
+      <CopyButton
+        icon
+        text={shortLink.url}
+        label="내 크리링 링크 복사"
+        onCopied={firstRunGuide.recordCopy}
+        onResult={copy.report}
+        buttonRef={copyRef}
+      />
+      {/* 연필과 자물쇠는 같은 버튼이어야 저장 뒤 시트를 닫을 때 초점이 돌아갈 곳이 남습니다. */}
+      {isPageOwner(state.pageAccess) ? (
+        <button
+          ref={sheetButtonRef}
+          type="button"
+          className="secondary icon-only"
+          aria-label={locked ? '주소 변경 잠김, 다음 변경 가능일 보기' : '주소 변경'}
+          onClick={() => setSheetOpen(true)}
+        >
+          {locked ? lockIcon : pencilIcon}
+        </button>
+      ) : null}
       <a
         className="secondary icon-only"
         href={landing.url}
@@ -100,6 +127,31 @@ export function NarrowBar({
           미리보기
         </button>
       </div>
+      <div className={messageClass}>
+        <CopyResultLine result={copy.result} url={shortLink.url} />
+        {failed ? (
+          <div className="address-message-actions">
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => {
+                copy.clear();
+                setMessageClosed((count) => count + 1);
+              }}
+            >
+              닫기
+            </button>
+          </div>
+        ) : null}
+      </div>
+      {sheetOpen && isPageOwner(state.pageAccess) ? (
+        <SlugSheet
+          onClose={() => {
+            setSheetOpen(false);
+            setSheetClosed((count) => count + 1);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

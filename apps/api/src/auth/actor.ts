@@ -1,5 +1,5 @@
 import { createParamDecorator, ExecutionContext, SetMetadata } from '@nestjs/common';
-import { AccountKind, SessionUser } from '@crelink/shared';
+import { AccountKind, SessionUser, PageContext } from '@crelink/shared';
 import type { Request } from 'express';
 
 /**
@@ -14,7 +14,11 @@ export interface RequestActor {
 }
 
 /** 가드가 채우는 요청 필드. `sessionUser`는 기존 `CurrentUser`·`ViewerUser`가, `actor`는 `CurrentActor`가 읽습니다. */
-export type AuthenticatedRequest = Request & { sessionUser?: SessionUser; actor?: RequestActor };
+export type AuthenticatedRequest = Request & {
+  sessionUser?: SessionUser;
+  actor?: RequestActor;
+  pageContext?: PageContext;
+};
 
 export const ACTOR_KINDS_KEY = 'crelink:actorKinds';
 export const AGENT_RUN_EXEMPT_KEY = 'crelink:agentRunExempt';

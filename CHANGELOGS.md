@@ -4,9 +4,24 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-11-11
+
+- Instagram DM 정책 문구 정정(0269): 처리방침·약관의 발송 설명과 처리방침의 이용 목적을 ‘작성한 문구 그대로’로 맞췄습니다. 근거: [웹 변경 기록](apps/web/CHANGELOGS.md), [0269 진행 기록](docs/work/orchestrator/0269-instagram-dm-integration.md).
+
+- Instagram DM 자동 접미사 제거(0269): 규칙 문구를 그대로 전송하도록 채널 링크·자동 발송·수신 거부 안내 자동 부착을 제거하고 PRD·설계를 맞췄습니다. 편집기의 생성·수정 요청에서 `message.trim()`을 제거해 앞뒤 개행·공백도 보존합니다. 근거: `apps/api/src/instagram/webhook.service.ts`, `apps/web/src/components/manage/instagram/RuleEditor.tsx`.
+
+- Instagram 댓글 자동 DM 제품 요구와 에픽 추가(0251): PRD R30을 추가하고, R12의 제외 범위가 프로필 SNS 주소 인증만 가리키도록 문구를 고쳤습니다. 일반 크리에이터 공개는 범위에서 뺐습니다.
+
 ## 2026-11-10
 
 - 지표의 본인 방문 표시와 Meta 링크 검사 제외(0233): `packages/shared`의 `AnalyticsReport`에 `ownerVisits`와 일별 본인 건수를 추가했습니다. 세부는 [백엔드 로그](apps/api/CHANGELOGS.md)와 [웹 로그](apps/web/CHANGELOGS.md), 근거는 [0233](docs/work/orchestrator/0233-owner-badge.md)에 있습니다.
+- 채널별 짧은 주소(0246, 0247, 0248): `{SHORT}/s/{code}`(7자 난수)가 저장된 채널·노출 위치를 UTM으로 기록하고 주소창에는 UTM 대신 `via={code}`만 남깁니다. 설계 `docs/specs/channel-links.md`를 추가했고 `packages/shared`에 `channel-links.ts`(프리셋 8채널·한도·`ChannelLinkView`·UTM 변환·API 경로·오류 코드 3개)와 공개 랜딩 응답의 선택 필드 `utm`을 더했습니다. 세부는 [백엔드 로그](apps/api/CHANGELOGS.md), [웹 로그](apps/web/CHANGELOGS.md), [인프라 로그](infra/CHANGELOGS.md)에 있습니다.
+- 공유관리 페이지 출시(0241~0245): 설계 문서의 공동 관리자 화면 경로를 실제(`/members`)로 맞췄습니다.
+- 공유관리 페이지 설계와 제품 요구 추가(0241, 0242): `docs/specs/shared-pages.md`, PRD R29, R19 공동 관리자 반영. 구현은 0243, 0244입니다.
+- 웹 컴포넌트 카탈로그 1차(0240): `design/docs/component-catalog.md`를 추가했습니다. 공통 부품 현황과 관리 화면 패턴의 상태·접근성 비교, 개선 후보 10건을 담은 문서이며 제품 코드는 바꾸지 않습니다.
+- ego 콘솔 검사의 파비콘 예외를 지웠습니다(0238). 사이트 아이콘이 생겨 브라우저가 `/favicon.ico`를 요청하지 않습니다.
+- CI를 로컬로 전환(0237): `ci.yml`을 수동 실행 전용으로 바꾸고 ruleset의 필수 검사 `CI 통과`를 GitHub Actions에 묶지 않아 `pnpm ci:local --report`의 commit status로 충족합니다. 자동으로 도는 Actions는 CD만 남습니다.
+- 관리 화면 주소 막대 입력형·프로필 메뉴·`주소 설정` 메뉴 제거(0234): 인계 `design/manager-address-bar/handoff.md`를 추가해 실측값으로 갱신하고, PRD R18 ⑦·`docs/specs/crelink-mvp.md`·`design/first-run-guide/handoff.md`·`docs/product/growth/profile-self-check.txt`·`tests/e2e/`를 새 화면에 맞췄습니다. 세부는 [웹 로그](apps/web/CHANGELOGS.md), 근거는 [0234](docs/work/orchestrator/0234-address-bar-inline.md)에 있습니다.
 - 방문자 지표 보강(0232): `packages/shared`에 봇 판별 `isBotUserAgent`와 계약 `sources`·`visitorRecency`·`botExclusions`를 추가했습니다. 새 수집·컬럼·migration은 없습니다. `tests/e2e/fixtures.ts` 세션의 크로미움 기본 UA를 사람 브라우저 값으로 고정했습니다. 세부는 [백엔드 로그](apps/api/CHANGELOGS.md)와 [웹 로그](apps/web/CHANGELOGS.md), 근거는 [0232](docs/work/orchestrator/0232-visitor-metrics.md)에 있습니다.
 - 앱 내 브라우저 가입 안내와 가입 경로 계측(0231): 공유 계약 `packages/shared/src/signup-funnel.ts`를 추가하고 `tests/e2e/ego/signup-funnel.mjs`를 `pnpm ci:local`의 ego 시험 모음에 넣었습니다. 세부는 [백엔드 로그](apps/api/CHANGELOGS.md)와 [웹 로그](apps/web/CHANGELOGS.md), 판단과 범위는 [0231](docs/work/orchestrator/0231-inapp-signup-funnel.md)에 있습니다.
 - `tests/smoke/smoke.spec.ts`와 `tests/e2e/visitor.spec.ts`를 ego-lite로 옮겼습니다(0230). `tests/e2e/ego/smoke.mjs`·`visitor.mjs`를 `pnpm ci:local`의 ego 시험 모음에 추가했습니다. 기존 Playwright spec·`ci.yml`은 바꾸지 않습니다. 옮기지 못한 검사와 `Fetch` 시험 결과는 [0230](docs/work/orchestrator/0230-ego-smoke-core.md)에 있습니다.

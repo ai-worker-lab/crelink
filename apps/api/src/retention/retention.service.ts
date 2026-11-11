@@ -9,6 +9,8 @@ export const STATS_TIME_ZONE = 'Asia/Seoul';
 
 const RETENTION_LOCK_KEY = 931475211;
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** Instagram DM 발송 행과 삭제 확인 코드의 보관 일수. 근거: docs/specs/instagram-comment-dm.md (`보관과 파기`). */
+const INSTAGRAM_DM_RETENTION_DAYS = 90;
 
 /** Sentry Cron 모니터 slug. 첫 체크인이 모니터를 만듭니다(`RETENTION_MONITOR_CONFIG` upsert). */
 const RETENTION_MONITOR_SLUG = 'crelink-api-retention';
@@ -27,6 +29,7 @@ const RETENTION_MONITOR_CONFIG: Parameters<typeof Sentry.withMonitor>[2] = {
 /**
  * 접근 로그 보존 작업(R11). 기동 시와 24시간마다 365일보다 오래된 날짜의 visits·link_clicks·creator_banner_clicks를 집계 테이블로
  * 옮기고 같은 트랜잭션에서 원본을 지웁니다. 여러 API 인스턴스가 동시에 돌지 않게 트랜잭션 advisory lock을 잡습니다.
+ * Instagram DM 발송 행과 삭제 확인 코드는 집계 없이 90일 뒤 지웁니다. 수신 거부 기록(`instagram_dm_opt_outs`)은 거부 의사가 사라지면 안 되므로 지우지 않습니다.
  * 실행마다 Sentry Cron 체크인(`in_progress` → `ok`·`error`)을 보냅니다. `SENTRY_DSN`이 비면 보내지 않고 작업만 실행합니다.
  */
 @Injectable()
@@ -52,7 +55,13 @@ export class RetentionService implements OnApplicationBootstrap, OnModuleDestroy
   }
 
   /** 한 번 실행합니다. 다른 인스턴스가 실행 중이면 끝날 때까지 기다렸다가 남은 것만 처리합니다. */
-  async runOnce(): Promise<{ visits: number; linkClicks: number; bannerClicks: number }> {
+  async runOnce(): Promise<{
+    visits: number;
+    linkClicks: number;
+    bannerClicks: number;
+    instagramDeliveries: number;
+    instagramDeletionCodes: number;
+  }> {
     const moved = await this.database.transaction(async (client) => {
       await client.query('SELECT pg_advisory_xact_lock($1)', [RETENTION_LOCK_KEY]);
       // 오늘(Asia/Seoul) - 365일 0시보다 이전 원본이 대상입니다.
@@ -157,6 +166,15 @@ export class RetentionService implements OnApplicationBootstrap, OnModuleDestroy
         STATS_TIME_ZONE,
       ]);
       await client.query("DELETE FROM signup_funnel_oauth_contexts WHERE created_at < now() - interval '15 minutes'");
+      await client.query("DELETE FROM page_invites WHERE coalesce(used_at, expires_at) < now() - interval '7 days'");
+      const instagramDeliveries = await client.query(
+        "DELETE FROM instagram_dm_deliveries WHERE created_at < now() - ($1::int * interval '1 day')",
+        [INSTAGRAM_DM_RETENTION_DAYS],
+      );
+      const instagramDeletionCodes = await client.query(
+        "DELETE FROM instagram_deletion_requests WHERE created_at < now() - ($1::int * interval '1 day')",
+        [INSTAGRAM_DM_RETENTION_DAYS],
+      );
       const visits = await client.query('DELETE FROM visits WHERE occurred_at < $1', [boundary.rows[0].boundary]);
       const clicks = await client.query('DELETE FROM link_clicks WHERE occurred_at < $1', [boundary.rows[0].boundary]);
       const bannerClicks = await client.query('DELETE FROM creator_banner_clicks WHERE occurred_at < $1', [
@@ -166,10 +184,13 @@ export class RetentionService implements OnApplicationBootstrap, OnModuleDestroy
         visits: visits.rowCount ?? 0,
         linkClicks: clicks.rowCount ?? 0,
         bannerClicks: bannerClicks.rowCount ?? 0,
+        instagramDeliveries: instagramDeliveries.rowCount ?? 0,
+        instagramDeletionCodes: instagramDeletionCodes.rowCount ?? 0,
       };
     });
     this.logger.log(
-      `보존 작업 완료: 방문 원본 ${moved.visits}건, 클릭 원본 ${moved.linkClicks}건, 배너 클릭 원본 ${moved.bannerClicks}건을 집계로 옮기고 지웠습니다.`,
+      `보존 작업 완료: 방문 원본 ${moved.visits}건, 클릭 원본 ${moved.linkClicks}건, 배너 클릭 원본 ${moved.bannerClicks}건을 집계로 옮기고 지웠습니다. ` +
+        `Instagram 발송 행 ${moved.instagramDeliveries}건, 삭제 확인 코드 ${moved.instagramDeletionCodes}건을 파기했습니다.`,
     );
     return moved;
   }

@@ -1,6 +1,8 @@
 import { Controller, Get, Param, Req, RequestMethod, Res } from '@nestjs/common';
 import type { RouteInfo } from '@nestjs/common/interfaces';
 import {
+  CHANNEL_LINK_CODE_PATTERN,
+  channelLinkUtm,
   COOKIE_NAMES,
   CRELINK_LIMITS,
   CRELINK_WEB_PATHS,
@@ -21,14 +23,15 @@ import { requestFacts, TrackingService } from './tracking.service';
 /**
  * `/api` 접두사를 붙이지 않는 단축 도메인 경로. Nest는 exclude 패턴을 요청 URL이 아니라 "라우트 정의 경로"에 맞춰 봅니다.
  * 그냥 `:slug`라고 쓰면 `/me`, `/health` 같은 한 단계 API 정의도 걸려 접두사가 빠지므로, `:`를 이스케이프해 아래 정의
- * (`/:slug`, `/c/:linkPublicId`, `/a/:bannerPublicId/:landingPublicId`, `/b/:bannerPublicId`)와 글자 그대로 같은 경로만 제외합니다.
- * 운영 edge(Caddy 단축 호스트)는 `^/(c/[a-z0-9]{10}|a/[a-z0-9]{10}/[a-z0-9]{10}|b/[a-z0-9]{10})$`과 단축 주소만 API로 넘깁니다.
+ * (`/:slug`, `/c/:linkPublicId`, `/a/:bannerPublicId/:landingPublicId`, `/b/:bannerPublicId`, `/s/:code`)와 글자 그대로 같은 경로만 제외합니다.
+ * 운영 edge(Caddy 단축 호스트)는 `^/(c/[a-z0-9]{10}|a/[a-z0-9]{10}/[a-z0-9]{10}|b/[a-z0-9]{10}|s/[a-z0-9]{7,10})$`과 단축 주소만 API로 넘깁니다.
  */
 export const SHORT_DOMAIN_ROUTES: RouteInfo[] = [
   { path: '\\:slug', method: RequestMethod.GET },
   { path: 'c/\\:linkPublicId', method: RequestMethod.GET },
   { path: 'a/\\:bannerPublicId/\\:landingPublicId', method: RequestMethod.GET },
   { path: 'b/\\:bannerPublicId', method: RequestMethod.GET },
+  { path: 's/\\:code', method: RequestMethod.GET },
 ];
 
 /** 배너·랜딩 공개 ID(`randomId(10)`, migration CHECK). Caddy 단축 호스트 정규식의 세그먼트와 같습니다. */
@@ -166,6 +169,51 @@ export class ShortLinkController {
     countBusinessMetric('crelink.creator_banner.click');
     // 열린 리디렉트 방지: DB에 저장된(저장 시 http·https만 허용한) URL로만 보냅니다.
     this.redirect(response, banner.url);
+  }
+
+  /**
+   * `GET {SHORT}/s/{code}` → 채널별 짧은 주소(docs/specs/channel-links.md). 방문을 기록하고 `/p/{publicId}?pass=…&via={code}`로 보냅니다.
+   * 방문의 UTM은 저장된 프리셋만 쓰고 요청 쿼리의 `utm_*`는 무시합니다. 최종 주소창에는 UTM 대신 `via`만 남습니다.
+   * 보관한 주소도 계속 동작합니다. 없는 code·삭제된 페이지는 `link_not_found`, 정지 계정은 `creator_suspended` 안내입니다.
+   */
+  @Get('s/:code')
+  async channelVisit(@Param('code') code: string, @Req() request: Request, @Res() response: Response): Promise<void> {
+    if (!CHANNEL_LINK_CODE_PATTERN.test(code)) return this.notice(response, 'link_not_found');
+    const result = await this.database.query<{
+      channel: string;
+      placement: string;
+      campaign: string;
+      short_link_id: string;
+      slug: string;
+      public_id: string;
+      suspended: boolean;
+    }>(
+      `SELECT cl.channel, cl.placement, cl.campaign, sl.id AS short_link_id, s.slug, l.public_id,
+              u.suspended_at IS NOT NULL AS suspended
+       FROM channel_links cl
+       JOIN landings l ON l.id = cl.landing_id
+       JOIN users u ON u.id = l.user_id
+       JOIN short_links sl ON sl.landing_id = l.id
+       JOIN short_slugs s ON s.short_link_id = sl.id AND s.retired_at IS NULL
+       WHERE cl.code = $1`,
+      [code],
+    );
+    const target = result.rows[0];
+    if (!target) return this.notice(response, 'link_not_found');
+    if (target.suspended) return this.notice(response, 'creator_suspended');
+    const visitorId = this.visitorId(request, response);
+    this.tracking.inBackground(
+      '방문',
+      this.tracking.recordVisit(target.short_link_id, target.slug, visitorId, {
+        ...requestFacts(request, this.config.trustedProxyHops),
+        utm: channelLinkUtm({ code, ...target }),
+      }),
+    );
+    countBusinessMetric('crelink.short_link.visit');
+    this.redirect(
+      response,
+      `${this.config.webUrl}${CRELINK_WEB_PATHS.landing(target.public_id, this.landingPass.issue(target.public_id, Date.now(), visitorId), code)}`,
+    );
   }
 
   /**

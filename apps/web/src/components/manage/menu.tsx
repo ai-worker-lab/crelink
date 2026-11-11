@@ -24,7 +24,7 @@ const iconProps = {
 /**
  * 랜딩 관리 화면 메뉴(설계: design/preview-direct-edit/handoff.md `정보 구조`). 메뉴 한 개 = 랜딩 아래 경로 한 개이고,
  * 새 기능은 이 배열에 한 줄을 더하고 `app/me/landings/[publicId]/<segment>/page.tsx`를 두어 붙입니다.
- * 순서는 자주 쓰는 순이고 설정류는 늘 맨 끝입니다.
+ * 순서는 자주 쓰는 순입니다.
  */
 export const MANAGER_MENU = [
   {
@@ -77,12 +77,32 @@ export const MANAGER_MENU = [
     ),
   },
   {
-    segment: 'settings',
-    label: '주소 설정',
+    segment: 'channels',
+    label: '채널 주소',
+    icon: (
+      <svg {...iconProps}>
+        <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+        <path d="M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1" />
+      </svg>
+    ),
+  },
+  {
+    segment: 'instagram',
+    label: '인스타그램 DM',
+    icon: (
+      <svg {...iconProps}>
+        <path d="M4 5h16v11H11l-4 4v-4H4V5Z" />
+        <path d="M8.5 10.5h7" />
+      </svg>
+    ),
+  },
+  {
+    segment: 'members',
+    label: '공동 관리자',
     icon: (
       <svg {...iconProps}>
         <circle cx="12" cy="12" r="8" />
-        <path d="M12 11v5M12 8h.01" />
+        <circle cx="12" cy="12" r="3" />
       </svg>
     ),
   },

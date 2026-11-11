@@ -54,4 +54,4 @@ export const SITEMAP_PATHS = [
 ];
 
 /** 검색 봇이 볼 필요 없는 로그인·관리·운영자·BFF 경로. */
-export const ROBOTS_DISALLOW = ['/admin', '/me', '/auth/', '/api/'];
+export const ROBOTS_DISALLOW = ['/admin', '/me', '/invite', '/dm-opt-out', '/auth/', '/api/'];

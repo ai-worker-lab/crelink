@@ -135,7 +135,7 @@ export function AdBannerDialog({
       title={banner ? '배너 수정' : '배너 등록'}
       pending={pending}
       onDismiss={onDismiss}
-      className="ad-banner-dialog"
+      className="centered-sheet"
     >
       <form
         className="form-stack edit-form"

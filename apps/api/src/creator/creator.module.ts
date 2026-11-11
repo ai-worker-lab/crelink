@@ -6,7 +6,8 @@ import { ShortLinkModule } from '../short-link/short-link.module';
 import { SignupFunnelModule } from '../telemetry/signup-funnel.module';
 import { BannersController } from './banners.controller';
 import { BannersService } from './banners.service';
-import { CreatorController, LinksController, PortfolioController } from './creator.controller';
+import { ChannelLinksService } from './channel-links.service';
+import { ChannelLinksController, CreatorController, LinksController, PortfolioController } from './creator.controller';
 import { CreatorService } from './creator.service';
 import { InstabioSource } from './instabio-source';
 import { InstabioImportService } from './instabio-import.service';
@@ -22,6 +23,7 @@ import { SlugService } from './slug.service';
     InstabioImportController,
     CreatorController,
     LinksController,
+    ChannelLinksController,
     PortfolioController,
     PublicLandingController,
     BannersController,
@@ -31,10 +33,11 @@ import { SlugService } from './slug.service';
     InstabioImportService,
     CreatorService,
     LinksService,
+    ChannelLinksService,
     ProfileService,
     SlugService,
     BannersService,
   ],
-  exports: [CreatorService],
+  exports: [CreatorService, ChannelLinksService],
 })
 export class CreatorModule {}

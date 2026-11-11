@@ -31,7 +31,7 @@
 
 ## 범위
 
-- 포함: migration `0014_landing_event_owner`, `apps/api/src/telemetry`·`auth`·`short-link` 모듈 연결·`analytics`, `packages/shared/src/analytics.ts`, BFF 규칙, `AnalyticsDashboard.tsx`, `styles.css`, 시험, 변경 기록, 관련 문서, 이 문서.
+- 포함: migration `0018_landing_event_owner`, `apps/api/src/telemetry`·`auth`·`short-link` 모듈 연결·`analytics`, `packages/shared/src/analytics.ts`, BFF 규칙, `AnalyticsDashboard.tsx`, `styles.css`, 시험, 변경 기록, 관련 문서, 이 문서.
 - 제외: 처리방침, 보존 작업(`retention.service.ts`), `/api/admin/metrics`·`/api/admin/creators/{id}/stats`, 앱 내 브라우저 처리, 과거 행 소급 표시.
 
 ## 위험·복구
@@ -51,7 +51,7 @@
 ## 연결
 
 - 설계: [지표·통계 설계](../../specs/crelink-analytics.md#본인-방문-표시와-meta-링크-검사-제외0233), [방문자 수집](../../specs/crelink-visitor-data.md)
-- 코드: `apps/api/migrations/0014_landing_event_owner.sql`, `apps/api/src/telemetry/landing-events.service.ts`, `apps/api/src/analytics/bot-ip.ts`, `apps/api/src/analytics/analytics.service.ts`, `apps/web/src/app/api/backend/[...path]/route.ts`, `apps/web/src/components/analytics/AnalyticsDashboard.tsx`
+- 코드: `apps/api/migrations/0018_landing_event_owner.sql`, `apps/api/src/telemetry/landing-events.service.ts`, `apps/api/src/analytics/bot-ip.ts`, `apps/api/src/analytics/analytics.service.ts`, `apps/web/src/app/api/backend/[...path]/route.ts`, `apps/web/src/components/analytics/AnalyticsDashboard.tsx`
 
 ## 진행 기록
 
@@ -61,3 +61,6 @@
 - 2026-11-10: `pnpm verify` 8단계(API 34개 스위트 311개 시험), `pnpm work:scope 0233`, `pnpm work:check`, `pnpm ci:local`(11단계 통과, 스택 정리는 이 실행이 띄운 스택이 없어 건너뜀, ego smoke·analytics-responsive·visitor·signup-funnel·이미지 빌드 포함)을 통과했습니다.
 - 2026-11-10: 앞선 `pnpm verify` 두 번은 실패했습니다. 하나는 `test/health.e2e-spec.ts`의 migration 고정 목록 누락이라 고쳤고, 다른 하나는 `sorry, too many clients already`였습니다. 12코어에서 jest 워커 11개가 풀 상한까지 연결을 잡으면 로컬 PostgreSQL `max_connections` 100에 닿습니다. 스위트별 연결은 풀 상한(10~11) 안이라 누수는 보이지 않았고, 이 브랜치 피크는 95~105, `origin/main`은 65~90이었습니다. 차이의 원인은 확정하지 못했고 `pnpm verify`가 이 기기에서 간헐적으로 실패할 수 있습니다. 시험 수나 코드를 건드리지 않았고 통과한 실행은 기본 설정입니다.
 - 2026-11-10: Playwright 전용 시험(personas, analytics-responsive의 WebKit·Firefox 등)은 이 기기에서 돌리지 않았고 PR CI로 확인합니다.
+
+- 2026-11-11: 사용자 순차 머지 승인으로 최신 main 통합 충돌을 해소합니다. BFF 허용 목록이 `lib/api/backend-rules.ts`로 이동한 현 구조에 `ownerSession`을 연결하고 Instagram 공개 수신 거부의 IP 전달·기존 세션·페이지 헤더 전달을 보존했습니다. BFF 실행 회귀(랜딩 이벤트 세션 전달·가입 이벤트 미전달·익명·기존 소유자 세션/IP 경로)를 추가했으며 웹 시험 165건 통과를 확인했습니다.
+- 2026-11-11: 기존 main이 migration 0014~0017을 이미 사용하므로 미배포 본인 표시 migration을 `0018_landing_event_owner`로 이동하고 고정 migration 목록과 참조를 갱신했습니다. 초기 빈 DB와 기존 main DB에서 추가되는 동작은 최종 통합 시험으로 확인합니다. ego 반응형 시험에도 익명 방문 후 소유자의 실제 공개 방문, 합계 유지·본인 1 뱃지·과거 구간 뱃지 없음을 추가했습니다. 최종 main 통합·전체 CI·원격 CI와 양측 검수는 아직 대기입니다.

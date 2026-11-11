@@ -1,10 +1,19 @@
-import { CRELINK_LIMITS, type CrelinkErrorCode, type NoticeReason } from '@crelink/shared';
+import { CHANNEL_LINK_LIMITS, CRELINK_LIMITS, type CrelinkApiErrorCode, type NoticeReason } from '@crelink/shared';
 
 /** 업로드 이미지 크기 한도 표시(예: `4MB`). 숫자는 계약 `CRELINK_LIMITS.imageMaxBytes`에서만 옵니다. */
 export const IMAGE_MAX_LABEL = `${Math.floor(CRELINK_LIMITS.imageMaxBytes / (1024 * 1024))}MB`;
 
 /** API 오류 코드별 사용자 안내. 계약(`CrelinkErrorCode`)의 모든 코드를 다룹니다. */
-const API_ERROR_MESSAGES: Record<CrelinkErrorCode, string> = {
+const API_ERROR_MESSAGES: Record<CrelinkApiErrorCode, string> = {
+  page_not_found: '페이지를 찾을 수 없어요. 권한이 해제되었을 수 있어요. 내 페이지로 돌아가 주세요.',
+  page_suspended: '운영이 정지된 페이지예요.',
+  page_owner_only: '페이지 소유자만 할 수 있는 작업이에요.',
+  page_member_limit: '공동 관리자는 최대 5명이에요. 소유자에게 문의해 주세요.',
+  member_not_found: '이미 해제되었거나 찾을 수 없는 공동 관리자예요.',
+  invite_invalid: '초대가 만료되었거나 이미 사용된 링크예요. 새 초대 링크를 요청해 주세요.',
+  invite_own_page: '내 페이지의 초대는 수락할 수 없어요.',
+  already_member: '이미 함께 관리하는 페이지예요.',
+
   import_unavailable:
     '원본을 가져오지 못했어요. 공개된 Instabio 주소와 페이지 상태를 확인한 뒤 다시 미리보기해 주세요.',
   import_source_changed: '원본 내용이 바뀌었어요. 다시 미리보기한 뒤 가져와 주세요.',
@@ -50,6 +59,24 @@ const API_ERROR_MESSAGES: Record<CrelinkErrorCode, string> = {
   banner_period_invalid: '게시 끝은 시작보다 뒤여야 해요.',
   // 광고 블록 켜고 끄기(R20 ⑩). 플랫폼 스위치가 꺼져 있는 동안 크리에이터 스위치를 바꾸려 할 때입니다.
   ad_block_unavailable: '크리링이 광고 블록 기능을 꺼 두어 지금은 바꿀 수 없어요.',
+  // 채널별 짧은 주소(docs/specs/channel-links.md). 한도 숫자는 계약 `CHANNEL_LINK_LIMITS`에서만 옵니다.
+  channel_link_not_found: '채널 주소를 찾을 수 없어요. 새로고침한 뒤 다시 시도해 주세요.',
+  channel_link_limit_reached: `채널 주소는 ${CHANNEL_LINK_LIMITS.perLanding}개까지 둘 수 있어요. 쓰지 않는 주소를 보관해 주세요.`,
+  channel_link_total_limit_reached: `보관한 주소를 포함해 채널 주소는 ${CHANNEL_LINK_LIMITS.totalPerLanding}개까지 만들 수 있어요.`,
+  // Instagram 댓글 자동 DM(docs/specs/instagram-comment-dm.md).
+  instagram_unavailable: '인스타그램 자동 DM을 아직 사용할 수 없어요.',
+  instagram_not_configured: '인스타그램 자동 DM을 아직 사용할 수 없어요.',
+  instagram_account_in_use: '이 인스타그램 계정은 이미 다른 페이지에 연결되어 있어요.',
+  instagram_account_selection_required: '인스타그램 계정을 하나만 골라 다시 연결해 주세요.',
+  instagram_account_not_professional:
+    '프로페셔널 계정만 연결할 수 있어요. 인스타그램 설정에서 계정 유형을 확인해 주세요.',
+  instagram_upstream_failed: '인스타그램에서 응답을 받지 못했어요. 잠시 뒤 다시 시도해 주세요.',
+  instagram_operator_paused: '운영자가 자동 DM을 멈춘 계정이에요.',
+  instagram_reauth_required: '인스타그램 연결이 끊겼어요. 다시 연결해 주세요.',
+  instagram_rule_limit_reached: '자동 DM 규칙을 더 만들 수 없어요. 쓰지 않는 규칙을 지워 주세요.',
+  instagram_rule_media_taken: '이 게시물에는 이미 규칙이 있어요.',
+  instagram_rule_not_found: '규칙을 찾을 수 없어요. 새로고침한 뒤 다시 시도해 주세요.',
+  opt_out_invalid: '유효하지 않은 링크예요.',
   agent_run_not_found: '실행 기록을 찾을 수 없어요.',
   agent_run_in_progress: '다른 AI 실행이 진행 중이에요.',
   agent_run_closed: '이미 끝난 실행 기록이에요.',

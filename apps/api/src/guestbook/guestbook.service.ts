@@ -33,7 +33,7 @@ function entryNotFound() {
 
 /**
  * 랜딩 방명록(R19). 가시성: 작성자가 정지된 글은 모두에게 빼고, 그 밖에는 보는 사람이 작성자이거나 랜딩 크리에이터이거나
- * 공개·숨기지 않은 글이면 보입니다. 숨김 여부(`hidden`)는 랜딩 크리에이터에게만 알립니다.
+ * 공개·숨기지 않은 글이면 보입니다. 숨김 여부(`hidden`)는 소유자와 공동 관리자에게 알립니다.
  * 근거: docs/specs/crelink-guestbook.md (데이터 모델, API 계약 초안)
  */
 @Injectable()
@@ -48,7 +48,7 @@ export class GuestbookService {
     const landing = await this.openLanding(publicId);
     const cursor = parseCursor(cursorValue, '방명록 목록 위치가 올바르지 않습니다. 처음부터 다시 불러와 주세요.');
     const viewerId = viewer?.id ?? null;
-    const isOwner = viewerId === landing.user_id;
+    const isOwner = await this.canManage(landing.user_id, viewerId);
     const pageSize = CRELINK_LIMITS.guestbookPageSize;
     const result = await this.database.query<EntryRow>(
       `WITH e AS (
@@ -79,7 +79,7 @@ export class GuestbookService {
        ${ENTRY_SELECT}`,
       [landing.id, user.id, text, secret],
     );
-    return this.view(result.rows[0], user.id, user.id === landing.user_id);
+    return this.view(result.rows[0], user.id, await this.canManage(landing.user_id, user.id));
   }
 
   /** 작성자만 지웁니다. 없거나 내 글이 아니면 404 `guestbook_entry_not_found`. */
@@ -92,7 +92,7 @@ export class GuestbookService {
     if (!result.rowCount) throw entryNotFound();
   }
 
-  /** 랜딩 크리에이터만 숨기고 풉니다. 없거나 내 랜딩 글이 아니면 404 `guestbook_entry_not_found`. */
+  /** 소유자 또는 정지되지 않은 페이지의 멤버가 숨기고 풉니다. 권한이 없으면 404입니다. */
   async setHidden(entryId: string, user: SessionUser, body: unknown): Promise<GuestbookEntryView> {
     if (!UUID_PATTERN.test(entryId)) throw entryNotFound();
     const hidden = optionalBoolean(bodyObject(body).hidden, '숨김(hidden)');
@@ -103,7 +103,11 @@ export class GuestbookService {
       `WITH e AS (
          UPDATE guestbook_entries g SET hidden_at = CASE WHEN $3::boolean THEN now() END
          FROM landings l
-         WHERE g.id = $1 AND l.id = g.landing_id AND l.user_id = $2
+         WHERE g.id = $1 AND l.id = g.landing_id
+           AND (l.user_id = $2 OR EXISTS (
+             SELECT 1 FROM page_members m JOIN users u ON u.id=m.page_user_id
+             WHERE m.page_user_id=l.user_id AND m.member_user_id=$2 AND u.suspended_at IS NULL
+           ))
          RETURNING g.*
        )
        ${ENTRY_SELECT}`,
@@ -120,6 +124,17 @@ export class GuestbookService {
       throw apiError(HttpStatus.NOT_FOUND, 'guestbook_disabled', '방명록을 닫은 페이지입니다.');
     }
     return landing;
+  }
+
+  private async canManage(ownerId: string, viewerId: string | null): Promise<boolean> {
+    if (ownerId === viewerId) return true;
+    if (!viewerId) return false;
+    const result = await this.database.query(
+      `SELECT 1 FROM page_members m JOIN users u ON u.id=m.page_user_id
+      WHERE m.page_user_id=$1 AND m.member_user_id=$2 AND u.suspended_at IS NULL`,
+      [ownerId, viewerId],
+    );
+    return !!result.rowCount;
   }
 
   private view(row: EntryRow, viewerId: string | null, isOwner: boolean): GuestbookEntryView {

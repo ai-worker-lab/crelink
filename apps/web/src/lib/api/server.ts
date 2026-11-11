@@ -34,12 +34,14 @@ export class ServerApiError extends Error {
 export interface ServerApiOptions {
   /** 현재 요청의 `cl_session` 쿠키를 API로 함께 보냅니다(로그인이 필요한 조회). */
   session?: boolean;
+  publicId?: string;
 }
 
 /** Server Component·route handler에서 Nest API를 직접 호출합니다. 204는 undefined를 돌려줍니다. */
 export async function serverApi<T>(path: string, options: ServerApiOptions = {}): Promise<T> {
   if (!apiOrigin) throw new ServerApiError('api_not_configured', errorMessage('api_not_configured', null, 503), 503);
   const headers = apiRequestHeaders({ Accept: 'application/json' });
+  if (options.publicId && path !== '/api/me') headers.set('X-Crelink-Page', options.publicId);
   if (options.session) {
     const token = (await cookies()).get(COOKIE_NAMES.session)?.value;
     if (!token) throw new ServerApiError('unauthenticated', errorMessage('unauthenticated', null, 401), 401);
@@ -65,9 +67,9 @@ export type ServerApiResult<T> = { ok: true; data: T } | { ok: false; error: Ser
 /**
  * 로그인이 필요한 화면의 조회. 401이면 홈(`/`)으로 보내고, 그 밖의 API 오류는 화면이 상태별 안내를 그리도록 돌려줍니다.
  */
-export async function loadSignedIn<T>(path: string): Promise<ServerApiResult<T>> {
+export async function loadSignedIn<T>(path: string, publicId?: string): Promise<ServerApiResult<T>> {
   try {
-    return { ok: true, data: await serverApi<T>(path, { session: true }) };
+    return { ok: true, data: await serverApi<T>(path, { session: true, publicId }) };
   } catch (error) {
     if (!(error instanceof ServerApiError)) throw error;
     if (error.status === 401) redirect('/');

@@ -41,6 +41,10 @@
 | `SENTRY_ENVIRONMENT` | 아니오 | 이벤트 환경 이름. 비면 `NODE_ENV=production`이면 `production`, 아니면 `development`. |
 | `SENTRY_RELEASE` | 아니오 | release. 운영 이미지는 빌드 인자로 배포 커밋 SHA가 이미지 ENV에 들어가 소스맵 업로드 release와 같습니다. 비면 release 없이 보냅니다. |
 | `SENTRY_TRACES_SAMPLE_RATE` | 아니오 | 성능 추적 비율(기본 0.1). 0~1 사이 수가 아니면 기동 거부. |
+| `META_APP_ID`, `META_APP_SECRET`, `META_LOGIN_CONFIG_ID`, `META_WEBHOOK_VERIFY_TOKEN` | Instagram DM에 필요(전부 또는 전무, 비밀) | Meta 앱 ID·시크릿, Facebook Login for Business 구성 ID, 웹훅 확인 토큰. [Instagram 댓글 자동 DM](#instagram-댓글-자동-dm). |
+| `INSTAGRAM_TOKEN_KEYS`, `INSTAGRAM_TOKEN_KEY_CURRENT` | Instagram DM에 필요(전부 또는 전무, 비밀) | 토큰 암호화 키 `1:<b64>,2:<b64>`(32바이트)와 현재 버전. 형식이 틀리면 기동 거부. |
+| `INSTAGRAM_COMMENTER_HASH_KEY`, `INSTAGRAM_OPT_OUT_KEY` | Instagram DM에 필요(전부 또는 전무, 비밀) | 작성자 해시 키와 수신 거부 토큰 키(각 32바이트 base64). 토큰 키를 포함해 서로 달라야 하고, 같으면 기동 거부. |
+| `INSTAGRAM_DM_HOURLY_LIMIT` | 아니오 | 연결당 시간당 DM 발송 한도(기본 700). 1 이상의 정수가 아니면 기동 거부. |
 
 ### 운영 필수 설정
 
@@ -128,13 +132,14 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 
 ## 단축 도메인
 
-- 같은 프로세스가 `/api` 접두사 밖의 `GET /{slug}`, `GET /c/{linkPublicId}`, `GET /a/{bannerPublicId}/{landingPublicId}`, `GET /b/{bannerPublicId}`를 처리합니다(`src/short-link/`). `app.setup.ts`의 `setGlobalPrefix` exclude(`SHORT_DOMAIN_ROUTES`)는 요청 URL이 아니라 라우트 정의 경로에 맞춰 보기 때문에, `:`를 이스케이프한 `\:slug`·`c/\:linkPublicId`·`a/\:bannerPublicId/\:landingPublicId`·`b/\:bannerPublicId`로 네 정의만 제외합니다. 그냥 `:slug`를 쓰면 `/api/me`·`/api/health` 같은 한 단계 경로가 접두사를 잃습니다. 이 매칭은 Nest 11.2와 12.1이 같습니다: `test/health.e2e-spec.ts`가 등록된 Express 라우트 표에서 `/api` 밖 라우트가 정확히 이 네 정의뿐이고 `/api/health/ready` 같은 두 단계 경로가 접두사를 유지하는지 확인합니다. 운영 edge(Caddy 단축 호스트)는 단축 주소와 `^/(c/[a-z0-9]{10}|a/[a-z0-9]{10}/[a-z0-9]{10}|b/[a-z0-9]{10})$`만 API로 넘기고, API도 배너·랜딩 공개 ID가 `[a-z0-9]{10}`이 아니면 DB를 보지 않고 안내로 보냅니다. Nest 12.2 이상은 제외 경로마다 모든 메서드의 404 전용 핸들러도 등록합니다(`\:` 정의라 글자 그대로 `:`가 든 주소만 받습니다).
+- 같은 프로세스가 `/api` 접두사 밖의 `GET /{slug}`, `GET /c/{linkPublicId}`, `GET /a/{bannerPublicId}/{landingPublicId}`, `GET /b/{bannerPublicId}`, `GET /s/{code}`를 처리합니다(`src/short-link/`). `app.setup.ts`의 `setGlobalPrefix` exclude(`SHORT_DOMAIN_ROUTES`)는 요청 URL이 아니라 라우트 정의 경로에 맞춰 보기 때문에, `:`를 이스케이프한 `\:slug`·`c/\:linkPublicId`·`a/\:bannerPublicId/\:landingPublicId`·`b/\:bannerPublicId`·`s/\:code`로 다섯 정의만 제외합니다. 그냥 `:slug`를 쓰면 `/api/me`·`/api/health` 같은 한 단계 경로가 접두사를 잃습니다. 이 매칭은 Nest 11.2와 12.1이 같습니다: `test/health.e2e-spec.ts`가 등록된 Express 라우트 표에서 `/api` 밖 라우트가 정확히 이 다섯 정의뿐이고 `/api/health/ready` 같은 두 단계 경로가 접두사를 유지하는지 확인합니다. 운영 edge(Caddy 단축 호스트)는 단축 주소와 `^/(c/[a-z0-9]{10}|a/[a-z0-9]{10}/[a-z0-9]{10}|b/[a-z0-9]{10}|s/[a-z0-9]{7,10})$`만 API로 넘기고, API도 배너·랜딩 공개 ID가 `[a-z0-9]{10}`이 아니면 DB를 보지 않고 안내로 보냅니다. Nest 12.2 이상은 제외 경로마다 모든 메서드의 404 전용 핸들러도 등록합니다(`\:` 정의라 글자 그대로 `:`가 든 주소만 받습니다).
 - 그래서 접두사 없는 `/health`, `/me`, `/api` 같은 요청은 단축 주소로 해석되고, 예약어라 없는 주소 안내로 302 합니다. 예약어 목록은 `RESERVED_SLUGS`(공유 계약).
 - `GET /{slug}`: 대소문자를 무시하고 현재 주소 또는 `retired_at + 90일` 안의 옛 주소를 찾습니다. 찾으면 방문을 기록(응답을 기다리지 않음)하고 302 `{WEB_URL}/p/{publicId}?pass={통과 표시}`. 없으면 302 `…/notice?reason=link_not_found`, 정지 크리에이터면 `…reason=creator_suspended`.
 - `GET /c/{linkPublicId}`: 클릭을 기록하고 DB에 저장된 URL(저장 시 http·https만 허용)로 302. 숨김·차단·삭제·정지면 302 `…/notice?reason=link_unavailable`. 열린 리디렉트를 막기 위해 요청 값으로 대상 URL을 만들지 않습니다.
 - `GET /a/{bannerPublicId}/{landingPublicId}`(크리링 배너 클릭, R20 ⑧): 배너가 지금 게시 중(`starts_at <= now() < ends_at`)이고 랜딩이 있고 크리에이터가 정지가 아니면 `TrackingService.recordAdStat('click')`로 날짜(Asia/Seoul)·배너·랜딩 카운터(`ad_banner_daily_stats.clicks`)를 올리고(응답을 기다리지 않음) 저장된 URL로 302. 끝남·예약·없음·정지면 302 `…/notice?reason=link_unavailable`. 개인 식별 정보를 남기지 않으므로 방문자 쿠키를 읽거나 발급하지 않습니다. 공개 랜딩 API가 `passAccepted`일 때만 이 주소를 주므로 서비스 화면에서 연 랜딩의 클릭은 세지 않습니다. 누구나 주소를 만들어 수를 늘릴 수 있다는 점은 `/c/`와 같은 수준으로 받아들였습니다([기술 설계](../../../docs/specs/crelink-ad-banner.md) `노출·클릭 기록` 절).
 - `GET /b/{bannerPublicId}`(크리에이터 배너 클릭, R21 ④): 연결 URL이 있고 숨김·차단이 아니고 계정이 배너 슬롯 부여됨·정지 아님이면 `creator_banner_clicks`에 링크 클릭과 같은 항목(방문자 쿠키·IP·국가·도시·유입 호스트·UA·기기·브라우저·OS)을 남기고 저장된 URL로 302. 단축 URL은 `short_links.landing_id = creator_banners.landing_id`로 찾습니다. URL 없음·숨김·차단·회수·정지·삭제면 `link_unavailable`. 배너를 지워도 기록은 `banner_public_id` 사본으로 남습니다.
-- 리디렉트는 모두 `Cache-Control: no-store`이고, 방문자 쿠키 `cl_vid`(UUID, HttpOnly, SameSite=Lax, 1년)는 `/{slug}`·`/c/`·`/b/`에서 없거나 형식이 틀릴 때만 새로 발급합니다. `/a/`는 쿠키를 다루지 않습니다.
+- `GET /s/{code}`(채널별 짧은 주소, [설계](../../../docs/specs/channel-links.md)): code는 `[a-z0-9]` 7~10자(발급은 7자)이며 아니면 DB를 보지 않고 `link_not_found` 안내입니다. `channel_links`에서 찾아 페이지가 지워졌거나 없으면 `link_not_found`, 정지 크리에이터면 `creator_suspended` 안내입니다. 찾으면 방문을 기록하고(`visits.slug`는 현재 슬러그, `visits.utm`은 **저장된 프리셋** `source`·`medium`·`campaign`·`content`·`id`=code이며 요청 쿼리의 `utm_*`는 무시) 302 `{WEB_URL}/p/{publicId}?pass={통과 표시}&via={code}`입니다. Location에 `utm_`이 없습니다. 보관한 주소도 계속 동작합니다(보관은 관리 목록에서만 숨김).
+- 리디렉트는 모두 `Cache-Control: no-store`이고, 방문자 쿠키 `cl_vid`(UUID, HttpOnly, SameSite=Lax, 1년)는 `/{slug}`·`/c/`·`/b/`·`/s/`에서 없거나 형식이 틀릴 때만 새로 발급합니다. `/a/`는 쿠키를 다루지 않습니다.
 
 ### 랜딩 통과 표시
 
@@ -142,7 +147,7 @@ docker buildx build --platform linux/amd64 -f apps/api/Dockerfile -t crelink-api
 
 - 형식 `<만료 epoch 초>.<base64url HMAC-SHA256 앞 16바이트>`, 서명 대상 `publicId + '.' + 만료`, 유효 60초. 비교는 `timingSafeEqual`.
 - 키: API 프로세스가 시작할 때 `crypto.randomBytes(32)`로 만듭니다. 환경변수·비밀값이 없습니다. 위조·재사용돼도 결과는 "그 요청이 방문으로 안 세어짐"뿐이고, Blue/Green 전환 순간 다른 색 API가 검증해 실패해도 웹이 단축 주소로 한 번 더 보내 새 표시를 받으므로 스스로 복구됩니다. 한 색에서 API 프로세스를 여러 개(cluster·복제) 띄우면 발급과 검증이 다른 프로세스로 갈 수 있어 공유 키가 필요합니다.
-- 검증: `GET /api/public/landings/{publicId}?pass=`가 `passAccepted`(이 publicId에 대해 발급했고 만료 전이면 true)와 `shortUrl`(현재 단축 주소, `CreatorService.shortLink`)을 줍니다. 발급(`ShortLinkModule`)과 검증(`CreatorModule`)이 같은 키를 쓰도록 `LandingPassModule` 하나가 서비스를 제공합니다.
+- 검증: `GET /api/public/landings/{publicId}?pass=&via=`가 `passAccepted`(이 publicId에 대해 발급했고 만료 전이면 true)와 `shortUrl`(현재 단축 주소, `CreatorService.shortLink`)을 줍니다. `via`가 이 랜딩의 채널 주소 code(보관 여부와 무관)이면 `shortUrl`이 `{SHORT}/s/{code}`이고 저장 프리셋 `utm`이 함께 옵니다. 다른 랜딩의 code·형식이 틀린 값은 조용히 무시하며 `via`가 없으면 질의하지 않습니다. 발급(`ShortLinkModule`)과 검증(`CreatorModule`)이 같은 키를 쓰도록 `LandingPassModule` 하나가 서비스를 제공합니다.
 
 ### 방문자 IP
 
@@ -165,7 +170,7 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 - 초기화: `src/instrument.ts`가 `main.ts`의 첫 import라 Nest·Express·pg보다 먼저 실행되고(자동 계측 조건), `apps/api/.env`를 읽은 뒤(`src/local-env.ts`) `sentryOptions`(`src/monitoring/sentry.ts`)로 `Sentry.init`합니다. `SENTRY_DSN`이 비면 초기화하지 않아 나머지 코드(`SentryModule.forRoot()`, 필터 데코레이터, `setUser`, `Sentry.close`)는 아무것도 보내지 않습니다. Jest 시험은 `main.ts`를 거치지 않으므로 Sentry가 꺼진 채 돕니다.
 - 보내는 오류: `ApiExceptionFilter`가 500 `internal_error`로 응답하는 오류만 `@SentryExceptionCaptured()`(500 처리 메서드에 붙임)로 보냅니다. Nest `HttpException`(4xx, 의도한 503 포함)과 본문 파서의 http-errors 4xx(400·413·415)는 보내지 않습니다. 이 데코레이터는 `HttpException`만 예상한 오류로 보므로 `catch`에 붙이면 http-errors 4xx도 보냅니다(실측: 데코레이터를 `catch`로 옮기면 아래 시험의 4xx 0건 검사가 실패).
 - 사용자: 요청마다 `src/monitoring/request-user.ts`(`configureApp`이 가장 먼저 붙이는 Express 미들웨어)가 요청 격리 스코프의 `user.ip_address`를 [방문자 IP](#방문자-ip)와 같은 `clientIp`(`TRUSTED_PROXY_HOPS`)로 넣고, `SessionGuard`가 세션을 확인하면 `user.id`(내부 UUID)를 더합니다. 이메일·이름은 넣지 않습니다. SDK의 헤더 기반 IP 추론(`X-Forwarded-For` 첫 값 등, 클라이언트가 위조 가능)은 `dataCollection.userInfo: false`로 끕니다. 웹 BFF·서버 컴포넌트를 거친 요청은 웹 컨테이너가 직접 부르므로 IP가 웹 서버 주소이고, 방문자 IP는 같은 trace의 웹 브라우저 이벤트에 있습니다.
-- 보내지 않는 것: 쿠키(`cl_session` 원문 포함)·`Authorization`·`Proxy-Authorization`·`X-Crelink-Internal`·`Set-Cookie` 헤더, 요청 본문, DB 쿼리 파라미터(`databaseQueryData: false`, 쿼리 문은 매개변수화된 형태만). URL 쿼리의 `code`·`state`(구글 로그인)·`pass`(통과 표시)는 `[Filtered]`. `dataCollection`(SDK 11은 `sendDefaultPii` 대신 이것으로 정함)으로 막고, `beforeSend`·`beforeSendSpan`(`scrubEvent`·`scrubSpan`)이 이벤트와 span 속성에서 한 번 더 지웁니다. SDK 11은 성능 데이터를 span 단위로 보내므로(`traceLifecycle: 'stream'` 기본) `beforeSendTransaction` 대신 `beforeSendSpan`을 씁니다.
+- 보내지 않는 것: 쿠키(`cl_session` 원문 포함)·`Authorization`·`Proxy-Authorization`·`X-Crelink-Internal`·`X-Hub-Signature-256`·`Set-Cookie` 헤더, 요청 본문, DB 쿼리 파라미터(`databaseQueryData: false`, 쿼리 문은 매개변수화된 형태만). URL 쿼리의 `code`·`state`(구글 로그인)·`pass`(통과 표시)·`access_token`·`client_secret`·`hub.verify_token`(Meta)은 `[Filtered]`이고, 오류 문구·URL·span 문자열 속성의 Meta 토큰 형식(`EAA…`)은 `[token]`으로 바꿉니다. `dataCollection`(SDK 11은 `sendDefaultPii` 대신 이것으로 정함)으로 막고, `beforeSend`·`beforeSendSpan`(`scrubEvent`·`scrubSpan`)이 이벤트와 span 속성에서 한 번 더 지웁니다. SDK 11은 성능 데이터를 span 단위로 보내므로(`traceLifecycle: 'stream'` 기본) `beforeSendTransaction` 대신 `beforeSendSpan`을 씁니다.
 - 그 밖에 SDK 기본으로 보내는 것: 프로세스 단위 세션(Release Health, 오류가 나면 `crashed`, `did`는 내부 사용자 ID), 버린 이벤트 수(client report).
 - 종료: [종료](#종료) 3단계의 `Sentry.close(2000)`.
 - 시험: `src/monitoring/sentry.spec.ts`(DSN 없음 → 설정 없음·`Sentry.isEnabled()` false, 기본값, 비율 검증, 헤더·쿠키 정리, 로그 속성·본문 정리, 지표 속성 정리), `test/sentry.e2e-spec.ts`(가짜 transport: 예상 못 한 오류 1건·user가 `{ id, ip_address }`뿐이고 IP는 `X-Forwarded-For` 오른쪽 신뢰 값·쿠키 원문 없음, 동시 요청의 user가 섞이지 않음, 401·404·413·400은 0건, span에 user가 붙고 쿠키 헤더 없음). 이 시험은 모듈을 불러온 뒤 초기화하므로 Express·pg 자동 계측 span은 확인하지 못합니다(실제 기동에서는 `SessionGuard`·`SELECT …` 같은 span이 붙는 것을 가짜 수신 서버로 확인, [0042 진행 기록](../../../docs/work/orchestrator/0042-sentry-monitoring.md#진행-기록)).
@@ -176,7 +181,7 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 `SENTRY_DSN`이 비면 Sentry client가 없어 `Sentry.logger`·`Sentry.metrics.count`·체크인은 아무것도 보내지 않고, `Sentry.withMonitor`는 작업만 실행합니다. 로그·지표는 SDK가 모아 몇 초마다 보내고, 종료 때 `Sentry.close`가 남은 것을 보냅니다. 근거: [0052](../../../docs/work/orchestrator/0052-sentry-free-features.md).
 
 - 로그(Sentry Logs): `main.ts`가 `NestFactory.create`의 `logger`로 `SentryConsoleLogger`(`src/monitoring/sentry-logger.ts`, Nest `ConsoleLogger` 하위 클래스)를 넘깁니다. 콘솔 출력은 그대로이고, `log`(Sentry `info`)·`warn`·`error`·`fatal`을 Sentry Logs로도 보냅니다. `debug`·`verbose`는 보내지 않습니다. 프레임워크 로그(기동 때 모듈·라우트 목록 등)와 모든 `new Logger(...)`가 대상입니다. 속성은 `nest.context`(로거 이름), 오류 스택이 있으면 `nest.stack`, SDK가 붙이는 release·environment·trace와 요청 중이면 `user.id`입니다. Jest 시험은 `main.ts`를 거치지 않고 `logger: false`로 앱을 만들어 이 로거를 쓰지 않습니다.
-- 로그 정리(`beforeSendLog: scrubLog`, `src/monitoring/sentry.ts`): 이름에 `cookie`·`authorization`·`token`·`secret`·`password`·`email`이 들어간 속성(대소문자 무시)과 `user.email`·`user.name`을 지우고, 본문과 남은 문자열 속성의 이메일 주소는 `[email]`, JWT(`eyJ…`)는 `[token]`으로 바꿉니다. `user.id`(내부 UUID)는 오류 이벤트처럼 남깁니다. 다른 로그는 쿠키·토큰·이메일을 넣지 않습니다.
+- 로그 정리(`beforeSendLog: scrubLog`, `src/monitoring/sentry.ts`): 이름에 `cookie`·`authorization`·`token`·`signature`·`secret`·`password`·`email`이 들어간 속성(대소문자 무시)과 `user.email`·`user.name`을 지우고, 본문과 남은 문자열 속성의 이메일 주소는 `[email]`, JWT(`eyJ…`)와 Meta 토큰(`EAA…`)은 `[token]`으로 바꿉니다. `user.id`(내부 UUID)는 오류 이벤트처럼 남깁니다. 다른 로그는 쿠키·토큰·이메일을 넣지 않습니다.
 - 구글 검증 실패 경고(`AuthService`): `google-auth-library` 오류 문구는 이유 뒤에 ID 토큰 원문(`: eyJ…`)이나 payload JSON(`: {…}`, 이메일·이름·사진·sub)을 붙이므로, `googleVerifyFailureReason`(`src/auth/google-oauth.ts`)이 그 꼬리를 버리고 오류 이름과 이유만 남깁니다. 콘솔과 Sentry Logs에 같은 문구가 남습니다.
 - 업무 지표(Sentry Metrics, counter, `src/monitoring/metrics.ts`의 `countBusinessMetric`): 아래 표. 없는 주소·정지·숨김 링크 안내 302는 세지 않습니다. 방문·클릭은 리디렉트 시점에 세므로 기록 저장 실패(오류 로그)와 무관합니다. 새 지표(방명록 0050 등)는 `BusinessMetric`에 이름을 더하고 이 표를 고칩니다.
 - 지표 정리(`beforeSendMetric: scrubMetric`): `user.`로 시작하는 속성(SDK가 스코프 user에서 붙이는 `user.id`·`user.email`·`user.name`)과 이름에 `email` 또는 IP(`ip`·`ip_address`·`client.address`·`remote_addr`)가 들어간 속성을 지웁니다. 속성에는 낮은 카디널리티 열거값만 넣고 단축 주소·링크 ID·사용자·IP는 넣지 않습니다.
@@ -190,6 +195,8 @@ Sentry(SaaS, 미국 리전)로 예상하지 못한 오류, 요청 10%의 성능 
 | `crelink.ad_banner.impression` | `TrackingService.recordAdStat('impression')`: 공개 랜딩 API가 `passAccepted`이고 광고 블록이 보일 때 첫 장 1건(기록 시작) | 없음 |
 | `crelink.ad_banner.click` | `TrackingService.recordAdStat('click')`: 광고 클릭 경로(기록 시작) | 없음 |
 | `crelink.creator_banner.click` | `ShortLinkController.creatorBannerClick`(`GET /b/{bannerPublicId}`)이 외부 URL로 302 할 때(클릭 기록 시작) | 없음 |
+| `crelink.instagram.webhook` | `InstagramWebhookService`. 값은 항목 수이고 본문 크기는 분포 `crelink.instagram.webhook.body_bytes` | `result`: `stored`, `not_stored`, `unmatched`, `malformed`, `forbidden`, `db_error`, 항목을 건너뛴 이유(`webhook-payload.ts`), 삭제 콜백 `deletion_processed`·`deletion_forbidden` |
+| `crelink.instagram.dm` | `InstagramWorkerService`. Graph 호출 결과 1건과 tick의 종료 처리 건수 | `result`: `sent`, `retry`, `unknown`, `rate_limited`, `token_invalid`, `messages_access`, `policy_restricted`, `rejected`, `token_unreadable`, `cancelled`(호출 직전 재확인에서 정지), `lease_expired`, `expired` |
 
 ### 소스맵
 
@@ -324,3 +331,48 @@ pnpm --filter @crelink/api --silent ai-operator list-tokens   # 또는 node apps
 기존 본인 랜딩 `PATCH /api/me/landing`의 `linkLayout`은 `list`/`grid`만 허용합니다. migration0011이 기존 랜딩을 기본 list로 유지하며 편집·공개 조회에도 반환합니다. 이전 응답에 필드가 없으면 list로 표시하고 저장 응답이 요청과 일치할 때만 성공 안내합니다. rollback 때 컬럼과 값을 삭제하지 않습니다. [0198](../../../docs/specs/link-grid-layout.md).
 
 같은 PATCH의 `listDensity`는 JSON 숫자8·10·12만 허용하며, 생략하면 현재 값을 보존합니다. null·문자열·불리언·배열·객체·다른 숫자는400 `validation_failed`입니다. migration `0012_list_density.sql`은 `smallint NOT NULL DEFAULT 8`과 CHECK로 기존 데이터를8개형으로 확장합니다. 편집 상태와 공개 조회는 항상 숫자를 반환하며 이전 API 응답에 필드가 없으면 소비자는8로 표시합니다. list/grid 전환·프로필·링크·Instabio 가져오기는 밀도를 바꾸지 않습니다. 이전 서버로 rollback할 때도 추가 컬럼과 저장값을 남깁니다. 구현 원본은 `src/creator/profile.service.ts`·`creator.service.ts`·`public-landing.controller.ts`, 계약은 `packages/shared/src/crelink.ts`입니다. [리스트 밀도 설계](../../../docs/specs/list-density.md).
+
+
+## 공유관리 페이지
+
+기준 설계는 [공유관리 페이지](../../../docs/specs/shared-pages.md)이며 실행 원본은 `src/pages/`, `migrations/0014_shared_pages.sql`, `packages/shared/src/crelink.ts`입니다.
+
+- `X-Crelink-Page`는 대상 랜딩의 10자리 `publicId`입니다. 편집 API의 `SessionGuard` 다음 `PageAccessGuard`가 매 요청 멤버십·대상 정지를 확인합니다. 헤더가 없으면 DB 조회 없이 기존 본인 대상을 유지합니다. 인증 사용자와 행위자는 바꾸지 않습니다.
+- 편집 API(랜딩·SNS·링크·포트폴리오·배너·Instabio 가져오기·파일·통계)는 멤버에게 허용합니다. 주소·광고 블록·초대 생성/취소·멤버 목록/해제는 소유자 전용입니다. 인증·본인 계정 조회·관리자·AI 운영자·공개 API에는 페이지 가드를 적용하지 않습니다. 방명록은 서비스가 별도로 소유자/멤버를 판정하고 작성자는 로그인한 사람으로 저장합니다.
+- `GET /api/me/pages`는 본인 페이지부터 반환하며 정지된 대상은 제외합니다. `POST`/`DELETE /api/me/page-invites`, `GET /api/me/page-members`, `DELETE /api/me/page-members/:userId`가 소유자 관리 경로입니다. 편집자는 `DELETE /api/me/page-members/me`로 나갑니다.
+- 로그인 후 `POST /api/page-invites/preview`·`accept`에 `{ token }`을 보냅니다. 수락은 사람만 가능합니다. 토큰은 발급 응답에서만 반환하며 32바이트 난수의 SHA-256 hex만 DB에 저장합니다. 유효기간 72시간·1회 사용·멤버 5명 제한입니다. 재발급은 미사용 초대를 교체하고 보존 작업은 만료/사용 후 7일 지난 초대를 지웁니다.
+- 웹의 헤더 전달과 BFF 허용 경로 추가는 후속 작업입니다. API 시험은 `test/page-members.e2e-spec.ts`에서 실제 PostgreSQL과 HTTP 요청으로 확인합니다.
+## 채널별 짧은 주소
+
+기준은 [채널별 짧은 주소 설계](../../../docs/specs/channel-links.md), 계약은 `packages/shared/src/channel-links.ts`, 구현은 `src/creator/channel-links.service.ts`(관리 API)와 `src/short-link/short-link.controller.ts`의 `GET /s/{code}`([단축 도메인](#단축-도메인))입니다.
+
+- 표: migration `0015_channel_links`가 `channel_link_codes`(code의 영구 기록, FK 없음, 지우지 않음)와 `channel_links`(code의 현재 의미, `landings` 삭제 시 CASCADE)를 만듭니다. 페이지가 지워지면 의미는 사라지고 code만 남아 다시 발급되지 않습니다. `RetentionService` 대상이 아닙니다. 적용 뒤 파일명을 바꾸면 기동이 막히므로 바꾸지 않습니다.
+- 관리 API `/api/me/channel-links`(`SessionGuard` 다음 `PageAccessGuard`와 `@PageOwnerOnly()`: 대상 페이지는 `X-Crelink-Page`(없으면 본인 페이지)로 정해지고 멤버(편집자)는 403 `page_owner_only`, AI는 다른 `/api/me` 쓰기와 같이 실행 헤더·멈춤 검사): `GET` 보관하지 않은 주소 최신순(최대 50), `POST {channel, placement, campaign?}`는 같은 조합의 보관되지 않은 주소가 있으면 200으로 그것을, 없으면 201로 새로 만들며 프리셋 밖 조합·정규화 뒤 빈 캠페인은 400 `validation_failed`, `POST /api/me/channel-links/{code}/archive`는 204(이미 보관이어도 204, 남의 code·없는 code는 404 `channel_link_not_found`). 운영자 대행 경로는 없습니다.
+- 한도: 보관 제외 50개(409 `channel_link_limit_reached`), 보관 포함 200개(409 `channel_link_total_limit_reached`). 같은 조합이 이미 있으면 한도와 관계없이 그 주소를 돌려줍니다.
+- 동시성: 트랜잭션 첫 줄에서 사용자 행을 `FOR UPDATE`로 잠가(링크 추가와 같은 방식) 같은 조합의 동시 요청과 한도 검사를 줄 세웁니다. `insertWithRandomId`는 `channel_link_codes`에만 쓰고(겹침만 재시도) 그다음 `channel_links`를 넣습니다. 부분 UNIQUE 인덱스 `channel_links_active`가 마지막 방어선입니다.
+- 공유관리([0243](#공유관리-페이지)): 이 경로는 소유자 전용이라 서비스에는 `PageContext.ownerUserId`를 넘깁니다. `GET /s/{code}`와 공개 랜딩 `via`는 공개 경로라 가드가 없습니다. 웹의 헤더 전달(0244)이 병합되면 편집자에게는 `채널 주소` 메뉴를 숨겨야 합니다(API는 이미 403).
+- 시험: `test/channel-links.e2e-spec.ts`(실제 일회용 PostgreSQL, 수용 기준 1~7·9와 멤버 403), `test/health.e2e-spec.ts`(`/api` 밖 경로·표·migration 목록).
+
+## Instagram 댓글 자동 DM
+
+`src/instagram/`. 설계는 [Instagram 댓글 자동 DM](../../../docs/specs/instagram-comment-dm.md)입니다. 공개 경로는 웹훅 2개(`/api/webhooks/instagram`, `/api/webhooks/instagram/data-deletion`)뿐이고 Caddy가 웹 호스트에서 API로 바로 보냅니다. 플랫폼 스위치 `platform_settings.instagram_dm_audience`의 기본값은 `off`입니다.
+
+- 설정: [환경변수](#환경변수)의 8개 키는 전부 있거나 전부 없어야 합니다. 일부만 있으면 기동을 거부하고 오류에는 키 이름만 넣습니다. 전부 없으면 `AppConfig.instagram`이 null이고 기능이 꺼집니다. 시크릿 등록 전 배포가 막히지 않도록 `PRODUCTION_REQUIRED_KEYS`에는 넣지 않습니다.
+- 토큰: AES-256-GCM(`iv || tag || ct`)이고 행 ID를 AAD로 묶어 다른 행으로 복사하면 복호화되지 않습니다. 저장할 행의 ID가 필요하므로 새 연결은 ID를 먼저 정합니다. 키는 `INSTAGRAM_TOKEN_KEYS`의 버전으로 회전하고, 옛 버전은 저장된 토큰을 모두 다시 암호화할 때까지 남겨 둡니다.
+- 작성자 해시: `HMAC-SHA256(INSTAGRAM_COMMENTER_HASH_KEY, ig_user_id || from.id)` 32바이트만 저장합니다. 원문·사용자명·원본 ID는 저장하지 않습니다.
+- DM 본문: `src/instagram/webhook.service.ts`가 저장 시점의 `rule.message`를 `message_body`에 그대로 넣고 worker가 전송합니다. 채널 링크와 자동 발송·수신 거부 안내 접미사는 자동으로 붙이지 않습니다.
+- 수신 거부 토큰: 새 DM에는 자동으로 발급·첨부하지 않으며 기존 토큰의 검증과 수신 거부 처리는 유지합니다. 저장하지 않는 서명 토큰(만료 없음)입니다. base64url(`len(1) || ig_user_id || commenter_hash || MAC 앞 16바이트`)이고 키는 `INSTAGRAM_OPT_OUT_KEY`입니다.
+- Graph 경계: `InstagramGraph`(`src/instagram/graph.ts`)가 `GoogleOAuth`와 같은 교체 지점입니다. API 버전 상수는 `GRAPH_API_VERSION`(`v27.0`)이고, 호출 형식이 미실측인 곳은 코드 주석에 `[M?]`로 표시했습니다(S3·S5·S7·S8). 오류는 `InstagramGraphError` 하나이며 종류·HTTP 상태와 허용 목록(`GRAPH_ALLOWED_ERROR_CODES`·`GRAPH_ALLOWED_ERROR_SUBCODES`) 안의 코드만 남기고 응답 원문은 버립니다. 실측으로 코드가 정해지면 이 목록에 더합니다.
+- 로그 차단: Sentry는 `x-hub-signature-256` 헤더, 쿼리 `access_token`·`client_secret`·`hub.verify_token`, 문자열 속의 Meta 토큰 형식(`EAA…`)을 지웁니다.
+- 발송 worker(`worker.service.ts`): 설정이 있을 때만 앱 기동과 함께 2초 tick으로 돕니다. 프로세스당 동시 5건(두 색 합쳐 10건)이고 빈 슬롯 수만큼만 `sending`으로 선점합니다. lease는 2분이며 끝나면 `unknown`으로 마감합니다. 결과를 모르는 호출(타임아웃·5xx·응답 전 끊김)은 다시 보내지 않습니다. 연결 전 실패만 30초·2분·10분·1시간 간격으로 4회 재시도하고, 레이트 제한은 연결 전체를 쉬게 하되 시도 횟수를 쓰지 않습니다. 댓글 시각에서 24시간이 지난 `pending`은 `expired`입니다. 시간당 한도는 `INSTAGRAM_DM_HOURLY_LIMIT`입니다. 종료 때 선점을 멈추고 진행 중인 호출을 기다립니다.
+- 긴급 정지: 운영자 스위치 `audience=off`(`PUT /api/admin/instagram-dm`)와 계정 정지(`PUT /api/admin/instagram-dm/connections/:userId/pause`)는 대기 건을 같은 트랜잭션에서 취소합니다. 호출 중이던 건이 재시도·레이트 대기로 돌아올 때 스위치 off, 계정·사용자 정지, 규칙 비활성·보관이면 `pending`이 아니라 `cancelled`(`failure_code=stopped_before_send`)로 끝납니다. 이 판정은 연결·규칙·설정 행을 잠가 진행 중인 정지 트랜잭션을 기다립니다. 재개해도 취소된 건은 보내지 않습니다.
+- 연결 해제: `DELETE /api/me/instagram`은 행을 지우고 규칙·내역은 CASCADE로 함께 지웁니다. 다만 `operator_paused_at`이 있으면 행을 남기고 재인증 전이(토큰 파기·대기 취소)와 규칙 보관만 해서 재연결(같은 `user_id`, 행 갱신)로 운영자 정지가 풀리지 않습니다. 응답은 똑같이 204입니다. Meta 데이터 삭제 콜백은 운영자 정지와 관계없이 행을 지웁니다.
+- 지표는 [로그·지표·Cron](#로그지표cron)의 `crelink.instagram.webhook`·`crelink.instagram.dm`입니다. 정책 제재와 재인증 전이는 경고 로그를 남기고, 정책 제재는 Sentry 경고도 보냅니다.
+
+### Instagram 공개 답글과 Unified Login 보강
+
+- `src/instagram/graph.ts`는 동의 URL에 `display=popup`, `prompt=login`을 넣고 페이지 계정, 직접 할당 계정(`assigned_instagram_accounts`), `granular_scopes` 순으로 계정을 조회합니다. granular scope 대상이 10개를 초과하거나 개별 조회가 실패하면 불완전한 계정 목록을 반환하지 않고 실패합니다. 실제 Meta 응답은 별도 실측이 필요합니다.
+- `src/instagram/rules.service.ts`의 선택 `replyMessage`는 최대 300 코드 포인트이며 null·빈 문자열은 공개 답글을 해제합니다. migration `0017_instagram_public_reply.sql`을 먼저 적용합니다.
+- `src/instagram/worker.service.ts`는 공개 답글 뒤 DM을 보냅니다. 답글 실패도 DM을 막지 않으며 답글 결과를 DM 전에 저장해 DM 재시도 시 답글을 반복하지 않습니다. DM 직전 발송 조건과 lease를 다시 확인하며 공개 답글 중 정지·수신 거부·취소·lease 상실이 발생하면 DM을 보내지 않습니다. 외부 발송과 DB 기록 사이 프로세스 종료는 원자적으로 묶을 수 없습니다.
+
+검증 기록(2026-11-11): `pnpm test --runTestsByPath src/instagram/instagram-crypto.spec.ts` 31개 통과, `pnpm typecheck` 통과, 변경 TypeScript 7개 파일의 ESLint 통과, `git diff --check` 통과, `pnpm work:scope` 통과. 지정 명령 `pnpm --filter @crelink/api test -- instagram`은 12 suite 통과·35 suite 실패이며 로컬 DB `127.0.0.1:6652` 연결이 샌드박스에서 `EPERM`으로 차단됩니다. 추가한 HTTP/DB 통합 회귀의 통과와 실제 Meta 연동은 확인하지 못했습니다. 작업 경로 자체에 `instagram`이 포함되어 지정 명령이 다른 API 테스트도 선택합니다.

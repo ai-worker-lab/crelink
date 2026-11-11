@@ -1,8 +1,9 @@
 /**
  * 크리링 MVP API 계약. 근거: docs/specs/crelink-mvp.md (API 계약 초안, 데이터 모델).
- * 오류 응답은 모두 `ApiError { code, message }`이며 code는 `CrelinkErrorCode` 중 하나입니다.
+ * 오류 응답은 모두 `ApiError { code, message }`이며 code는 `CrelinkApiErrorCode` 중 하나입니다.
  * 날짜·시각은 ISO 8601 문자열, 날짜만 쓰는 값은 `YYYY-MM-DD`입니다.
  */
+import type { LandingUtm } from './telemetry.js';
 
 /** 설계의 `[임시값]`. MVP 이후 사용자 결정으로 바꿉니다. */
 export const CRELINK_LIMITS = {
@@ -85,6 +86,20 @@ export const SOCIAL_PLATFORMS: readonly SocialPlatform[] = [
 
 export type UserRole = 'creator' | 'operator';
 
+/** 공유 페이지 오류. 기존 소비자의 완전 매핑을 유지하며 후속 웹 작업에서 별도로 처리합니다. */
+export type PageErrorCode =
+  | 'page_not_found'
+  | 'page_suspended'
+  | 'page_owner_only'
+  | 'page_member_limit'
+  | 'member_not_found'
+  | 'invite_invalid'
+  | 'invite_own_page'
+  | 'already_member';
+
+/** API에서 반환하는 전체 업무 오류 코드입니다. */
+export type CrelinkApiErrorCode = CrelinkErrorCode | PageErrorCode;
+
 export type CrelinkErrorCode =
   | 'validation_failed'
   | 'import_unavailable'
@@ -129,6 +144,23 @@ export type CrelinkErrorCode =
   | 'banner_period_invalid'
   // 광고 블록 켜고 끄기(R20 ⑩)
   | 'ad_block_unavailable'
+  // 채널별 짧은 주소. 근거: docs/specs/channel-links.md
+  | 'channel_link_not_found'
+  | 'channel_link_limit_reached'
+  | 'channel_link_total_limit_reached'
+  // Instagram 댓글 자동 DM. 근거: docs/specs/instagram-comment-dm.md `API 계약 초안`.
+  | 'instagram_unavailable'
+  | 'instagram_account_in_use'
+  | 'instagram_account_selection_required'
+  | 'instagram_account_not_professional'
+  | 'instagram_upstream_failed'
+  | 'instagram_operator_paused'
+  | 'instagram_reauth_required'
+  | 'instagram_rule_limit_reached'
+  | 'instagram_rule_media_taken'
+  | 'instagram_rule_not_found'
+  | 'instagram_not_configured'
+  | 'opt_out_invalid'
   // AI 운영자(R23). 근거: docs/specs/crelink-ai-operator.md `오류 코드`.
   | 'agent_run_not_found'
   | 'agent_run_in_progress'
@@ -273,6 +305,8 @@ export type ListDensity = 8 | 10 | 12;
 
 /** `GET /api/me/landing` 응답. 편집 화면 전체 상태입니다. */
 export interface CreatorLandingState {
+  instagramDmAvailable: boolean;
+  pageAccess?: PageAccess;
   landing: {
     publicId: string;
     /** 본 도메인 랜딩 주소. 예: `http://127.0.0.1:5193/p/k3j9x0a1b2`. */
@@ -541,8 +575,13 @@ export interface PublicLandingResponse extends PublicLandingView {
   telemetrySessionKey?: string | null;
   /** `pass`가 단축 주소 리디렉트(`GET {SHORT}/{slug}`)가 이 랜딩에 붙여 준, 아직 만료되지 않은 통과 표시이면 true. */
   passAccepted: boolean;
-  /** 이 랜딩의 현재 단축 주소 `{SHORT}/{slug}`(옛 주소 아님). */
+  /**
+   * 이 랜딩의 현재 단축 주소 `{SHORT}/{slug}`(옛 주소 아님). 요청의 `via`가 이 랜딩의 채널 주소 code이면
+   * (보관 여부와 무관) `{SHORT}/s/{code}`이고, 그때만 `utm`이 함께 옵니다.
+   */
   shortUrl: string;
+  /** `via`가 이 랜딩의 채널 주소 code일 때 그 주소의 저장 UTM. 웹이 `VisitorTracker`에 넘깁니다. 그 밖에는 없습니다. */
+  utm?: LandingUtm;
 }
 
 // ---------- 방명록 (R19) ----------
@@ -931,6 +970,9 @@ export type OperatorActionType =
   | 'ai_operator.token_revoke'
   // 플랫폼 광고 블록 스위치(R20 ⑩)
   | 'platform.ad_block'
+  // Instagram 댓글 자동 DM 감사 기록.
+  | 'instagram_dm.audience'
+  | 'instagram_dm.connection_pause'
   // 지난 기록에만 있는 행동(2026-10-12 기능 제거, 더 이상 만들지 않음): 운영자 추가 슬롯, 링크 슬롯 이벤트 기간 저장
   | 'creator.extra_slots'
   | 'slot_event.period_update';
@@ -999,7 +1041,58 @@ export interface SetMetricsExclusionRequest {
 /** 단축 주소 리디렉트가 랜딩 주소에 붙이는 통과 표시 쿼리 이름. 웹은 이 표시가 유효할 때만 외부에서 온 요청을 그대로 그립니다(PRD R7). */
 export const LANDING_PASS_PARAM = 'pass';
 
+export const PAGE_HEADER = 'X-Crelink-Page';
+export interface PageAccess {
+  role: 'owner' | 'editor';
+  shared: boolean;
+}
+export interface PageContext extends PageAccess {
+  ownerUserId: string;
+  publicId: string | null;
+}
+export interface ManagedPage {
+  publicId: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  access: 'personal' | 'shared';
+  role: 'owner' | 'editor';
+  hasMembers: boolean;
+}
+export interface ManagedPagesResponse {
+  pages: ManagedPage[];
+}
+export interface PageInviteResponse {
+  token: string;
+  expiresAt: string;
+}
+export interface PageInviteRequest {
+  token: string;
+}
+export interface PageInvitePreview {
+  publicId: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  expiresAt: string;
+}
+export interface PageInviteAccepted {
+  publicId: string;
+}
+export interface PageMembersResponse {
+  members: { userId: string; email: string; createdAt: string }[];
+  invite: { expiresAt: string } | null;
+  limit: 5;
+}
+/** 채널별 짧은 주소 리디렉트가 랜딩 주소에 붙이는 code 쿼리 이름(`GET {SHORT}/s/{code}` → `/p/{publicId}?pass=…&via={code}`). 공개 랜딩 API와 웹이 같은 이름을 씁니다. */
+export const CHANNEL_LINK_VIA_PARAM = 'via';
+
 export const CRELINK_API_PATHS = {
+  pages: '/api/me/pages',
+  pageInvites: '/api/me/page-invites',
+  pageMembers: '/api/me/page-members',
+  pageMember: (userId: string) => `/api/me/page-members/${encodeURIComponent(userId)}`,
+  leavePage: '/api/me/page-members/me',
+  pageInvitePreview: '/api/page-invites/preview',
+  pageInviteAccept: '/api/page-invites/accept',
   landingEvents: (publicId: string) => `/api/landings/${encodeURIComponent(publicId)}/events`,
   signupFunnelEvents: '/api/signup-funnel/events',
   authGoogleStart: '/api/auth/google/start',
@@ -1025,8 +1118,15 @@ export const CRELINK_API_PATHS = {
   meBannersOrder: '/api/me/banners/order',
   file: (id: string) => `/api/files/${encodeURIComponent(id)}`,
   /** `pass`: 단축 주소 리디렉트가 랜딩 주소에 붙인 통과 표시(`LANDING_PASS_PARAM`). 있으면 그대로 넘겨 검증을 받습니다. */
-  publicLanding: (publicId: string, pass?: string) =>
-    `/api/public/landings/${encodeURIComponent(publicId)}${pass ? `?${LANDING_PASS_PARAM}=${encodeURIComponent(pass)}` : ''}`,
+  publicLanding: (publicId: string, pass?: string, via?: string) => {
+    const query = new URLSearchParams();
+    if (pass) query.set(LANDING_PASS_PARAM, pass);
+    if (via) query.set(CHANNEL_LINK_VIA_PARAM, via);
+    const text = query.toString();
+    return `/api/public/landings/${encodeURIComponent(publicId)}${text ? `?${text}` : ''}`;
+  },
+  meChannelLinks: '/api/me/channel-links',
+  meChannelLinkArchive: (code: string) => `/api/me/channel-links/${encodeURIComponent(code)}/archive`,
   adminCreators: '/api/admin/creators',
   adminCreator: (userId: string) => `/api/admin/creators/${encodeURIComponent(userId)}`,
   adminCreatorStats: (userId: string) => `/api/admin/creators/${encodeURIComponent(userId)}/stats`,
@@ -1043,6 +1143,23 @@ export const CRELINK_API_PATHS = {
   /** 광고 블록 스위치(R20 ⑩). `PUT`은 `SetAdBlockRequest`. */
   meAdBlock: '/api/me/ad-block',
   adminAdBlock: '/api/admin/ad-block',
+  // Instagram 댓글 자동 DM. 근거: docs/specs/instagram-comment-dm.md `API 계약 초안`.
+  meInstagram: '/api/me/instagram',
+  meInstagramConnect: '/api/me/instagram/connect',
+  meInstagramCallback: '/api/me/instagram/callback',
+  meInstagramRecheck: '/api/me/instagram/recheck',
+  meInstagramPause: '/api/me/instagram/pause',
+  meInstagramMedia: '/api/me/instagram/media',
+  meInstagramRules: '/api/me/instagram/rules',
+  meInstagramRule: (publicId: string) => `/api/me/instagram/rules/${encodeURIComponent(publicId)}`,
+  meInstagramDeliveries: '/api/me/instagram/deliveries',
+  adminInstagramDm: '/api/admin/instagram-dm',
+  adminInstagramDmConnectionPause: (userId: string) =>
+    `/api/admin/instagram-dm/connections/${encodeURIComponent(userId)}/pause`,
+  instagramWebhook: '/api/webhooks/instagram',
+  instagramDataDeletionWebhook: '/api/webhooks/instagram/data-deletion',
+  publicInstagramDeletion: (code: string) => `/api/public/instagram-deletions/${encodeURIComponent(code)}`,
+  publicInstagramDmOptOuts: '/api/public/instagram-dm-opt-outs',
   /** `cursor`: 이전 응답의 `GuestbookPage.nextCursor`. */
   landingGuestbook: (publicId: string, cursor?: string | null) =>
     `/api/landings/${encodeURIComponent(publicId)}/guestbook${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
@@ -1081,8 +1198,14 @@ export const LOGIN_RETURN_TO_PARAM = 'returnTo';
 
 /** 본 도메인(웹) 경로. API가 리디렉트 대상을 만들 때도 씁니다. */
 export const CRELINK_WEB_PATHS = {
-  landing: (publicId: string, pass?: string) =>
-    `/p/${encodeURIComponent(publicId)}${pass ? `?${LANDING_PASS_PARAM}=${encodeURIComponent(pass)}` : ''}`,
+  /** `via`: 채널 주소 code(`GET {SHORT}/s/{code}`가 붙임). 최종 주소창에 UTM 대신 남습니다. */
+  landing: (publicId: string, pass?: string, via?: string) => {
+    const query = [
+      ...(pass ? [`${LANDING_PASS_PARAM}=${encodeURIComponent(pass)}`] : []),
+      ...(via ? [`${CHANNEL_LINK_VIA_PARAM}=${encodeURIComponent(via)}`] : []),
+    ];
+    return `/p/${encodeURIComponent(publicId)}${query.length ? `?${query.join('&')}` : ''}`;
+  },
   landingGuestbook: (publicId: string) => `/p/${encodeURIComponent(publicId)}#${GUESTBOOK_TAB_HASH}`,
   notice: (reason: NoticeReason) => `/notice?reason=${reason}`,
   /** 웹 구글 로그인 시작. `returnTo`가 `LOGIN_RETURN_TO_PATTERN`에 맞으면 로그인 뒤 그 주소로 돌아갑니다. */

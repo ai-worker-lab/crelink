@@ -136,7 +136,7 @@ migration은 `apps/api/migrations/`의 SQL 파일(기존 실행기). 모든 시�
 | `/` | 로그인 전·후 | `GET /api/me` 401이면 구글 로그인 버튼, 로그인 상태면 `/me`·운영자는 `/admin` 링크 |
 | `/auth/google/callback` | 성공·실패 | 성공 시 `/me`, `oauth_*`·`account_suspended`·`auth_not_configured`면 `/notice?reason=` |
 | `/me` | 이동 | 로그인 상태면 내 랜딩 관리 화면(`/me/landings/{publicId}`)으로, 401이면 `/`로 |
-| `/me/landings/{publicId}`·`/profile`·`/guestbook`·`/settings` | 로딩·정상·오류·401·남의 랜딩 | 관리 화면(PRD R18): 메뉴 `페이지 편집`·`프로필`·`방명록`·`주소 설정`, 가운데 미리보기(위 단축 주소 막대)와 오른쪽 편집 패널. 페이지 편집은 미리보기에서 구역·항목을 골라 패널(휴대폰은 하단 시트)에서 고침([디자인 인계](../../design/preview-direct-edit/handoff.md)). 401이면 `/`로, 남의 랜딩이면 안내. 빈 프로필·링크 0개도 정상 화면. 한도 도달 시 추가 버튼 대신 안내. 차단된 링크는 차단 표시. 주소 변경은 입력 중 사용 가능 여부, 30일 제한 시 다음 변경 가능일. 옛 `?mode=view`는 페이지 편집으로 이동 |
+| `/me/landings/{publicId}`·`/profile`·`/guestbook` | 로딩·정상·오류·401·남의 랜딩 | 관리 화면(PRD R18): 메뉴 `페이지 편집`·`프로필`·`방명록`, 가운데 미리보기(위 단축 주소 막대. 주소 복사·변경은 여기서, 휴대폰은 메뉴 아래 줄의 하단 시트, [주소 막대 인계](../../design/manager-address-bar/handoff.md))와 오른쪽 편집 패널. 머리글 프로필 메뉴에 이메일·로그아웃. 페이지 편집은 미리보기에서 구역·항목을 골라 패널(휴대폰은 하단 시트)에서 고침([디자인 인계](../../design/preview-direct-edit/handoff.md)). 401이면 `/`로, 남의 랜딩이면 안내. 빈 프로필·링크 0개도 정상 화면. 한도 도달 시 추가 버튼 대신 안내. 차단된 링크는 차단 표시. 주소 변경은 입력 중 사용 가능 여부, 30일 제한 시 다음 변경 가능일. 옛 `?mode=view`·`/settings`는 페이지 편집으로 이동 |
 | `/p/{publicId}` | 정상·빈 랜딩·없음·정지·외부 진입 | 모든 항목이 비어도 크리링 표시와 함께 열림. 404·410은 안내 화면. 같은 출처도 유효한 통과 표시도 아니면 현재 단축 주소로 307 |
 | `/notice` | 사유별 안내 | `link_not_found`, `link_unavailable`, `creator_suspended`, 로그인 오류 |
 | `/privacy` | 고정 고지 | 수집 항목·목적·보관 기간(원본 1년)·쿠키 `cl_vid`. 법률 검토 전 문구임을 표시 |

@@ -208,8 +208,8 @@ export function Landing({
           className="profile-avatar"
           src={landing.avatarUrl}
           alt={landing.displayName ? `${landing.displayName} 프로필 사진` : '프로필 사진'}
-          width={96}
-          height={96}
+          width={72}
+          height={72}
         />
       ) : (
         <DefaultAvatar className="profile-avatar" />
@@ -408,7 +408,7 @@ export function LinkCardContent({
   title: string;
   description: string | null;
   thumbnailUrl: string | null;
-  /** 비어 있으면(저장 전 초안) 기본 아이콘을 그립니다. */
+  /** 카드형(grid)의 썸네일 자리에만 씁니다. 비어 있으면(저장 전 초안) 기본 아이콘을 그립니다. 목록형은 링크명 옆에 아이콘을 그리지 않습니다. */
   faviconUrl: string;
   descriptionId?: string;
   grid?: boolean;
@@ -424,7 +424,6 @@ export function LinkCardContent({
       ) : null}
       <span className="link-text">
         <span className="link-title">
-          {grid ? null : <Favicon key={faviconUrl} src={faviconUrl} />}
           <span>{title}</span>
         </span>
         {description ? (

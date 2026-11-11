@@ -1,3 +1,5 @@
+import { CurrentPage, PageAccessGuard } from '../pages/page-access.guard';
+import { PageContext } from '@crelink/shared';
 import {
   ArgumentsHost,
   Catch,
@@ -15,10 +17,10 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { CRELINK_LIMITS, SessionUser, UploadFileResponse } from '@crelink/shared';
+import { CRELINK_LIMITS, UploadFileResponse } from '@crelink/shared';
 import type { Response } from 'express';
 import { apiError } from '../common/http';
-import { CurrentUser, SessionGuard } from '../auth/session.guard';
+import { SessionGuard } from '../auth/session.guard';
 import { FilesService, IMAGE_TOO_LARGE_MESSAGE } from './files.service';
 
 /** multer 크기 제한 초과(413)를 계약의 400 `file_too_large`로 바꿉니다. */
@@ -38,14 +40,14 @@ export class FilesController {
   constructor(private readonly files: FilesService) {}
 
   @Post('me/files')
-  @UseGuards(SessionGuard)
+  @UseGuards(SessionGuard, PageAccessGuard)
   @UseFilters(FileTooLargeFilter)
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: CRELINK_LIMITS.imageMaxBytes, files: 1 } }))
   async upload(
-    @CurrentUser() user: SessionUser,
+    @CurrentPage() page: PageContext,
     @UploadedFile() file: Express.Multer.File | undefined,
   ): Promise<UploadFileResponse> {
-    return this.files.upload(user.id, file);
+    return this.files.upload(page.ownerUserId, file);
   }
 
   /** 공개 이미지. id는 추측하기 어려운 UUID이며 내용이 바뀌지 않으므로 오래 캐시합니다. */

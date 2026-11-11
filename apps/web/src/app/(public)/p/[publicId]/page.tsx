@@ -1,4 +1,5 @@
 import {
+  CHANNEL_LINK_VIA_PARAM,
   CRELINK_API_PATHS,
   CRELINK_WEB_PATHS,
   LANDING_PASS_PARAM,
@@ -14,6 +15,7 @@ import { cache } from 'react';
 import { Landing } from '../../../../components/landing/Landing';
 import { PassCleanup } from '../../../../components/landing/PassCleanup';
 import { VisitorTracker } from '../../../../components/landing/VisitorTracker';
+import { readLandingVia } from '../../../../lib/channel-links';
 import { serverApi, ServerApiError, type ServerApiResult } from '../../../../lib/api/server';
 
 export const dynamic = 'force-dynamic';
@@ -23,13 +25,20 @@ type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-/** 메타데이터와 화면이 같은 요청 안에서 한 번만 조회하도록 묶습니다. 통과 표시 검증 결과가 달라지므로 `pass`도 키에 넣습니다. */
+/**
+ * 메타데이터와 화면이 같은 요청 안에서 한 번만 조회하도록 묶습니다. 통과 표시 검증 결과가 달라지므로 `pass`도 키에 넣고,
+ * 채널 주소 code(`via`)에 따라 `shortUrl`·`utm`이 달라지므로 `via`도 키에 넣습니다.
+ */
 const loadLanding = cache(
-  async (publicId: string, pass: string | undefined): Promise<ServerApiResult<PublicLandingResponse>> => {
+  async (
+    publicId: string,
+    pass: string | undefined,
+    via: string | undefined,
+  ): Promise<ServerApiResult<PublicLandingResponse>> => {
     try {
       return {
         ok: true,
-        data: await serverApi<PublicLandingResponse>(CRELINK_API_PATHS.publicLanding(publicId, pass)),
+        data: await serverApi<PublicLandingResponse>(CRELINK_API_PATHS.publicLanding(publicId, pass, via)),
       };
     } catch (error) {
       if (error instanceof ServerApiError) return { ok: false, error };
@@ -44,6 +53,9 @@ const loadLanding = cache(
  * - 단축 주소 리디렉트가 붙인 통과 표시(`?pass=`)를 API가 받아들인 경우(`passAccepted`).
  * 그 밖(외부 링크, 주소창 직접 입력, 메신저 미리보기 봇, Sec-Fetch 헤더를 보내지 않는 클라이언트)은 현재 단축 주소로 보내
  * 방문을 기록하게 합니다. 무효·만료 표시도 단축 주소에서 새 표시를 받아 돌아오므로 반복되지 않습니다.
+ * 채널 주소(`GET {SHORT}/s/{code}`)로 들어온 방문은 주소창에 UTM 대신 `via={code}`만 남습니다. API가 `via`를 이 페이지의 code로 확인하면
+ * `shortUrl`이 `{SHORT}/s/{code}`이고 저장된 `utm`이 함께 오므로, 통과 표시가 없을 때는 그 주소로 돌려보내 채널 UTM으로 다시 기록하고
+ * (UTM은 주소에 붙이지 않음) 화면의 방문 계측에는 그 `utm`을 넘깁니다. 다른 페이지의 code나 틀린 값은 API가 무시해 기존 동작 그대로입니다.
  * 랜딩 오류(404·410·API 오류)는 보낼 곳이 없거나 모르므로 리디렉트하지 않고 오류 화면을 그립니다.
  * 이 화면 위에 `loading.tsx`(Suspense 경계)를 두면 응답이 먼저 나가 리디렉트가 HTTP 307이 아닌 200 + meta refresh가 되므로 두지 않습니다.
  */
@@ -51,10 +63,12 @@ async function loadForRequest({ params, searchParams }: Props) {
   const [{ publicId }, query] = await Promise.all([params, searchParams]);
   const value = query[LANDING_PASS_PARAM];
   const pass = typeof value === 'string' ? value : undefined;
-  const result = await loadLanding(publicId, pass);
-  const utm = readLandingUtm(query);
+  const via = readLandingVia(query[CHANNEL_LINK_VIA_PARAM]);
+  const result = await loadLanding(publicId, pass, via);
+  const channelUtm = result.ok ? result.data.utm : undefined;
+  const utm = channelUtm ?? readLandingUtm(query);
   if (result.ok && !result.data.passAccepted && (await headers()).get('sec-fetch-site') !== 'same-origin') {
-    redirect(withLandingUtm(result.data.shortUrl, utm));
+    redirect(channelUtm ? result.data.shortUrl : withLandingUtm(result.data.shortUrl, utm));
   }
   return { result, hasPass: value !== undefined, utm };
 }

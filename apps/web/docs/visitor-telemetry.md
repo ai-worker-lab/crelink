@@ -5,7 +5,7 @@
 ## 경계와 데이터
 
 - 공개 `/p/[publicId]`의 서버 응답에 `passAccepted`, `telemetryToken`, `telemetrySessionKey`가 함께 있을 때만 `VisitorTracker`를 마운트합니다. 재사용되는 `Landing`, 홈 예시, 관리 미리보기에는 수집기를 두지 않습니다.
-- 서버에서 `readLandingUtm`으로 `utm_source`, `utm_medium`, `utm_campaign`, `utm_id`, `utm_term`, `utm_content`만 고릅니다. 공개 주소에서 단축 주소로 보내는 리디렉트에도 같은 값만 보존하며, 통과 표시는 기존 `PassCleanup`이 제거합니다. 브라우저 수집기는 주소 쿼리를 다시 읽지 않습니다.
+- 서버에서 `readLandingUtm`으로 `utm_source`, `utm_medium`, `utm_campaign`, `utm_id`, `utm_term`, `utm_content`만 고릅니다. 공개 주소에서 단축 주소로 보내는 리디렉트에도 같은 값만 보존하며, 통과 표시는 기존 `PassCleanup`이 제거합니다. 브라우저 수집기는 주소 쿼리를 다시 읽지 않습니다. 채널별 짧은 주소(`/s/{code}`)로 들어온 방문은 주소창에 UTM 대신 `via={code}`만 남고, 이때는 공개 랜딩 API가 `via`를 확인해 내려 준 `utm`(저장 프리셋)을 서버가 `VisitorTracker`에 넘깁니다. 통과 표시가 없는 `via` 주소는 `shortUrl`(`/s/{code}`)로 돌려보내며 이때 UTM을 주소에 붙이지 않습니다. 다른 페이지의 code나 형식이 틀린 `via`는 API가 무시해 기존 동작과 같습니다. 근거 [채널별 짧은 주소 설계](../../../docs/specs/channel-links.md).
 - `data-visitor-kind`·`data-visitor-id`로 표시한 블록·링크·SNS·포트폴리오·크리에이터 배너·광고 배너만 대상으로 삼습니다. 목적 URL·제목·화면 글자·폼 입력값은 읽거나 전송하지 않습니다.
 - 언어·시간대·viewport/screen 크기·픽셀 비율은 최초 페이지뷰에서 허용한 키와 범위로만 보냅니다. 이 값은 브라우저의 보고이며 실명·정확한 위치·사람 방문의 증명이 아닙니다.
 - API는 서명 토큰으로 기존 익명 단축 방문에 연결합니다. BFF는 수집 경로에 클라이언트 IP 헤더를 넘기지 않고, 로그인 쿠키는 본인 방문 표시(0233)를 위해 랜딩 이벤트에 `cl_session`만 넘깁니다. 가입 경로 합계에는 넘기지 않습니다.

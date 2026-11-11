@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
+import { isPageOwner } from '../../lib/api/page-context';
 import { firstRunGuidePlacement } from '../../lib/first-run-guide';
 import { useWideLayout } from '../../lib/use-wide-layout';
 import { BannerSlotNotice } from './BannerSlotSection';
 import { FirstRunGuide } from './FirstRunGuide';
 import { useManager } from './ManagerContext';
 import { ManagerStage, NarrowBar, PreviewLanding, type PreviewMode } from './ManagerPreview';
+import { instagramMenuVisible } from './instagram/state';
 import { MANAGER_MENU, managerHref, managerMenuLabel, type ManagerMenuSegment } from './menu';
 
 /**
@@ -73,11 +75,18 @@ function useMenuSegment(): ManagerMenuSegment {
 /** 관리 메뉴. 메뉴는 주소가 바뀌는 이동이라 탭 위젯이 아니라 링크 목록이고, 지금 메뉴에 `aria-current="page"`를 둡니다. */
 function ManagerMenu() {
   const pathname = usePathname();
-  const { publicId } = useManager().state.landing;
+  const { state } = useManager();
+  const { publicId } = state.landing;
+  // `채널 주소`는 소유자 전용입니다(API가 편집자에게 403). 편집자에게는 메뉴를 보이지 않습니다.
+  const owner = isPageOwner(state.pageAccess);
+  // `인스타그램 DM`도 소유자 전용이며, 운영자 스위치·설정이 켜져 API가 `instagramDmAvailable`을 true로 줄 때만 보입니다.
+  const instagram = instagramMenuVisible(state);
   return (
     <nav className="manager-menu" aria-label="관리 메뉴">
       <ul>
-        {MANAGER_MENU.map((item) => {
+        {MANAGER_MENU.filter(
+          (item) => (item.segment !== 'channels' || owner) && (item.segment !== 'instagram' || instagram),
+        ).map((item) => {
           const href = managerHref(publicId, item.segment);
           return (
             <li key={item.segment}>

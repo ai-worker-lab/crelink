@@ -9,6 +9,7 @@
 | 토큰 값 | `packages/design-tokens/src/tokens.json` | 저장소 |
 | OpenDesign 공통 슬롯 대응 | `packages/design-tokens/src/opendesign.json` | 저장소 |
 | 디자인 시스템 패키지 | `design/system/`(`DESIGN.md`는 직접 작성, `tokens.css`·`manifest.json`은 생성물) | 저장소 |
+| 웹 공통 부품 현황 | [컴포넌트 카탈로그](component-catalog.md) | 저장소(동작의 원본은 `apps/web/src/`) |
 | 생성·수정·미리보기·대화 이력 | OpenDesign 프로젝트(OpenDesign 데이터 폴더) | OpenDesign |
 | 구현에 넘기는 화면·상태·인계 문서 | `design/<기능>/` | 저장소 |
 
