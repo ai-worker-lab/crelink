@@ -146,6 +146,7 @@ describe('API 기동과 health', () => {
         { version: '0015_channel_links' },
         { version: '0016_instagram_dm' },
         { version: '0017_instagram_public_reply' },
+        { version: '0018_landing_event_owner' },
       ]);
     } finally {
       await client.end();

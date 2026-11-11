@@ -14,6 +14,7 @@ import {
 import { apiError, UUID_PATTERN } from '../common/http';
 import { Database } from '../database';
 import { STATS_TIME_ZONE } from '../retention/retention.service';
+import { isMetaCrawlerIp } from './bot-ip';
 import { analyticsRange } from './date-range';
 import { ANALYTICS_DIMENSIONS, ANALYTICS_DIMENSIONS_SQL } from './dimensions';
 
@@ -27,6 +28,8 @@ type DailyRow = {
   sessions: string;
   daily_visitors?: string;
   daily_sessions?: string;
+  owner_page_views?: string;
+  owner_unique_visitors?: string;
   clicked_page_views: string;
   scroll_25: string;
   scroll_50: string;
@@ -111,20 +114,27 @@ export class AnalyticsService {
         AND e.occurred_at >= ($3::date::timestamp AT TIME ZONE $5)
         AND e.occurred_at < (($4::date+1)::timestamp AT TIME ZONE $5)`;
       const rolledRange = `short_link_id IN (SELECT id FROM scope) AND day BETWEEN $3::date AND $4::date`;
-      // 합계에서 뺄 User-Agent를 판별 함수 하나로 고릅니다. SQL은 값 비교만 하고 원문은 응답에 넣지 않습니다.
-      const agents = await db.query<{ user_agent: string }>(
-        `${scope}
-          SELECT DISTINCT user_agent FROM (
-            SELECT e.user_agent FROM landing_events e WHERE e.short_link_id IN (SELECT id FROM scope)
+      // 합계에서 뺄 User-Agent·IP를 판별 함수로 고릅니다. SQL은 값 비교만 하고 원문은 응답에 넣지 않습니다.
+      const storedValues = (column: 'user_agent' | 'ip') =>
+        db.query<{ value: string }>(
+          `${scope}
+          SELECT DISTINCT ${column} AS value FROM (
+            SELECT e.${column} FROM landing_events e WHERE e.short_link_id IN (SELECT id FROM scope)
               AND e.occurred_at < (($4::date+1)::timestamp AT TIME ZONE $5)
-            UNION ALL SELECT e.user_agent FROM visits e WHERE ${rawRange}
-            UNION ALL SELECT e.user_agent FROM link_clicks e WHERE ${rawRange}
-            UNION ALL SELECT e.user_agent FROM creator_banner_clicks e WHERE ${rawRange}
-          ) stored WHERE user_agent IS NOT NULL`,
-        params,
-      );
-      const rawParams = [...params, agents.rows.map((row) => row.user_agent).filter((agent) => isBotUserAgent(agent))];
-      const isBot = `coalesce(e.user_agent = ANY($6::text[]),false)`;
+            UNION ALL SELECT e.${column} FROM visits e WHERE ${rawRange}
+            UNION ALL SELECT e.${column} FROM link_clicks e WHERE ${rawRange}
+            UNION ALL SELECT e.${column} FROM creator_banner_clicks e WHERE ${rawRange}
+          ) stored WHERE ${column} IS NOT NULL`,
+          params,
+        );
+      const agents = await storedValues('user_agent');
+      const addresses = await storedValues('ip');
+      const rawParams = [
+        ...params,
+        agents.rows.map((row) => row.value).filter((agent) => isBotUserAgent(agent)),
+        addresses.rows.map((row) => row.value).filter((ip) => isMetaCrawlerIp(ip)),
+      ];
+      const isBot = `(coalesce(e.user_agent = ANY($6::text[]),false) OR coalesce(e.ip = ANY($7::inet[]),false))`;
       const rawDaily = await db.query<DailyRow>(
         `${scope}
           SELECT (e.occurred_at AT TIME ZONE $5)::date::text AS day,
@@ -136,6 +146,8 @@ export class AnalyticsService {
             count(DISTINCT e.session_id) FILTER(WHERE e.kind='page_view') AS sessions,
             count(DISTINCT (e.short_link_id,e.visitor_id)) FILTER(WHERE e.kind='page_view') AS daily_visitors,
             count(DISTINCT (e.short_link_id,e.session_id)) FILTER(WHERE e.kind='page_view') AS daily_sessions,
+            count(*) FILTER(WHERE e.kind='page_view' AND e.is_owner) AS owner_page_views,
+            count(DISTINCT e.visitor_id) FILTER(WHERE e.kind='page_view' AND e.is_owner) AS owner_unique_visitors,
             count(*) FILTER(WHERE e.kind='page_view' AND EXISTS(SELECT 1 FROM landing_events c
               WHERE c.page_view_id=e.page_view_id AND c.kind='click')) AS clicked_page_views,
             count(*) FILTER(WHERE e.kind='page_view' AND e.scroll_percent>=25) AS scroll_25,
@@ -169,15 +181,24 @@ export class AnalyticsService {
         sessions: string;
         daily_visitors: string;
         daily_sessions: string;
+        owner_page_views: string;
+        owner_visitors: string;
+        first_owner_day: string | null;
       }>(
         `${scope}, views AS (
           SELECT e.*,(e.occurred_at AT TIME ZONE $5)::date AS day FROM landing_events e
           WHERE ${rawRange} AND NOT ${isBot} AND e.kind='page_view'
         ) SELECT count(DISTINCT visitor_id) AS visitors,count(DISTINCT session_id) AS sessions,
+          count(*) FILTER(WHERE is_owner) AS owner_page_views,
+          count(DISTINCT visitor_id) FILTER(WHERE is_owner) AS owner_visitors,
+          (SELECT min((e.occurred_at AT TIME ZONE $5)::date)::text FROM landing_events e
+            WHERE e.short_link_id IN (SELECT id FROM scope) AND NOT ${isBot} AND e.kind='page_view' AND e.is_owner) AS first_owner_day,
           (SELECT coalesce(sum(n),0) FROM (SELECT count(DISTINCT visitor_id) n FROM views GROUP BY day,short_link_id) d) AS daily_visitors,
           (SELECT coalesce(sum(n),0) FROM (SELECT count(DISTINCT session_id) n FROM views GROUP BY day,short_link_id) d) AS daily_sessions FROM views`,
         rawParams,
       );
+      // 컬럼 추가 전 행은 false라 본인이 없었는지 알 수 없습니다. 조회 범위의 첫 본인 표시부터만 값을 냅니다.
+      const firstOwnerDay = exact.rows[0].first_owner_day;
       const rawDimensions = await db.query<RawDimensionRow>(
         `${scope}
           SELECT d.dimension,coalesce(nullif(d.value,''),'unknown') AS value,count(*) AS count,
@@ -272,6 +293,8 @@ export class AnalyticsService {
             legacyVisits: 0,
             legacyLinkClicks: 0,
             legacyCreatorBannerClicks: 0,
+            ownerPageViews: firstOwnerDay !== null && day >= firstOwnerDay ? 0 : null,
+            ownerUniqueVisitors: firstOwnerDay !== null && day >= firstOwnerDay ? 0 : null,
           },
         ]),
       );
@@ -286,9 +309,15 @@ export class AnalyticsService {
         if (archived) {
           day.uniqueVisitors = null;
           day.sessions = null;
+          day.ownerPageViews = null;
+          day.ownerUniqueVisitors = null;
         } else {
           day.uniqueVisitors = Number(row.unique_visitors);
           day.sessions = Number(row.sessions);
+          if (day.ownerPageViews !== null) {
+            day.ownerPageViews = Number(row.owner_page_views);
+            day.ownerUniqueVisitors = Number(row.owner_unique_visitors);
+          }
         }
         for (const [field, column] of [
           ['clickedPageViews', 'clicked_page_views'],
@@ -325,6 +354,7 @@ export class AnalyticsService {
       const archived = rolledDaily.rows.length > 0;
       summary.uniqueVisitors = archived ? null : Number(exact.rows[0].visitors);
       summary.sessions = archived ? null : Number(exact.rows[0].sessions);
+      const ownerKnown = !archived && firstOwnerDay !== null && range.to >= firstOwnerDay;
       summary.dailyPageUniqueVisitors =
         Number(exact.rows[0].daily_visitors) +
         rolledDaily.rows.reduce((sum, row) => sum + Number(row.unique_visitors), 0);
@@ -451,6 +481,10 @@ export class AnalyticsService {
           pageViews: archived ? null : Number(excluded.rows[0].page_views),
           visits: excluded.rows[0].legacy_rollups ? null : Number(excluded.rows[0].visits),
           redirectClicks: excluded.rows[0].legacy_rollups ? null : Number(excluded.rows[0].redirect_clicks),
+        },
+        ownerVisits: {
+          pageViews: ownerKnown ? Number(exact.rows[0].owner_page_views) : null,
+          uniqueVisitors: ownerKnown ? Number(exact.rows[0].owner_visitors) : null,
         },
         targets: targets.rows.map((row) => ({
           targetKind: row.target_kind,

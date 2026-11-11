@@ -65,7 +65,7 @@ async function loadBffRoute() {
       "export const apiOrigin='https://api.test'; export const apiRequestHeaders=(init)=>new Headers(init);",
     ),
     '../../../../lib/api/visitor-event': dataModule(
-      'export const forwardVisitorEvent=()=>{}; export const readVisitorEventBody=()=>{};',
+      'export const forwardVisitorEvent=(body,send)=>send(body); export const readVisitorEventBody=async()=>({type: "pageview"});',
     ),
   })) {
     compiled = compiled
@@ -76,11 +76,13 @@ async function loadBffRoute() {
 }
 
 describe('Instagram DM BFF 전달', () => {
-  async function send(path: string, requestHeaders: Record<string, string>, method = 'POST') {
+  async function send(path: string, requestHeaders: Record<string, string>, method = 'POST', session?: string) {
     const route = await loadBffRoute();
     const original = globalThis.fetch;
     const upstream: string[] = [];
-    globalThis.fetch = async (url) => {
+    const forwardedHeaders: Headers[] = [];
+    globalThis.fetch = async (url, init) => {
+      forwardedHeaders.push(new Headers(init?.headers));
       upstream.push(String(url));
       return new Response(null, { status: 204 });
     };
@@ -90,15 +92,55 @@ describe('Instagram DM BFF 전달', () => {
         headers: requestHeaders,
         body: method === 'GET' ? undefined : '{"token":"opaque"}',
       });
-      Object.assign(request, { nextUrl: new URL(request.url), cookies: { get: () => undefined } });
+      Object.assign(request, {
+        nextUrl: new URL(request.url),
+        cookies: { get: () => (session ? { value: session } : undefined) },
+      });
       const response = (await route[method](request, {
         params: Promise.resolve({ path: path.split('/') }),
       })) as Response;
-      return { response, upstream };
+      return { response, upstream, forwardedHeaders };
     } finally {
       globalThis.fetch = original;
     }
   }
+
+  it('로그인 세션은 랜딩 방문 수집에만 전달하고 가입 경로 수집에는 전달하지 않는다', async () => {
+    const headers = { origin: 'https://web.test', host: 'web.test' };
+    for (const [path, expectedCookie] of [
+      ['api/landings/abc123def4/events', 'cl_session=owner-test-session'],
+      ['api/signup-funnel/events', null],
+    ] as const) {
+      const result = await send(path, headers, 'POST', 'owner-test-session');
+      assert.equal(result.response.status, 204, path);
+      assert.equal(result.forwardedHeaders.length, 1, path);
+      assert.equal(result.forwardedHeaders[0]!.get('cookie'), expectedCookie, path);
+    }
+    const anonymous = await send('api/landings/abc123def4/events', headers);
+    assert.equal(anonymous.response.status, 204);
+    assert.equal(anonymous.forwardedHeaders[0]!.get('cookie'), null);
+  });
+
+  it('공개 수신 거부의 IP 전달과 소유자 경로의 세션 전달을 유지한다', async () => {
+    const result = await send('api/public/instagram-dm-opt-outs', {
+      origin: 'https://web.test',
+      host: 'web.test',
+      'x-forwarded-for': '192.0.2.123',
+    });
+    assert.equal(result.response.status, 204);
+    assert.equal(result.forwardedHeaders[0]!.get('x-forwarded-for'), '192.0.2.123');
+    const owner = await send(
+      'api/me/instagram/connect',
+      {
+        origin: 'https://web.test',
+        host: 'web.test',
+      },
+      'POST',
+      'owner-test-session',
+    );
+    assert.equal(owner.response.status, 204);
+    assert.equal(owner.forwardedHeaders[0]!.get('cookie'), 'cl_session=owner-test-session');
+  });
 
   it('같은 출처의 공개 수신 거부만 API로 넘긴다', async () => {
     const path = 'api/public/instagram-dm-opt-outs';

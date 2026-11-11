@@ -62,6 +62,36 @@ describe('runMigrations', () => {
     expect((await pool.query('SELECT 1 FROM page_invites')).rowCount).toBe(0);
   });
 
+  it('0018은 기존 main 방문을 보존하고 기본 false를 추가해 이전 API 삽입과 호환된다', async () => {
+    const source = join(__dirname, '../migrations');
+    for (const name of readdirSync(source).filter((name) => name.endsWith('.sql') && name < '0018_')) {
+      copyFileSync(join(source, name), join(directory, name));
+    }
+    await runMigrations(pool, directory);
+    const user = await pool.query("INSERT INTO users(email) VALUES('owner-upgrade@example.com') RETURNING id");
+    const landing = await pool.query("INSERT INTO landings(user_id,public_id) VALUES($1,'upgrade001') RETURNING id", [
+      user.rows[0].id,
+    ]);
+    const short = await pool.query('INSERT INTO short_links(user_id,landing_id) VALUES($1,$2) RETURNING id', [
+      user.rows[0].id,
+      landing.rows[0].id,
+    ]);
+    const insert = () =>
+      pool.query(
+        `INSERT INTO landing_events(event_id,page_view_id,session_id,short_link_id,visitor_id,kind)
+       VALUES(gen_random_uuid(),gen_random_uuid(),gen_random_uuid(),$1,gen_random_uuid(),'page_view') RETURNING *`,
+        [short.rows[0].id],
+      );
+    const before = (await insert()).rows[0];
+    copyFileSync(join(source, '0018_landing_event_owner.sql'), join(directory, '0018_landing_event_owner.sql'));
+    await runMigrations(pool, directory);
+    await runMigrations(pool, directory);
+    const upgraded = await pool.query('SELECT * FROM landing_events WHERE event_id=$1', [before.event_id]);
+    expect(upgraded.rows).toEqual([{ ...before, is_owner: false }]);
+    expect((await insert()).rows[0].is_owner).toBe(false);
+    expect((await versions()).at(-1)).toBe('0018_landing_event_owner');
+  });
+
   it('디렉터리가 없으면 기록 테이블만 만들고 아무것도 적용하지 않는다', async () => {
     await runMigrations(pool, join(directory, 'missing'));
     expect(await versions()).toEqual([]);

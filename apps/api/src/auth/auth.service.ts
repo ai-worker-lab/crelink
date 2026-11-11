@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AccountKind, AI_TOKEN_PATTERN, COOKIE_NAMES, CRELINK_LIMITS, SessionUser, UserRole } from '@crelink/shared';
+import type { Request } from 'express';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { AppConfig } from '../config.service';
 import { Database, isUniqueViolation } from '../database';
@@ -156,6 +157,20 @@ export class AuthService {
     request.actor = { userId: user.id, email: user.email, kind, runId: null };
     setUserId(user.id);
     return request.actor;
+  }
+
+  /**
+   * 공개 경로가 로그인 사용자 ID만 알면 될 때 씁니다(0233 본인 방문 표시). 권한 판단에 쓰지 않습니다. `cl_session`만 보고 Bearer·Sentry user를 건드리지 않으며,
+   * 세션이 무효이거나 확인에 실패해도 던지지 않고 null입니다. 로그에는 세션·사용자 값을 남기지 않습니다.
+   */
+  async sessionUserId(request: Request): Promise<string | null> {
+    try {
+      const token = readCookie(request, COOKIE_NAMES.session);
+      return token ? ((await this.sessionAccount(token))?.id ?? null) : null;
+    } catch {
+      this.logger.warn('공개 경로의 세션 확인에 실패해 비로그인으로 처리합니다.');
+      return null;
+    }
   }
 
   /** 유효한 세션의 사용자. 만료·없는 세션이나 정지 사용자는 null입니다. */

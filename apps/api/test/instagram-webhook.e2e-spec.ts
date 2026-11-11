@@ -10,6 +10,7 @@ import { Database } from '../src/database';
 import { commenterHash } from '../src/instagram/crypto';
 import { LOCK_CONNECTIONS, LOCK_RULES, LOCK_SETTINGS } from '../src/instagram/lock-order';
 import { INSTAGRAM_WEBHOOK_BODY_LIMIT } from '../src/instagram/raw-body';
+import { InstagramWorkerService } from '../src/instagram/worker.service';
 import { api, createTestApp, login, TestApp, WEB_URL } from './test-app';
 
 const APP_SECRET = randomBytes(32).toString('hex');
@@ -161,7 +162,15 @@ describe('Instagram 웹훅 수신·데이터 삭제 콜백 (0257, docs/specs/ins
   };
 
   beforeAll(async () => {
-    t = await createTestApp({ env: INSTAGRAM_ENV });
+    t = await createTestApp({
+      env: INSTAGRAM_ENV,
+      configure: (app) => {
+        // 웹훅 자체의 조회 횟수와 저장을 검사합니다. 2초 주기 발송 worker가
+        // pool.query 감시에 끼거나 pending 행을 선점하지 않도록 타이머만 격리합니다.
+        // worker의 선점·발송·종료는 instagram-worker.e2e-spec.ts에서 따로 검증합니다.
+        jest.spyOn(app.get(InstagramWorkerService), 'onApplicationBootstrap').mockImplementation(() => undefined);
+      },
+    });
     database = t.app.get(Database);
     await setAudience('everyone');
   });

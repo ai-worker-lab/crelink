@@ -43,6 +43,9 @@ export interface AnalyticsDaily extends AnalyticsTotals {
   legacyVisits: number;
   legacyLinkClicks: number;
   legacyCreatorBannerClicks: number;
+  /** pageViews·uniqueVisitors에 포함된 본인 방문. 그날이 첫 본인 표시 전이거나 보존 집계이면 구분할 수 없어 null입니다(0이 아님). */
+  ownerPageViews: number | null;
+  ownerUniqueVisitors: number | null;
 }
 
 export interface AnalyticsTarget {
@@ -119,10 +122,15 @@ export interface AnalyticsReport {
    */
   visitorRecency: { newVisitors: number | null; returningVisitors: number | null };
   /**
-   * isBotUserAgent로 판별해 위 합계·분포·legacy에서 뺀 건수. 보존 집계는 User-Agent가 없어 구분할 수 없고 그대로 합계에 남으며,
+   * User-Agent(isBotUserAgent)와 서버 쪽 IP 판별로 위 합계·분포·legacy에서 뺀 건수. 보존 집계는 두 값이 없어 구분할 수 없고 그대로 합계에 남으며,
    * 그 구간이 섞이면 null입니다.
    */
   botExclusions: { pageViews: number | null; visits: number | null; redirectClicks: number | null };
+  /**
+   * summary의 pageViews·uniqueVisitors에 포함된 크리에이터 본인 방문(0233). 합계에서 빼지 않습니다. 로그인 상태의 방문만 표시되며 값은 건수뿐입니다.
+   * 조회 범위에 본인 표시가 아직 없거나 기간이 첫 표시 전이거나 보존 집계가 섞이면 null입니다(0이 아님).
+   */
+  ownerVisits: { pageViews: number | null; uniqueVisitors: number | null };
   /** 클릭·노출 내림차순 상위 100개 대상. */
   targets: AnalyticsTarget[];
 }

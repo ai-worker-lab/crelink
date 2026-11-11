@@ -76,7 +76,12 @@ for (const role of ['creator', 'operator'] as const) {
       if (mode === 'metrics') await page.getByText('일별 데이터 표 보기', { exact: true }).click();
       const recent = page.getByRole('region', { name: '최근 일별 데이터 가로 스크롤', exact: true });
       await expect(recent.locator('tbody tr')).toHaveCount(7);
-      const dates = await recent.locator('tbody th').allTextContents();
+      // Firefox 159의 DOM 배열 main-world 전달 경로에서 Page crashed가 재현되어,
+      // 같은 7개 셀을 개별로 읽습니다. 행 수·날짜 정렬·첫 날짜 검사는 유지합니다.
+      const dateCells = recent.locator('tbody th');
+      await expect(dateCells).toHaveCount(7);
+      const dates: string[] = [];
+      for (let i = 0; i < 7; i += 1) dates.push((await dateCells.nth(i).textContent()) ?? '');
       expect(dates).toEqual([...dates].sort().reverse());
       expect(dates[0]).toBe(recentRange(30).to);
       expect(
