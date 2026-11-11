@@ -2,6 +2,21 @@
 
 내부 참고용으로 백엔드 API의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-11-11
+
+- Instagram DM 자동 접미사 제거(0269): 웹훅이 `rule.message`를 그대로 저장하며 채널 링크와 수신 거부 토큰을 본문에 붙이지 않습니다. 사용하지 않는 채널 코드 조회를 제거하고 공백·줄바꿈·직접 입력 링크·이모지가 있는 문구의 본문 일치 회귀를 갱신했습니다. 근거: `src/instagram/webhook.service.ts`, `test/instagram-webhook.e2e-spec.ts`.
+
+- QA D1·D2·D4·D5·D6: 웹훅 원문·서명 디버그 로그를 제거하고 migration 검증을 갱신했습니다. 공개 답글 뒤 DM 직전에 발송 조건·lease를 재확인하며 granular scope 조회는 대상 10개 초과 및 개별 조회 실패 시 안전하게 실패합니다. 근거: `src/instagram/{webhook.controller,worker.service,graph}.ts`, `test/health.e2e-spec.ts`.
+  - 검증: API `pnpm typecheck`, Graph 단위 시험 35건, 루트 `pnpm work:scope 0269` 통과. 요청된 E2E 5개는 DB `127.0.0.1:6652` 연결 `EPERM`으로 검증 불가(254건 실패). shared 시험은 D3 기대값 누락으로 134건 중 1건 실패. shared·web은 이 세션 쓰기 범위 밖이므로 D3·D7·D10 미적용.
+
+- Instagram 선택지 A 안정화: OAuth popup/login 파라미터와 공개 답글 Graph 요청 테스트를 추가했습니다. Unified Login 직접 할당·granular scope 계정 조회를 검증하고 잘못된 target ID를 제외합니다. DM 재시도 때 공개 답글을 반복하지 않도록 답글 결과를 먼저 저장하며 로그에서 댓글 ID를 제거했습니다. 계약 응답·300자 경계·답글 실패 후 DM 지속 회귀를 추가했습니다. 근거: `src/instagram/graph.ts`, `src/instagram/worker.service.ts`, [운영 안내](docs/README.md#instagram-공개-답글과-unified-login-보강).
+
+
+- Instagram 댓글 자동 DM QA 결함 수정(0269): 발송 행에 `rule_version`을 두어 호출 중 규칙이 바뀌면 재시도·레이트 대기로 옛 문구를 보내지 않고 `cancelled`로 끝냅니다. 호출 직전 판정(`SENDABLE_SQL`)에 수신 거부를 넣었습니다. 잠금 순서를 `platform_settings → instagram_connections → users → instagram_dm_rules → instagram_dm_deliveries`로 고정했습니다(`src/instagram/lock-order.ts`). 웹훅은 트랜잭션에서 순서대로 잠근 뒤 INSERT하고 실패(40P01 포함)는 503입니다. `audience` 변경과 수신 거부는 연결 행을 먼저 잡고, worker `sweep`은 `SKIP LOCKED`입니다. 다른 크리링 계정이 운영자 정지된 IG 계정을 연결하면 409 `instagram_operator_paused`입니다(같은 계정 재연결은 유지). `instagram_opt_out_owners`(연결 때 upsert, 일반 해제 뒤에도 유지, 데이터 삭제 콜백이 파기)를 더했습니다. 규칙 키워드·문구의 NUL은 외부 호출 전에 400이고, 규칙 생성은 Graph 호출을 잠금 밖에서 하며(페이지 순회 10쪽 상한) 호출 뒤 잠금에서 한도·중복을 다시 검사하고 채널 주소 생성과 규칙 저장을 한 트랜잭션으로 묶습니다(`ChannelLinksService.create`가 client를 받습니다). migration 0016을 직접 고쳤습니다(아직 main에 없음). [설계](../../docs/specs/instagram-comment-dm.md), [티켓](../../docs/work/orchestrator/0269-instagram-dm-integration.md).
+- Instagram 댓글 자동 DM(0256~0261, 0269): OAuth 연결과 일일 토큰 점검, 웹훅 수신·데이터 삭제 콜백, 발송 worker(`crelink.instagram.dm` 지표), 규칙·게시물·발송 내역 API, 긴급 정지와 90일 보존을 더했습니다. 통합 보정(0269): 운영자 정지 중인 연결의 `DELETE /api/me/instagram`은 행을 지우지 않고 재인증 전이(토큰 파기·대기 취소)와 규칙 보관만 해 재연결로 `operator_paused_at`이 사라지지 않습니다. 호출 중 정지·비활성이 생기면 재시도·레이트 대기로 `pending`에 되돌리지 않고 `cancelled`(`stopped_before_send`)로 끝내며 레이트 제한의 시도 횟수 미차감은 유지합니다. `crelink.instagram.webhook`·`crelink.instagram.dm`을 `BusinessMetric`에 더했습니다. 실제 Meta 연동은 미검증입니다. [설계](../../docs/specs/instagram-comment-dm.md), [티켓](../../docs/work/orchestrator/0269-instagram-dm-integration.md).
+
+- Instagram 댓글 자동 DM 기반(0254): migration `0016_instagram_dm`(연결·규칙·발송·수신 거부·삭제 요청 표, `platform_settings.instagram_dm_audience` 기본 `off`), `src/instagram/`의 암호화(`crypto.ts`: AES-256-GCM·행 ID AAD·키 회전·작성자 해시·수신 거부 토큰), Graph 경계(`graph.ts`: `v27.0`, 허용된 코드·서브코드만 남기고 원문을 버림), 뒤 티켓용 빈 controller·service와 모듈 등록을 추가했습니다. 설정 8개 키는 전부 있거나 전부 없어야 하고(`AppConfig.instagram`, 없으면 null) `PRODUCTION_REQUIRED_KEYS`에 넣지 않았습니다. Sentry에 `x-hub-signature-256`, 쿼리 `access_token`·`client_secret`·`hub.verify_token`, Meta 토큰 형식(`EAA…`) 스크럽을 더했습니다. 공개 경로는 아직 없습니다. 실제 Meta 호출은 하지 않았고 `[M?]` 호출 형식은 미실측입니다. [설계](../../docs/specs/instagram-comment-dm.md), [티켓](../../docs/work/api/0254-instagram-dm-foundation.md).
+
 ## 2026-11-10
 
 - 공유관리 페이지 API(0243): `0014_shared_pages.sql`, 초대·멤버·페이지 목록 계약과 경로를 추가했습니다. `SessionGuard` 다음 `PageAccessGuard`가 헤더 대상 권한을 매 요청 조회하고 인증 사용자·행위자를 유지한 채 서비스에 대상 소유자 id를 전달합니다. 파일 소유자·통계·방명록 공동 관리와 초대 보존을 적용했습니다. 초대는 SHA-256만 저장하고 소유자 행 잠금·조건부 소비로 동시 수락을 제한합니다. 웹/BFF 전달은 후속 0244 범위입니다. 검증 제한과 실행 결과는 [0243](../../docs/work/api/0243-shared-pages-api.md)에 기록합니다.

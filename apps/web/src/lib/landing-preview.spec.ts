@@ -89,6 +89,7 @@ function state(patch: Partial<CreatorLandingState> = {}): CreatorLandingState {
     bannerLimits: { visibleMax: 5, visibleUsed: 0, totalMax: 20, totalUsed: 0 },
     // 광고 블록 기존 시험은 두 스위치가 모두 켜진 상태에서 봅니다(꺼진 경우는 `ad_off` 시험).
     adBlock: { platformEnabled: true, enabled: true },
+    instagramDmAvailable: false,
     ...patch,
   };
 }

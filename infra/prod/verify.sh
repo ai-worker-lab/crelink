@@ -44,5 +44,13 @@ done
 check "채널 주소 /s/zzzzzzz 302" 302 "$(code "$short/s/zzzzzzz")"
 check "채널 주소 /s/zzzzzzz → notice" "$web/notice?reason=link_not_found" \
 	"$(curl -s -o /dev/null --max-time 20 -w '%{redirect_url}' "$short/s/zzzzzzz")"
+# Instagram 웹훅 공개 경로(docs/specs/instagram-comment-dm.md `웹훅 수신 경로`): web이 아니라 API가 답하는지 본다. API 응답은 라우트 배포 전 404, 설정 키 없으면 503,
+# 설정 뒤 토큰 없는 GET은 403이고 web으로 잘못 가면 Next의 HTML 404다. 그래서 상태와 함께 HTML이 아닌지로 구분한다. 토큰 없는 GET만 보내고 쓰기 요청은 보내지 않는다.
+webhook="$(curl -s -o /dev/null --max-time 20 -w '%{http_code} %{content_type}' "$web/api/webhooks/instagram")"
+case "$webhook" in
+*html*) ;;
+403\ * | 404\ * | 503\ *) webhook=api ;;
+esac
+check "Instagram 웹훅 경로는 API가 응답" api "$webhook"
 check "API 직접 접근 차단" 404 "$(code "$short/api/health")"
 exit "$fail"

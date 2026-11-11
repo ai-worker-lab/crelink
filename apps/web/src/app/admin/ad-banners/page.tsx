@@ -1,22 +1,29 @@
-import { CRELINK_API_PATHS, type AdBannerListResponse, type AdBlockSettingView } from '@crelink/shared';
+import {
+  CRELINK_API_PATHS,
+  type AdBannerListResponse,
+  type AdBlockSettingView,
+  type InstagramDmSettingsView,
+} from '@crelink/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AdBanners } from '../../../components/admin/AdBanners';
 import { AdBlockSetting } from '../../../components/admin/AdBlockSetting';
 import { AdminShell } from '../../../components/admin/AdminShell';
+import { InstagramDmSetting } from '../../../components/admin/InstagramDmSetting';
 import { loadSignedIn } from '../../../lib/api/server';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: '광고 배너 · 운영자', robots: { index: false } };
 
 /**
- * 운영자 크리링 광고 배너(R20 ④⑧⑨)와 플랫폼 광고 블록 스위치(R20 ⑩). 전체 목록과 스위치 상태를 서버에서 함께 읽고,
+ * 운영자 크리링 광고 배너(R20 ④⑧⑨), 플랫폼 광고 블록 스위치(R20 ⑩), 인스타그램 DM 스위치(0266). 전체 목록과 스위치 상태를 서버에서 함께 읽고,
  * 걸러보기·정렬·등록은 `AdBanners`, 스위치는 `AdBlockSetting`이 맡습니다. 스위치 상태만 못 읽으면 그 카드 자리에 오류와 `다시 시도`를 둡니다.
  */
 export default async function AdBannersPage() {
-  const [result, adBlock] = await Promise.all([
+  const [result, adBlock, instagramDm] = await Promise.all([
     loadSignedIn<AdBannerListResponse>(CRELINK_API_PATHS.adminAdBanners),
     loadSignedIn<AdBlockSettingView>(CRELINK_API_PATHS.adminAdBlock),
+    loadSignedIn<InstagramDmSettingsView>(CRELINK_API_PATHS.adminInstagramDm),
   ]);
   return (
     <AdminShell
@@ -28,19 +35,34 @@ export default async function AdBannersPage() {
         <AdBanners
           list={result.data}
           adBlock={
-            adBlock.ok ? (
-              <AdBlockSetting setting={adBlock.data} />
-            ) : (
-              <section className="card" aria-labelledby="ad-block-error-title">
-                <h2 id="ad-block-error-title">광고 블록</h2>
-                <p className="form-error" role="alert">
-                  광고 블록 설정을 불러오지 못했어요. {adBlock.error.message}
-                </p>
-                <Link className="secondary" href="/admin/ad-banners">
-                  다시 시도
-                </Link>
-              </section>
-            )
+            <>
+              {adBlock.ok ? (
+                <AdBlockSetting setting={adBlock.data} />
+              ) : (
+                <section className="card" aria-labelledby="ad-block-error-title">
+                  <h2 id="ad-block-error-title">광고 블록</h2>
+                  <p className="form-error" role="alert">
+                    광고 블록 설정을 불러오지 못했어요. {adBlock.error.message}
+                  </p>
+                  <Link className="secondary" href="/admin/ad-banners">
+                    다시 시도
+                  </Link>
+                </section>
+              )}
+              {instagramDm.ok ? (
+                <InstagramDmSetting setting={instagramDm.data} />
+              ) : (
+                <section className="card" aria-labelledby="instagram-dm-error-title">
+                  <h2 id="instagram-dm-error-title">인스타그램 DM</h2>
+                  <p className="form-error" role="alert">
+                    인스타그램 DM 설정을 불러오지 못했어요. {instagramDm.error.message}
+                  </p>
+                  <Link className="secondary" href="/admin/ad-banners">
+                    다시 시도
+                  </Link>
+                </section>
+              )}
+            </>
           }
         />
       ) : null}

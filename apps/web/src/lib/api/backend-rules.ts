@@ -5,6 +5,8 @@ export const backendRules: ReadonlyArray<{
   pattern: RegExp;
   upload?: true;
   visitorEvent?: true;
+  /** Caddy가 넣은 방문자 IP를 API로 넘깁니다. 공개 쓰기 경로의 IP 한도에 씁니다. */
+  forwardClientIp?: true;
   signupInAppKind?: true;
 }> = [
   { methods: ['GET'], pattern: /^api\/health$/ },
@@ -64,4 +66,16 @@ export const backendRules: ReadonlyArray<{
   // AI 운영자(설계 docs/specs/crelink-ai-operator.md `화면 상태와 API 대응`). 조회 GET은 서버 렌더만 부르므로 넣지 않습니다.
   { methods: ['PUT'], pattern: /^api\/admin\/ai-operator\/pause$/ },
   { methods: ['PUT'], pattern: new RegExp(`^api/admin/ai-operator/tokens/${ID}/revoke$`) },
+  // Instagram 댓글 자동 DM(설계 docs/specs/instagram-comment-dm.md `API 계약 초안`): 소유자 경로와 공개 수신 거부.
+  // 콜백은 state 쿠키가 필요해 전용 route(`/me/integrations/instagram/callback`)만 부르고, 웹훅은 Meta가 API로 직접 부르므로 넣지 않습니다.
+  { methods: ['GET', 'DELETE'], pattern: /^api\/me\/instagram$/ },
+  { methods: ['POST'], pattern: /^api\/me\/instagram\/(connect|recheck)$/ },
+  { methods: ['PUT'], pattern: /^api\/me\/instagram\/pause$/ },
+  { methods: ['GET'], pattern: /^api\/me\/instagram\/(media|deliveries)$/ },
+  { methods: ['GET', 'POST'], pattern: /^api\/me\/instagram\/rules$/ },
+  { methods: ['PATCH', 'DELETE'], pattern: /^api\/me\/instagram\/rules\/[a-z0-9]{10}$/ },
+  { methods: ['POST'], pattern: /^api\/public\/instagram-dm-opt-outs$/, forwardClientIp: true },
+  // 운영자 스위치와 계정별 정지. 설정 `GET`은 서버 렌더만 부르므로 넣지 않습니다.
+  { methods: ['PUT'], pattern: /^api\/admin\/instagram-dm$/ },
+  { methods: ['PUT'], pattern: new RegExp(`^api/admin/instagram-dm/connections/${ID}/pause$`) },
 ];

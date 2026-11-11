@@ -9,7 +9,7 @@ import type { ErrorEvent, Log, Metric, NodeOptions } from '@sentry/nestjs';
 /** `SENTRY_TRACES_SAMPLE_RATE`가 비었을 때 성능 추적 비율(요청의 10%). */
 export const DEFAULT_TRACES_SAMPLE_RATE = 0.1;
 
-/** 이벤트·span에서 지우는 요청·응답 헤더(소문자). 세션 쿠키 `cl_session`, 인증 정보, 웹이 붙이는 내부 토큰입니다. */
+/** 이벤트·span에서 지우는 요청·응답 헤더(소문자). 세션 쿠키 `cl_session`, 인증 정보, 웹이 붙이는 내부 토큰, Meta 웹훅 서명입니다. */
 export const SCRUBBED_HEADERS = [
   'cookie',
   'set-cookie',
@@ -17,26 +17,32 @@ export const SCRUBBED_HEADERS = [
   'proxy-authorization',
   'x-crelink-internal',
   'x-crelink-signup-context',
+  'x-hub-signature-256',
 ];
 
-/** URL 쿼리에서 값을 `[Filtered]`로 바꾸는 이름: 구글 로그인 `code`·`state`, 랜딩 통과 표시 `pass`. */
-const SCRUBBED_QUERY_PARAMS = ['code', 'state', 'pass'];
+/** URL 쿼리에서 값을 `[Filtered]`로 바꾸는 이름: OAuth `code`·`state`, 랜딩 통과 표시 `pass`, Meta 토큰·앱 시크릿·웹훅 확인 토큰. */
+const SCRUBBED_QUERY_PARAMS = ['code', 'state', 'pass', 'access_token', 'client_secret', 'hub.verify_token'];
 
 const SCRUBBED_SPAN_ATTRIBUTE = new RegExp(`^http\\.(request|response)\\.header\\.(${SCRUBBED_HEADERS.join('|')})$`);
 
 /**
- * Sentry Logs 속성에서 지우는 이름: 쿠키·인증 헤더·토큰·비밀값·비밀번호·이메일. 스코프 user에서 SDK가 더하는 `user.email`·`user.name`도
+ * Sentry Logs 속성에서 지우는 이름: 쿠키·인증 헤더·토큰·서명·비밀값·비밀번호·이메일. 스코프 user에서 SDK가 더하는 `user.email`·`user.name`도
  * 지웁니다. `user.id`(내부 UUID)는 오류 이벤트와 같이 남깁니다.
  */
-const SCRUBBED_LOG_ATTRIBUTE = /cookie|authorization|token|secret|password|email/i;
+const SCRUBBED_LOG_ATTRIBUTE = /cookie|authorization|token|signature|secret|password|email/i;
 const SCRUBBED_LOG_USER_ATTRIBUTES = ['user.email', 'user.name'];
 
 /** Sentry Metrics 속성에서 지우는 이름: 스코프 user(`user.id`·`user.email`·`user.name` 등)와 이메일·IP 속성. */
 const SCRUBBED_METRIC_ATTRIBUTE = /^user\.|email|(^|[._-])ip([._-]|$)|ip_?address|client\.address|remote_?addr/i;
 
-/** 로그 본문·문자열 속성에서 가리는 값: 이메일 주소와 JWT(라이브러리 오류 문구에 섞여 들어오는 경우의 마지막 방어). */
+/** 로그 본문·문자열 속성에서 가리는 값: 이메일 주소와 JWT, Meta 액세스 토큰(라이브러리 오류 문구에 섞여 들어오는 경우의 마지막 방어). */
 const EMAIL_PATTERN = /[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[A-Za-z]{2,}/g;
 const JWT_PATTERN = /eyJ[\w-]{10,}(?:\.[\w-]+){0,2}/g;
+const META_TOKEN_PATTERN = /\bEAA[A-Za-z0-9_-]{20,}/g;
+
+const scrubMetaToken = (text: string) => text.replace(META_TOKEN_PATTERN, '[token]');
+const scrubLogText = (text: string) =>
+  scrubMetaToken(text.replace(EMAIL_PATTERN, '[email]').replace(JWT_PATTERN, '[token]'));
 
 /** `SENTRY_TRACES_SAMPLE_RATE`: 비면 0.1, 0~1 사이 수가 아니면 오류(기동 거부). */
 export function parseTracesSampleRate(value: string | undefined): number {
@@ -55,7 +61,7 @@ export function parseTracesSampleRate(value: string | undefined): number {
  * 수집 범위(사용자 결정: IP와 내부 사용자 ID 포함, 이메일·이름 제외). SDK 11은 `sendDefaultPii` 대신 `dataCollection`으로 정합니다.
  * - `userInfo: false`: SDK가 요청 헤더(`X-Forwarded-For` 첫 값, 클라이언트가 위조 가능)로 IP를 추론하지 않게 합니다. IP와 ID는
  *   요청마다 `setRequestUser`(신뢰 프록시 기준 `clientIp`)·`setUserId`(세션 가드)가 요청 격리 스코프의 user에 직접 넣습니다.
- * - 쿠키·요청 본문·DB 쿼리 파라미터는 보내지 않고, 인증 헤더와 로그인 `code`·`state`·통과 표시 `pass` 값은 지웁니다.
+ * - 쿠키·요청 본문·DB 쿼리 파라미터는 보내지 않고, 인증 헤더·웹훅 서명과 로그인 `code`·`state`·통과 표시 `pass`·Meta 토큰 값은 지웁니다.
  * - Logs(`src/monitoring/sentry-logger.ts`)는 `scrubLog`, 업무 지표(`src/monitoring/metrics.ts`)는 `scrubMetric`이 보내기 직전에 정리합니다.
  */
 export function sentryOptions(env: NodeJS.ProcessEnv): NodeOptions | null {
@@ -81,7 +87,7 @@ export function sentryOptions(env: NodeJS.ProcessEnv): NodeOptions | null {
   };
 }
 
-/** 오류 이벤트의 요청 정보에서 쿠키와 인증 헤더를 지웁니다(`dataCollection` 설정이 바뀌어도 남지 않게 하는 마지막 단계). */
+/** 오류 이벤트의 요청 정보에서 쿠키와 인증 헤더를 지우고 오류 문구·URL의 Meta 토큰을 가립니다(`dataCollection` 설정이 바뀌어도 남지 않게 하는 마지막 단계). */
 export function scrubEvent(event: ErrorEvent): ErrorEvent {
   const request = event.request;
   if (request) {
@@ -91,32 +97,38 @@ export function scrubEvent(event: ErrorEvent): ErrorEvent {
         if (SCRUBBED_HEADERS.includes(name.toLowerCase())) delete request.headers[name];
       }
     }
+    if (request.url) request.url = scrubMetaToken(request.url);
+    if (typeof request.query_string === 'string') request.query_string = scrubMetaToken(request.query_string);
+  }
+  if (typeof event.message === 'string') event.message = scrubMetaToken(event.message);
+  for (const exception of event.exception?.values ?? []) {
+    if (exception.value) exception.value = scrubMetaToken(exception.value);
   }
   return event;
 }
 
 type StreamedSpan = Parameters<NonNullable<NodeOptions['beforeSendSpan']>>[0];
 
-/** span 속성에서 쿠키·인증 헤더(`http.request.header.cookie` 등)를 지웁니다. */
+/** span 속성에서 쿠키·인증 헤더(`http.request.header.cookie` 등)를 지우고, 남은 문자열 속성의 Meta 토큰을 가립니다. */
 export function scrubSpan(span: StreamedSpan): StreamedSpan {
-  for (const key of Object.keys(span.attributes)) {
+  for (const [key, value] of Object.entries(span.attributes)) {
     if (SCRUBBED_SPAN_ATTRIBUTE.test(key)) delete span.attributes[key];
+    else if (typeof value === 'string') span.attributes[key] = scrubMetaToken(value);
   }
   return span;
 }
 
 /**
- * 로그에서 쿠키·인증·토큰·비밀값·이메일 속성과 `user.email`·`user.name`을 지우고, 본문과 남은 문자열 속성의 이메일 주소를 `[email]`,
- * JWT를 `[token]`으로 가립니다. `user.id`(내부 UUID)와 `nest.context` 같은 나머지 속성은 남깁니다.
+ * 로그에서 쿠키·인증·토큰·서명·비밀값·이메일 속성과 `user.email`·`user.name`을 지우고, 본문과 남은 문자열 속성의 이메일 주소를 `[email]`,
+ * JWT와 Meta 토큰을 `[token]`으로 가립니다. `user.id`(내부 UUID)와 `nest.context` 같은 나머지 속성은 남깁니다.
  */
 export function scrubLog(log: Log): Log {
   const attributes: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(log.attributes ?? {})) {
     if (SCRUBBED_LOG_ATTRIBUTE.test(key) || SCRUBBED_LOG_USER_ATTRIBUTES.includes(key)) continue;
-    attributes[key] =
-      typeof value === 'string' ? value.replace(EMAIL_PATTERN, '[email]').replace(JWT_PATTERN, '[token]') : value;
+    attributes[key] = typeof value === 'string' ? scrubLogText(value) : value;
   }
-  const message = String(log.message).replace(EMAIL_PATTERN, '[email]').replace(JWT_PATTERN, '[token]');
+  const message = scrubLogText(String(log.message));
   return { ...log, message, attributes };
 }
 

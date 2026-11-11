@@ -87,6 +87,16 @@ export const MANAGER_MENU = [
     ),
   },
   {
+    segment: 'instagram',
+    label: '인스타그램 DM',
+    icon: (
+      <svg {...iconProps}>
+        <path d="M4 5h16v11H11l-4 4v-4H4V5Z" />
+        <path d="M8.5 10.5h7" />
+      </svg>
+    ),
+  },
+  {
     segment: 'members',
     label: '공동 관리자',
     icon: (

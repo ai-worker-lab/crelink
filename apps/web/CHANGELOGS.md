@@ -2,6 +2,19 @@
 
 내부 참고용으로 웹 클라이언트의 모든 변경을 공개 여부와 관계없이 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../../docs/development/repository-policy.md#변경-기록)을 따르며, 공개 릴리스 노트는 [RELEASES](../../RELEASES.md)에 있습니다.
 
+## 2026-11-11
+
+- Instagram DM 정책 문구 정정(0269): `src/app/(public)/privacy/page.tsx`와 `src/app/(public)/terms/page.tsx`의 발송 설명을 ‘작성한 문구 그대로’로 통일하고, 처리방침의 이용 목적에서도 링크를 담는다는 잔존 표현을 제거했습니다.
+
+- Instagram DM 자동 접미사 안내 제거·입력 보존(0269): `src/components/manage/instagram/RuleEditor.tsx`에서 채널 링크·수신 거부 안내 자동 부착 설명을 제거했습니다. 규칙 생성·수정 요청의 `message.trim()`을 제거해 메시지 앞뒤 개행·공백을 그대로 서버에 전달합니다.
+
+- 인스타그램 DM QA 결함 수정 연동(0269): 연결 실패 코드에 `instagram_operator_paused`를 더해 콜백 화면에 안내합니다(다른 크리링 계정이 운영자 정지된 IG 계정을 연결할 때). 처리방침의 운영자 정지 해제 항목과 삭제용 소유 대응표, 약관의 정지 유지 문구를 실제 동작에 맞췄습니다.
+- 인스타그램 DM 콜백·발송 내역과 통합 보정(0263, 0265, 0269): OAuth 콜백 route(`/me/integrations/instagram/callback`)와 BFF 허용 목록, 발송 내역 화면(`/me/landings/[publicId]/instagram/deliveries`)을 더했습니다. 보정(0269): 규칙 카드에 발송 내역 링크를 넣고, 동의 거부 코드 `instagram_access_denied`의 안내 문구를 더했으며, `instagramMenuVisible`이 공유 계약의 `CreatorLandingState['instagramDmAvailable']`을 그대로 읽도록 임시 선택 필드를 없앴습니다. [설계](../../docs/specs/instagram-comment-dm.md), [티켓](../../docs/work/orchestrator/0269-instagram-dm-integration.md).
+- 운영자 인스타그램 DM 카드(0266): `/admin/ad-banners`의 광고 블록 카드 아래에 `공개 범위`(끔·운영자만·모든 크리에이터)를 고르는 카드를 더했습니다. 기본은 꺼짐이고, `모든 크리에이터`는 일반 공개라 비즈니스 인증·앱 검수 전에는 켜지 말라는 경고를 늘 보이며 고르면 확인 시트(첫 초점 취소)를 거칩니다. 설정을 못 읽으면 카드 자리에 오류와 `다시 시도`를 둡니다. BFF 허용 목록에 운영자 `PUT /api/admin/instagram-dm`과 `PUT .../connections/:userId/pause`를 더했고(조회 GET은 서버 렌더만 부름), 계정별 정지 화면은 설계에 없어 만들지 않았습니다. 근거: [설계](../../docs/specs/instagram-comment-dm.md), [티켓](../../docs/work/web/0266-instagram-dm-admin-card.md).
+- 인스타그램 DM 수신 거부 화면(0272): 공개 `/dm-opt-out`이 URL 프래그먼트 `#t=`의 토큰을 클라이언트에서만 읽고, `수신 거부` 버튼을 눌러야 `POST /api/public/instagram-dm-opt-outs`(본문 `{ token }`, 기존 BFF)를 보냅니다. 진입만으로는 거부되지 않습니다. 확인·처리 중·완료·유효하지 않음(토큰 없음 포함, 400 `opt_out_invalid`)·오류와 `다시 시도` 상태를 그리고, 완료나 유효하지 않음이 되면 `history.replaceState`로 프래그먼트를 지웁니다. 토큰은 쿼리·로그·분석 이벤트·저장소에 넣지 않고 `referrer: no-referrer`로 둡니다. `ROBOTS_DISALLOW`에 `/dm-opt-out`을 더했습니다. 근거: [설계](../../docs/specs/instagram-comment-dm.md), [티켓](../../docs/work/web/0272-instagram-dm-opt-out-ui.md).
+
+- 인스타그램 DM 연결·규칙 화면(0264): 관리 메뉴 `인스타그램 DM`(`/me/landings/[publicId]/instagram`)에서 계정 연결·해제(확인 시트, 첫 초점 취소)·자동 DM 정지 스위치와 규칙 목록·게시물 고르기·키워드·메시지(250자 글자 수)·켜기·삭제를 합니다. 미연결·연결 전 안내·메시지 접근 꺼짐(`다시 확인`)·재연결 필요(규칙 읽기 전용)·만료 14일 전 안내·운영자 정지·인앱 브라우저 안내·연결 실패 코드별 문구를 상태표대로 그립니다. 메뉴는 소유자이고 `instagramDmAvailable`이 true일 때만 보이며, 이 값이 공유 계약에 들어오기 전에는 선택 필드로 읽습니다. 규칙 기본 문구에 독점 콘텐츠 표현과 팔로우 조건이 없습니다. BFF 허용 목록과 OAuth 콜백 route는 0263 소관이라 이 변경에 없습니다. 근거: [설계](../../docs/specs/instagram-comment-dm.md), [티켓](../../docs/work/web/0264-instagram-dm-settings-ui.md).
+
 ## 2026-11-10
 
 - 목록형 링크 카드의 링크명 옆 아이콘 제거(0250): 사이트 아이콘(파비콘)과 불러오지 못했을 때의 기본 링크 아이콘을 목록형 링크명 앞에서 모두 뺐습니다. 카드형(그리드)은 썸네일 자리의 아이콘을 유지합니다.
