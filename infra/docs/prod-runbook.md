@@ -193,6 +193,16 @@ SOPS_AGE_KEY_CMD='security find-generic-password -s crelink-sops-age -a operator
 6. GeoIP를 넣습니다([8](#8-geoip)).
 7. 확인: 배포 job의 `운영 주소 검사` 단계 결과(검사 14개 ok, 0085부터 배너 클릭 `/b/`·`/a/`, 0107부터 AI 토큰 경로 `/api/agent` 401, 0262부터 Instagram 웹훅 경로의 API 응답 포함), 구글 로그인, 단축 주소 생성·방문, 링크 클릭 기록의 IP가 내 공인 IP인지(Caddy·cloudflared 주소가 아닌지).
 
+### 5-1. API 캐시와 격리 벤치
+
+기준은 [운영 설계 API 캐시](../../docs/specs/crelink-prod-deploy.md#api-캐시-api-cache-2026-11-12-r1u1)(`api-cache-2026-11-12-r1/u1`), 실행 원본은 [deploy.yml](../../.github/workflows/deploy.yml)의 `api_cache`입니다. Deploy 수동 입력은 `default`(기본), `bypass`, `bench-seed`, `bench-warm`, `bench-bypass`입니다. 운영 캐시 장애에는 main에서 `bypass`로 읽기만 우회하며 export는 유지합니다. `force`는 별도 입력으로 기존처럼 변경 영역과 무관하게 두 이미지를 새로 만들어 배포합니다.
+
+1. Coordinator가 최종 clean 코드 SHA에서 `pnpm ci:local` full을 한 번 성공시킨 뒤 push하고, 같은 SHA의 `--report`로 대조·등록만 합니다(검사 0회). 현재는 메인 CI 준비 상태이며 실제 CI·벤치 통과는 미확인입니다.
+2. Deploy에서 코드 branch를 선택해 동일 SHA로 `api_cache=bench-seed` → `bench-warm` → `bench-bypass`를 각각 한 번씩 순차 실행합니다. 중간 코드·문서 commit은 추가하지 않습니다. seed는 SHA별 tag가 없어야 하고 실제 import miss fallback을 거칩니다. warm/bypass는 동일 주석 fixture이며 매 실행 새 runner/builder에서 amd64 OCI 출력을 만듭니다. 벤치는 `force`와 무관하게 운영 네 job을 모두 건너뛰며 운영 캐시·SHA 이미지·배포 태그에 쓰지 않습니다.
+3. 각 실행의 로그·build record/summary에서 SHA·source/fixture hash·builder/플랫폼, import miss/hit/읽기 없음, 단계별 시간·CACHED, export 성공·캐시 blob 크기·OCI 파일 크기, 운영 `plan`·`image`·`deploy`·`record` skip을 확보합니다. warm의 부모 의존성 CACHED와 API COPY/compile 실행이 필수 관측 조건입니다. 전부 CACHED 결과로 대체하지 않습니다. Sentry secret 없는 `SENTRY_UPLOAD=no`라 운영 업로드 비용·cache key와 차이가 있으며 OCI 출력·캐시 export 비용도 포함합니다. 같은 모드를 이유 없이 재실행하지 않습니다.
+4. raw CLI 출력은 Git 밖에, 실제 측정은 PR 본문 초안·중앙 기록에 보관합니다. 증거 확보 후 최종 양측 각 한 번 검수/complete → 코드 PR 생성·merge → Deploy 결과 확인 순서입니다. 캐시 정책만 바뀌어 plan-only면 강제 재배포를 추가하지 않습니다.
+5. 코드 PR merge 뒤 main 기준 동일 0283 문서 전용 마감 PR에서 티켓·계약·SSoT 결과/상태를 `u2`로 마감합니다(현재 pending). docs-only CI와 report만 수행하고 앱 full·코드 검수를 반복하지 않습니다. 측정 결과를 코드 branch에 commit해 receipt SHA를 바꾸지 않습니다.
+
 ## 6. 운영 확인
 
 ```bash

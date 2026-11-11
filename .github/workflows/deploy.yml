@@ -25,13 +25,23 @@ on:
         description: 변경 영역과 관계없이 API·웹 이미지를 새로 만들어 배포
         type: boolean
         default: false
+      api_cache:
+        description: API 캐시 읽기 정책 또는 운영과 격리한 벤치
+        type: choice
+        default: default
+        options:
+          - default
+          - bypass
+          - bench-seed
+          - bench-warm
+          - bench-bypass
 
 permissions:
   contents: read
 
-# 배포는 한 번에 하나씩, 진행 중인 배포를 취소하지 않습니다(rollback.yml과 같은 그룹).
+# 운영은 rollback.yml과 직렬화하고, 벤치는 SHA별 별도 그룹에서 순서대로 실행합니다.
 concurrency:
-  group: deploy-prod
+  group: ${{ github.event_name == 'workflow_dispatch' && startsWith(inputs.api_cache, 'bench-') && format('deploy-api-bench-{0}', github.sha) || 'deploy-prod' }}
   cancel-in-progress: false
 
 env:
@@ -40,8 +50,8 @@ env:
 jobs:
   plan:
     name: plan
-    # main push와 main에서의 수동 실행만 배포합니다.
-    if: github.ref == 'refs/heads/main'
+    # main push와 main에서의 일반 수동 실행만 배포합니다. 벤치는 네 운영 job 모두 제외합니다.
+    if: github.ref == 'refs/heads/main' && !startsWith(inputs.api_cache, 'bench-')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -115,7 +125,7 @@ jobs:
       matrix:
         area: [api, web]
     # 바뀐 영역만 만듭니다(matrix 값으로 plan 출력을 고름).
-    if: needs.plan.outputs.api == 'true' || needs.plan.outputs.web == 'true'
+    if: "!startsWith(inputs.api_cache, 'bench-') && (needs.plan.outputs.api == 'true' || needs.plan.outputs.web == 'true')"
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
@@ -142,6 +152,25 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
+      - name: 캐시 정책
+        if: steps.want.outputs.build == 'true'
+        id: cache
+        env:
+          AREA: ${{ matrix.area }}
+          API_CACHE: ${{ inputs.api_cache }}
+        run: |
+          if [[ "$AREA" == api ]]; then
+            ref="$IMAGE_PREFIX-api:buildcache"
+            if [[ "$API_CACHE" == bypass ]]; then
+              echo 'from=' >> "$GITHUB_OUTPUT"
+            else
+              echo "from=type=registry,ref=$ref" >> "$GITHUB_OUTPUT"
+            fi
+            echo "to=type=registry,ref=$ref,mode=max,ignore-error=true" >> "$GITHUB_OUTPUT"
+          else
+            echo 'from=type=gha,scope=web' >> "$GITHUB_OUTPUT"
+            echo 'to=type=gha,mode=max,scope=web' >> "$GITHUB_OUTPUT"
+          fi
       # Sentry(ADR 0012): release는 배포 커밋 SHA. 웹만 DSN을 빌드 시점에 넣습니다(API DSN은 서버 SOPS 암호문의 SENTRY_DSN).
       # 소스맵은 SENTRY_AUTH_TOKEN이 있을 때만 올립니다. vars·secret이 비어 있으면 빈 값이 넘어가 업로드를 건너뛰고(빈 secret은 action이
       # "is not a valid secret" 경고만 내고 넘기지 않음) 웹은 Sentry가 꺼진 이미지가 됩니다. 토큰이 있는데 업로드가 실패하면 이 job이 실패합니다.
@@ -154,8 +183,8 @@ jobs:
           platforms: ${{ needs.plan.outputs.platforms }}
           push: true
           tags: ${{ env.IMAGE_PREFIX }}-${{ matrix.area }}:${{ needs.plan.outputs.sha }}
-          cache-from: type=gha,scope=${{ matrix.area }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.area }}
+          cache-from: ${{ steps.cache.outputs.from }}
+          cache-to: ${{ steps.cache.outputs.to }}
           build-args: |
             SENTRY_RELEASE=${{ needs.plan.outputs.sha }}
             SENTRY_ORG=${{ vars.SENTRY_ORG }}
@@ -170,6 +199,7 @@ jobs:
     needs: [plan, image]
     if: >-
       always() && needs.plan.result == 'success'
+      && !startsWith(inputs.api_cache, 'bench-')
       && needs.plan.outputs.release == 'true' && needs.plan.outputs.ready == 'true'
       && (needs.image.result == 'success' || needs.image.result == 'skipped')
     strategy:
@@ -237,7 +267,7 @@ jobs:
   record:
     name: 배포 기록 태그
     needs: [plan, deploy]
-    if: always() && needs.deploy.result == 'success'
+    if: always() && !startsWith(inputs.api_cache, 'bench-') && needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -256,3 +286,88 @@ jobs:
           [[ "$API" == true ]] && tags+=(deploy/prod-api)
           [[ "$WEB" == true ]] && tags+=(deploy/prod-web)
           for t in "${tags[@]}"; do git tag -f "$t" "$SHA"; git push -f origin "refs/tags/$t"; done
+
+  bench:
+    name: API 캐시 ${{ inputs.api_cache }}
+    if: github.event_name == 'workflow_dispatch' && startsWith(inputs.api_cache, 'bench-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      # 실행마다 새 runner/builder. 운영 접속·Sentry secret·이미지 push는 사용하지 않습니다.
+      - uses: docker/setup-buildx-action@v4
+        id: builder
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: 벤치 입력과 fixture
+        id: cache
+        env:
+          MODE: ${{ inputs.api_cache }}
+          BUILDER: ${{ steps.builder.outputs.name }}
+        run: |
+          [[ "$(uname -m)" == x86_64 ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          ref="$IMAGE_PREFIX-api:buildcache-bench-$GITHUB_SHA"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          # seed는 실제 미존재 ref를 읽어 import miss fallback부터 측정합니다.
+          if [[ "$MODE" == bench-seed ]]; then
+            if docker buildx imagetools inspect "$ref" > "$RUNNER_TEMP/cache-before.txt" 2>&1; then
+              echo '::error::seed 캐시 tag가 이미 존재합니다. 같은 SHA의 seed를 반복하지 마세요.'
+              exit 1
+            fi
+            cat "$RUNNER_TEMP/cache-before.txt"
+            grep -Eiq 'not found|manifest unknown|name unknown' "$RUNNER_TEMP/cache-before.txt"
+          elif [[ "$MODE" == bench-warm ]]; then
+            docker buildx imagetools inspect "$ref"
+          fi
+          source_hash=$(sha256sum apps/api/src/main.ts | cut -d ' ' -f 1)
+          case "$MODE" in
+            bench-seed) ;;
+            bench-warm|bench-bypass)
+              printf '%s\n' '// api-cache-2026-11-12-r1 fixture' >> apps/api/src/main.ts
+              ;;
+            *) exit 1 ;;
+          esac
+          if [[ "$MODE" == bench-bypass ]]; then
+            echo 'from=' >> "$GITHUB_OUTPUT"
+          else
+            echo "from=type=registry,ref=$ref" >> "$GITHUB_OUTPUT"
+          fi
+          docker buildx inspect "$BUILDER" --bootstrap
+          {
+            echo "mode=$MODE sha=$GITHUB_SHA platform=linux/amd64 builder=$BUILDER"
+            echo "cache=$ref source_main_sha256=$source_hash"
+            sha256sum apps/api/src/main.ts apps/api/Dockerfile
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          platforms: linux/amd64
+          push: false
+          outputs: type=oci,dest=${{ runner.temp }}/api-bench.tar
+          cache-from: ${{ steps.cache.outputs.from }}
+          # 벤치는 export 실패도 실패로 처리합니다. 운영 buildcache·:<SHA>에는 쓰지 않습니다.
+          cache-to: type=registry,ref=${{ steps.cache.outputs.ref }},mode=max,ignore-error=false
+          build-args: |
+            SENTRY_RELEASE=${{ github.sha }}
+            SENTRY_UPLOAD=no
+      - name: OCI 출력과 캐시 크기
+        env:
+          CACHE_REF: ${{ steps.cache.outputs.ref }}
+        run: |
+          test -s "$RUNNER_TEMP/api-bench.tar"
+          docker buildx imagetools inspect "$CACHE_REF" --raw > "$RUNNER_TEMP/cache-after.json"
+          cache_bytes=$(jq -er '[.config.size, .layers[].size] | add | select(. > 0)' "$RUNNER_TEMP/cache-after.json")
+          {
+            echo "oci_bytes=$(stat -c %s "$RUNNER_TEMP/api-bench.tar")"
+            echo "cache_blob_bytes=$cache_bytes"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
