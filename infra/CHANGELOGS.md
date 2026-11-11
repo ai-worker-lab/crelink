@@ -4,6 +4,8 @@
 
 ## 2026-11-12
 
+- 0283 u2 마감: registry cache·bypass 실측과 코드 PR188/plan-only Deploy 결과를 SSoT에 연결했습니다. 운영 설정/앱 배포 변경 없는 문서 마감입니다. [기준](../docs/specs/crelink-prod-deploy.md#api-캐시-api-cache-2026-11-12-r1u2).
+
 - 0283: [Deploy](../.github/workflows/deploy.yml)의 API 캐시만 registry로 전환하고 읽기 bypass·SHA별 격리 벤치/OCI 출력을 추가했습니다. 웹 GHA·운영 Sentry·배포/롤백 경로를 유지하며 [런북](docs/prod-runbook.md#5-1-api-캐시와-격리-벤치)에 실행 한계·문서 마감 pending을 반영했습니다. 실제 운영 적용·실측은 미실행입니다. [티켓](../docs/work/orchestrator/0283-api-build-cache.md).
 
 ## 2026-11-11

@@ -44,3 +44,17 @@ R2(run-1e9938bd67f149868c4885e91599ba2d)은 push 전 full1회, 실제 OCI 출력
 ## 영향·복구·검증
 
 앱/DB/운영 자원·시크릿 변화 없음. cache 장애 시 bypass, workflow 자체 rollback은 이번 변경 revert다. 트래픽 전환/자동롤백 경로를 바꾸지 않는다. actionlint와 실제 branch bench의 production job 0회, miss/hit/bypass, 전체 로컬 필수 검사와 report0를 확인한다. 원격 앱 전수 CI·실 Meta·UI QA·범용 벤치 도구·캐시 보관 정책 추가는 제외한다. 특정 절감 시간은 실측 전 보장하지 않는다.
+
+## R3 실행·반영 마감 (r1/u2)
+
+- 실제 확인 시각: 2026-11-11T17:34:56.317Z(UTC). 구현 source128faba90b7f319786b5d935536563b48a61afc8. actionlint1.7.12·production cache 선택 실제 step5경계 통과. 필수 full1회124.1초/12통과·report시험0/실제status등록을 확인한 뒤 벤치를 실행했다. source 브랜치에 결과 commit을 추가하지 않았다.
+- 위 실측3개 run 모두 success. seed miss와 cache export, warm 부모cached/APIcompile, bypassimport없음, 각OCI출력103MB·cacheblob합계약572MB 성공을로그로대조했다. sourcefixture warm/bypass hash617067c3b746d0b00de63eba48309bff0bca0b3bcf42f6a46b943a8be39270a6, Dockerfile4519766fc4f98b398deca3b1b9733f18e1d811e5391d16fcd0e1fcc5c7330cb6이다. 실제 cache/OCI는 서로 다른 지표다.
+
+| 모드 | build step | bench job | 실행 |
+| --- | ---: | ---: | --- |
+| seed | 96초 | 143초 | [43066903014](https://github.com/ai-worker-lab/crelink/actions/runs/43066903014) |
+| warm | 66초 | 103초 | [43067441736](https://github.com/ai-worker-lab/crelink/actions/runs/43067441736) |
+| bypass | 113초 | 158초 | [43067942635](https://github.com/ai-worker-lab/crelink/actions/runs/43067942635) |
+
+- Claude run-e1fbf7b68dc2450a927b0b3dd296e12f·Codex run-e590b1348e7f402fa247f05d54a4440a 각1회PASS, 같은지문 fa5e3173bca0fd11a84c70192fcf96d9cbbb73913061d4a49616233aaa4326b3의 complete exit0 후 PR188을생성/일반merge했다.
+- merge d579e6da4ede496fac8b7c5f778f3c8427c95b6b, Deploy43069237768 plan-only success. workflow정책은main에반영됐으며 앱강제배포는없다. 실제운영시간·Sentry업로드·production cache warm은미실측이다. 각1회표본의효과를일반보장하지않는다. 현재 결과 원본은 SSoT r1/u2, raw로그/CLI는Git밖에만보관한다.
