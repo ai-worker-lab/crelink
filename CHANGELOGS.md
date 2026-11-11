@@ -6,6 +6,8 @@
 
 ## 2026-11-11
 
+- Instagram 계정 응답 검증 보완(0278): 사용하지 않는 `client_business_id`를 응답 필수값에서 제외하고 BISU id·assigned IG 목록 검증은 유지했습니다. 현재 SSoT·API 안내의 필수 필드 설명과 fetch mock 회귀를 보완했습니다. [API 로그](apps/api/CHANGELOGS.md), [0278](docs/work/orchestrator/0278-instagram-account-response.md).
+
 - Instagram 로그인 수정(0276 CTO R2): 공식 Unified Login authorize와 BISU·assigned 계정 조회로 정리하고 SSoT 인증 리비전을 `r2-unified-2026-11-11`로 갱신했습니다. 기존 Meta 설정·null 만료·소유권/state/revision을 유지합니다. 세부는 [API 로그](apps/api/CHANGELOGS.md), [웹 로그](apps/web/CHANGELOGS.md), [0276 진행 기록](docs/work/orchestrator/0277-instagram-direct-login.md).
 
 - PR #161 원격 CI 시험 보완(0276): 웹훅 쿼리 감시에 발송 worker 타이머가 섞이는 경합을 격리하고 Firefox 분석 시험의 날짜 7개를 개별로 읽습니다. 제품 동작과 기존 검사·엔진은 유지합니다. 근거: [0276](docs/work/orchestrator/0276-pr161-ci-regressions.md).

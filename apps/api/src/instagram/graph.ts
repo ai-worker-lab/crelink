@@ -224,7 +224,7 @@ export class FetchInstagramGraph extends InstagramGraph {
       }),
     );
     const metaUserId = text(body.id);
-    if (!metaUserId || !text(body.client_business_id)) throw this.malformed('fetchAccounts');
+    if (!metaUserId) throw this.malformed('fetchAccounts');
 
     const accounts: GraphInstagramAccount[] = [];
     const cursors = new Set<string>();

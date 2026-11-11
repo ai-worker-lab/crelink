@@ -337,7 +337,7 @@ S4에서 같은 `comment_id` 재호출이 구분되는 오류로 거부된다고
 4. `POST /api/me/instagram/callback`은 쿠키 일치, 서명, 만료, `uid=세션 사용자`를 검증합니다. 다음으로 기존 Meta code 교환, BISU·assigned IG 계정 조회, 프로페셔널 계정 확인, **충돌 검사**, `subscribed_apps` 구독, 암호화 저장 순서로 진행하고 저장은 한 트랜잭션에 합니다.
 5. 동의 화면에서 거부하면 콜백 route가 Meta의 `error` 값을 옮기지 않고 `instagram_access_denied`로 화면에 돌려보냅니다.
 6. 동의 결과 IG 계정이 정확히 1개가 아니면 409 `instagram_account_selection_required`입니다. 선택 화면은 만들지 않고 하나만 골라 다시 연결하도록 안내합니다.
-7. `/me?fields=id,client_business_id`의 BISU id와 client_business_id가 모두 있어야 하며 `/me`을 IG 계정으로 간주하지 않습니다 `[문서]`. `metaUserId`에는 BISU id를 저장합니다. client_business_id는 확인에만 쓰고 저장하지 않습니다. 토큰 관리 API는 이번 범위 밖이며 만료 구성을 도입할 때 저장 구조를 다시 판단합니다.
+7. `/me?fields=id,client_business_id`에서 유효한 BISU id는 필수이며 `/me`을 IG 계정으로 간주하지 않습니다. `metaUserId`에는 BISU id를 저장합니다. `client_business_id`는 저장·사용하지 않아 응답에서 생략되어도 허용합니다(`apps/api/src/instagram/graph.ts`, [후속 0278](../work/orchestrator/0278-instagram-account-response.md)). IG 목록 검증은 아래 assigned edge에서 수행합니다. 토큰 관리 API는 이번 범위 밖이며 만료 구성을 도입할 때 저장 구조를 다시 판단합니다.
 8. IG 계정은 `/me/assigned_instagram_accounts?fields=id,username`만 사용합니다 `[문서]`. `data`와 각 계정의 id·username을 확인하고 다음 페이지가 있으면 고정 호스트·edge에 `after` cursor로 조회합니다. 불완전 응답·중복 계정·cursor 누락/반복·최대 10쪽에서 미완료·계정 10개 초과·어느 페이지든 조회 실패는 502로 막습니다. 0개·복수개는 기존 409로 거절합니다. 페이지/accounts/debug_token 대체 경로는 없습니다.
 
 **토큰 암호화와 키.**

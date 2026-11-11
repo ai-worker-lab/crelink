@@ -372,8 +372,8 @@ pnpm --filter @crelink/api --silent ai-operator list-tokens   # 또는 node apps
 ### Instagram 공개 답글과 Unified Login 보강
 
 - 현재 인증 기준은 설계의 `r2-unified-2026-11-11`입니다. `src/instagram/graph.ts`는 공식 `https://www.facebook.com/dialog/oauth`에 기존 `client_id`·`config_id`·`redirect_uri`·`state`, `override_default_response_type=true`, `prompt=login`, `response_type=code`, `display=popup`을 전달합니다. 사용자는 Instagram 계정으로 로그인하고 공유할 계정을 하나만 선택합니다. 기존 Meta 자격 증명·verify token·암호키를 유지합니다.
-- 계정 조회는 `/me?fields=id,client_business_id`로 BISU 필수 식별자를 확인한 뒤 `/me/assigned_instagram_accounts?fields=id,username`만 사용합니다. 다음 페이지는 고정 Graph edge에 cursor로 요청하며 최대 10쪽·계정 10개입니다. 필드 누락·중복·불완전 pagination·조회 실패·상한 초과는 502, 0개·복수개는 409로 거부합니다. 페이지/accounts/debug_token 대체 조회나 임의 Facebook 페이지 연결 요구는 없습니다.
-- `meta_user_id`에는 BISU id를 저장하고 client_business_id는 확인만 합니다. 삭제 콜백 user_id와 BISU id의 실제 대응은 미실측이며 기존 콜백 시험이 이를 입증하지는 않습니다. 선택 config는 콘솔에서 SUAT·만료 없음으로 확인했고 `token_expires_at=null`을 유지합니다. 새 설정·migration·60일 refresh·관리 API 호출은 없습니다. 실제 code 교환·BISU/assigned 응답·연결 완료와 webhook은 Coordinator의 후속 확인 범위입니다.
+- 계정 조회는 `/me?fields=id,client_business_id`로 유효한 BISU id를 필수로 확인한 뒤 `/me/assigned_instagram_accounts?fields=id,username`만 사용합니다. 다음 페이지는 고정 Graph edge에 cursor로 요청하며 최대 10쪽·계정 10개입니다. 필드 누락·중복·불완전 pagination·조회 실패·상한 초과는 502, 0개·복수개는 409로 거부합니다. 페이지/accounts/debug_token 대체 조회나 임의 Facebook 페이지 연결 요구는 없습니다.
+- `meta_user_id`에는 BISU id를 저장하고 `client_business_id`는 저장·사용하지 않아 응답에서 생략되어도 허용합니다([후속 0278](../../../docs/work/orchestrator/0278-instagram-account-response.md)). 삭제 콜백 user_id와 BISU id의 실제 대응은 미실측이며 기존 콜백 시험이 이를 입증하지는 않습니다. 선택 config는 콘솔에서 SUAT·만료 없음으로 확인했고 `token_expires_at=null`을 유지합니다. 새 설정·migration·60일 refresh·관리 API 호출은 없습니다. 실제 code 교환·BISU/assigned 응답·연결 완료와 webhook은 Coordinator의 후속 확인 범위입니다.
 - `src/instagram/rules.service.ts`의 선택 `replyMessage`는 최대 300 코드 포인트이며 null·빈 문자열은 공개 답글을 해제합니다. migration `0017_instagram_public_reply.sql`을 먼저 적용합니다.
 - `src/instagram/worker.service.ts`는 공개 답글 뒤 DM을 보냅니다. 답글 실패도 DM을 막지 않으며 답글 결과를 DM 전에 저장해 DM 재시도 시 답글을 반복하지 않습니다. DM 직전 발송 조건과 lease를 다시 확인하며 공개 답글 중 정지·수신 거부·취소·lease 상실이 발생하면 DM을 보내지 않습니다. 외부 발송과 DB 기록 사이 프로세스 종료는 원자적으로 묶을 수 없습니다.
 

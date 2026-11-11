@@ -51,3 +51,5 @@
 - 2026-11-11 CTO R2 미확인 한계/인계: 실제 Meta code 교환의 기존 폼 POST·Bearer 인증, BISU id/client_business_id·assigned 응답과 연결 완료, 실제 삭제 콜백 user_id와 BISU id의 대응, Facebook 계정 없이 포트폴리오를 만드는 경로·webhook 수신은 이 작업에서 실측하지 않았다. 필수값 누락은 오류로 막으며 Facebook 페이지 연결을 우회 요구하지 않는다. DB 접근 가능한 환경에서 지정 E2E 재실행과 CI·브라우저·외부 Meta·최종 검수·PR/배포는 Coordinator가 이어서 확인한다. 티켓은 통합 검증 전이므로 `진행`을 유지한다.
 - 2026-11-11 Coordinator 통합: Node 24 환경의 로컬 CI 12단계 통과(109.4초). API 47 suite·755건, 웹 162건 통과로 개발 격리환경의 DB EPERM 실패를 해소했다. 실제 Meta 콘솔의 callback은 운영 주소로 검증·저장 후 새로고침 유지, comments 구독 확인. Instagram 인증 진입은 미리보기로만 확인했고 최종 실제 연결은 배포 후 확인한다.
 - 2026-11-11: 다른 작업 PR #161이 main에 병합되며 0276 번호를 사용해 이 작업을 0277로 재번호 부여한다. 같은 task를 유지하고 첫 검증 당시 번호·로그는 과거 이력으로 보존한다. 최신 main 통합 후 최종 CI status·검수는 새 최종 커밋을 대상으로 수행한다.
+
+- 2026-11-11 후속 운영 결함: `fetchAccounts`의 미사용 `client_business_id` 필수 guard 보완은 [0278](0278-instagram-account-response.md)에서 처리한다. 이 티켓과 CTO R2 계약은 당시 구현·검증 이력으로 보존한다.
