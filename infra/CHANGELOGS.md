@@ -4,6 +4,8 @@
 
 ## 2026-11-11
 
+- Instagram DM 운영 설정(0275): `prod/secrets/home-server.sops.env`에 사용자가 등록한 필수 8개 항목을 암호문으로 반영합니다. 설정 주입 후 API worker가 활성화되며 공개 범위는 기존 DB 값을 따릅니다. 실제 배포·검증은 [0275](../docs/work/orchestrator/0275-instagram-dm-prod-settings.md)에 기록합니다.
+
 - Caddy 패치 갱신(PR #178, 0273): `prod/edge/compose.yaml`을 2.11.7-alpine에서 2.11.9-alpine으로 갱신하고 라우팅 시험은 해당 Compose의 이미지를 읽도록 맞췄습니다. README의 중복 태그를 원본 참조로 바꿨습니다. 고정 edge는 앱 배포와 별개로 재생성해야 반영되며, 운영 적용은 수행하지 않습니다. 근거: [0273](../docs/work/orchestrator/0273-caddy-patch-update.md), [인프라 계약](../contracts/0273-caddy-patch-update/5-infra.contract.md).
 
 - Instagram 웹훅 공개 경로(0262): `prod/Caddyfile` 웹 호스트에서 `/api/webhooks/instagram`과 `/api/webhooks/instagram/data-deletion`의 GET·POST만 BFF 없이 API 업스트림으로 보냅니다. 경로는 `{http.request.uri}` 원문 정규식으로 맞춰 하위 경로·대소문자·`..`·`//`·인코딩 변형은 지금처럼 web으로 가고, 본문 상한 6MB는 웹훅에도 같이 걸립니다. 단축 호스트는 그대로입니다. `prod/tests/caddy-routing.sh`에 78건을 더해 Docker로 172건 통과를 확인했고, `prod/verify.sh`는 토큰 없는 GET이 HTML이 아닌 403·404·503인지(API 응답인지) 보는 검사를 더해 14개가 됩니다. 실제 서버 적용은 병합 뒤 Deploy job으로만 확인합니다. 롤백하면 두 경로가 재배포 전까지 web의 404입니다. [티켓](../docs/work/infra/0262-instagram-dm-edge.md).
