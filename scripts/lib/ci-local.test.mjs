@@ -205,32 +205,41 @@ test('Instagram 소스/시험 파일 그룹은 관련 명령과 DB만 선택한�
         'test/instagram-contract.e2e-spec.ts',
       ],
     ],
-    ['graph.ts', ['graph.ts'], ['src/instagram/graph.spec.ts']],
+    ['graph.ts', ['graph.ts'], ['src/instagram/graph.spec.ts', 'src/instagram/instagram-crypto.spec.ts']],
   ];
   for (const [group, sources, tests] of cases) {
-    for (const file of [...sources.map((name) => `src/instagram/${name}`), ...tests]) {
-      const stages = verificationPlan(opts('hotfix', [`api:src/instagram/${group}`]), [`apps/api/${file}`]);
-      assert.deepEqual(apiTestPaths(stages), tests, file);
-      assert.equal(
-        hasDb(stages),
-        tests.some((path) => path.startsWith('test/')),
-        file,
-      );
-      assert.ok(
-        stages.some((entry) => entry.command === 'pnpm' && entry.args.join(' ') === '--filter @crelink/api typecheck'),
-      );
-      assert.equal(
-        stages.some(
-          (entry) =>
-            entry.args?.includes('@crelink/web') || entry.args?.includes('@crelink/app') || entry.action === 'stack',
-        ),
-        false,
-      );
-      if (hasDb(stages)) {
-        assert.ok(
-          stages.findIndex((entry) => entry.command === 'make') < stages.findIndex((entry) => entry.id === 'api test'),
+    for (const profile of ['hotfix', 'auth']) {
+      for (const file of [...sources.map((name) => `src/instagram/${name}`), ...tests]) {
+        const stages = verificationPlan(opts(profile, [`api:src/instagram/${group}`]), [`apps/api/${file}`]);
+        assert.deepEqual(apiTestPaths(stages), tests, file);
+        assert.equal(
+          hasDb(stages),
+          tests.some((path) => path.startsWith('test/')),
+          file,
         );
-        assert.ok(stages.some((entry) => entry.action === 'teardown'));
+        assert.ok(
+          stages.some(
+            (entry) => entry.command === 'pnpm' && entry.args.join(' ') === '--filter @crelink/api typecheck',
+          ),
+        );
+        assert.equal(
+          stages.some(
+            (entry) =>
+              entry.args?.includes('@crelink/web') ||
+              entry.args?.includes('@crelink/app') ||
+              entry.action === 'stack' ||
+              entry.id.startsWith('ego ') ||
+              entry.action?.startsWith('image:'),
+          ),
+          false,
+        );
+        if (hasDb(stages)) {
+          assert.ok(
+            stages.findIndex((entry) => entry.command === 'make') <
+              stages.findIndex((entry) => entry.id === 'api test'),
+          );
+          assert.ok(stages.some((entry) => entry.action === 'teardown'));
+        }
       }
     }
   }

@@ -70,3 +70,9 @@
 - 2026-11-11: HEAD `164dda8`의 실제 첫 full은 **122.7s, 12 통과·0 실패**로 성공 receipt를 저장했다(`/tmp/crelink-0281-ci-first.log`, `ci_exit=0`). 첫 report는 환경 지문 불일치로 fail-closed 거부했다(`/tmp/crelink-0281-report-first.log`, exit 1). 원인은 `exec_command`가 호출마다 다른 `CODEX_TOOL_CALL_ID`를 주입하는 것이며, 별도 호출에서 변수 이름과 값 변경을 확인했다.
 - `scripts/ci-local.mjs`의 `identityFor`에서 이 한 항목만 기존 volatile metadata 제외 목록에 추가했다. 기존 hermetic 검증→report는 호출마다 다른 ID를 주입해 `tests 0`·fake status만 실행하는 재사용을 확인하고, 일반 실제 테스트 환경변수 `TEST_DATABASE_URL` 변경은 계속 거부한다. 기준 `scoped-verification-2026-11-11-r1`/R2와 수용 기준은 유지한다. 전체 rerun·최종 검수는 Coordinator 담당이다.
 - 제한 검증(Node `26.13.0`): `node --test scripts/lib/ci-local.test.mjs` **32건 통과**, 변경 JS 2개의 ESLint와 변경 파일 5개의 Prettier 통과. 로그: `/tmp/crelink-0281-call-id-{unit,lint,format}.log`. 제품·Meta·DB·Docker·실제 전체 CI·push·프로젝트 commit·검수는 실행하지 않았다. hermetic 내부 full/report·Git commit은 임시 저장소·fake 대역이다.
+
+### 최종검수 Graph source selector 보완
+
+- 2026-11-11: 같은 task·브랜치, HEAD `bfe2167`에서 사용자 전달 Codex FAIL의 유효 결함을 보완했다. `graph.ts` source selector가 기존 `instagram-crypto.spec.ts`의 crypto/Graph 보안경계(form-secret 포함)와 새 `graph.spec.ts` fixture 검사를 함께 선택하고 두 시험 파일도 덮는다. fixture-only selector는 해당 fixture를 소비하는 `graph.spec.ts`만 유지한다. 기존 mapping unit에서 auth/hotfix의 두 모음·API typecheck 포함과 DB/스택/EGO/이미지 자동 미추가를 확인한다.
+- 제한 검증(Node `26.13.0`): API 두 모음 **78건**, runner unit **32건**, 변경 JS 2개 ESLint·변경 파일 5개 Prettier, `pnpm work:scope 0281`, `git diff --check` 통과. 로그: `/tmp/crelink-0281-graph-selector-{api,unit,lint,format,scope}.log`.
+- acceptance·SSoT `scoped-verification-2026-11-11-r1`/R2와 제품은 유지했다. 새 mutation 하네스·패키지, 실제 DB/스택/Meta/전체 CI·프로젝트 commit/push·추가 검수 없이 최종 source를 한 회차로 인계한다. runner unit 내부 실행은 기존 임시 저장소·fake 대역이다.

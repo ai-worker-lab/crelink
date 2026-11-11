@@ -173,8 +173,12 @@ export const SCOPE_REGISTRY = Object.freeze({
     tests: WEBHOOK_TESTS,
   },
   'api:src/instagram/graph.ts': {
-    files: ['apps/api/src/instagram/graph.ts', 'apps/api/src/instagram/graph.spec.ts'],
-    tests: ['src/instagram/graph.spec.ts'],
+    files: [
+      'apps/api/src/instagram/graph.ts',
+      'apps/api/src/instagram/graph.spec.ts',
+      'apps/api/src/instagram/instagram-crypto.spec.ts',
+    ],
+    tests: ['src/instagram/graph.spec.ts', 'src/instagram/instagram-crypto.spec.ts'],
   },
   'api:test/fixtures/instagram-graph.fixtures.ts': {
     files: ['apps/api/test/fixtures/instagram-graph.fixtures.ts'],
