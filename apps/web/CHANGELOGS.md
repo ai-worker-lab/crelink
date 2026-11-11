@@ -4,6 +4,8 @@
 
 ## 2026-11-11
 
+- Instagram 연결 안내 수정(0276 CTO R2): `src/components/manage/instagram/ConnectionPanel.tsx`의 인스타그램(페이스북) 문구를 “Instagram 계정으로 로그인하고 연결할 계정을 선택해요.”로 바꿨습니다. 브라우저 검증은 Coordinator 범위입니다.
+
 - Instagram DM 정책 문구 정정(0269): `src/app/(public)/privacy/page.tsx`와 `src/app/(public)/terms/page.tsx`의 발송 설명을 ‘작성한 문구 그대로’로 통일하고, 처리방침의 이용 목적에서도 링크를 담는다는 잔존 표현을 제거했습니다.
 
 - Instagram DM 자동 접미사 안내 제거·입력 보존(0269): `src/components/manage/instagram/RuleEditor.tsx`에서 채널 링크·수신 거부 안내 자동 부착 설명을 제거했습니다. 규칙 생성·수정 요청의 `message.trim()`을 제거해 메시지 앞뒤 개행·공백을 그대로 서버에 전달합니다.

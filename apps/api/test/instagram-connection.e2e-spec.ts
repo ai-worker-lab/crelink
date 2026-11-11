@@ -47,6 +47,7 @@ interface ConnectionRow {
   id: string;
   user_id: string;
   ig_user_id: string;
+  meta_user_id: string | null;
   status: string;
   token_ciphertext: Buffer | null;
   token_key_version: number | null;
@@ -263,6 +264,10 @@ describe('Instagram 연결 API', () => {
       const { response, state } = await startFlow(owner);
       expect(response.headers.get('cache-control')).toBe('no-store');
       const url = new URL(response.body.authorizationUrl);
+      expect(url.origin + url.pathname).toBe('https://www.facebook.com/dialog/oauth');
+      expect(url.searchParams.get('config_id')).toBe(META_ENV.META_LOGIN_CONFIG_ID);
+      expect(url.searchParams.get('override_default_response_type')).toBe('true');
+      expect(url.searchParams.get('prompt')).toBe('login');
       expect(url.searchParams.get('state')).toBe(state);
       expect(url.searchParams.get('redirect_uri')).toBe('http://web.test/me/integrations/instagram/callback');
       expect(response.headers.getSetCookie()[0]).toContain('HttpOnly');
@@ -378,6 +383,11 @@ describe('Instagram 연결 API', () => {
       expect(spies.subscribe).toHaveBeenCalledWith(secret, ig);
       expect(spies.accounts).toHaveBeenCalledWith(secret, t.app.get(AppConfig).instagram);
       const stored = await requireRow(owner.userId);
+      expect(stored.meta_user_id).toBe(`meta-${ig}`);
+      expect(
+        (await t.pool.query('SELECT meta_user_id FROM instagram_opt_out_owners WHERE ig_user_id = $1', [ig])).rows[0]
+          .meta_user_id,
+      ).toBe(stored.meta_user_id);
       expect(stored.token_ciphertext!.includes(Buffer.from(secret))).toBe(false);
       const dump = await t.pool.query<{ dump: string }>(
         'SELECT row_to_json(c)::text AS dump FROM instagram_connections c WHERE id = $1',

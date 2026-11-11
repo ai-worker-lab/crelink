@@ -6,6 +6,8 @@
 
 ## 2026-11-11
 
+- Instagram 로그인 수정(0276 CTO R2): 공식 Unified Login authorize와 BISU·assigned 계정 조회로 정리하고 SSoT 인증 리비전을 `r2-unified-2026-11-11`로 갱신했습니다. 기존 Meta 설정·null 만료·소유권/state/revision을 유지합니다. 세부는 [API 로그](apps/api/CHANGELOGS.md), [웹 로그](apps/web/CHANGELOGS.md), [0276 진행 기록](docs/work/orchestrator/0277-instagram-direct-login.md).
+
 - PR #161 원격 CI 시험 보완(0276): 웹훅 쿼리 감시에 발송 worker 타이머가 섞이는 경합을 격리하고 Firefox 분석 시험의 날짜 7개를 개별로 읽습니다. 제품 동작과 기존 검사·엔진은 유지합니다. 근거: [0276](docs/work/orchestrator/0276-pr161-ci-regressions.md).
 - Instagram DM 운영 설정 등록(0275): 사용자 SOPS 암호문의 필수 연동 설정을 검증하고 기존 배포 경로로 적용합니다. [작업 기록](docs/work/orchestrator/0275-instagram-dm-prod-settings.md), [인프라 계약](contracts/0275-instagram-dm-prod-settings/5-infra.contract.md).
 

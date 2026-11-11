@@ -1,6 +1,7 @@
 # Instagram 댓글 자동 DM 기술 설계
 
 - 상태: 초안
+- 현재 인증 리비전: `r2-unified-2026-11-11` (0276 CTO R2)
 - 작성일: 2026-11-11
 - 에픽: `docs/work/epics/0251-instagram-comment-dm.md`
 - 입력: PRD R30(`docs/product/crelink.md`), 0252 결과(`docs/references/instagram-comment-dm.md`, 작성 예정)
@@ -61,17 +62,18 @@
 
 ## 구성과 전제
 
-- 인증은 Unified Login입니다. 앱은 Business 포트폴리오 소유이고 Facebook Login for Business 구성을 씁니다 `[문서]`.
-- 권한은 `instagram_basic`, `instagram_manage_comments`, `instagram_manage_messages`입니다 `[문서]`. 추가 권한(`pages_*`, `business_management` 등) 필요 여부는 S7로 확정합니다 `[M?]`.
-- API 호스트는 `graph.facebook.com/v27.0`입니다. 버전은 `graph.ts` 상수로 두고 env로 만들지 않습니다.
-- 설정 키는 `META_APP_ID`, `META_APP_SECRET`, `META_LOGIN_CONFIG_ID`, `META_WEBHOOK_VERIFY_TOKEN`, `INSTAGRAM_TOKEN_KEYS`, `INSTAGRAM_TOKEN_KEY_CURRENT`, `INSTAGRAM_COMMENTER_HASH_KEY`, `INSTAGRAM_OPT_OUT_KEY`입니다.
-- Sentry 스크럽 정규식은 Meta 토큰 형식(`EAA…`)을 대상으로 합니다.
-- 기존에 Instagram Login 앱이 있다고 확인되면 이 전제를 다시 봅니다.
+- 현재 인증은 **Instagram 로그인 호환 Unified Login**입니다. Business 포트폴리오 소유 Meta 앱과 Facebook Login for Business 구성을 사용하며 Instagram 또는 Facebook으로 로그인할 수 있습니다 `[문서]`. 사용자는 Instagram 계정으로 로그인하고 공유할 계정을 하나만 선택합니다. Facebook 페이지 연결을 요구하거나 페이지 계정을 대신 조회하지 않습니다.
+- 공식 근거는 Coordinator가 제공한 「통합 로그인을 통한 Instagram API 시작하기」(Updated 2026-10-27, `/tmp/crelink-unified-get-started-official.txt`)와 「인증 및 액세스 토큰」(Updated 2026-10-13, `/tmp/crelink-unified-authentication-official.txt`)입니다. 로그인·토큰·계정 조회의 실행 원본은 `apps/api/src/instagram/graph.ts`입니다.
+- 필요한 권한은 `instagram_basic`, `instagram_manage_comments`, `instagram_manage_messages`이며 config가 동의할 자산과 권한을 정합니다 `[문서]`. 이번 구현은 `pages_*` 권한이나 Facebook 페이지 연결을 요구하지 않습니다.
+- API 호스트는 `graph.facebook.com/v27.0`입니다. 버전은 `graph.ts` 상수로 두고 env로 만들지 않습니다. 코드 교환은 기존 Meta App ID/Secret을 사용하는 `/oauth/access_token`을 유지합니다. 서버 폼 POST·Bearer 헤더의 실제 지원 여부와 콜백 완료는 미실측입니다 `[M?]`.
+- 기존 설정 키 `META_APP_ID`, `META_APP_SECRET`, `META_LOGIN_CONFIG_ID`, `META_WEBHOOK_VERIFY_TOKEN`, `INSTAGRAM_TOKEN_KEYS`, `INSTAGRAM_TOKEN_KEY_CURRENT`, `INSTAGRAM_COMMENTER_HASH_KEY`, `INSTAGRAM_OPT_OUT_KEY`를 유지합니다(`apps/api/src/config.service.ts`). 새 설정·migration·60일 refresh는 도입하지 않습니다. Sentry 스크럽도 기존 Meta 토큰 형식(`EAA…`)을 유지합니다.
+- Coordinator의 실제 콘솔 확인: Instagram 로그인 호환 구성 `1767663210968198`, SUAT·만료 없음. 콘솔 생성 URL에 `override_default_response_type=true`와 `prompt=login`이 있으며, ‘Instagram으로 계속하기’는 `instagram.com/accounts/login`의 IG 계정 목록으로 이동했습니다. 권한 승인·code 교환·콜백 완료·테스트 webhook은 아직 확인하지 않았습니다 `[M?]`.
+- 설계 이력: 초기 Facebook Login 기반 구현은 페이지/accounts와 debug_token 대체 조회를 사용했습니다. 0276 R1의 old Instagram Login 전환안은 신규 앱 콘솔에서 지원 불가가 확인되어 취소했습니다. R2는 Meta 자격 증명과 Graph 호스트를 유지하고 BISU·assigned 계정 조회로 대체합니다.
 
 ## 구성과 흐름
 
 ```text
-[연결] 브라우저 → BFF → POST /api/me/instagram/connect → Facebook Login 동의
+[연결] 브라우저 → BFF → POST /api/me/instagram/connect → Unified Login(Instagram 계정 선택) 동의
        → {WEB}/me/integrations/instagram/callback → POST /api/me/instagram/callback → 암호화 저장·구독
 
 [수신] Meta → Cloudflare → Caddy(웹 호스트의 웹훅 경로만 API로) → raw 미들웨어 → 서명 검증
@@ -97,7 +99,7 @@ CREATE TABLE instagram_connections (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL UNIQUE REFERENCES users (id) ON DELETE CASCADE,
   ig_user_id text NOT NULL,            -- /<IG_ID>/messages, 웹훅 entry.id
-  meta_user_id text,                   -- signed_request user_id 대조용(S9)
+  meta_user_id text,                   -- BISU id 저장, signed_request user_id 일치는 미실측(S9)
   ig_username text NOT NULL,
   status text NOT NULL CHECK (status IN ('active','messages_access_required','reauth_required')),
   token_ciphertext bytea,              -- iv || tag || ct, reauth_required면 NULL
@@ -205,7 +207,7 @@ CREATE TABLE instagram_deletion_requests (
 | 연결 해제 | 즉시 | 연결 행 삭제, CASCADE. 운영자 정지 중이면 행을 남기고 토큰 파기·대기 취소·규칙 보관(아래 `해제`). 이때 발송 내역은 90일 보존 작업으로 지운다 |
 | 토큰 무효 | 즉시 | 토큰 파기, `reauth_required`, 대기 건 취소 |
 | 데이터 삭제 콜백 | 즉시 | 연결 행 삭제, 소유 대응표 파기, 확인 코드만 남김 |
-| 수신 거부 소유 대응표(`instagram_opt_out_owners`) | Meta 데이터 삭제 요청 때 즉시 | 연결 때 `(ig_user_id, meta_user_id)`를 upsert하고 일반 해제 뒤에도 남긴다. `signed_request`는 `meta_user_id`만 주므로 연결 행이 사라진 뒤 `ig_user_id`를 찾는 유일한 근거다 |
+| 수신 거부 소유 대응표(`instagram_opt_out_owners`) | Meta 데이터 삭제 요청 때 즉시 | 연결 때 `(ig_user_id, meta_user_id)`를 upsert하고 일반 해제 뒤에도 남긴다. `meta_user_id`에는 BISU id를 저장하며, signed_request의 user_id와 실제 일치는 미실측이다(S9). 일치할 때 일반 해제 뒤에도 ig_user_id를 찾는 근거다 |
 | 확인 코드 | 90일 | 보존 작업 DELETE |
 | 수신 거부 기록(`instagram_dm_opt_outs`) | 크리링 회원 탈퇴·Meta 데이터 삭제 요청 때 해당 `ig_user_id`분 즉시 | 90일 파기 대상이 아님. 일반 해제·재연결·재인증에서는 유지. FK가 없으므로 데이터 삭제 콜백(0257)이 같은 트랜잭션에서 소유 대응표와 연결 행으로 찾은 `ig_user_id`로 직접 DELETE. 현재 API에 회원 탈퇴 경로가 없어 이번 티켓은 없고, 탈퇴 기능을 만들 때 같은 파기를 넣는다 |
 
@@ -327,14 +329,16 @@ S4에서 같은 `comment_id` 재호출이 구분되는 오류로 거부된다고
 
 ## OAuth·토큰·삭제
 
-**연결.** 엔드포인트와 파라미터(`config_id` 등)는 S7로 확정합니다 `[M?]`.
+**연결.** 현재 인증 리비전은 `r2-unified-2026-11-11`입니다. `graph.ts`는 공식 `https://www.facebook.com/dialog/oauth`에 `client_id`, `config_id`, `override_default_response_type=true`, `prompt=login`, `response_type=code`, `display=popup`, 기존 `redirect_uri`와 `state`를 보냅니다. override 값은 실제 콘솔 생성 URL에서 확인했습니다. 콜백까지의 실제 응답은 S7 미확인입니다 `[M?]`.
 
-1. `POST /api/me/instagram/connect`: 소유자·사람·`audience` 검사 후 `state`를 만들고 Facebook Login 동의 URL을 돌려줍니다. `state`는 `{uid, exp 10분, nonce}`에 HMAC으로 서명하며 테이블을 만들지 않습니다. 새 쿠키 `cl_ig_oauth_state`로 내려 Google 로그인 state와 섞이지 않게 합니다.
-2. 동의는 브라우저에서 열리고 비밀번호가 필요합니다 `[문서]`. 시작과 콜백이 같은 브라우저여야 쿠키가 맞습니다. 인앱 브라우저이면(기존 `inAppKindOfUserAgent`, `apps/web/src/app/api/backend/[...path]/route.ts:6`, `:56`) 시작 전에 기본 브라우저 안내 화면을 보입니다.
+1. `POST /api/me/instagram/connect`: 소유자·사람·`audience` 검사 후 `state`를 만들고 Unified Login 동의 URL을 돌려줍니다. `state`는 `{uid, exp 10분, nonce, rev}`에 HMAC으로 서명하며 테이블을 만들지 않습니다. 새 쿠키 `cl_ig_oauth_state`로 내려 Google 로그인 state와 섞이지 않게 합니다.
+2. 동의는 브라우저에서 열리고 Instagram 계정으로 로그인할 수 있습니다 `[문서]`. 시작과 콜백이 같은 브라우저여야 쿠키가 맞습니다. 인앱 브라우저이면(기존 `inAppKindOfUserAgent`, `apps/web/src/app/api/backend/[...path]/route.ts:6`, `:56`) 시작 전에 기본 브라우저 안내 화면을 보입니다.
 3. 콜백 페이지(web 전용 route)는 세션 쿠키와 state 쿠키를 API에 전달합니다(E9). `code`·`state`는 Sentry에서 이미 지웁니다(E12).
-4. `POST /api/me/instagram/callback`은 쿠키 일치, 서명, 만료, `uid=세션 사용자`를 검증합니다. 다음으로 code 교환, IG 계정 조회, 프로페셔널 계정 확인, **충돌 검사**, `subscribed_apps` 구독, 암호화 저장 순서로 진행하고 저장은 한 트랜잭션에 합니다.
+4. `POST /api/me/instagram/callback`은 쿠키 일치, 서명, 만료, `uid=세션 사용자`를 검증합니다. 다음으로 기존 Meta code 교환, BISU·assigned IG 계정 조회, 프로페셔널 계정 확인, **충돌 검사**, `subscribed_apps` 구독, 암호화 저장 순서로 진행하고 저장은 한 트랜잭션에 합니다.
 5. 동의 화면에서 거부하면 콜백 route가 Meta의 `error` 값을 옮기지 않고 `instagram_access_denied`로 화면에 돌려보냅니다.
 6. 동의 결과 IG 계정이 정확히 1개가 아니면 409 `instagram_account_selection_required`입니다. 선택 화면은 만들지 않고 하나만 골라 다시 연결하도록 안내합니다.
+7. `/me?fields=id,client_business_id`의 BISU id와 client_business_id가 모두 있어야 하며 `/me`을 IG 계정으로 간주하지 않습니다 `[문서]`. `metaUserId`에는 BISU id를 저장합니다. client_business_id는 확인에만 쓰고 저장하지 않습니다. 토큰 관리 API는 이번 범위 밖이며 만료 구성을 도입할 때 저장 구조를 다시 판단합니다.
+8. IG 계정은 `/me/assigned_instagram_accounts?fields=id,username`만 사용합니다 `[문서]`. `data`와 각 계정의 id·username을 확인하고 다음 페이지가 있으면 고정 호스트·edge에 `after` cursor로 조회합니다. 불완전 응답·중복 계정·cursor 누락/반복·최대 10쪽에서 미완료·계정 10개 초과·어느 페이지든 조회 실패는 502로 막습니다. 0개·복수개는 기존 409로 거절합니다. 페이지/accounts/debug_token 대체 경로는 없습니다.
 
 **토큰 암호화와 키.**
 
@@ -345,14 +349,14 @@ S4에서 같은 `comment_id` 재호출이 구분되는 오류로 거부된다고
 
 **로그 차단(E12).** `SCRUBBED_QUERY_PARAMS`에 `access_token`, 헤더 목록에 `x-hub-signature-256`, 로그 정규식에 Meta 토큰 형식(`EAA…`)을 더합니다. 토큰은 가능하면 `Authorization` 헤더로 보냅니다 `[M?]`. `comment_id`와 작성자 ID는 로그에 쓰지 않습니다. Graph 경계에서 허용된 오류 코드와 서브코드만 남기고 원문 오류는 버립니다. 수신 거부 토큰은 URL 프래그먼트와 요청 본문으로만 다니므로 경로·쿼리 로그에 남지 않으며, 본문을 로그·Sentry에 넣지 않습니다.
 
-**토큰 수명.** 토큰 교체 작업은 MVP에 없습니다. Facebook Login for Business의 기본은 무기한이고 `[문서]`, 구성도 무기한으로 잡습니다.
+**토큰 수명.** Unified Login은 비즈니스 통합 시스템 사용자 액세스 토큰(BISU token, 콘솔 표기 SUAT)을 발급하고 토큰 수명은 config에 따릅니다 `[문서]`. 선택한 구성은 콘솔에서 만료 없음으로 확인했습니다. 기존 `expiresAt: null`·DB `token_expires_at: null` 처리를 유지하며 60일 교환·refresh는 없습니다(`graph.ts`, `connection.service.ts`, `token-health.service.ts`). 포트폴리오에서 앱을 제거하거나 IG 계정을 다른 포트폴리오로 옮기면 무효가 될 수 있습니다 `[문서]`.
 
 | 만료 값 | 동작 |
 | --- | --- |
 | 없음 | 무기한으로 처리, 무효 오류와 일일 점검으로만 감지 |
 | 있음 | 14일 전 화면 경고, 지나면 `reauth_required`(재연결로 복구) |
 
-S7에서 토큰이 만료되고 갱신 수단이 있다고 확인되면 후속 migration으로 추가합니다.
+공식 관리 API는 client_business_id 저장이 필요하지만 이번 범위에서는 호출하지 않습니다. 만료 있는 config가 필요하면 저장·갱신 설계를 별도로 결정합니다.
 
 **일일 점검.** 1시간 tick에서 `token_checked_at`이 24시간 지난 연결을 최대 100개 처리합니다. 조건부 UPDATE로 단일 승자를 고르고 트랜잭션 밖에서 `GET /<IG_ID>?fields=id`를 부릅니다. `token_key_version`이 현재 키와 다르면 재암호화도 합니다. 무효이면 재인증 전이 함수를 호출합니다(`token_revision`이 같을 때만). 해제 콜백이 없을 때의 대체 신호이며 최대 24시간 지연을 수용합니다.
 
@@ -362,7 +366,7 @@ S7에서 토큰이 만료되고 갱신 수단이 있다고 확인되면 후속 m
 
 **해제.** `DELETE /api/me/instagram`은 구독 해제를 시도하고(실패 무시) 연결 행을 삭제합니다. 규칙과 내역도 함께 지워지며 화면에 그렇게 안내합니다. 운영자 정지(`operator_paused_at`)가 있으면 행을 지우지 않습니다. 재인증 전이(토큰 파기·`pending` 취소)를 하고 규칙을 보관한 뒤 행을 남기며, 구독 해제 뒤에 행을 잠그고 다시 읽어 호출 중에 걸린 정지도 놓치지 않습니다. 재연결(같은 `user_id`)은 그 행을 갱신하므로 정지가 유지됩니다. 응답은 똑같이 204이고, 데이터 삭제 콜백은 운영자 정지와 관계없이 행을 지웁니다.
 
-**데이터 삭제 콜백.** HTTPS, `signed_request` 검증, `{url, confirmation_code}` 응답입니다 `[문서]`. `meta_user_id`로 연결을 찾아 삭제하고, 일반 해제로 연결 행이 없어도 소유 대응표(`instagram_opt_out_owners`)로 `ig_user_id`를 찾아 그 수신 거부 기록과 대응표 행을 같은 트랜잭션에서 파기합니다. 못 찾아도 같은 응답을 줍니다. 응답 `url`은 `{WEB}/privacy/instagram-deletion/{code}`입니다. `user_id` 대응이 안 되면(S9) 콜백 대신 안내 URL과 제품 내 해제로 바꿉니다. 확인 페이지는 코드 존재 여부만 표시합니다. 댓글 작성자는 앱을 승인한 적이 없어 콜백이 오지 않습니다 `[M?]`. 90일 자동 파기와 처리방침의 문의 경로로 대응합니다.
+**데이터 삭제 콜백.** HTTPS, `signed_request` 검증, `{url, confirmation_code}` 응답입니다 `[문서]`. `meta_user_id`로 연결을 찾아 삭제하고, 일반 해제로 연결 행이 없어도 소유 대응표(`instagram_opt_out_owners`)로 `ig_user_id`를 찾아 그 수신 거부 기록과 대응표 행을 같은 트랜잭션에서 파기합니다. 못 찾아도 같은 응답을 줍니다. 응답 `url`은 `{WEB}/privacy/instagram-deletion/{code}`입니다. 현재 `meta_user_id`에 저장한 BISU id와 실제 삭제 콜백의 `user_id`가 같은 식별자인지는 미실측입니다(S9) `[M?]`. 기존 서명 검증과 일치 식별자에 대한 삭제 시험은 실제 Meta 식별자 일치의 증거가 아닙니다. 불일치 시 다른 식별자나 Facebook 페이지를 임의로 대입하지 않고 삭제 경로를 다시 결정해야 합니다. 확인 페이지는 코드 존재 여부만 표시합니다. 댓글 작성자는 앱을 승인한 적이 없어 콜백이 오지 않습니다 `[M?]`. 90일 자동 파기와 처리방침의 문의 경로로 대응합니다.
 
 ## DM 링크와 측정
 
@@ -483,7 +487,7 @@ S7에서 토큰이 만료되고 갱신 수단이 있다고 확인되면 후속 m
 | S4 | 같은 `comment_id` 재호출 결과 | 0258 | 두 번째 응답 코드 기록 |
 | S5 | 실제 원문의 `value.id`/`value.comment_id`, 캐러셀의 `media.id` | 0254, 0257, 0260 | 필드표와 캐러셀 처리 결정. S2 실패 시 Advanced 뒤로 이월 |
 | S6 | 규칙 문구에 직접 넣은 `/s/{code}` 링크 포함 DM의 전달, 크롤러, 탭 1회 기록 | 0260 | 본문이 규칙 문구와 일치, visits·page_view 건수 |
-| S7 | Unified 토큰 발급, 추가 권한, 만료 값, IG ID 조회, 계정 복수 | 0254, 0256 | 응답 형식표 |
+| S7 | R2 Unified Login: 콘솔 IG 로그인 이동·SUAT 만료 없음 확인, code 교환·BISU/assigned 실제 응답·콜백 완료는 미실측 | 0254, 0256 | 응답 형식표 |
 | S8 | 메시지 접근 꺼짐과 토큰 무효의 오류 코드, BUC 헤더 형식 | 0258 | 코드표 |
 | S9 | 데이터 삭제 콜백 `user_id`와 해제 콜백 존재 여부 | 0257 | 호출 원문(비식별) 또는 문서 근거 |
 | S10 | 크리에이터에게 포트폴리오나 Facebook 페이지가 필요한가 | 제품 판단 | 빈 계정으로 실측 |
@@ -582,7 +586,7 @@ R 등급의 정의 문서는 `docs/development`, `docs/alm`, `WORKFLOW.md`, `doc
 | # | 시점 | 항목 |
 | --- | --- | --- |
 | A0 | 지금 | 설계 승인, PRD 수정, `미정` 결정 |
-| A1 | 0252 전 | Business 포트폴리오 소유 Meta 앱 생성, Facebook Login for Business 구성. 사용자 본인이 로그인 |
+| A1 | 0252 전(이력), 0276 R2 | 기존 Meta 앱·자격 증명 유지, Instagram 로그인 호환 config 선택. 콘솔 IG 로그인 이동 확인, 승인·콜백 완료 미실측 |
 | A2 | 0252 전 | 앱 시크릿 로컬 사용. 운영 SOPS 등록은 0269 전 별도 승인 |
 | A3 | 0252 중 | 테스트 DM 최대 5건(재호출 1건 포함), 수신 계정 지정 |
 | A3a | S2 실패 시 | 결정됨(2026-11-11): 구현 진행, 스위치 `off` 유지. 완료 보고에 실제 Meta 연동 미검증을 명시 |
@@ -604,6 +608,8 @@ R 등급의 정의 문서는 `docs/development`, `docs/alm`, `WORKFLOW.md`, `doc
 - 2026-11-11 Codex Sol xhigh 반대 의견 10건 검토, 전부 반영(6번으로 10번 해소). api·web·product 검토 전
 
 ## 변경 기록
+
+- 2026-11-11 0276 CTO R2(`r2-unified-2026-11-11`): old Instagram Login R1 취소 이력을 남기고 실제 콘솔 기준 authorize·BISU/assigned 조회·SUAT null 만료·기존 설정 유지 및 삭제 콜백 식별자 한계를 반영했습니다.
 
 - 승인 전 없음
 - 2026-11-11 0269 통합 보정: 운영자 정지 중 해제 동작, 정지 중 재시도 복귀 취소, `instagram_access_denied`, 삭제 확인 주소 `/privacy/instagram-deletion/{code}` 반영

@@ -123,7 +123,7 @@ export function ConnectionPanel({
             <h3 className="ig-guide-title">연결하기 전에 확인해 주세요</h3>
             <ul className="ig-guide">
               <li>프로페셔널(비즈니스·크리에이터) 계정이고 공개 계정이어야 해요.</li>
-              <li>브라우저에서 인스타그램(페이스북) 로그인이 열려요. 로그인에 비밀번호가 필요해요.</li>
+              <li>Instagram 계정으로 로그인하고 연결할 계정을 선택해요.</li>
               <li>
                 동의 화면에서 <strong>Allow access to messages</strong>(메시지 접근 허용)를 켜 주세요. 꺼져 있으면 DM을
                 보낼 수 없어요.

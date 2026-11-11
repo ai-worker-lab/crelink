@@ -4,6 +4,8 @@
 
 ## 2026-11-11
 
+- Instagram 로그인 호환 구성 전환(0277): SOPS의 `META_LOGIN_CONFIG_ID`만 통합 로그인 구성으로 교체합니다. 기존 앱 시크릿·암호키·공개 범위는 유지합니다. [작업 기록](../docs/work/orchestrator/0277-instagram-direct-login.md).
+
 - Instagram DM 운영 설정(0275): `prod/secrets/home-server.sops.env`에 사용자가 등록한 필수 8개 항목을 암호문으로 반영합니다. 설정 주입 후 API worker가 활성화되며 공개 범위는 기존 DB 값을 따릅니다. 실제 배포·검증은 [0275](../docs/work/orchestrator/0275-instagram-dm-prod-settings.md)에 기록합니다.
 
 - Caddy 패치 갱신(PR #178, 0273): `prod/edge/compose.yaml`을 2.11.7-alpine에서 2.11.9-alpine으로 갱신하고 라우팅 시험은 해당 Compose의 이미지를 읽도록 맞췄습니다. README의 중복 태그를 원본 참조로 바꿨습니다. 고정 edge는 앱 배포와 별개로 재생성해야 반영되며, 운영 적용은 수행하지 않습니다. 근거: [0273](../docs/work/orchestrator/0273-caddy-patch-update.md), [인프라 계약](../contracts/0273-caddy-patch-update/5-infra.contract.md).

@@ -3,7 +3,9 @@ import { Injectable, Logger } from '@nestjs/common';
 /** Graph API 버전. env로 만들지 않습니다(docs/specs/instagram-comment-dm.md#구성과-전제). */
 export const GRAPH_API_VERSION = 'v27.0';
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
-const LOGIN_DIALOG_URL = `https://www.facebook.com/${GRAPH_API_VERSION}/dialog/oauth`;
+const LOGIN_DIALOG_URL = 'https://www.facebook.com/dialog/oauth';
+const GRAPH_ACCOUNT_LIMIT = 10;
+const GRAPH_ACCOUNT_PAGE_LIMIT = 10;
 
 /** 호출 한 건의 타임아웃. 발송 worker의 종료 유예(최악 10초)와 맞춥니다. */
 export const GRAPH_REQUEST_TIMEOUT_MS = 10_000;
@@ -81,7 +83,7 @@ export interface GraphInstagramAccount {
 }
 
 export interface GraphAccountLookup {
-  /** 데이터 삭제 콜백의 `user_id` 대조용(S9). */
+  /** BISU id. 삭제 콜백의 `user_id`와 일치하는지는 미실측(S9). */
   metaUserId: string | null;
   accounts: GraphInstagramAccount[];
 }
@@ -112,7 +114,7 @@ export interface GraphSentMessage {
  * 실패는 모두 `InstagramGraphError`입니다.
  */
 export abstract class InstagramGraph {
-  /** Facebook Login 동의 URL. `[M?]` 엔드포인트와 파라미터는 S7로 확정합니다. */
+  /** Unified Login 동의 URL. Instagram 로그인 호환 config를 사용합니다. */
   abstract authorizationUrl(config: InstagramGraphConfig, state: string): string;
   /** authorization code를 토큰으로 바꿉니다. `[M?]` S7. */
   abstract exchangeCode(config: InstagramGraphConfig, code: string): Promise<GraphAccessToken>;
@@ -184,6 +186,7 @@ export class FetchInstagramGraph extends InstagramGraph {
       client_id: config.appId,
       redirect_uri: config.redirectUri,
       config_id: config.loginConfigId,
+      override_default_response_type: 'true',
       response_type: 'code',
       display: 'popup',
       prompt: 'login',
@@ -211,110 +214,55 @@ export class FetchInstagramGraph extends InstagramGraph {
     return { accessToken, expiresAt: expiresIn === null ? null : new Date(Date.now() + expiresIn * 1000) };
   }
 
-  async fetchAccounts(accessToken: string, config?: InstagramGraphConfig): Promise<GraphAccountLookup> {
-    // `[M?]` Facebook Login for Business의 계정 조회 형식은 S7로 확정합니다.
+  async fetchAccounts(accessToken: string): Promise<GraphAccountLookup> {
+    // Unified Login의 /me는 Instagram 계정이 아니라 비즈니스 통합 시스템 사용자(BISU)입니다.
     const body = record(
       await this.request('fetchAccounts', '/me', {
         method: 'GET',
         accessToken,
-        query: { fields: 'id,accounts{instagram_business_account{id,username}}' },
+        query: { fields: 'id,client_business_id' },
       }),
     );
-    const pages = record(body.accounts).data;
-    const accounts = (Array.isArray(pages) ? pages : []).flatMap((page): GraphInstagramAccount[] => {
-      const account = record(record(page).instagram_business_account);
-      const igUserId = text(account.id);
-      const username = text(account.username);
-      // `[M?]` instagram_business_account는 프로페셔널 계정에만 있다고 가정합니다. S7로 확인합니다.
-      return igUserId && username ? [{ igUserId, username, isProfessional: true }] : [];
-    });
+    const metaUserId = text(body.id);
+    if (!metaUserId || !text(body.client_business_id)) throw this.malformed('fetchAccounts');
 
-    // Unified Login에서 페이지 없이 직접 할당된 계정도 확인합니다.
-    if (accounts.length === 0 && config) {
-      let assigned: Record<string, unknown> = {};
-      try {
-        assigned = record(
-          await this.request('fetchAssignedAccounts', '/me/assigned_instagram_accounts', {
-            method: 'GET',
-            accessToken,
-            query: { fields: 'id,username' },
-          }),
-        );
-      } catch (error) {
-        // 해당 edge를 지원하지 않는 로그인 구성은 granular_scopes로 조회합니다.
-        if (!(error instanceof InstagramGraphError) || error.kind !== 'rejected' || error.code === 190) throw error;
-      }
-      for (const value of Array.isArray(assigned.data) ? assigned.data : []) {
+    const accounts: GraphInstagramAccount[] = [];
+    const cursors = new Set<string>();
+    let after: string | null = null;
+    for (let page = 0; page < GRAPH_ACCOUNT_PAGE_LIMIT; page++) {
+      const assigned = record(
+        await this.request('fetchAssignedAccounts', '/me/assigned_instagram_accounts', {
+          method: 'GET',
+          accessToken,
+          query: { fields: 'id,username', ...(after ? { after } : {}) },
+        }),
+      );
+      if (!Array.isArray(assigned.data)) throw this.malformed('fetchAssignedAccounts');
+      for (const value of assigned.data) {
         const account = record(value);
         const igUserId = text(account.id);
         const username = text(account.username);
-        if (igUserId && username && !accounts.some((item) => item.igUserId === igUserId)) {
-          accounts.push({ igUserId, username, isProfessional: true });
+        // 누락된 계정을 버리면 복수 선택을 한 계정으로 오인할 수 있으므로 전체 조회를 실패시킵니다.
+        if (!igUserId || !username || accounts.some((item) => item.igUserId === igUserId)) {
+          throw this.malformed('fetchAssignedAccounts');
         }
+        accounts.push({ igUserId, username, isProfessional: true });
+        if (accounts.length > GRAPH_ACCOUNT_LIMIT) throw this.malformed('fetchAssignedAccounts');
       }
+      if (
+        assigned.paging !== undefined &&
+        (!assigned.paging || typeof assigned.paging !== 'object' || Array.isArray(assigned.paging))
+      ) {
+        throw this.malformed('fetchAssignedAccounts');
+      }
+      const paging = record(assigned.paging);
+      if (paging.next === undefined || paging.next === null) return { metaUserId, accounts };
+      after = text(record(paging.cursors).after);
+      if (!text(paging.next) || !after || cursors.has(after)) throw this.malformed('fetchAssignedAccounts');
+      cursors.add(after);
+      // next URL은 따라가지 않고 고정 Graph 호스트·edge에 cursor만 전달합니다.
     }
-
-    // Facebook Login for Business: /me/accounts가 비어있고 config가 있는 경우 debug_token의 granular_scopes target_ids로 조회
-    if (accounts.length === 0 && config) {
-      const debug = record(
-        record(
-          await this.request('debugToken', '/debug_token', {
-            method: 'GET',
-            accessToken: `${config.appId}|${config.appSecret}`,
-            query: { input_token: accessToken },
-          }),
-        ).data,
-      );
-      const granular = Array.isArray(debug.granular_scopes) ? debug.granular_scopes : [];
-
-      // 1) instagram_basic의 target_ids에서 직접 IG 계정 조회
-      const igScope = granular.find((s) => record(s).scope === 'instagram_basic');
-      const igTargetIds = Array.isArray(record(igScope).target_ids)
-        ? (record(igScope).target_ids as unknown[]).filter((id): id is string => typeof id === 'string' && !!id)
-        : [];
-
-      if (igTargetIds.length > 10) throw this.malformed('fetchIgAccount');
-      for (const igId of igTargetIds) {
-        const igRes = record(
-          await this.request('fetchIgAccount', `/${encodeURIComponent(igId)}`, {
-            method: 'GET',
-            accessToken,
-            query: { fields: 'id,username' },
-          }),
-        );
-        const igUserId = text(igRes.id);
-        const username = text(igRes.username);
-        if (igUserId && username && !accounts.some((a) => a.igUserId === igUserId)) {
-          accounts.push({ igUserId, username, isProfessional: true });
-        }
-      }
-
-      // 2) IG 직접 조회가 비어있고 pages_show_list의 target_ids가 있는 경우 페이지에서 instagram_business_account 조회
-      if (accounts.length === 0) {
-        const pageScope = granular.find((s) => record(s).scope === 'pages_show_list');
-        const pageTargetIds = Array.isArray(record(pageScope).target_ids)
-          ? (record(pageScope).target_ids as unknown[]).filter((id): id is string => typeof id === 'string' && !!id)
-          : [];
-        if (pageTargetIds.length > 10) throw this.malformed('fetchPage');
-        for (const pageId of pageTargetIds) {
-          const pageRes = record(
-            await this.request('fetchPage', `/${encodeURIComponent(pageId)}`, {
-              method: 'GET',
-              accessToken,
-              query: { fields: 'id,instagram_business_account{id,username}' },
-            }),
-          );
-          const account = record(pageRes.instagram_business_account);
-          const igUserId = text(account.id);
-          const username = text(account.username);
-          if (igUserId && username && !accounts.some((a) => a.igUserId === igUserId)) {
-            accounts.push({ igUserId, username, isProfessional: true });
-          }
-        }
-      }
-    }
-
-    return { metaUserId: text(body.id), accounts };
+    throw this.malformed('fetchAssignedAccounts');
   }
 
   async subscribeApp(accessToken: string, igUserId: string): Promise<void> {
