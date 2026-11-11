@@ -2,6 +2,10 @@
 
 내부 참고용으로 인프라의 모든 변경을 적용 여부와 관계없이 기록합니다. 환경별 적용 시각·결과·복구 정보는 운영 work item이나 배포 플랫폼에 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-11-11
+
+- Instagram 웹훅 공개 경로(0262): `prod/Caddyfile` 웹 호스트에서 `/api/webhooks/instagram`과 `/api/webhooks/instagram/data-deletion`의 GET·POST만 BFF 없이 API 업스트림으로 보냅니다. 경로는 `{http.request.uri}` 원문 정규식으로 맞춰 하위 경로·대소문자·`..`·`//`·인코딩 변형은 지금처럼 web으로 가고, 본문 상한 6MB는 웹훅에도 같이 걸립니다. 단축 호스트는 그대로입니다. `prod/tests/caddy-routing.sh`에 78건을 더해 Docker로 172건 통과를 확인했고, `prod/verify.sh`는 토큰 없는 GET이 HTML이 아닌 403·404·503인지(API 응답인지) 보는 검사를 더해 14개가 됩니다. 실제 서버 적용은 병합 뒤 Deploy job으로만 확인합니다. 롤백하면 두 경로가 재배포 전까지 web의 404입니다. [티켓](../docs/work/infra/0262-instagram-dm-edge.md).
+
 ## 2026-11-10
 
 - 채널별 짧은 주소 경로(0248): `prod/Caddyfile` 단축 호스트 `@click` 정규식에 `s/[a-z0-9]{7,10}`(GET만)를 더했습니다. `prod/tests/caddy-routing.sh`에 `/s/` 허용·거부와 웹 호스트·색 전환 뒤 확인 14건을 더해 Docker로 94건 통과를 확인했고, `prod/verify.sh`는 `/s/zzzzzzz` 302와 `notice?reason=link_not_found`로 검사 13개가 됩니다. 실제 서버 적용은 병합 뒤 Deploy job으로만 확인합니다. 롤백하면 이미 공유한 `/s/` 주소가 재배포 전까지 404입니다. [티켓](../docs/work/infra/0248-channel-links-edge.md).

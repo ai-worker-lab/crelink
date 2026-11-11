@@ -4063,3 +4063,147 @@ body:has(.sheet[open]) {
   align-items: center;
   gap: var(--ds-space-8);
 }
+
+/* 인스타그램 DM 메뉴(docs/specs/instagram-comment-dm.md): 연결 카드, 규칙 목록, 게시물 고르기. 390px에서도 가로로 넘치지 않게 줄바꿈한다. */
+.ig-guide-title {
+  margin: 0 0 var(--ds-space-8);
+  font-size: var(--ds-font-size-16);
+}
+.ig-guide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-6);
+  margin: 0;
+  padding-left: var(--ds-space-20);
+  font-size: var(--ds-font-size-14);
+  overflow-wrap: anywhere;
+}
+.ig-inapp {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ds-space-8);
+}
+.ig-inapp p {
+  margin: 0;
+}
+.ig-pause-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-12);
+}
+.ig-pause-row > div {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.ig-pause-row p {
+  margin: var(--ds-space-4) 0 0;
+}
+.ig-rule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-8) var(--ds-space-12);
+}
+.ig-rule > .ig-rule-form {
+  flex: 1 1 100%;
+}
+.ig-rule-main {
+  display: flex;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+  min-width: 0;
+}
+.ig-rule-main p {
+  margin: 0;
+}
+.ig-rule-media {
+  color: var(--ds-color-text-subtle);
+  font-size: var(--ds-font-size-13);
+  overflow-wrap: anywhere;
+}
+.ig-rule-message {
+  font-size: var(--ds-font-size-14);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ig-label {
+  font-size: var(--ds-font-size-14);
+  font-weight: var(--ds-font-weight-bold);
+}
+.ig-picked {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ig-count {
+  font-variant-numeric: tabular-nums;
+}
+.ig-media {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ds-space-8);
+  min-width: 0;
+}
+.ig-media-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-6);
+  align-self: stretch;
+  max-height: 360px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.ig-media-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-12);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--ds-space-8);
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--ds-corner-md);
+  background: var(--ds-color-surface-default);
+  color: var(--ds-color-text-primary);
+  text-align: left;
+}
+.ig-media-item.is-selected {
+  border-color: var(--ds-color-text-primary);
+}
+.ig-media-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.ig-media-thumb {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--ds-corner-sm);
+  background: var(--ds-color-border-default);
+  object-fit: cover;
+}
+.ig-media-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ig-media-caption {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: var(--ds-font-size-14);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.ig-media-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ds-space-8);
+}

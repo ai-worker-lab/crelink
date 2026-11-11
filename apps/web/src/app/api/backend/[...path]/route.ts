@@ -48,6 +48,10 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
   forwardPageHeader(request.headers, headers);
   const session = request.cookies.get(COOKIE_NAMES.session)?.value;
   if (session && !rule.visitorEvent) headers.set('Cookie', `${COOKIE_NAMES.session}=${session}`);
+  if (rule.forwardClientIp) {
+    const clientIp = request.headers.get('x-forwarded-for');
+    if (clientIp) headers.set('X-Forwarded-For', clientIp);
+  }
   if (rule.signupInAppKind) {
     headers.set(
       SIGNUP_CONTEXT_HEADER,

@@ -148,6 +148,19 @@ export type CrelinkErrorCode =
   | 'channel_link_not_found'
   | 'channel_link_limit_reached'
   | 'channel_link_total_limit_reached'
+  // Instagram 댓글 자동 DM. 근거: docs/specs/instagram-comment-dm.md `API 계약 초안`.
+  | 'instagram_unavailable'
+  | 'instagram_account_in_use'
+  | 'instagram_account_selection_required'
+  | 'instagram_account_not_professional'
+  | 'instagram_upstream_failed'
+  | 'instagram_operator_paused'
+  | 'instagram_reauth_required'
+  | 'instagram_rule_limit_reached'
+  | 'instagram_rule_media_taken'
+  | 'instagram_rule_not_found'
+  | 'instagram_not_configured'
+  | 'opt_out_invalid'
   // AI 운영자(R23). 근거: docs/specs/crelink-ai-operator.md `오류 코드`.
   | 'agent_run_not_found'
   | 'agent_run_in_progress'
@@ -292,6 +305,7 @@ export type ListDensity = 8 | 10 | 12;
 
 /** `GET /api/me/landing` 응답. 편집 화면 전체 상태입니다. */
 export interface CreatorLandingState {
+  instagramDmAvailable: boolean;
   pageAccess?: PageAccess;
   landing: {
     publicId: string;
@@ -956,6 +970,9 @@ export type OperatorActionType =
   | 'ai_operator.token_revoke'
   // 플랫폼 광고 블록 스위치(R20 ⑩)
   | 'platform.ad_block'
+  // Instagram 댓글 자동 DM 감사 기록.
+  | 'instagram_dm.audience'
+  | 'instagram_dm.connection_pause'
   // 지난 기록에만 있는 행동(2026-10-12 기능 제거, 더 이상 만들지 않음): 운영자 추가 슬롯, 링크 슬롯 이벤트 기간 저장
   | 'creator.extra_slots'
   | 'slot_event.period_update';
@@ -1126,6 +1143,23 @@ export const CRELINK_API_PATHS = {
   /** 광고 블록 스위치(R20 ⑩). `PUT`은 `SetAdBlockRequest`. */
   meAdBlock: '/api/me/ad-block',
   adminAdBlock: '/api/admin/ad-block',
+  // Instagram 댓글 자동 DM. 근거: docs/specs/instagram-comment-dm.md `API 계약 초안`.
+  meInstagram: '/api/me/instagram',
+  meInstagramConnect: '/api/me/instagram/connect',
+  meInstagramCallback: '/api/me/instagram/callback',
+  meInstagramRecheck: '/api/me/instagram/recheck',
+  meInstagramPause: '/api/me/instagram/pause',
+  meInstagramMedia: '/api/me/instagram/media',
+  meInstagramRules: '/api/me/instagram/rules',
+  meInstagramRule: (publicId: string) => `/api/me/instagram/rules/${encodeURIComponent(publicId)}`,
+  meInstagramDeliveries: '/api/me/instagram/deliveries',
+  adminInstagramDm: '/api/admin/instagram-dm',
+  adminInstagramDmConnectionPause: (userId: string) =>
+    `/api/admin/instagram-dm/connections/${encodeURIComponent(userId)}/pause`,
+  instagramWebhook: '/api/webhooks/instagram',
+  instagramDataDeletionWebhook: '/api/webhooks/instagram/data-deletion',
+  publicInstagramDeletion: (code: string) => `/api/public/instagram-deletions/${encodeURIComponent(code)}`,
+  publicInstagramDmOptOuts: '/api/public/instagram-dm-opt-outs',
   /** `cursor`: 이전 응답의 `GuestbookPage.nextCursor`. */
   landingGuestbook: (publicId: string, cursor?: string | null) =>
     `/api/landings/${encodeURIComponent(publicId)}/guestbook${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
