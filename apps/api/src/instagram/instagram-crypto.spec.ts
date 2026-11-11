@@ -200,7 +200,9 @@ describe('Graph 경계', () => {
   const lastCall = () => fetchMock.mock.calls.at(-1) as [string, RequestInit & { headers: Record<string, string> }];
 
   beforeEach(() => {
-    fetchMock = jest.spyOn(globalThis, 'fetch');
+    fetchMock = jest.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      throw new Error('등록하지 않은 Graph fetch: 실제 Meta 호출 금지');
+    });
     warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
   });
 

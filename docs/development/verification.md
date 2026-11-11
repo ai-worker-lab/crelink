@@ -46,7 +46,7 @@
 
 PR마다 GitHub Actions에서 도는 CI는 없습니다(0237, [ADR 0016](../adr/0016-devoffice-takeover.md) 결정 5). 머지 전 검사는 [로컬 CI](#로컬-ci)의 `pnpm ci:local --report`가 맡습니다. GitHub ruleset `main 보호`(0061)가 머지를 막습니다: main 직접 push·force push·삭제 금지, PR 필수(squash만, 승인 0), 필수 검사 `CI 통과`, PR 브랜치가 최신 `main`을 포함해야 함. `CI 통과`는 `--report`가 기록하는 commit status로 충족합니다. 어느 앱에서 온 status인지는 묶지 않으므로 쓰기 권한자는 검증 없이도 기록할 수 있습니다(ADR 0016의 한계).
 
-[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)은 수동 실행 전용입니다(`gh workflow run CI --ref <브랜치>`). 아래 변경은 머지 전에 한 번 실행합니다. 로컬 CI에 없는 E2E가 이 흐름을 지키기 때문입니다: 로그인·가입, 권한·개인정보, 관리 화면·공개 랜딩의 작성 흐름, 의존성 major 갱신, WebKit·Firefox나 amd64에서만 나는 문제가 의심되는 변경. 성공하면 같은 이름의 `CI 통과`가 남습니다.
+[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)은 수동 실행 전용입니다(`gh workflow run CI --ref <브랜치>`). 실제 변경 영향이 로컬 검사로 덮이지 않는 로그인·권한·개인정보 계약, 브라우저 엔진 차이, 의존성 major 또는 amd64 빌드 위험에 닿을 때 필요한 범위를 확인해 실행합니다. 관리 화면의 단순 옵션·문구 변경이라는 이유만으로 원격 전수 CI를 실행하지 않습니다. 관련 unit·계약 검사와 지정 QA로 충분한 변경은 해당 로컬 profile을 씁니다. 수동 CI가 성공하면 같은 이름의 `CI 통과`가 남습니다.
 
 | job | 내용 |
 | --- | --- |
@@ -65,26 +65,45 @@ PR마다 GitHub Actions에서 도는 CI는 없습니다(0237, [ADR 0016](../adr/
 
 ## 로컬 CI
 
-[`scripts/ci-local.mjs`](../../scripts/ci-local.mjs)의 `pnpm ci:local`이 머지 전 검사를 이 기기에서 실행합니다([ADR 0016](../adr/0016-devoffice-takeover.md) 결정 5). push 전에 `pnpm ci:local`을, 머지 전에 PR 브랜치에서 `pnpm ci:local --report`를 실행합니다(`--report`는 push된 커밋에만 기록하므로 push 뒤에 다시 돕니다). Dependabot PR도 브랜치를 받아 같은 명령을 씁니다.
+[`scripts/ci-local.mjs`](../../scripts/ci-local.mjs)가 실행하고 [`scripts/lib/ci-local.mjs`](../../scripts/lib/ci-local.mjs)의 registry가 범위와 명령을 정합니다([ADR 0016](../adr/0016-devoffice-takeover.md) 결정 5). push 전에 clean HEAD에서 영향 범위를 덮는 profile을 성공시켜 receipt를 만들고, push 뒤 머지 전에 **동일 옵션**으로 `--report`를 실행합니다. report는 receipt 대조·status 등록만 하며 테스트를 다시 실행하지 않습니다. Dependabot도 같은 기준입니다. 기본 profile은 항상 `full`이며 report에서 이전 profile을 추정하지 않습니다.
 
-| 판정 | 순서 |
+| profile | concrete CLI 예와 범위 |
 | --- | --- |
-| 문서만 바뀜 | `pnpm verify --docs --keep-going` → `work:scope` |
-| 코드가 바뀜(비교할 수 없을 때 포함) | `work:scope` → `make infra-up` → `pnpm verify --keep-going` → `make up` → ego-lite 시험 모음 → `apps/api`·`apps/web` 이미지 빌드(기기 고유 플랫폼, 내보내지 않음) |
+| `full` (기본) | `pnpm ci:local` → push → `pnpm ci:local --report`. 기존 전체 코드/문서 경로 유지 |
+| `config` | `pnpm ci:local --profile config` → push → `pnpm ci:local --profile config --report`. 기존 `infra/prod/secrets/home-server.sops.env`의 암호문 교체 또는 기존 `INSTAGRAM_REQUIRED_KEYS` 8개 전체의 최초 암호문 등록만 허용. 미등록 이름·삭제·부분 등록·평문·수신자·파서·배포동작 변경은 full |
+| `hotfix` | `pnpm ci:local --profile hotfix --select api:src/instagram/rules.service.ts,api:src/instagram/webhook.service.ts`. rules/webhook 옵션 변경의 관련 unit·각 e2e·공개 계약만 검사. web/shared 변경이 있으면 해당 selector 추가 |
+| `auth` | `pnpm ci:local --profile auth --select api:src/instagram/graph.ts,api:test/fixtures/instagram-graph.fixtures.ts`. offline 인증 계약 예. 같은 변경에 web/shared가 있으면 selector를 명시적으로 추가 |
+| 지정 QA | QA 이름은 `smoke`, `analytics-responsive`, `visitor`, `signup-funnel`. 해당 변경과 실제 관련된 모음에만 `--qa <이름>`을 지정 |
 
-- **판정 기준:** 문서만 바뀌었는지는 `git diff origin/main...HEAD`와 작업 트리 변경(추적하지 않는 파일 포함)을 봅니다. 작업 트리도 보는 것은 `pnpm verify`가 작업 트리를 검사하기 때문입니다. 이름 변경은 옛 경로와 새 경로를 모두 세므로(`--no-renames`) 코드를 `docs/`로 옮긴 변경은 코드입니다.
-- **결과:** 단계별 결과·시간을 요약합니다. CI job처럼 한 단계가 실패해도 남은 단계를 돌리고, 하나라도 실패하면 종료 코드 1입니다. `Ctrl-C`·`SIGTERM`은 진행 중인 단계를 멈추고 스택을 정리한 뒤 130·143으로 끝납니다.
-- **스택 정리:** 시작할 때 DB 컨테이너와 API·웹·앱 포트를 확인해 이 실행이 띄운 것만 내립니다. 이미 떠 있던 서비스는 다시 시작하지도 내리지도 않고 그대로 씁니다. 스택은 ego 시험 뒤 바로 내리고 이미지 빌드는 그다음에 합니다.
-- **시험 모음:** ego-lite 시험은 스크립트의 `EGO_SUITES`, 아직 옮기지 않은 검사와 Node 26은 `NOT_LOCAL`이 원본입니다. 코드 경로의 실행 요약에 `로컬 CI 미포함`으로 나옵니다. `playwright install`을 하지 않습니다.
-- **Node:** `.nvmrc`(24) 기준입니다. 다른 버전으로 실행하면 경고합니다.
-- **이미지 플랫폼:** 이미지 단계는 Docker 서버의 고유 플랫폼(Apple Silicon은 `linux/arm64`)으로 빌드해 Dockerfile·의존성 오류를 잡습니다. `linux/amd64`를 쓰지 않는 이유는 Apple Silicon의 QEMU에서 `apps/web`의 `next build`가 크래시하기 때문입니다(2026-11-10 네 번 재현, [0210](../work/orchestrator/0210-local-ci.md)). amd64 빌드는 Deploy에서 검증합니다. [`deploy.yml`](../../.github/workflows/deploy.yml)의 `배포` job은 `이미지` job이 성공(또는 건너뜀)해야 돌고 플랫폼은 [`infra/prod/targets.json`](../../infra/prod/targets.json)을 따르므로, 빌드가 실패하면 서버를 건드리지 않고 멈춥니다. 실행 요약의 `로컬 CI 미포함`에 `amd64 빌드는 Deploy에서 검증`으로 표시합니다.
-- **이미지 플랫폼의 한계:** amd64에서만 나는 빌드 실패는 머지 뒤 Deploy에서 드러납니다. 운영에는 나가지 않지만 그 사이 `main`에 고장 난 커밋이 남고, 되돌리거나 후속 PR로 고쳐야 합니다. amd64가 걱정되는 변경은 머지 전에 `ci.yml`을 수동 실행합니다.
+hotfix/auth도 report 때 `--profile`, `--select`, `--qa`를 위 실행과 동일하게 전달합니다. 예: `pnpm ci:local --profile auth --select api:src/instagram/graph.ts,api:test/fixtures/instagram-graph.fixtures.ts --report`. selector 목록 순서는 정규화합니다. `full`에는 `--select`/`--qa`를 붙여 축소할 수 없습니다.
 
-### commit status 기록
+### 범위와 실행
 
-`pnpm ci:local --report`는 모든 단계가 통과하고, 시작과 끝에 작업 트리가 깨끗하고, 실행 중 HEAD가 그대로이고, HEAD가 같은 이름의 원격 브랜치 tip일 때만 그 커밋에 commit status(`context` `CI 통과`, `state` `success`)를 `gh api`로 기록합니다. 인증은 `gh`의 현재 인증(`GH_TOKEN` 또는 `gh auth`)을 씁니다. 조건을 못 맞추거나 호출이 실패하면 종료 코드 1입니다. `--report --dry-run`은 같은 판정까지 하고 대상 SHA·`context`·호출 내용만 출력합니다. 옵션 없이 실행하면 기록하지 않습니다.
+- 실행 전 변경 파일·profile·selector·QA·필수/관측 명령을 출력해 고정합니다. 비교는 `origin/main...HEAD`와 작업 트리(추적하지 않는 파일 포함)이며 이름 변경의 양쪽 경로를 검사합니다. 등록되지 않은 소스·관련 범위 누락·빈 selector·알 수 없는 인자는 종료 코드 2로 거부합니다. 임의 shell 명령은 받지 않고 registry의 `spawn`/`execFile` argv만 실행합니다.
+- runner(`scripts/`), lockfile, package manifest, `.github/`, 공통 infra, Dockerfile 변경은 full입니다. config의 기존 암호문 교체와 기존 8개 키 최초 일괄 등록만 예외이며 암호문 구조/기존 메타데이터를 비교합니다. 허용 이름은 `apps/api/src/config.service.ts`의 기존 `INSTAGRAM_REQUIRED_KEYS`와 unit으로 대조합니다. 이는 기존 정의값 주입이며 새 파서 정의가 아닙니다. 이 검사는 **복호화 값 형식이나 운영 정상의 증거가 아닙니다**.
+- API의 `api:src/instagram/rules.service.ts`는 rules 서비스·컨트롤러와 rules/contract e2e, `api:src/instagram/webhook.service.ts`는 webhook 서비스·컨트롤러·payload·raw-body·서명과 signed-request unit 및 webhook/contract e2e를 선택합니다. `api:src/instagram/graph.ts`는 기존 crypto/Graph 보안경계(`instagram-crypto.spec.ts`, form-secret 포함)와 새 fixture 검사(`graph.spec.ts`)를 함께 선택합니다. fixture-only `api:test/fixtures/instagram-graph.fixtures.ts`는 해당 fixture를 소비하는 `graph.spec.ts`만 선택합니다(원본: `scripts/lib/ci-local.mjs`의 `SCOPE_REGISTRY`). `api:src/instagram`은 모듈 전체 unit과 Instagram 도메인의 모든 e2e를 선택합니다(루트 전체 시험 제외). 각 그룹의 변경 시험 파일도 같은 selector로 덮으며, connection e2e 단독 selector도 유지합니다. 모두 API typecheck를 포함합니다. Jest는 `--runTestsByPath`로 지정하고 테스트 0건은 실패합니다. **선택한 시험에 e2e가 있을 때만** DB를 시작합니다.
+- `web`은 Instagram 설정·발송 내역·callback·삭제 상태 경로와 `instagram-dm-audience`만 덮습니다. 관련 `state.spec.ts`·audience·callback·삭제 상태 unit과 web typecheck를 실행합니다. web typecheck만으로 성공시키지 않습니다.
+- `shared`는 `packages/shared/src/instagram-dm.ts`와 해당 spec만 덮으며 shared build/test 및 API·web·app 소비자 typecheck를 실행합니다. 새 공통 계약은 등록하거나 full로 확인합니다.
+- hotfix/auth는 `shared` selector가 없어도 API/web workspace import의 `dist`를 준비하려고 소비자 시험·typecheck 전에 shared build를 실행합니다. shared test와 추가 소비자 typecheck는 `shared` 선택 등 기존 필요조건을 유지합니다. 새 checkout/오래된 dist의 순서는 synthetic 소비자가 dist 일치를 확인하는 hermetic 시험으로 고정합니다.
+- registry QA는 실제 관련된 경우에만 선택합니다. `visitor`는 공개 방문 경로 검사이므로 Instagram 설정 폼 부분 QA의 근거가 아닙니다. Instagram 폼 같은 화면은 기존 fixture와 동일 소스 증거를 사용하는 별도 부분 QA가 필요하며, registry unit/typecheck만으로 화면 QA 완료를 주장하지 않습니다.
+- 좁은 profile은 `pnpm verify --docs --keep-going`, `work:scope`, 변경한 코드 파일 ESLint·Prettier를 함께 실행합니다. 이미지 빌드와 ego 네 모음은 자동 추가하지 않습니다. QA를 지정했을 때만 스택을 준비합니다.
+- full은 기존 동작을 유지합니다. 문서만 바뀌면 `pnpm verify --docs --keep-going` → `work:scope`; 코드 변경(비교 불가 포함)은 `work:scope` → 인스턴스 설정 → `make infra-up` → `pnpm verify --keep-going` → 스택 준비 → ego 네 모음 → 스택 정리 → API/web 이미지 빌드입니다. 이미 떠 있던 서비스는 보존하고 이번 실행이 만든 서비스만 내립니다.
+- 단계가 실패해도 나머지 필수 검사를 실행하고 실패를 유지합니다. SIGINT/SIGTERM은 자식 프로세스 그룹을 중단하고 정리한 뒤 130/143입니다. dirty·중단·필수 실패/누락이면 성공 receipt를 쓰지 않고 실패합니다. 동일 SHA 재실행 시작 시 이전 receipt를 지워 실패 뒤 옛 성공을 재사용하지 못하게 합니다.
+- Node 기준은 `.nvmrc`이며 다르면 경고합니다. full 이미지는 Docker 서버 고유 플랫폼으로 `cacheonly` 빌드합니다. Apple Silicon QEMU의 amd64 Next 빌드 오류 때문에 amd64는 Deploy에서 검사하며, 머지 전에 이 위험을 확인해야 하는 변경이면 수동 CI를 사용합니다. 실제 포함되지 않은 E2E·Node 26 범위는 실행기의 `NOT_LOCAL`을 요약에 표시합니다.
 
-ruleset `main 보호`의 필수 검사 `CI 통과`는 이 status로 충족합니다. `strict` 때문에 `main`보다 뒤처진 커밋은 머지할 수 없으니 브랜치를 갱신한 뒤 다시 실행합니다. HEAD가 `origin/main`을 포함하지 않으면 경고합니다. 쓰기 권한자는 검증 없이도 status를 기록할 수 있다는 한계는 ADR 0016에 적었습니다.
+### receipt와 commit status 기록
+
+성공 receipt는 `.local/ci/receipts/<sha>.json`에 원자적으로 저장합니다(Git 제외, 영구 보관 스키마 아님). SHA, 현재 base SHA, clean 여부, profile/selectors/QA와 변경 파일, 전체 명령 계획·실제 단계 argv, Node/platform, lock hash, runner 지문, 환경 지문, 필수 결과(`results`)와 외부 관측(`observations`)을 분리하고 완전성·중단 여부를 기록합니다. 환경은 비밀값을 출력하지 않고 전체 digest만 저장합니다. `gh` 등록 인증과 터미널·pnpm 호출 메타데이터를 제외한 실행 환경 및 로컬 env 파일은 지문으로 대조합니다. `exec_command`가 호출마다 주입하는 `CODEX_TOOL_CALL_ID`도 호출 메타데이터로 제외하며, 실제 테스트 환경변수·키·설정은 계속 대조합니다(구현: `scripts/ci-local.mjs`의 `identityFor`).
+
+`--report`는 현재 registry로 계획을 다시 계산해 모든 필드·필수 여부·결과의 누락/중복/순서·실제 실행 argv를 대조합니다. receipt 없음·손상·빈 required·불명·불일치·dirty·실패/중단이면 종료 코드 1이며 full을 자동 실행하지 않습니다. 출력의 `tests 0 (검사 명령 0회)`로 재사용 경로를 확인합니다. source·테스트·registry·HEAD/base·환경이 바뀌면 검증을 다시 실행해야 합니다.
+
+통과한 receipt가 있고 현재 HEAD가 같은 이름의 원격 브랜치 tip이며 시작/끝 clean·HEAD 고정을 만족할 때만 `gh api`로 `context=CI 통과`, `state=success`를 등록합니다. `--report --dry-run`은 같은 대조 후 등록만 생략합니다. 옵션 없이 실행하면 status를 등록하지 않습니다. ruleset의 strict 조건 때문에 main 갱신/rebase 뒤에는 새 SHA에서 검증이 필요합니다. 쓰기 권한자의 status·receipt 위조를 암호학적으로 막지는 않는다는 신뢰 한계는 ADR 0016 그대로입니다.
+
+### 내부 계약과 외부 관측
+
+기본 auth 검사는 실제 Meta 네트워크 없이 [test-only synthetic fixture](../../apps/api/test/fixtures/instagram-graph.fixtures.ts)를 `FetchInstagramGraph` fetch 경계에서 재생합니다. 2026-11-11 관측 shape의 출처와 가짜 값은 fixture·[API 안내](../../apps/api/docs/README.md#instagram-공개-답글과-unified-login-보강)에 구분합니다. 복수 계정은 Graph 목록 반환/서비스 409이며 malformed·timeout은 기존 `indeterminate`, 연결 전 실패는 `connect_failed` 계약을 보존합니다.
+
+별도 opt-in `INSTAGRAM_LIVE=1 pnpm ci:local --profile auth --select api:src/instagram/graph.ts`은 registry에 미리 선언된 `Meta 도달 관측`만 추가합니다. 이 관측은 비밀 없이 공개 Graph 호스트 도달만 확인하며 실제 로그인·실계정 성공을 뜻하지 않습니다. 외부 관측 불가는 별도 **실패** 결과로 남기되 비차단입니다. 필수 내부 계약 실패를 외부 장애라고 재분류하거나 FAIL을 PASS로 바꾸지 않습니다. `EGO_TEST_ONLY`·`EGO_TEST_FAULT`·`EGO_TEST_INJECT_CSS`로 필수 결과를 숨기거나 조작할 수 없습니다.
 
 ## CD(운영 배포)
 
@@ -112,7 +131,7 @@ GitHub Actions가 돌지 않을 때(장애, 비공개 시절의 사용량 한도
 
 ## 완료 보고 전 확인 범위
 
-work item을 `검증` 상태로 올리거나 완료를 보고하기 전에 변경 영역에 맞는 명령을 실제로 실행하고, 실행한 명령과 결과를 work item `진행 기록`에 남깁니다. 실행하지 않은 검증을 통과로 적지 않습니다.
+work item을 `검증` 상태로 올리거나 완료를 보고하기 전에 변경 영역에 맞는 명령을 실제로 실행하고, 실행한 명령과 결과를 work item `진행 기록`에 남깁니다. 위 registry가 지원하는 변경은 선택 profile의 관련 시험·계약·부분 QA가 이 표의 전체 명령보다 우선하며, 이미 확인한 같은 대상의 성공 검증을 중복 실행하지 않습니다. 미등록·공통 기반 변경은 full을 사용합니다. 실행하지 않은 검증을 통과로 적지 않습니다.
 
 | 변경 영역 | 실행 |
 | --- | --- |

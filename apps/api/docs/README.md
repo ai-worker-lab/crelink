@@ -378,4 +378,6 @@ pnpm --filter @crelink/api --silent ai-operator list-tokens   # 또는 node apps
 - `src/instagram/rules.service.ts`의 선택 `replyMessage`는 최대 300 코드 포인트이며 null·빈 문자열은 공개 답글을 해제합니다. migration `0017_instagram_public_reply.sql`을 먼저 적용합니다.
 - `src/instagram/worker.service.ts`는 공개 답글 뒤 DM을 보냅니다. 답글 실패도 DM을 막지 않으며 답글 결과를 DM 전에 저장해 DM 재시도 시 답글을 반복하지 않습니다. DM 직전 발송 조건과 lease를 다시 확인하며 공개 답글 중 정지·수신 거부·취소·lease 상실이 발생하면 DM을 보내지 않습니다. 외부 발송과 DB 기록 사이 프로세스 종료는 원자적으로 묶을 수 없습니다.
 
+기본 인증 회귀는 `test/fixtures/instagram-graph.fixtures.ts`의 test-only synthetic 응답을 `src/instagram/graph.spec.ts`의 fetch mock에서 재생합니다. 출처는 2026-11-11 Coordinator 관측([0279](../../../docs/work/orchestrator/0279-instagram-token-identity.md))이며 token 200·빈 `/me`·debug_token principal·assigned 한 계정의 shape만 옮겼습니다. 식별자·token은 가짜이며 `/me`는 호출하지 않습니다. 정상 복수 계정은 Graph 목록으로 반환한 뒤 기존 서비스가 409로 거부합니다. 연결 전 오류는 `connect_failed`, timeout·계약 형식 불일치는 기존 `indeterminate`입니다. 실행: `pnpm --filter @crelink/api test --runInBand --runTestsByPath src/instagram/graph.spec.ts`. 실제 Meta 가용성·실계정 연결 성공은 이 시험으로 입증하지 않으며 [로컬 CI 외부 관측](../../../docs/development/verification.md#내부-계약과-외부-관측)은 별도 opt-in입니다.
+
 0276 CTO R2의 지정 시험·타입 검사·lint 결과와 로컬 DB 접근 한계는 [0276 진행 기록](../../../docs/work/orchestrator/0277-instagram-direct-login.md#진행-기록)에 있습니다. 기존 Graph 대역의 HTTP/DB 회귀와 실제 Meta 식별자·응답은 별도 검증 범위이며 fetch mock 통과로 실측 완료를 주장하지 않습니다.
