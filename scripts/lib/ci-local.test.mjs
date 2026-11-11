@@ -649,10 +649,11 @@ if (name === 'docker' || name === 'make') {
   // 사용자의 선택/오류 주입 환경은 이 hermetic 저장소에 상속하지 않습니다.
   for (const key of ['INSTAGRAM_LIVE', 'EGO_TEST_ONLY', 'EGO_TEST_FAULT', 'EGO_TEST_INJECT_CSS']) delete env[key];
   if (live) env.INSTAGRAM_LIVE = '1';
+  let toolCallId = 0;
   const run = (...args) =>
     spawnSync(process.execPath, ['scripts/ci-local.mjs', ...args], {
       cwd: temp,
-      env,
+      env: { ...env, CODEX_TOOL_CALL_ID: `synthetic-tool-call-${++toolCallId}` },
       encoding: 'utf8',
       timeout: 20_000,
     });
@@ -661,7 +662,7 @@ if (name === 'docker' || name === 'make') {
       ? readFileSync(join(temp, '.local/calls.jsonl'), 'utf8').trim().split('\n').map(JSON.parse)
       : [];
   const receiptPath = () => join(temp, '.local/ci/receipts', `${git('rev-parse', 'HEAD')}.json`);
-  return { temp, git, run, calls, receiptPath };
+  return { temp, git, run, calls, receiptPath, env };
 }
 
 test('hermetic CLI: shared selector 없이 API/web 소비자 전에 build 1회(새 checkout·오래된 dist)', () => {
@@ -758,9 +759,10 @@ test('hermetic CLI: config 최초 등록만 허용하며 부분·평문·수신�
   }
 });
 
-test('hermetic CLI: full 문서 호환 → report는 fake status만 등록하고 검사 0회', () => {
+test('hermetic CLI: 호출별 CODEX_TOOL_CALL_ID 변경은 report 검사 0회 재사용, 테스트 환경 변경은 거부', () => {
   const fixture = cliFixture();
   try {
+    fixture.env.TEST_DATABASE_URL = 'postgresql://synthetic:synthetic@example.test/original';
     const first = fixture.run();
     assert.equal(first.status, 0, first.stdout + first.stderr);
     const before = fixture.calls();
@@ -780,6 +782,12 @@ test('hermetic CLI: full 문서 호환 → report는 fake status만 등록하고
     );
     assert.equal(fixture.calls().filter(([command]) => command === 'pnpm').length, before.length);
     const count = fixture.calls().length;
+    fixture.env.TEST_DATABASE_URL = 'postgresql://synthetic:synthetic@example.test/changed';
+    const changedEnvironment = fixture.run('--report');
+    assert.equal(changedEnvironment.status, 1, changedEnvironment.stdout + changedEnvironment.stderr);
+    assert.match(changedEnvironment.stderr, /영수증 대상 불일치/);
+    assert.equal(fixture.calls().length, count);
+    fixture.env.TEST_DATABASE_URL = 'postgresql://synthetic:synthetic@example.test/original';
     rmSync(fixture.receiptPath());
     const missing = fixture.run('--report');
     assert.equal(missing.status, 1);

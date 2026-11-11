@@ -370,6 +370,7 @@ function identityFor(options, files) {
             'npm_lifecycle_script',
             'npm_command',
             'npm_config_argv',
+            'CODEX_TOOL_CALL_ID',
             'TERM',
             'TERM_PROGRAM',
             'TERM_PROGRAM_VERSION',

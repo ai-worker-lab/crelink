@@ -6,6 +6,8 @@
 
 ## 2026-11-11
 
+- 0281 report 환경 지문 보정: `exec_command`의 호출별 `CODEX_TOOL_CALL_ID`만 기존 제외 목록에 추가했습니다. hermetic 검증→report에서 호출 ID가 달라도 검사 0회 재사용하고 `TEST_DATABASE_URL` 변경은 거부하도록 검사합니다. 실제 첫 full 성공·첫 report 거부 근거는 [티켓](docs/work/orchestrator/0281-scoped-verification.md)에 기록합니다.
+
 - 부분 검증·결과 재사용(0281): 기존 로컬 CI에 범위 registry와 clean 성공 receipt를 추가했습니다. report는 동일 대상·명령·필수 결과를 대조해 검사 0회로 status만 등록하고, 사전 선언한 외부 관측 외 실패는 차단합니다. test-only Meta fixture와 정책 안내를 동기화했습니다. Instagram 소스/시험 그룹별 관련 검사·모듈 e2e, 소비자 전 shared build의 hermetic 회귀, 기존 8개 설정 키 최초 일괄 등록 경계를 보정하고 무관한 visitor QA 예시를 제거했습니다. [티켓](docs/work/orchestrator/0281-scoped-verification.md), [검증 루프](docs/development/verification.md#로컬-ci), [API 로그](apps/api/CHANGELOGS.md).
 
 - Instagram 모든 댓글·최초 1회(0280): 사용자 확정 범위를 SSoT `r4-all-comments-2026-11-11/u1`와 shared에 동기화하고 0019·API·체크박스·처리방침 및 Coordinator용 격리 DB/웹 fixture를 추가했습니다. 인증 r3와 미실측 이력은 유지합니다. [티켓](docs/work/orchestrator/0280-instagram-all-comments.md), [API 로그](apps/api/CHANGELOGS.md), [웹 로그](apps/web/CHANGELOGS.md).

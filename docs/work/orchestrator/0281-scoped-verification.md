@@ -64,3 +64,9 @@
 - 실제 검증: `node --test scripts/lib/ci-local.test.mjs` **32건 통과**(`/tmp/crelink-0281-correction-unit.log`), 대상 ESLint·Prettier, `pnpm docs:check`, `pnpm work:check`, `pnpm work:scope 0281`, `git diff --check` 통과. 보조 로그는 `/tmp/crelink-0281-correction-{lint,format,docs,work,scope}.log`다. 제품 코드·완료한 Graph fixture는 추가 변경하지 않았다. 설정 실데이터/복호화·서비스/외부 호출·실제 Docker/listen/브라우저·실제 full/report·프로젝트 commit/push/review는 실행하지 않고 Coordinator에 인계한다. unit 안의 Git commit·full/report·인프라 명령은 임시 저장소와 fake 대역이다.
 
 - Coordinator 문서 대조: 완료 보고 표에도 등록 profile 우선과 같은 대상 성공 검증 재사용을 명시했다. 구현 코드 변경은 없으며 최종 full/report와 릴리스 증거는 settings-sync의 후속 적용 기록 및 PR에서 실제 결과로 연결한다.
+
+### 호출 메타데이터 지문 보정
+
+- 2026-11-11: HEAD `164dda8`의 실제 첫 full은 **122.7s, 12 통과·0 실패**로 성공 receipt를 저장했다(`/tmp/crelink-0281-ci-first.log`, `ci_exit=0`). 첫 report는 환경 지문 불일치로 fail-closed 거부했다(`/tmp/crelink-0281-report-first.log`, exit 1). 원인은 `exec_command`가 호출마다 다른 `CODEX_TOOL_CALL_ID`를 주입하는 것이며, 별도 호출에서 변수 이름과 값 변경을 확인했다.
+- `scripts/ci-local.mjs`의 `identityFor`에서 이 한 항목만 기존 volatile metadata 제외 목록에 추가했다. 기존 hermetic 검증→report는 호출마다 다른 ID를 주입해 `tests 0`·fake status만 실행하는 재사용을 확인하고, 일반 실제 테스트 환경변수 `TEST_DATABASE_URL` 변경은 계속 거부한다. 기준 `scoped-verification-2026-11-11-r1`/R2와 수용 기준은 유지한다. 전체 rerun·최종 검수는 Coordinator 담당이다.
+- 제한 검증(Node `26.13.0`): `node --test scripts/lib/ci-local.test.mjs` **32건 통과**, 변경 JS 2개의 ESLint와 변경 파일 5개의 Prettier 통과. 로그: `/tmp/crelink-0281-call-id-{unit,lint,format}.log`. 제품·Meta·DB·Docker·실제 전체 CI·push·프로젝트 commit·검수는 실행하지 않았다. hermetic 내부 full/report·Git commit은 임시 저장소·fake 대역이다.

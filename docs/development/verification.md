@@ -93,7 +93,7 @@ hotfix/auth도 report 때 `--profile`, `--select`, `--qa`를 위 실행과 동�
 
 ### receipt와 commit status 기록
 
-성공 receipt는 `.local/ci/receipts/<sha>.json`에 원자적으로 저장합니다(Git 제외, 영구 보관 스키마 아님). SHA, 현재 base SHA, clean 여부, profile/selectors/QA와 변경 파일, 전체 명령 계획·실제 단계 argv, Node/platform, lock hash, runner 지문, 환경 지문, 필수 결과(`results`)와 외부 관측(`observations`)을 분리하고 완전성·중단 여부를 기록합니다. 환경은 비밀값을 출력하지 않고 전체 digest만 저장합니다. `gh` 등록 인증과 터미널·pnpm 호출 메타데이터를 제외한 실행 환경 및 로컬 env 파일은 지문으로 대조합니다.
+성공 receipt는 `.local/ci/receipts/<sha>.json`에 원자적으로 저장합니다(Git 제외, 영구 보관 스키마 아님). SHA, 현재 base SHA, clean 여부, profile/selectors/QA와 변경 파일, 전체 명령 계획·실제 단계 argv, Node/platform, lock hash, runner 지문, 환경 지문, 필수 결과(`results`)와 외부 관측(`observations`)을 분리하고 완전성·중단 여부를 기록합니다. 환경은 비밀값을 출력하지 않고 전체 digest만 저장합니다. `gh` 등록 인증과 터미널·pnpm 호출 메타데이터를 제외한 실행 환경 및 로컬 env 파일은 지문으로 대조합니다. `exec_command`가 호출마다 주입하는 `CODEX_TOOL_CALL_ID`도 호출 메타데이터로 제외하며, 실제 테스트 환경변수·키·설정은 계속 대조합니다(구현: `scripts/ci-local.mjs`의 `identityFor`).
 
 `--report`는 현재 registry로 계획을 다시 계산해 모든 필드·필수 여부·결과의 누락/중복/순서·실제 실행 argv를 대조합니다. receipt 없음·손상·빈 required·불명·불일치·dirty·실패/중단이면 종료 코드 1이며 full을 자동 실행하지 않습니다. 출력의 `tests 0 (검사 명령 0회)`로 재사용 경로를 확인합니다. source·테스트·registry·HEAD/base·환경이 바뀌면 검증을 다시 실행해야 합니다.
 
