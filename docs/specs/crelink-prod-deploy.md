@@ -139,13 +139,25 @@ Next.js 16(0039)부터 웹 standalone 서버는 SIGTERM에 진행 중 요청을 
 | `bench` | 수동 `api_cache=bench-*`일 때만 독립 실행(`needs` 없음), `plan`·`image`·`deploy`·`record`는 모두 skip. 권한은 `contents:read`·`packages:write`, 운영 접속·Sentry secret·운영 이미지/배포 태그 쓰기 없음 |
 | `rollback.yml` | main에서 `workflow_dispatch`(입력 `target` 기본 `home-server`, `release` SHA 선택) → Tailscale → `ssh deploy@<host> "rollback [SHA]"`(배포와 같은 무중단 전환) → `ssh deploy@<host> verify`(운영 주소 검사, 위와 같음) |
 
-### API 캐시 (`api-cache-2026-11-12-r1/u1`)
+### API 캐시 (`api-cache-2026-11-12-r1/u2`)
 
 실행 원본은 [deploy.yml](../../.github/workflows/deploy.yml)의 choice 입력 `api_cache`입니다. 기본 `default`는 API `<IMAGE_PREFIX>-api:buildcache` registry 캐시 읽기·`mode=max` 쓰기, `bypass`는 읽기만 비우고 쓰기를 유지합니다. 운영 export는 `ignore-error=true`로 캐시 저장 실패를 허용하며 이미지 빌드·push·Sentry 업로드 실패 정책은 유지합니다. 웹은 GHA `scope=web` 그대로입니다. `api_cache`는 변경 영역 판별이나 기존 `force` 의미를 바꾸지 않습니다.
 
 `bench-seed`는 원본 checkout과 미존재 `buildcache-bench-<SHA>` 읽기로 import miss fallback·export를 측정합니다(이미 있는 tag면 중단). `bench-warm`·`bench-bypass`는 checkout의 `apps/api/src/main.ts`에 동일한 고정 주석 한 줄을 추가하며, warm만 채워진 bench ref를 읽습니다. 세 모드 모두 같은 bench ref로 export하고, 동일 Git SHA·Dockerfile·`linux/amd64`, 새 runner/builder, `SENTRY_RELEASE=<SHA>`·`SENTRY_UPLOAD=no`·Sentry secret 없음, `push=false`·OCI 파일 출력으로 실행합니다. 벤치 export 실패는 job 실패이며 OCI 파일 크기·소스/fixture hash·builder/플랫폼·캐시 blob 크기를 기록합니다.
 
-warm의 부모 의존성 CACHED와 API COPY/compile 실행을 실제 로그에서 대조해야 합니다. 전부 CACHED인 시험은 hotfix 성능 근거로 쓰지 않습니다. 단계별 시간·import·export와 운영 네 job skip도 실행 기록으로 확인하며, Sentry 업로드 비용·cache key가 운영과 다른 한계와 캐시 blob 합계가 OCI 출력 크기와 다른 지표임을 구분합니다. 실측 결과와 문서 마감은 pending이며 절감 시간은 아직 확인하지 않았습니다. 실행·마감 절차는 [런북 5-1](../../infra/docs/prod-runbook.md#5-1-api-캐시와-격리-벤치)에 있습니다.
+warm의 부모 의존성 CACHED와 API COPY/compile 실행을 실제 로그에서 대조해야 합니다. 전부 CACHED인 시험은 hotfix 성능 근거로 쓰지 않습니다. 단계별 시간·import·export와 운영 네 job skip도 실행 기록으로 확인하며, Sentry 업로드 비용·cache key가 운영과 다른 한계와 캐시 blob 합계가 OCI 출력 크기와 다른 지표임을 구분합니다. 실측과 코드 반영을 완료했으며 아래 u2 기록으로 결과를 확인합니다. 실행·마감 절차는 [런북 5-1](../../infra/docs/prod-runbook.md#5-1-api-캐시와-격리-벤치)에 있습니다.
+
+**u2 실측·반영 기록 (2026-11-11T17:34:56.317Z, UTC):** 소스128faba90b7f319786b5d935536563b48a61afc8의 amd64 비교입니다. seed는 원본, warm/bypass는 동일 주석 fixture이며 Dockerfile·base digest는 같고 builder는3개 모두 다릅니다. 실제 import miss fallback·부모 의존성 CACHED/API compile 실행·bypass import 없음·OCI/격리 cache export 성공과 운영4job skip·배포태그 불변을 대조했습니다.
+
+| 모드 | build step | bench job | 실행 |
+| --- | ---: | ---: | --- |
+| seed | 96초 | 143초 | [43066903014](https://github.com/ai-worker-lab/crelink/actions/runs/43066903014) |
+| warm | 66초 | 103초 | [43067441736](https://github.com/ai-worker-lab/crelink/actions/runs/43067441736) |
+| bypass | 113초 | 158초 | [43067942635](https://github.com/ai-worker-lab/crelink/actions/runs/43067942635) |
+
+warm의 복원 단계25.2초·API compile5.7초, 이번 warm/bypass 차이는47초였습니다. 각1회 관측으로 평균/운영 총시간을 보장하지 않습니다. Sentry 토큰 없는 OCI 출력이며, 이전 운영 GHA 복원918.5초와는 시점·출력·인증 조건이 다릅니다. 벤치 cache는격리tag로남고 운영기본cache는다음실제API빌드에서처음채워집니다.
+
+[코드 PR188](https://github.com/ai-worker-lab/crelink/pull/188)은 merge d579e6da4ede496fac8b7c5f778f3c8427c95b6b으로 반영됐습니다. [Deploy43069237768](https://github.com/ai-worker-lab/crelink/actions/runs/43069237768)는2026-11-11T17:33:10Z에 plan-only success였고 이미지·운영 배포·배포태그는 skipped입니다. 강제 재배포를 하지 않았으며, 이 결과를 운영 Sentry/실제 앱 발송 검증으로 설명하지 않습니다.
 
 ## DB migration 운영 규칙
 
