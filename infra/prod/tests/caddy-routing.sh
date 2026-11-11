@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 운영 edge Caddy(infra/prod/Caddyfile) 공개 정책 로컬 시험. Docker만 필요(DNS·Cloudflare 불필요). 저장소 루트에서:
 #   infra/prod/tests/caddy-routing.sh
-# - 실제 caddy:2.11.7-alpine(edge/compose.yaml과 같은 이미지·읽기 전용·권한 축소)에 서버와 같은 설정 폴더(/etc/caddy 폴더 bind:
+# - edge/compose.yaml의 실제 Caddy 이미지(읽기 전용·권한 축소)에 서버와 같은 설정 폴더(/etc/caddy 폴더 bind:
 #   저장소 Caddyfile + lib.sh upstreams_for가 쓰는 upstreams.caddy)를 붙입니다. 다른 점은 아래뿐입니다.
 #   호스트 CRELINK_SHORT_HOST=go.localhost·CRELINK_WEB_HOST=links.localhost, 호스트 포트(127.0.0.1의 빈 포트),
 #   api·web 자리에 요청 메서드·경로·X-Forwarded-For·Authorization·X-Crelink-Agent-Run 등을 응답 헤더(x-echo-*)로 되돌려주는 스텁
@@ -17,7 +17,7 @@ set -euo pipefail
 prod="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 run_id="crelink-caddytest-$$"
 work="$(mktemp -d)"
-caddy_image=caddy:2.11.7-alpine
+caddy_image="$(docker compose -f "$prod/edge/compose.yaml" config --images)"
 node_image=node:24-alpine
 short=go.localhost
 web=links.localhost
