@@ -6,6 +6,8 @@
 
 ## 2026-11-11
 
+- Instagram 토큰 principal 수정(0279 CTO R3): 실제 `/me.id` 누락 확인에 따라 앱 Bearer로 검증한 `debug_token.data.user_id`를 identity로 사용합니다. assigned 계정 선택·기존 보안/설정/DB를 유지하고 opaque `input_token` 가림 회귀와 현재 identity 문서를 보완했습니다. 0278·CTO R2 이력은 보존합니다. [API 로그](apps/api/CHANGELOGS.md), [0279](docs/work/orchestrator/0279-instagram-token-identity.md).
+
 - Instagram 계정 응답 검증 보완(0278): 사용하지 않는 `client_business_id`를 응답 필수값에서 제외하고 BISU id·assigned IG 목록 검증은 유지했습니다. 현재 SSoT·API 안내의 필수 필드 설명과 fetch mock 회귀를 보완했습니다. [API 로그](apps/api/CHANGELOGS.md), [0278](docs/work/orchestrator/0278-instagram-account-response.md).
 
 - Instagram 로그인 수정(0276 CTO R2): 공식 Unified Login authorize와 BISU·assigned 계정 조회로 정리하고 SSoT 인증 리비전을 `r2-unified-2026-11-11`로 갱신했습니다. 기존 Meta 설정·null 만료·소유권/state/revision을 유지합니다. 세부는 [API 로그](apps/api/CHANGELOGS.md), [웹 로그](apps/web/CHANGELOGS.md), [0276 진행 기록](docs/work/orchestrator/0277-instagram-direct-login.md).

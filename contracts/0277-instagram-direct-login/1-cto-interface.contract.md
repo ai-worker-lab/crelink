@@ -1,7 +1,7 @@
 # [CTO Contract] Instagram 직접 로그인 전환
 
 - 작업: 0277. task: task-c7c34040700441b0afed513d08e93464.
-- 현재 기준: docs/specs/instagram-comment-dm.md `r2-unified-2026-11-11`. R1 원문은 취소 이력이며 현재 구현은 R2만 따른다.
+- 현재 기준: docs/specs/instagram-comment-dm.md `r3-token-identity-2026-11-11`. R1은 취소 이력, 아래 R2는 당시 승인 이력이며 identity는 후속 R3를 따른다.
 - 사용자 권한: Instagram 직접 연동으로 수정·배포·완수 요구. 코드 변경·필요한 설정 적용은 승인 범위이며 결제·일반공개·DM 발송은 제외.
 - 검증 담당: R2 구현 담당은 지정 API 시험·관련 typecheck/lint만 실행한다. CI·브라우저·실제 Meta·commit/push/PR·최종 검수는 Coordinator 소관이며 이번 구현에서 수행하지 않는다.
 - Coordinator 보완(R1 취소 이력, 현재 키 교체 지시 아님): 추가 공식 Webhooks 문서(2026-10-20)는 앱 기본 설정의 App Secret으로 서명을 검증한다고 설명한다. /tmp/crelink-instagram-webhooks-official.txt 참고. OAuth 전용 Instagram secret과 부모 Meta App Secret을 무조건 같다고 가정하지 않는다. 기존 META_APP_SECRET을 웹훅/삭제 검증용으로 보존하고 선택 규칙을 명시·시험한다. 불일치 때 양쪽 서명을 무조건 허용하는 처리는 하지 않는다. 실제 서명은 대시보드 시험에서 확인한다.
@@ -107,3 +107,11 @@
 - ConnectionPanel 안내는 “Instagram 계정으로 로그인하고 연결할 계정을 선택해요.”로 정정한다. R1의 graph.instagram·전용 Instagram 키·60일 refresh는 재사용하지 않는다.
 - 기존 SOPS config 값은 Coordinator가 변경했다. 구현 담당은 `infra/prod/secrets`를 열거나 수정·복호화하지 않는다.
 - 구현 담당의 실행 검증은 `pnpm --filter @crelink/api test -- "instagram-connection|instagram-contract|instagram-crypto|instagram-graph"`와 관련 typecheck/lint뿐이다. DB 필요 시 이 checkout의 `make infra-up`만 사용하고 직접 띄운 자원만 볼륨 삭제 없이 정리한다. CI·브라우저·외부 Meta·commit/push/PR·최종 review는 Coordinator가 담당한다. 실행 결과와 미확인 한계는 0276 티켓 진행 기록에 남긴다.
+
+
+## R3 identity 변경 이력 — 0279 CTO 승인·실응답 (2026-11-11)
+
+- 실제 code 교환 200 `access_token/token_type`, `/me?fields=id,client_business_id`는 `client_business_id`만, `fields=id`는 빈 객체였다. assigned는 badajjack 1개로 정상이었다(Coordinator 제공). 0278의 당시 판단·검증과 위 R2 원문은 보존한다.
+- `/me`를 제거한다. `fetchAccounts(token, config)`에서 앱 `Authorization: Bearer appId|appSecret`으로 `GET /debug_token?input_token=<SUAT>`를 조회하고 `data.app_id === config.appId`, `type === SYSTEM_USER`, `is_valid === true`, 비어 있지 않은 문자열 `user_id`를 엄격히 검증한다. 실제 응답 네 조건을 확인했으며 검증한 user_id를 metaUserId로 사용한다. secret query·raw body 로그는 금지한다.
+- IG 계정은 기존 assigned 목록만 사용한다. debug_token은 선택 fallback이 아니다. 필드·페이지·상한·0개/복수개 409 및 state/cookie/revision/소유자/암호화/삭제/scope/8개 env/DB schema는 유지한다. Sentry input_token 가림과 opaque 토큰 URL·span·query 회귀만 보강한다.
+- 구현 담당은 관련 단위 시험·typecheck와 identity 문서·변경 기록만 처리한다. 전체 설계·프론트·infra·새 migration/키·토큰 갱신은 제외한다. full CI·commit/push/PR·리뷰·브라우저·시크릿 조회·운영/외부 API는 Coordinator 담당이다. 최종 CI 로그는 `/tmp/crelink-0279-ci.log`, `/tmp/crelink-0279-ci-report.log`에 HEAD와 함께 Coordinator가 남긴다. 삭제 콜백 식별자 실일치는 계속 미확인이다.

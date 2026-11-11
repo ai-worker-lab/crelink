@@ -182,6 +182,7 @@ describe('수신 거부 토큰', () => {
 describe('Graph 경계', () => {
   const graph = new FetchInstagramGraph();
   const config = { appId: 'app', appSecret: 'app-secret', loginConfigId: 'cfg', redirectUri: 'https://w.test/cb' };
+  const validPrincipal = { app_id: config.appId, type: 'SYSTEM_USER', is_valid: true, user_id: 'bisu' };
   let fetchMock: jest.SpyInstance;
   let warn: jest.SpyInstance;
 
@@ -381,38 +382,83 @@ describe('Graph 경계', () => {
     await expect(failure(graph.replyToComment('t', 'c', 'm'))).resolves.toMatchObject({ kind: 'indeterminate' });
   });
 
-  it.each([{}, { client_business_id: null }, { client_business_id: 123 }, { client_business_id: 'business' }])(
-    'client_business_id는 필수가 아니며 BISU와 assigned 계정만 사용한다: %p',
-    async (optionalFields) => {
-      respond(200, {
-        id: 'bisu',
-        ...optionalFields,
-        accounts: { data: [{ instagram_business_account: { id: 'page-ig', username: 'unused' } }] },
-      });
-      respond(200, { data: [{ id: 'ig', username: 'me' }] });
-      await expect(graph.fetchAccounts(META_TOKEN)).resolves.toEqual({
-        metaUserId: 'bisu',
-        accounts: [{ igUserId: 'ig', username: 'me', isProfessional: true }],
-      });
-      expect(fetchMock.mock.calls.map(([url, init]) => [url, init.method, init.headers.authorization])).toEqual([
-        ['https://graph.facebook.com/v27.0/me?fields=id%2Cclient_business_id', 'GET', `Bearer ${META_TOKEN}`],
-        [
-          'https://graph.facebook.com/v27.0/me/assigned_instagram_accounts?fields=id%2Cusername',
-          'GET',
-          `Bearer ${META_TOKEN}`,
-        ],
-      ]);
-    },
-  );
+  it('앱 Bearer로 검증한 principal과 assigned 계정만 사용하고 /me·secret query는 호출하지 않는다', async () => {
+    const opaqueToken = 'opaque-suat/+?=&value';
+    respond(200, {
+      data: {
+        ...validPrincipal,
+        granular_scopes: [{ target_ids: ['fallback-ig'] }],
+      },
+      id: 'wrong-top-level-id',
+      accounts: { data: [{ instagram_business_account: { id: 'page-ig', username: 'unused' } }] },
+    });
+    respond(200, { data: [{ id: 'ig', username: 'badajjack' }] });
+    await expect(graph.fetchAccounts(opaqueToken, config)).resolves.toEqual({
+      metaUserId: 'bisu',
+      accounts: [{ igUserId: 'ig', username: 'badajjack', isProfessional: true }],
+    });
+    const [debugUrl, debugInit] = fetchMock.mock.calls[0];
+    expect(new URL(debugUrl).pathname).toBe('/v27.0/debug_token');
+    expect(Object.fromEntries(new URL(debugUrl).searchParams)).toEqual({ input_token: opaqueToken });
+    expect(debugInit.method).toBe('GET');
+    expect(debugInit.headers.authorization).toBe(`Bearer ${config.appId}|${config.appSecret}`);
+    expect(debugInit.body).toBeUndefined();
+    expect(lastCall()[0]).toBe('https://graph.facebook.com/v27.0/me/assigned_instagram_accounts?fields=id%2Cusername');
+    expect(lastCall()[1].headers.authorization).toBe(`Bearer ${opaqueToken}`);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [url] of fetchMock.mock.calls) {
+      expect(new URL(url).pathname).not.toBe('/v27.0/me');
+      expect(url).not.toContain(config.appSecret);
+      expect(new URL(url).searchParams.has('client_secret')).toBe(false);
+      expect(new URL(url).searchParams.has('access_token')).toBe(false);
+    }
+    expect(warn).not.toHaveBeenCalled();
+  });
 
-  it.each([{}, { id: '' }, { client_business_id: 'business' }, { id: 123, client_business_id: 'business' }])(
-    'BISU 필수 식별자가 없으면 assigned 조회 전에 실패한다: %p',
+  it.each([
+    ['app_id', undefined],
+    ['app_id', 'other-app'],
+    ['app_id', 123],
+    ['type', undefined],
+    ['type', 'USER'],
+    ['type', 'system_user'],
+    ['is_valid', undefined],
+    ['is_valid', false],
+    ['is_valid', 'true'],
+    ['is_valid', 1],
+    ['user_id', undefined],
+    ['user_id', ''],
+    ['user_id', null],
+    ['user_id', 123],
+  ])('principal의 %s=%p는 assigned 조회 전에 거부한다', async (field, value) => {
+    respond(200, { data: { ...validPrincipal, [field as string]: value } });
+    await expect(graph.fetchAccounts('t', config)).rejects.toBeInstanceOf(InstagramGraphError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([{}, { data: null }, { data: [] }, { data: 'invalid' }, { ...validPrincipal }])(
+    'debug_token의 data가 불완전하면 실패한다: %p',
     async (body) => {
       respond(200, body);
-      await expect(graph.fetchAccounts('t')).rejects.toBeInstanceOf(InstagramGraphError);
+      await expect(graph.fetchAccounts('t', config)).rejects.toBeInstanceOf(InstagramGraphError);
       expect(fetchMock).toHaveBeenCalledTimes(1);
     },
   );
+
+  it.each([200, 400])('debug_token %s 응답 원문·opaque 토큰·secret은 예외와 로그에 남기지 않는다', async (status) => {
+    const opaqueToken = 'opaque-suat-sensitive';
+    const rawBody = {
+      data: { ...validPrincipal, is_valid: false },
+      error: { message: `${opaqueToken} ${config.appSecret}` },
+    };
+    respond(status, rawBody);
+    const error = await failure(graph.fetchAccounts(opaqueToken, config));
+    const surfaces = [error.message, error.stack, JSON.stringify(error), JSON.stringify(warn.mock.calls)].join();
+    for (const raw of [opaqueToken, config.appSecret, JSON.stringify(rawBody), 'is_valid']) {
+      expect(surfaces).not.toContain(raw);
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 
   it.each([
     { data: [] },
@@ -422,10 +468,10 @@ describe('Graph 경계', () => {
         { id: 'two', username: 'two' },
       ],
     },
-  ])('client_business_id 없이도 0개·복수개를 전달하고 서비스는 409로 거부한다: %p', async ({ data }) => {
-    respond(200, { id: 'bisu' });
+  ])('검증한 principal 뒤 assigned 0개·복수개를 전달하고 서비스는 409로 거부한다: %p', async ({ data }) => {
+    respond(200, { data: validPrincipal });
     respond(200, { data });
-    const result = await graph.fetchAccounts('t');
+    const result = await graph.fetchAccounts('t', config);
     expect(result.accounts).toHaveLength(data.length);
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
@@ -445,7 +491,7 @@ describe('Graph 경계', () => {
       rev: 0,
     });
     respond(200, { access_token: META_TOKEN });
-    respond(200, { id: 'bisu' });
+    respond(200, { data: validPrincipal });
     respond(200, { data });
     await expect(service.complete(user, 'code', state, state)).rejects.toMatchObject({
       status: 409,
@@ -468,33 +514,33 @@ describe('Graph 경계', () => {
       ],
     },
   ])('assigned 목록이 불완전하면 일부 계정만 반환하지 않는다: %p', async (body) => {
-    respond(200, { id: 'bisu' });
+    respond(200, { data: validPrincipal });
     respond(200, body);
-    await expect(graph.fetchAccounts('t')).rejects.toBeInstanceOf(InstagramGraphError);
+    await expect(graph.fetchAccounts('t', config)).rejects.toBeInstanceOf(InstagramGraphError);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it.each([100, 190, 500])('assigned 오류 %s는 대체 경로 없이 실패한다', async (code) => {
-    respond(200, { id: 'bisu' });
+    respond(200, { data: validPrincipal });
     respond(code === 500 ? 500 : 400, { error: { code } });
-    await expect(graph.fetchAccounts('t')).rejects.toBeInstanceOf(InstagramGraphError);
+    await expect(graph.fetchAccounts('t', config)).rejects.toBeInstanceOf(InstagramGraphError);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('BISU 조회 오류도 대체 경로 없이 실패한다', async () => {
+  it('principal 조회 오류도 대체 경로 없이 실패한다', async () => {
     respond(400, { error: { code: 190 } });
-    await expect(failure(graph.fetchAccounts('t'))).resolves.toMatchObject({ code: 190 });
+    await expect(failure(graph.fetchAccounts('t', config))).resolves.toMatchObject({ code: 190 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('assigned 다음 페이지도 확인하고 next URL 대신 cursor만 사용한다', async () => {
-    respond(200, { id: 'bisu' });
+    respond(200, { data: validPrincipal });
     respond(200, {
       data: [{ id: 'one', username: 'one' }],
       paging: { next: 'https://untrusted.test/next', cursors: { after: 'a b&c' } },
     });
     respond(200, { data: [{ id: 'two', username: 'two' }], paging: { cursors: { after: 'last' } } });
-    const result = await graph.fetchAccounts('t');
+    const result = await graph.fetchAccounts('t', config);
     expect(result.accounts.map((account) => account.igUserId)).toEqual(['one', 'two']);
     expect(lastCall()[0]).toBe(
       'https://graph.facebook.com/v27.0/me/assigned_instagram_accounts?fields=id%2Cusername&after=a+b%26c',
@@ -503,45 +549,45 @@ describe('Graph 경계', () => {
   });
 
   it('다음 페이지 실패는 첫 페이지의 한 계정을 반환하지 않는다', async () => {
-    respond(200, { id: 'bisu' });
+    respond(200, { data: validPrincipal });
     respond(200, { data: [{ id: 'one', username: 'one' }], paging: { next: 'next', cursors: { after: 'a' } } });
     respond(500, {});
-    await expect(graph.fetchAccounts('t')).rejects.toBeInstanceOf(InstagramGraphError);
+    await expect(graph.fetchAccounts('t', config)).rejects.toBeInstanceOf(InstagramGraphError);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it.each([{ next: 'next' }, { next: 'next', cursors: { after: '' } }, { next: 123, cursors: { after: 'a' } }])(
     '다음 페이지 정보가 불완전하면 실패한다: %p',
     async (paging) => {
-      respond(200, { id: 'bisu' });
+      respond(200, { data: validPrincipal });
       respond(200, { data: [{ id: 'one', username: 'one' }], paging });
-      await expect(graph.fetchAccounts('t')).rejects.toBeInstanceOf(InstagramGraphError);
+      await expect(graph.fetchAccounts('t', config)).rejects.toBeInstanceOf(InstagramGraphError);
       expect(fetchMock).toHaveBeenCalledTimes(2);
     },
   );
 
   it('페이지 cursor 반복은 실패한다', async () => {
-    respond(200, { id: 'bisu' });
+    respond(200, { data: validPrincipal });
     for (let i = 0; i < 2; i++) respond(200, { data: [], paging: { next: 'next', cursors: { after: 'a' } } });
-    await expect(graph.fetchAccounts('t')).rejects.toBeInstanceOf(InstagramGraphError);
+    await expect(graph.fetchAccounts('t', config)).rejects.toBeInstanceOf(InstagramGraphError);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('10쪽 뒤에도 다음 페이지가 있으면 불완전한 목록을 반환하지 않는다', async () => {
-    respond(200, { id: 'bisu' });
+    respond(200, { data: validPrincipal });
     for (let i = 0; i < 10; i++) respond(200, { data: [], paging: { next: 'next', cursors: { after: String(i) } } });
-    await expect(graph.fetchAccounts('t')).rejects.toBeInstanceOf(InstagramGraphError);
+    await expect(graph.fetchAccounts('t', config)).rejects.toBeInstanceOf(InstagramGraphError);
     expect(fetchMock).toHaveBeenCalledTimes(11);
   });
 
   it('assigned 계정 10개 초과는 페이지를 넘어도 실패한다', async () => {
-    respond(200, { id: 'bisu' });
+    respond(200, { data: validPrincipal });
     respond(200, {
       data: Array.from({ length: 10 }, (_, i) => ({ id: String(i), username: 'me' })),
       paging: { next: 'next', cursors: { after: 'a' } },
     });
     respond(200, { data: [{ id: 'eleven', username: 'me' }] });
-    await expect(graph.fetchAccounts('t')).rejects.toBeInstanceOf(InstagramGraphError);
+    await expect(graph.fetchAccounts('t', config)).rejects.toBeInstanceOf(InstagramGraphError);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
