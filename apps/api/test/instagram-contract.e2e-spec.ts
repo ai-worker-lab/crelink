@@ -12,6 +12,7 @@ const RULE_KEYS = [
   'mediaPermalink',
   'mediaCaptionPreview',
   'keyword',
+  'matchAllComments',
   'message',
   'replyMessage',
   'channelLinkCode',

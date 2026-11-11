@@ -9,6 +9,7 @@ interface DeliveryRow {
   id: string;
   rule_public_id: string;
   keyword: string;
+  match_all_comments: boolean;
   media_caption_preview: string;
   status: InstagramDmDeliveryView['status'];
   created_at: Date;
@@ -43,7 +44,7 @@ export class InstagramDeliveriesService {
       }
     }
     const result = await this.database.query<DeliveryRow>(
-      `SELECT d.id, r.public_id AS rule_public_id, r.keyword, r.media_caption_preview,
+      `SELECT d.id, r.public_id AS rule_public_id, r.keyword, r.match_all_comments, r.media_caption_preview,
               d.status, d.created_at, d.sent_at, ${cursorAtSql('d.created_at')} AS cursor_at
        FROM instagram_dm_deliveries d
        JOIN instagram_connections c ON c.id = d.connection_id
@@ -57,6 +58,7 @@ export class InstagramDeliveriesService {
       id: row.id,
       ruleId: row.rule_public_id,
       keyword: row.keyword,
+      matchAllComments: row.match_all_comments,
       mediaPreview: row.media_caption_preview,
       status: row.status,
       createdAt: row.created_at.toISOString(),

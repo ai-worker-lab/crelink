@@ -643,6 +643,19 @@ describe('Instagram DM 긴급 정지·보존', () => {
       expect(await status(kept)).toBe('sent');
     });
 
+    it('0280 최초 발송 기회 마커는 90일이 지나도 남는다', async () => {
+      const account = await seedAccount(await seedUser('creator'));
+      await t.pool.query(
+        `INSERT INTO instagram_dm_recipients (ig_user_id,scope_key,commenter_hash,created_at)
+        VALUES ($1,'canonical-post',$2,now()-interval '400 days')`,
+        [account.igUserId, randomBytes(32)],
+      );
+      await retention();
+      expect(
+        (await t.pool.query('SELECT 1 FROM instagram_dm_recipients WHERE ig_user_id=$1', [account.igUserId])).rowCount,
+      ).toBe(1);
+    });
+
     it('90일이 지난 삭제 확인 코드만 지운다', async () => {
       await t.pool.query(
         `INSERT INTO instagram_deletion_requests (confirmation_code, created_at) VALUES
@@ -676,6 +689,10 @@ describe('Instagram DM 긴급 정지·보존', () => {
       const hash = randomBytes(32);
       const igUserId = `ig-keep-${++sequence}`;
       const first = await seedAccount(creatorId, { igUserId });
+      await t.pool.query(
+        "INSERT INTO instagram_dm_recipients (ig_user_id,scope_key,commenter_hash) VALUES ($1,'post',$2)",
+        [igUserId, hash],
+      );
       await t.pool.query('INSERT INTO instagram_dm_opt_outs (ig_user_id, commenter_hash) VALUES ($1, $2)', [
         igUserId,
         hash,
@@ -693,6 +710,9 @@ describe('Instagram DM 긴급 정지·보존', () => {
 
       await connectThroughApi(igUserId);
       expect(await optOutCount()).toBe(1);
+      expect(
+        (await t.pool.query('SELECT 1 FROM instagram_dm_recipients WHERE ig_user_id=$1', [igUserId])).rowCount,
+      ).toBe(1);
 
       const { rows } = await t.pool.query<{ id: string }>('SELECT id FROM instagram_connections WHERE user_id = $1', [
         creatorId,

@@ -1,5 +1,6 @@
 import {
   INSTAGRAM_DM_LIMITS,
+  isInstagramDmKeyword,
   type CreatorLandingState,
   type InstagramConnectionView,
   type InstagramDmRuleView,
@@ -85,6 +86,7 @@ export const CONNECT_FAILURE_MESSAGES: Record<ConnectFailureCode, string> = {
 export interface RuleDraft {
   mediaId: string;
   keyword: string;
+  matchAllComments?: boolean;
   message: string;
 }
 
@@ -92,10 +94,9 @@ export type RuleDraftProblem = 'media' | 'keyword' | 'message';
 
 export function ruleDraftProblem(draft: RuleDraft, requireMedia: boolean): RuleDraftProblem | null {
   if (requireMedia && !draft.mediaId) return 'media';
-  const keyword = draft.keyword.trim();
-  if (keyword.length < 1 || keyword.length > INSTAGRAM_DM_LIMITS.keywordMaxLength) return 'keyword';
+  if (!isInstagramDmKeyword(draft.keyword, draft.matchAllComments ?? false)) return 'keyword';
   const message = draft.message.trim();
-  if (message.length < 1 || message.length > INSTAGRAM_DM_LIMITS.messageMaxLength) return 'message';
+  if (message.length < 1 || Array.from(draft.message).length > INSTAGRAM_DM_LIMITS.messageMaxLength) return 'message';
   return null;
 }
 

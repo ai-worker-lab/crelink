@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   INSTAGRAM_DM_LIMITS,
+  isInstagramDmKeyword,
   InstagramDmMediaView,
   InstagramDmRuleView,
   normalizeChannelCampaign,
@@ -28,6 +29,7 @@ interface RuleRow {
   media_permalink: string;
   media_caption_preview: string;
   keyword: string;
+  match_all_comments: boolean;
   message: string;
   reply_message: string | null;
   channel_link_code: string;
@@ -45,6 +47,16 @@ const MEDIA_OWNERSHIP_MAX_PAGES = 10;
 function ruleText(value: unknown, max: number): string {
   if (typeof value !== 'string' || !value.trim() || value.includes('\u0000') || Array.from(value).length > max) {
     throw apiError(HttpStatus.BAD_REQUEST, 'validation_failed', `1~${max}자로 입력해 주세요.`);
+  }
+  return value;
+}
+function keywordText(value: unknown, matchAllComments: boolean): string {
+  if (!isInstagramDmKeyword(value, matchAllComments)) {
+    throw apiError(
+      HttpStatus.BAD_REQUEST,
+      'validation_failed',
+      matchAllComments ? '키워드는 0~30자로 입력해 주세요.' : '키워드는 1~30자로 입력해 주세요.',
+    );
   }
   return value;
 }
@@ -66,6 +78,7 @@ function view(row: RuleRow): InstagramDmRuleView {
     mediaPermalink: row.media_permalink,
     mediaCaptionPreview: row.media_caption_preview,
     keyword: row.keyword,
+    matchAllComments: row.match_all_comments,
     message: row.message,
     replyMessage: row.reply_message ?? null,
     channelLinkCode: row.channel_link_code,
@@ -188,7 +201,8 @@ export class InstagramRulesService {
     this.settings();
     const input = bodyObject(body);
     const mediaId = ruleText(input.mediaId, 255);
-    const keyword = ruleText(input.keyword, INSTAGRAM_DM_LIMITS.keywordMaxLength);
+    const matchAllComments = optionalBoolean(input.matchAllComments, 'matchAllComments') ?? false;
+    const keyword = keywordText(input.keyword, matchAllComments);
     const message = ruleText(input.message, INSTAGRAM_DM_LIMITS.messageMaxLength);
     const replyMessage = optionalReplyText(input.replyMessage, INSTAGRAM_DM_LIMITS.replyMessageMaxLength);
     // 외부 호출 전에 막을 수 있는 실패를 먼저 거릅니다. Graph 호출 중에는 연결 행을 잠그지 않습니다(웹훅·worker를 막지 않게).
@@ -208,14 +222,14 @@ export class InstagramRulesService {
         {
           channel: 'instagram',
           placement: 'dm',
-          campaign: normalizeChannelCampaign(`dm-${keyword}-${publicId.slice(0, 6)}`),
+          campaign: normalizeChannelCampaign(`dm-${keyword.trim() ? keyword : 'all'}-${publicId.slice(0, 6)}`),
         },
         client,
       );
       const result = await client.query<RuleRow>(
         `INSERT INTO instagram_dm_rules (public_id, connection_id, ig_media_id, ig_media_child_ids,
-         media_permalink, media_caption_preview, keyword, message, reply_message, channel_link_code)
-         SELECT $1, c.id, $3, '{}'::text[], $4, $5, $6, $7, $8, $9 FROM instagram_connections c
+         media_permalink, media_caption_preview, keyword, message, reply_message, channel_link_code, match_all_comments)
+         SELECT $1, c.id, $3, '{}'::text[], $4, $5, $6, $7, $8, $9, $11 FROM instagram_connections c
          WHERE c.id = $2 AND c.user_id = $10 RETURNING *`,
         [
           publicId,
@@ -228,6 +242,7 @@ export class InstagramRulesService {
           replyMessage,
           link.code,
           userId,
+          matchAllComments,
         ],
       );
       return view(result.rows[0]);
@@ -255,8 +270,7 @@ export class InstagramRulesService {
   async update(userId: string, publicId: string, body: unknown): Promise<InstagramDmRuleView> {
     this.settings();
     const input = bodyObject(body);
-    const keyword =
-      input.keyword === undefined ? undefined : ruleText(input.keyword, INSTAGRAM_DM_LIMITS.keywordMaxLength);
+    const matchAllComments = optionalBoolean(input.matchAllComments, 'matchAllComments');
     const message =
       input.message === undefined ? undefined : ruleText(input.message, INSTAGRAM_DM_LIMITS.messageMaxLength);
     const replyMessage =
@@ -268,24 +282,28 @@ export class InstagramRulesService {
       // 잠금 순서: 연결 → 규칙 → 발송 행(`lock-order.ts`). 없는 연결도 남의 publicId와 똑같이 404입니다.
       await client.query('SELECT id FROM instagram_connections WHERE user_id = $1 FOR UPDATE', [userId]);
       const rule = await this.ownedRule(client, userId, publicId);
+      const finalMode = matchAllComments ?? rule.match_all_comments;
+      const keyword = keywordText(input.keyword === undefined ? rule.keyword : input.keyword, finalMode);
       if (enabled === true && !rule.enabled) await this.checkLimits(client, userId);
       const invalidate =
-        (keyword !== undefined && keyword !== rule.keyword) ||
+        keyword !== rule.keyword ||
+        finalMode !== rule.match_all_comments ||
         (message !== undefined && message !== rule.message) ||
         (replyMessage !== undefined && replyMessage !== rule.reply_message) ||
         (enabled === false && rule.enabled);
       const result = await client.query<RuleRow>(
         `UPDATE instagram_dm_rules r SET keyword = $3, message = $4, reply_message = $5, enabled = $6,
-         version = version + $7, updated_at = now() FROM instagram_connections c
+         version = version + $7, match_all_comments = $8, updated_at = now() FROM instagram_connections c
          WHERE c.id = r.connection_id AND c.user_id = $1 AND r.public_id = $2 AND r.archived_at IS NULL RETURNING r.*`,
         [
           userId,
           publicId,
-          keyword ?? rule.keyword,
+          keyword,
           message ?? rule.message,
           replyMessage !== undefined ? replyMessage : rule.reply_message,
           enabled ?? rule.enabled,
           invalidate ? 1 : 0,
+          finalMode,
         ],
       );
       if (invalidate) await this.cancelPending(client, userId, rule.id);

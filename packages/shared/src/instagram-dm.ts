@@ -54,6 +54,7 @@ export interface InstagramDmRuleView {
   mediaPermalink: string;
   mediaCaptionPreview: string;
   keyword: string;
+  matchAllComments: boolean;
   message: string;
   replyMessage: string | null;
   channelLinkCode: string;
@@ -62,17 +63,19 @@ export interface InstagramDmRuleView {
   updatedAt: string;
 }
 
-/** 규칙 생성 요청. keyword 1~30자, message 1~250자, replyMessage 1~300자(선택)입니다. */
+/** 규칙 생성 요청. 기본 키워드 모드는 keyword 1~30자, 모든 댓글 모드는 0~30자, message 1~250자, replyMessage 1~300자(선택)입니다. */
 export interface CreateInstagramDmRuleRequest {
   mediaId: string;
   keyword: string;
+  matchAllComments?: boolean;
   message: string;
   replyMessage?: string | null;
 }
 
-/** 규칙 부분 수정 요청. keyword 1~30자, message 1~250자, replyMessage 1~300자(선택)입니다. */
+/** 규칙 부분 수정 요청. 최종 모드에 따라 keyword 1~30자 또는 0~30자, message 1~250자, replyMessage 1~300자(선택)입니다. */
 export interface UpdateInstagramDmRuleRequest {
   keyword?: string;
+  matchAllComments?: boolean;
   message?: string;
   replyMessage?: string | null;
   enabled?: boolean;
@@ -83,6 +86,7 @@ export interface InstagramDmDeliveryView {
   id: string;
   ruleId: string;
   keyword: string;
+  matchAllComments: boolean;
   mediaPreview: string;
   status: InstagramDmDeliveryStatus;
   createdAt: string;
@@ -107,4 +111,14 @@ export interface SetInstagramConnectionPauseRequest {
 /** 공개 수신 거부 요청. 토큰은 서버에서 검증하며 공유 계약은 본문 길이를 계산하지 않습니다. */
 export interface InstagramDmOptOutRequest {
   token: string;
+}
+
+/** DB char_length와 같은 코드 포인트 기준. 모든 댓글 모드에서도 저장된 키워드 길이·NUL을 검사합니다. */
+export function isInstagramDmKeyword(value: unknown, matchAllComments: boolean): value is string {
+  return (
+    typeof value === 'string' &&
+    !value.includes('\u0000') &&
+    Array.from(value).length <= INSTAGRAM_DM_LIMITS.keywordMaxLength &&
+    (matchAllComments || value.trim().length > 0)
+  );
 }

@@ -104,3 +104,33 @@ API **프로세스에만** `CRELINK_E2E_INSTABIO=1 NODE_OPTIONS="--import <check
 기준선이 없으면 CI는 missing-baseline으로 **실패**해야 합니다. PM이 실패 artifact의 actual PNG를 직접 열어2열·잘림·간격·배너·가독성을 검토하고 승인한 PNG만 `tests/e2e/link-layout.spec.ts-snapshots/public-two-column-chromium-linux.png`에 추가한 뒤, 같은 환경에서 일반 명령으로 비교 성공을 확인합니다. 실패 이미지를 자동승인하거나 허용 픽셀을 임의로 늘리지 않습니다(`maxDiffPixels: 0`). Playwright/OS/폰트 변경은 기준선 재검토 대상입니다.
 
 접근성은 [Playwright 공식 지침](https://playwright.dev/docs/accessibility-testing)의 `@axe-core/playwright`4.14.0으로 공개 grid 전체 페이지와 열린 Instabio 패널에 WCAG2/2.1 A/AA를 검사합니다. 전체 scan JSON을 attachment로 보존하며 위반을 일괄 제외하지 않습니다. 자동검사는 스크린리더·실물 터치·키보드 수동 평가 전체를 보증하지 않습니다.
+
+
+## 0280 모든 댓글 local fixture (Coordinator)
+
+[0280 티켓](../../docs/work/orchestrator/0280-instagram-all-comments.md)의 브라우저 검증 전용입니다. 기존 `ego/lib/harness.mjs`의 `loadTargets` 루프백 검사, `ego/lib/data.mjs`의 합성 사용자/세션과 API의 `test-app.ts`·`test-database.ts`를 재사용합니다. Graph 게시물 목록만 고정하고 발송 worker·토큰 점검·보존 타이머는 끕니다. 나머지 Graph 메서드와 외부 fetch는 거부합니다. 실제 Nest API·일회용 PostgreSQL·웹 BFF·RuleEditor를 사용하므로 checkbox 생성/편집/저장/재진입이 실제 DB까지 이어집니다. 개발 DB의 플랫폼 설정과 기존 서버는 바꾸지 않습니다.
+
+```sh
+make infra-up
+pnpm --filter @crelink/shared build
+node tests/e2e/ego/instagram-all-comments.fixture.mjs --check # TS/provider 로더만 확인, 서버/DB 검사 아님
+node tests/e2e/ego/instagram-all-comments.fixture.mjs > /tmp/crelink-0280-fixture.log 2>&1
+```
+
+마지막 명령은 계속 실행됩니다. 이 실행은 루프백 임의 포트의 API/웹을 직접 띄우고, `.next/0280-ui`를 써 기존 Next dev 캐시/잠금과 분리합니다. 준비되면 `/tmp/crelink-0280-ui/config.json`에 `webUrl`, `apiUrl`, `settingsUrl`, `deliveriesUrl`, 합성 `sessionToken`을 기록합니다(0600). 로컬 세션이므로 기록을 외부에 올리지 않습니다. Coordinator는 ego TaskSpace를 열고 기존 `ego/lib/browser.mjs`의 `setSessionCookie(page, config, config.sessionToken)`로 쿠키를 설정한 뒤 `settingsUrl`로 이동합니다. 외부 리소스 차단·콘솔 수집·viewport·쿠키 정리는 같은 `browser.mjs` 도구를 사용합니다. 브라우저 실행은 fixture에 포함하지 않습니다.
+
+확인 순서(390px와 1280px에서 반복):
+
+1. `규칙 추가` → `post-a` 선택 → 체크박스 기본 꺼짐, 키워드 필수 확인 → 키워드 `링크`·메시지 입력 → 모든 댓글 켜기(키워드 disabled)·끄기(값 복귀)·다시 켜기 → 저장.
+2. 목록의 `모든 댓글` 표시 → 고치기 → checked/disabled·키워드 `링크` 보존 확인 → 메시지 변경 저장 → 다른 관리 메뉴로 이동·복귀 또는 새로고침 → 같은 모드·문구 확인.
+3. 체크박스를 끄고 저장 → 목록 키워드와 재진입의 unchecked 상태 확인. `post-b`는 키워드 빈 채 모든 댓글 모드로 생성 → 저장/재진입 → 끄면 키워드 필수 오류 확인 → 키워드 입력 후 저장. 공개 답글 선택 입력도 보존되는지 확인.
+4. `발송 내역`의 규칙 필터가 모든 댓글을 표시하는지 확인(실제 발송하지 않아 내역은 비어 있음). `privacy`의 마커 보관/삭제 안내, 두 폭 가로 넘침·초점·콘솔 오류를 확인.
+5. `/tmp/crelink-0280-ui`에 폭별 생성·편집·저장·복귀 PNG, 콘솔 결과와 `git rev-parse HEAD`/`git diff --stat`을 남깁니다. fixture의 `apiRulesUrl`에 합성 세션 Cookie로 GET하면 실제 저장된 `matchAllComments`·keyword 응답을 확인할 수 있습니다. 최종 DB 통합 근거는 아래 API 시험도 별도로 통과해야 합니다.
+
+브라우저의 합성 세션 쿠키만 지우고 TaskSpace를 정리한 다음 fixture 터미널에 Ctrl-C 또는 `/tmp/crelink-0280-ui/pid`의 PID에 SIGTERM을 보냅니다. 이 실행의 API/웹·합성 행·일회용 DB·업로드만 정리하고 `config.json`·pid를 지웁니다. PNG/콘솔 결과와 `.next/0280-ui` 캐시는 남깁니다. 기존 서버·Compose·볼륨은 건드리지 않습니다. 강제 종료(SIGKILL)는 정리 경로를 건너뛰므로 사용하지 않습니다.
+
+DB 시험은 기존 격리 경로에서 다음을 실행합니다. mock Graph와 실제 HTTP/PostgreSQL로 저장·원자성·동시성·백필·삭제를 검증하며 실제 Meta 식별자/발송을 검증하지 않습니다.
+
+```sh
+pnpm --filter @crelink/api test --runInBand --runTestsByPath test/instagram-webhook.e2e-spec.ts test/instagram-rules.e2e-spec.ts test/instagram-deliveries.e2e-spec.ts test/instagram-admin.e2e-spec.ts test/health.e2e-spec.ts test/instagram-all-comments-migration.e2e-spec.ts
+```

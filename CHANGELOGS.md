@@ -6,6 +6,8 @@
 
 ## 2026-11-11
 
+- Instagram 모든 댓글·최초 1회(0280): 사용자 확정 범위를 SSoT `r4-all-comments-2026-11-11/u1`와 shared에 동기화하고 0019·API·체크박스·처리방침 및 Coordinator용 격리 DB/웹 fixture를 추가했습니다. 인증 r3와 미실측 이력은 유지합니다. [티켓](docs/work/orchestrator/0280-instagram-all-comments.md), [API 로그](apps/api/CHANGELOGS.md), [웹 로그](apps/web/CHANGELOGS.md).
+
 - Instagram 토큰 principal 수정(0279 CTO R3): 실제 `/me.id` 누락 확인에 따라 앱 Bearer로 검증한 `debug_token.data.user_id`를 identity로 사용합니다. assigned 계정 선택·기존 보안/설정/DB를 유지하고 opaque `input_token` 가림 회귀와 현재 identity 문서를 보완했습니다. 0278·CTO R2 이력은 보존합니다. [API 로그](apps/api/CHANGELOGS.md), [0279](docs/work/orchestrator/0279-instagram-token-identity.md).
 
 - Instagram 계정 응답 검증 보완(0278): 사용하지 않는 `client_business_id`를 응답 필수값에서 제외하고 BISU id·assigned IG 목록 검증은 유지했습니다. 현재 SSoT·API 안내의 필수 필드 설명과 fetch mock 회귀를 보완했습니다. [API 로그](apps/api/CHANGELOGS.md), [0278](docs/work/orchestrator/0278-instagram-account-response.md).

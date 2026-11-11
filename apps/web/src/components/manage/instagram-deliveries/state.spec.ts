@@ -31,6 +31,7 @@ test('더 보기의 중복 행을 갱신하고 기존 순서와 원본 목록을
   const delivery = (id: string, status: InstagramDmDeliveryStatus = 'pending'): InstagramDmDeliveryView => ({
     id,
     ruleId: 'rule-1',
+    matchAllComments: false,
     keyword: '링크',
     mediaPreview: '게시물',
     status,
