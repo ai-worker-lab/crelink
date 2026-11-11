@@ -2,6 +2,10 @@
 
 내부 참고용으로 인프라의 모든 변경을 적용 여부와 관계없이 기록합니다. 환경별 적용 시각·결과·복구 정보는 운영 work item이나 배포 플랫폼에 기록합니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](../docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-11-12
+
+- 0283: [Deploy](../.github/workflows/deploy.yml)의 API 캐시만 registry로 전환하고 읽기 bypass·SHA별 격리 벤치/OCI 출력을 추가했습니다. 웹 GHA·운영 Sentry·배포/롤백 경로를 유지하며 [런북](docs/prod-runbook.md#5-1-api-캐시와-격리-벤치)에 실행 한계·문서 마감 pending을 반영했습니다. 실제 운영 적용·실측은 미실행입니다. [티켓](../docs/work/orchestrator/0283-api-build-cache.md).
+
 ## 2026-11-11
 
 - Instagram 로그인 호환 구성 전환(0277): SOPS의 `META_LOGIN_CONFIG_ID`만 통합 로그인 구성으로 교체합니다. 기존 앱 시크릿·암호키·공개 범위는 유지합니다. [작업 기록](../docs/work/orchestrator/0277-instagram-direct-login.md).

@@ -130,13 +130,22 @@ Next.js 16(0039)부터 웹 standalone 서버는 SIGTERM에 진행 중 요청을 
 | 워크플로·job | 내용 |
 | --- | --- |
 | `ci.yml` `이미지 빌드 api`·`web` | PR마다 두 이미지를 `linux/amd64`로 빌드만 합니다(푸시 없음, gha 캐시). `ci.yml`은 main push에서 돌지 않습니다(0060) |
-| `deploy.yml` 트리거 | main `push`(PR 머지, CI를 다시 기다리지 않음) 또는 main에서 `workflow_dispatch`(`force`: 변경과 무관하게 두 이미지 새로 빌드). 동시 실행 그룹 `deploy-prod`(취소 안 함, `rollback.yml`과 공유) |
+| `deploy.yml` 트리거 | main `push`(PR 머지, CI를 다시 기다리지 않음) 또는 `workflow_dispatch`. 운영은 main에서만 실행하며 `force`는 변경과 무관하게 두 이미지 새로 빌드. 운영 동시 실행 그룹 `deploy-prod`(취소 안 함, `rollback.yml`과 공유), `api_cache`의 `bench-*`는 branch 선택 가능·SHA별 별도 그룹 |
 | `plan` | 배포 커밋, 변경 영역(태그 기준: `api` ← `deploy/prod-api` 이후 `apps/api/`·`packages/shared/`·`pnpm-lock.yaml`·`.dockerignore`, `web` ← `deploy/prod-web` 이후 `apps/web/`·`packages/shared/`·`packages/design-tokens/`·같은 두 파일, `release` ← `deploy/prod` 이후 위 경로나 `infra/prod/`. 태그가 없으면 그 영역 예), `targets.json`의 `enabled` 대상 matrix와 플랫폼 합집합, 접속 설정 준비 여부(`vars.TS_OIDC_*`·`DEPLOY_SSH_KEY`가 없으면 배포를 건너뛰고 경고) |
 | `image` | matrix `api`·`web` 중 바뀐 영역만 GHCR `:<SHA>`로 push. 플랫폼에 arm64가 있을 때만 QEMU. 빌드 인자 `SENTRY_RELEASE=<배포 커밋 SHA>`·`SENTRY_ORG=vars.SENTRY_ORG`·`SENTRY_PROJECT`(api `vars.SENTRY_PROJECT_API`, web `vars.SENTRY_PROJECT_WEB`), 웹만 `NEXT_PUBLIC_SENTRY_DSN=vars.SENTRY_WEB_DSN`, BuildKit secret `sentry_auth_token=secrets.SENTRY_AUTH_TOKEN`. 토큰이 있으면 소스맵 업로드(실패하면 빌드 실패), 없으면 건너뜀 |
 | `deploy` | 대상 matrix(`max-parallel: 1`, `fail-fast`). `release`가 예이고 접속 설정이 있을 때. Tailscale(OIDC, `tag:ci`, 대상 `ping`) → `ssh deploy@<host> "deploy <SHA> <api 이미지 SHA> <web 이미지 SHA>"`(이미지 SHA는 plan의 `api_image`·`web_image`), stdin = GHCR 사용자·토큰 + `infra/prod` tar.gz(`tests`·`README.md`·`*.example`·`.env` 제외). 호스트 신원은 Tailscale이 보증하므로 `StrictHostKeyChecking accept-new`. 이어서 같은 job에서 `ssh deploy@<host> verify`(운영 주소 검사), 실패하면 `rollback`(직전 릴리스) 뒤 다시 `verify`하고 job 실패 |
 | 운영 주소 검사(`infra/prod/verify.sh`) | 배포 대상 서버가 Cloudflare를 거쳐 공개 주소를 불러 14개를 검사: 웹 `/` 200, `/privacy` 200, BFF `/api/backend/api/health` 200, AI 토큰 경로 `/api/agent/api/health`(토큰 없음) 401, `go.shaul.kr/zzz-e2e-none` 302 → `https://links.shaul.kr/notice?reason=link_not_found`, 배너 클릭 `go.shaul.kr/b/zzzzzzzzzz`·`/a/zzzzzzzzzz/zzzzzzzzzz` 302 → `https://links.shaul.kr/notice?reason=link_unavailable`, `go.shaul.kr/s/zzzzzzz` 302 → `https://links.shaul.kr/notice?reason=link_not_found`, `links.shaul.kr/api/webhooks/instagram`을 web이 아니라 API가 응답(403·404·503이고 HTML 아님), `go.shaul.kr/api/health` 404. 주소는 릴리스 암호문의 평문 키 `WEB_URL`·`SHORT_LINK_BASE_URL`. 검사 스크립트는 활성 릴리스(`current`)의 것이라 롤백 뒤에는 그 릴리스의 검사를 씁니다. 러너에서 부르지 않는 이유: Cloudflare가 GitHub 러너(데이터센터 IP) 요청을 403으로 막음(2026-10-07 확인) |
 | `record` | 성공 시 태그 `deploy/prod`와 바뀐 영역의 `deploy/prod-api`·`deploy/prod-web`를 배포 커밋으로 옮김(다음 변경 비교 기준) |
+| `bench` | 수동 `api_cache=bench-*`일 때만 독립 실행(`needs` 없음), `plan`·`image`·`deploy`·`record`는 모두 skip. 권한은 `contents:read`·`packages:write`, 운영 접속·Sentry secret·운영 이미지/배포 태그 쓰기 없음 |
 | `rollback.yml` | main에서 `workflow_dispatch`(입력 `target` 기본 `home-server`, `release` SHA 선택) → Tailscale → `ssh deploy@<host> "rollback [SHA]"`(배포와 같은 무중단 전환) → `ssh deploy@<host> verify`(운영 주소 검사, 위와 같음) |
+
+### API 캐시 (`api-cache-2026-11-12-r1/u1`)
+
+실행 원본은 [deploy.yml](../../.github/workflows/deploy.yml)의 choice 입력 `api_cache`입니다. 기본 `default`는 API `<IMAGE_PREFIX>-api:buildcache` registry 캐시 읽기·`mode=max` 쓰기, `bypass`는 읽기만 비우고 쓰기를 유지합니다. 운영 export는 `ignore-error=true`로 캐시 저장 실패를 허용하며 이미지 빌드·push·Sentry 업로드 실패 정책은 유지합니다. 웹은 GHA `scope=web` 그대로입니다. `api_cache`는 변경 영역 판별이나 기존 `force` 의미를 바꾸지 않습니다.
+
+`bench-seed`는 원본 checkout과 미존재 `buildcache-bench-<SHA>` 읽기로 import miss fallback·export를 측정합니다(이미 있는 tag면 중단). `bench-warm`·`bench-bypass`는 checkout의 `apps/api/src/main.ts`에 동일한 고정 주석 한 줄을 추가하며, warm만 채워진 bench ref를 읽습니다. 세 모드 모두 같은 bench ref로 export하고, 동일 Git SHA·Dockerfile·`linux/amd64`, 새 runner/builder, `SENTRY_RELEASE=<SHA>`·`SENTRY_UPLOAD=no`·Sentry secret 없음, `push=false`·OCI 파일 출력으로 실행합니다. 벤치 export 실패는 job 실패이며 OCI 파일 크기·소스/fixture hash·builder/플랫폼·캐시 blob 크기를 기록합니다.
+
+warm의 부모 의존성 CACHED와 API COPY/compile 실행을 실제 로그에서 대조해야 합니다. 전부 CACHED인 시험은 hotfix 성능 근거로 쓰지 않습니다. 단계별 시간·import·export와 운영 네 job skip도 실행 기록으로 확인하며, Sentry 업로드 비용·cache key가 운영과 다른 한계와 캐시 blob 합계가 OCI 출력 크기와 다른 지표임을 구분합니다. 실측 결과와 문서 마감은 pending이며 절감 시간은 아직 확인하지 않았습니다. 실행·마감 절차는 [런북 5-1](../../infra/docs/prod-runbook.md#5-1-api-캐시와-격리-벤치)에 있습니다.
 
 ## DB migration 운영 규칙
 

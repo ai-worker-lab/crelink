@@ -4,6 +4,10 @@
 
 공개 릴리스 노트는 [RELEASES](RELEASES.md)에 있습니다. 작성 규칙은 [저장소 공통 정책의 변경 기록](docs/development/repository-policy.md#변경-기록)을 따릅니다.
 
+## 2026-11-12
+
+- 0283: Deploy에 API registry 캐시·읽기 우회와 운영 격리 seed/warm/bypass OCI 벤치를 구현하고 SSoT `api-cache-2026-11-12-r1/u1`을 반영했습니다. 실제 CI·벤치·문서 마감은 pending입니다. [티켓](docs/work/orchestrator/0283-api-build-cache.md), [인프라 로그](infra/CHANGELOGS.md).
+
 ## 2026-11-11
 
 - Instagram DM 성공 후 답글 hotfix(0282): worker ordering을 `r5-dm-before-reply/u1`로 동기화하고 DM 성공 저장 뒤에만 답글을 허용합니다. [티켓](docs/work/orchestrator/0282-instagram-reply-after-dm.md), [API 로그](apps/api/CHANGELOGS.md).
