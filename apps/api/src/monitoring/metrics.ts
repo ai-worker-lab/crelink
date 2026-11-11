@@ -7,6 +7,8 @@ import * as Sentry from '@sentry/nestjs';
  * - `crelink.link.click`: 외부 링크 클릭이 저장된 URL로 302 된 1회(클릭 기록 시작)
  * - `crelink.ad_banner.impression`·`crelink.ad_banner.click`: 크리링 배너 노출·클릭 카운터 기록 시작 1회(`TrackingService.recordAdStat`)
  * - `crelink.creator_banner.click`: 크리에이터 배너 클릭이 저장된 URL로 302 된 1회(클릭 기록 시작)
+ * - `crelink.instagram.webhook`: Instagram 웹훅 수신 결과(`result`, 값은 항목 수)
+ * - `crelink.instagram.dm`: DM worker의 호출 결과와 종료 처리(`result`, 값은 건수)
  */
 export type BusinessMetric =
   | 'crelink.auth.login'
@@ -14,12 +16,14 @@ export type BusinessMetric =
   | 'crelink.link.click'
   | 'crelink.ad_banner.impression'
   | 'crelink.ad_banner.click'
-  | 'crelink.creator_banner.click';
+  | 'crelink.creator_banner.click'
+  | 'crelink.instagram.webhook'
+  | 'crelink.instagram.dm';
 
 /**
- * 업무 지표를 1 올립니다. 속성은 낮은 카디널리티 열거값만 넘깁니다(단축 주소·링크 ID·사용자·IP 금지). 스코프 user가 붙여도
+ * 업무 지표를 올립니다(기본 1). 속성은 낮은 카디널리티 열거값만 넘깁니다(단축 주소·링크 ID·사용자·IP 금지). 스코프 user가 붙여도
  * `scrubMetric`(`src/monitoring/sentry.ts`)이 지웁니다. `SENTRY_DSN`이 비면(Sentry client 없음) 아무것도 보내지 않습니다.
  */
-export function countBusinessMetric(name: BusinessMetric, attributes?: Record<string, string>): void {
-  Sentry.metrics.count(name, 1, { attributes });
+export function countBusinessMetric(name: BusinessMetric, attributes?: Record<string, string>, value = 1): void {
+  Sentry.metrics.count(name, value, { attributes });
 }

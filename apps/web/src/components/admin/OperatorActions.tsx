@@ -32,6 +32,8 @@ const ACTION_LABELS: Record<OperatorActionType, string> = {
   'ad_banner.reorder': '광고 배너 순서 변경',
   'ad_banner.end': '광고 배너 내리기',
   'ai_operator.pause': 'AI 멈춤 변경',
+  'instagram_dm.audience': '인스타그램 DM 공개 범위 변경',
+  'instagram_dm.connection_pause': '인스타그램 DM 계정 정지·해제',
   'ai_operator.token_issue': 'AI 토큰 발급',
   'ai_operator.token_revoke': 'AI 토큰 폐기',
   'platform.ad_block': '플랫폼 광고 블록 변경',

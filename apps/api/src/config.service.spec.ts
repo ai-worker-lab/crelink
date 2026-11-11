@@ -1,10 +1,14 @@
 import {
+  AppConfig,
   assertProductionConfig,
+  INSTAGRAM_REQUIRED_KEYS,
   parseBannerSlotLimits,
   parseDatabasePoolMax,
   parseFileStorageConfig,
+  parseInstagramSettings,
   parseTrustedProxyHops,
   productionConfigProblems,
+  PRODUCTION_REQUIRED_KEYS,
 } from './config.service';
 
 const PRODUCTION = {
@@ -192,5 +196,119 @@ describe('파일 저장소 설정(FILE_STORAGE·S3_*)', () => {
       expect(message).toContain('S3_ENDPOINT는 http(s) URL');
       expect(message).not.toContain('s3-secret');
     }
+  });
+});
+
+describe('Instagram DM 설정(META_*·INSTAGRAM_*)', () => {
+  const b64 = (fill: number) => Buffer.alloc(32, fill).toString('base64');
+  const INSTAGRAM = {
+    META_APP_ID: 'app-id',
+    META_APP_SECRET: 'meta-app-secret-value',
+    META_LOGIN_CONFIG_ID: 'config-id',
+    META_WEBHOOK_VERIFY_TOKEN: 'verify-token-value',
+    INSTAGRAM_TOKEN_KEYS: `1:${b64(1)},2:${b64(2)}`,
+    INSTAGRAM_TOKEN_KEY_CURRENT: '2',
+    INSTAGRAM_COMMENTER_HASH_KEY: b64(3),
+    INSTAGRAM_OPT_OUT_KEY: b64(4),
+  };
+
+  it('키가 하나도 없거나 공백뿐이면 null(기능 꺼짐)이고 운영 필수 키가 아니다', () => {
+    expect(parseInstagramSettings({})).toBeNull();
+    expect(parseInstagramSettings({ META_APP_ID: '  ', INSTAGRAM_OPT_OUT_KEY: '' })).toBeNull();
+    for (const key of INSTAGRAM_REQUIRED_KEYS) {
+      expect(PRODUCTION_REQUIRED_KEYS as readonly string[]).not.toContain(key);
+    }
+    expect(productionConfigProblems(PRODUCTION)).toEqual([]);
+  });
+
+  it('전부 있으면 키를 해석하고 시간당 한도는 비면 700이다', () => {
+    const settings = parseInstagramSettings(INSTAGRAM)!;
+    expect(settings).toMatchObject({
+      appId: 'app-id',
+      appSecret: 'meta-app-secret-value',
+      loginConfigId: 'config-id',
+      webhookVerifyToken: 'verify-token-value',
+      dmHourlyLimit: 700,
+    });
+    expect(settings.tokenKeyring.current).toBe(2);
+    expect([...settings.tokenKeyring.keys.keys()]).toEqual([1, 2]);
+    expect(settings.commenterHashKey).toEqual(Buffer.alloc(32, 3));
+    expect(settings.optOutKey).toEqual(Buffer.alloc(32, 4));
+    expect(parseInstagramSettings({ ...INSTAGRAM, INSTAGRAM_DM_HOURLY_LIMIT: ' 500 ' })?.dmHourlyLimit).toBe(500);
+  });
+
+  it.each(INSTAGRAM_REQUIRED_KEYS)('%s만 빠져도 그 이름을 담아 기동을 거부한다', (key) => {
+    let message = '';
+    try {
+      parseInstagramSettings({ ...INSTAGRAM, [key]: ' ' });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toBe(`Instagram DM 설정은 전부 있거나 전부 없어야 합니다. 비어 있음: ${key}`);
+    expect(message).not.toContain('meta-app-secret-value');
+  });
+
+  it('값 형식이 틀리면 값 없이 키 이름만 담아 거부한다', () => {
+    const cases: Array<[Record<string, string>, string]> = [
+      [{ INSTAGRAM_TOKEN_KEYS: 'not-a-keyring' }, 'INSTAGRAM_TOKEN_KEYS'],
+      [{ INSTAGRAM_TOKEN_KEYS: `1:${Buffer.alloc(16, 1).toString('base64')}` }, 'INSTAGRAM_TOKEN_KEYS'],
+      [{ INSTAGRAM_TOKEN_KEY_CURRENT: '3' }, 'INSTAGRAM_TOKEN_KEY_CURRENT'],
+      [{ INSTAGRAM_COMMENTER_HASH_KEY: 'short' }, 'INSTAGRAM_COMMENTER_HASH_KEY'],
+      [{ INSTAGRAM_OPT_OUT_KEY: 'short' }, 'INSTAGRAM_OPT_OUT_KEY'],
+      [{ INSTAGRAM_DM_HOURLY_LIMIT: '0' }, 'INSTAGRAM_DM_HOURLY_LIMIT'],
+    ];
+    for (const [patch, keyName] of cases) {
+      let message = '';
+      try {
+        parseInstagramSettings({ ...INSTAGRAM, ...patch });
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).toContain(keyName);
+      for (const secret of [b64(1), b64(3), 'meta-app-secret-value']) expect(message).not.toContain(secret);
+    }
+  });
+
+  it('토큰 키·해시 키·수신 거부 키가 겹치면 거부한다', () => {
+    const error = 'INSTAGRAM_TOKEN_KEYS·INSTAGRAM_COMMENTER_HASH_KEY·INSTAGRAM_OPT_OUT_KEY는 서로 다른 키여야 합니다.';
+    expect(() => parseInstagramSettings({ ...INSTAGRAM, INSTAGRAM_OPT_OUT_KEY: b64(3) })).toThrow(new Error(error));
+    expect(() => parseInstagramSettings({ ...INSTAGRAM, INSTAGRAM_COMMENTER_HASH_KEY: b64(1) })).toThrow(
+      new Error(error),
+    );
+    expect(() => parseInstagramSettings({ ...INSTAGRAM, INSTAGRAM_OPT_OUT_KEY: b64(2) })).toThrow(new Error(error));
+  });
+
+  describe('AppConfig', () => {
+    const saved = { ...process.env };
+    const reset = () => {
+      for (const key of INSTAGRAM_REQUIRED_KEYS) delete process.env[key];
+      Object.assign(process.env, {
+        DATABASE_URL: 'postgresql://localhost/test',
+        WEB_URL: 'https://links.example/',
+        SHORT_LINK_BASE_URL: 'https://go.example',
+        FILE_STORAGE: 'disk',
+      });
+    };
+
+    beforeEach(reset);
+    afterAll(() => {
+      process.env = saved;
+    });
+
+    it('설정이 없으면 getter가 null이고 기동은 통과한다', () => {
+      const config = new AppConfig();
+      expect(() => config.onModuleInit()).not.toThrow();
+      expect(config.instagram).toBeNull();
+    });
+
+    it('전부 있으면 웹 콜백 주소를 더해 돌려준다', () => {
+      Object.assign(process.env, INSTAGRAM);
+      expect(new AppConfig().instagram?.redirectUri).toBe('https://links.example/me/integrations/instagram/callback');
+    });
+
+    it('일부만 있으면 onModuleInit이 기동을 거부한다', () => {
+      process.env.INSTAGRAM_OPT_OUT_KEY = b64(4);
+      expect(() => new AppConfig().onModuleInit()).toThrow(/META_APP_ID.*INSTAGRAM_COMMENTER_HASH_KEY/);
+    });
   });
 });

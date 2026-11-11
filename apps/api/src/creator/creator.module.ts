@@ -38,6 +38,6 @@ import { SlugService } from './slug.service';
     SlugService,
     BannersService,
   ],
-  exports: [CreatorService],
+  exports: [CreatorService, ChannelLinksService],
 })
 export class CreatorModule {}

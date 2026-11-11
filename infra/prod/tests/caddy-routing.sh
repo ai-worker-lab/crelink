@@ -4,7 +4,7 @@
 # - 실제 caddy:2.11.7-alpine(edge/compose.yaml과 같은 이미지·읽기 전용·권한 축소)에 서버와 같은 설정 폴더(/etc/caddy 폴더 bind:
 #   저장소 Caddyfile + lib.sh upstreams_for가 쓰는 upstreams.caddy)를 붙입니다. 다른 점은 아래뿐입니다.
 #   호스트 CRELINK_SHORT_HOST=go.localhost·CRELINK_WEB_HOST=links.localhost, 호스트 포트(127.0.0.1의 빈 포트),
-#   api·web 자리에 요청 메서드·경로·X-Forwarded-For·Authorization·X-Crelink-Agent-Run을 응답 헤더(x-echo-*)로 되돌려주는 스텁
+#   api·web 자리에 요청 메서드·경로·X-Forwarded-For·Authorization·X-Crelink-Agent-Run 등을 응답 헤더(x-echo-*)로 되돌려주는 스텁
 #   (같은 네트워크, 색 별칭 api-blue·web-blue·api-green·web-green만. 색 없는 api·web 이름은 없어서 Caddyfile이 그 이름을 쓰면 실패합니다).
 # - 방문자 IP: 호스트에서 보낸 요청은 Docker 게이트웨이(사설 대역)에서 오므로 cloudflared처럼 신뢰됩니다. 사설 대역이 아닌 곳에서 오는 요청은
 #   203.0.113.0/24(TEST-NET-3) 네트워크의 클라이언트 컨테이너로 흉내 냅니다.
@@ -67,12 +67,13 @@ result() { # result <설명> <기대> <실제>
 echo "== 준비"
 docker network create --label "crelink-test=$run_id" "$net" >/dev/null
 docker network create --label "crelink-test=$run_id" --subnet 203.0.113.0/24 "$pubnet" >/dev/null
-# 업스트림 스텁: 받은 요청(메서드·경로·X-Forwarded-For·Authorization·X-Crelink-Agent-Run·본문 길이)을 응답 헤더로, 요청 헤더 전체를 본문(JSON)으로 돌려줍니다.
+# 업스트림 스텁: 받은 요청(메서드·경로·X-Forwarded-For·Authorization·X-Crelink-Agent-Run·X-Hub-Signature-256·본문 길이·본문 SHA-256)을 응답 헤더로, 요청 헤더 전체를 본문(JSON)으로 돌려줍니다.
 stub_js='
 const role = process.env.ROLE;
 require("http").createServer((q, s) => {
   let n = 0;
-  q.on("data", (c) => { n += c.length; });
+  const sum = require("crypto").createHash("sha256");
+  q.on("data", (c) => { n += c.length; sum.update(c); });
   q.on("error", () => {});
   q.on("end", () => {
     s.setHeader("x-echo-role", role);
@@ -82,7 +83,9 @@ require("http").createServer((q, s) => {
     s.setHeader("x-echo-xff", q.headers["x-forwarded-for"] ?? "-");
     s.setHeader("x-echo-auth", q.headers["authorization"] ?? "-");
     s.setHeader("x-echo-agent-run", q.headers["x-crelink-agent-run"] ?? "-");
+    s.setHeader("x-echo-signature", q.headers["x-hub-signature-256"] ?? "-");
     s.setHeader("x-echo-len", String(n));
+    s.setHeader("x-echo-sha256", sum.digest("hex"));
     s.setHeader("content-type", "application/json");
     s.end(JSON.stringify(q.headers));
   });
@@ -205,8 +208,15 @@ check 'POST /s/abcde12' 404 -X POST -d x "$go/s/abcde12"
 check 'HEAD /s/abcde12' 404 -I "$go/s/abcde12"
 check 'GET /s/../api/health (path-as-is)' 404 --path-as-is "$go/s/../api/health"
 check 'GET /a/abcde12345/../../api/health (path-as-is)' 404 --path-as-is "$go/a/abcde12345/../../api/health"
+# Instagram 웹훅은 웹 호스트에만 엽니다(docs/specs/instagram-comment-dm.md `웹훅 수신 경로`).
+webhook=/api/webhooks/instagram
+deletion=$webhook/data-deletion
+check "단축 호스트 GET $webhook" 404 "$go$webhook"
+check "단축 호스트 POST $webhook" 404 -X POST -d x "$go$webhook"
+check "단축 호스트 GET $deletion" 404 "$go$deletion"
+check "단축 호스트 POST $deletion" 404 -X POST -d x "$go$deletion"
 
-echo "== 웹 호스트($web): 전체 web"
+echo "== 웹 호스트($web): 전체 web(Instagram 웹훅 2개는 아래에서 따로 확인)"
 check 'GET /' '200 web GET /' "$links/"
 check 'GET /dashboard/links?x=1' '200 web GET /dashboard/links?x=1' "$links/dashboard/links?x=1"
 check 'POST /api/backend/me/links' '200 web POST /api/backend/me/links' -X POST -d '{}' "$links/api/backend/me/links"
@@ -230,12 +240,57 @@ result 'POST 본문 5MB 업스트림 수신 길이' 5000000 "$("${CURL[@]}" -o /
 check 'POST 본문 7MiB(Content-Length)' 413 --data-binary "@$work/7mib" "$links/upload"
 check 'POST 본문 7MiB(chunked)' 413 -H 'Transfer-Encoding: chunked' --data-binary "@$work/7mib" "$links/upload"
 
+echo "== 웹 호스트($web): Instagram 웹훅 2개 경로의 GET·POST만 api"
+webhook_query='?hub.mode=subscribe&hub.verify_token=caddy-routing-test&hub.challenge=123'
+check "GET $webhook (검증 요청, 쿼리 유지)" "200 api GET $webhook$webhook_query" "$links$webhook$webhook_query"
+check "GET $webhook" "200 api GET $webhook" "$links$webhook"
+check "POST $webhook" "200 api POST $webhook" -X POST -H 'Content-Type: application/json' -d '{}' "$links$webhook"
+check "GET $deletion" "200 api GET $deletion" "$links$deletion"
+check "POST $deletion (폼 본문)" "200 api POST $deletion" -X POST -d 'signed_request=caddy-routing-test' "$links$deletion"
+# 다른 메서드는 지금처럼 web으로 갑니다.
+for path in "$webhook" "$deletion"; do
+	check "HEAD $path (web)" "200 web HEAD $path" -I "$links$path"
+	for method in PUT PATCH DELETE OPTIONS; do
+		check "$method $path (web)" "200 web $method $path" -X "$method" "$links$path"
+	done
+done
+# 하위·유사 경로는 메서드와 관계없이 web으로 갑니다.
+for path in "$webhook/x" "$webhook/" "$deletion/" "$deletion/x" "$webhook/data-deletionx" "${webhook}x" /api/webhooks /api/webhooks/ /api/webhooks/facebook; do
+	check "GET $path (web)" "200 web GET $path" "$links$path"
+	check "POST $path (web)" "200 web POST $path" -X POST -d x "$links$path"
+done
+# 정규화·인코딩·대소문자 변형도 API로 가지 않습니다(같은 경로로 풀려도 원문은 그대로 넘어가므로 허용 목록을 넓히는 셈입니다).
+for path in /API/webhooks/instagram /api/webhooks/Instagram "//api/webhooks/instagram" /api//webhooks/instagram "$webhook//data-deletion" \
+	/api/health/../webhooks/instagram /api/admin/x/../../webhooks/instagram "$webhook/x/.." "$webhook/." "$webhook/x/../data-deletion" \
+	/api/webhooks/%69nstagram /%61pi/webhooks/instagram "$webhook%2Fdata-deletion" "$webhook%2F"; do
+	check "GET $path (변형, web, path-as-is)" "200 web GET $path" --path-as-is "$links$path"
+	check "POST $path (변형, web, path-as-is)" "200 web POST $path" --path-as-is -X POST -d x "$links$path"
+done
+# 그 밖의 /api/*는 그대로 web입니다.
+check 'GET /api/health (web)' '200 web GET /api/health' "$links/api/health"
+check 'POST /api/backend/webhooks/instagram (BFF 경로는 web)' '200 web POST /api/backend/webhooks/instagram' -X POST -d x "$links/api/backend/webhooks/instagram"
+check 'GET /webhooks/instagram (web)' '200 web GET /webhooks/instagram' "$links/webhooks/instagram"
+# 본문 상한 6MB(6,000,000바이트)와 서명 검증에 필요한 바이트·헤더 보존.
+head -c 6000000 /dev/urandom >"$work/6mb"
+head -c 6000001 /dev/zero >"$work/6mb1"
+webhook_sig=sha256=caddy-routing-test
+webhook_post=(-H 'Content-Type: application/json' -H "X-Hub-Signature-256: $webhook_sig" --data-binary "@$work/6mb" "$links$webhook")
+result "POST $webhook 본문 6MB: API가 같은 길이·해시·서명 헤더를 받음" \
+	"200 api POST $webhook 6000000 $(docker exec -i "$caddy" sha256sum <"$work/6mb" | cut -d' ' -f1) $webhook_sig" \
+	"$("${CURL[@]}" -o /dev/null -w '%{http_code} %header{x-echo-role} %header{x-echo-method} %header{x-echo-url} %header{x-echo-len} %header{x-echo-sha256} %header{x-echo-signature}' "${webhook_post[@]}")"
+check "POST $webhook 본문 6MB+1바이트" 413 --data-binary "@$work/6mb1" "$links$webhook"
+check "POST $webhook 본문 7MiB(Content-Length)" 413 --data-binary "@$work/7mib" "$links$webhook"
+check "POST $webhook 본문 7MiB(chunked)" 413 -H 'Transfer-Encoding: chunked' --data-binary "@$work/7mib" "$links$webhook"
+check "POST $deletion 본문 7MiB(Content-Length)" 413 --data-binary "@$work/7mib" "$links$deletion"
+
 echo "== 방문자 IP(X-Forwarded-For)"
 xff() { "${CURL[@]}" -o /dev/null -w '%header{x-echo-xff}' "$@"; }
 result 'go: 사설 대역 + CF-Connecting-IP → XFF = CF 값 하나(클라이언트 XFF 버림)' 203.0.113.9 \
 	"$(xff -H 'X-Forwarded-For: 6.6.6.6, 7.7.7.7' -H 'CF-Connecting-IP: 203.0.113.9' "$go/abc")"
 result 'links: 사설 대역 + CF-Connecting-IP → XFF = CF 값 하나' 198.51.100.7 \
 	"$(xff -H 'X-Forwarded-For: 6.6.6.6' -H 'CF-Connecting-IP: 198.51.100.7' "$links/")"
+result 'links 웹훅: 사설 대역 + CF-Connecting-IP → XFF = CF 값 하나' 198.51.100.8 \
+	"$(xff -H 'X-Forwarded-For: 6.6.6.6' -H 'CF-Connecting-IP: 198.51.100.8' "$links$webhook")"
 host_xff="$(xff -H 'X-Forwarded-For: 6.6.6.6, 7.7.7.7' "$go/abc")"
 result 'go: CF-Connecting-IP 없음 → XFF = 접속 주소 하나(사설 게이트웨이)' 'ok' \
 	"$([[ "$host_xff" =~ ^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|127\.)[0-9.]+$ ]] && echo ok || echo "$host_xff")"
@@ -261,6 +316,8 @@ read -r code got self <<<"$(client "$pubnet" "$short" /abc 8.8.8.8)"
 result 'go: 사설 대역이 아닌 곳(203.0.113.0/24) + CF-Connecting-IP → CF 무시, XFF = 접속 주소' "200 $self" "$code $got"
 read -r code got self <<<"$(client "$pubnet" "$web" / 8.8.8.8)"
 result 'links: 사설 대역이 아닌 곳 + CF-Connecting-IP → CF 무시, XFF = 접속 주소' "200 $self" "$code $got"
+read -r code got self <<<"$(client "$pubnet" "$web" "$webhook" 8.8.8.8)"
+result 'links 웹훅: 사설 대역이 아닌 곳 + CF-Connecting-IP → CF 무시, XFF = 접속 주소' "200 $self" "$code $got"
 
 echo "== 색 전환(upstreams.caddy 교체 + caddy reload, Caddy 재생성 없음)"
 caddy_started="$(docker inspect -f '{{.State.StartedAt}}' "$caddy")"
@@ -273,6 +330,9 @@ check '전환 뒤 공개 정책 유지: GET /c/abcde12345' '200 api GET /c/abcde
 check '전환 뒤 공개 정책 유지: GET /b/abcde12345' '200 api GET /b/abcde12345' "$go/b/abcde12345"
 check '전환 뒤 공개 정책 유지: GET /s/abcde12' '200 api GET /s/abcde12' "$go/s/abcde12"
 result '전환 뒤 /b/ 업스트림 green' green "$("${CURL[@]}" -o /dev/null -w '%header{x-echo-color}' "$go/b/abcde12345")"
+check "전환 뒤 공개 정책 유지: POST $webhook" "200 api POST $webhook" -X POST -d x "$links$webhook"
+check "전환 뒤 공개 정책 유지: PUT $webhook (web)" "200 web PUT $webhook" -X PUT -d x "$links$webhook"
+result "전환 뒤 $webhook 업스트림 green" green "$("${CURL[@]}" -o /dev/null -w '%header{x-echo-color}' "$links$webhook")"
 result 'reload는 컨테이너를 다시 만들거나 재시작하지 않음' "$caddy_started" "$(docker inspect -f '{{.State.StartedAt}}' "$caddy")"
 
 echo
